@@ -13,6 +13,7 @@ namespace {
     // Dezente konzentrische Ringe + Fadenkreuz als "Zielfernrohr"-Hintergrund,
     // in gedaempftem Gruen (gleicher Ton wie die Sweep-Nachzieh-Linie im
     // Radar-Bildschirm), damit das Flugzeug wie ins Visier genommen wirkt.
+    // UNVERAENDERT gegenueber vorher - nur das Flugzeug wurde verkleinert/gedreht.
     void drawRadarReticle(TFT_eSPI& tft, int16_t cx, int16_t cy) {
         uint16_t dim = 0x0320;
         tft.drawCircle(cx, cy, 80, dim);
@@ -22,23 +23,22 @@ namespace {
         tft.drawFastVLine(cx, cy - 80, 160, dim);
     }
 
-    // Einfache Vektor-Silhouette eines schlanken Duesenjets von oben (keine
-    // Bilddatei eingebunden, daher per Dreiecken gezeichnet) - nur als Umriss
-    // (nicht ausgefuellt), in Gruen, passend zum restlichen Dark-Theme.
-    // Etwas kleiner als frueher, damit er sauber zwischen Titel und
-    // Statuszeilen passt, ohne diese zu ueberlappen.
+    // Flugzeug-Silhouette: 40% kleiner (Skalierung 0.6) und 25 Grad im
+    // Uhrzeigersinn gedreht (Nase zeigt jetzt leicht nach rechts), um den
+    // Reticle-Mittelpunkt (cx, 174) - der Radar-Kreis selbst bleibt exakt
+    // gleich gross wie vorher.
     void drawAirplane(TFT_eSPI& tft, int16_t cx) {
         uint16_t color = TFT_GREEN;
 
-        // Schlanker Rumpf (nur Umriss)
-        tft.drawTriangle(cx, 116, cx - 4, 223, cx + 4, 223, color);
+        // Rumpf (nur Umriss)
+        tft.drawTriangle(cx + 15, 142, cx - 15, 200, cx - 10, 202, color);
 
-        // Deltafluegel, nach hinten gepfeilt (nur Umriss)
-        tft.drawTriangle(cx, 155, cx - 71, 209, cx, 184, color);
-        tft.drawTriangle(cx, 155, cx + 71, 209, cx, 184, color);
+        // Deltafluegel (nur Umriss)
+        tft.drawTriangle(cx + 5, 164, cx - 47, 175, cx - 3, 179, color);
+        tft.drawTriangle(cx + 5, 164, cx + 30, 211, cx - 3, 179, color);
 
-        // Kleines Leitwerk (Hoehenruder) am Heck (nur Umriss)
-        tft.drawTriangle(cx, 219, cx - 16, 232, cx + 16, 232, color);
+        // Leitwerk (nur Umriss)
+        tft.drawTriangle(cx - 11, 198, cx - 23, 201, cx - 6, 210, color);
     }
 }
 
