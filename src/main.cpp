@@ -29,6 +29,7 @@
 #include "screenshot.h"
 #include "i18n.h"
 #include "first_run_language_screen.h"
+#include "ui_font.h"
 
 TFT_eSPI tft = TFT_eSPI();
 
@@ -59,25 +60,59 @@ struct Rect {
     }
 };
 
-Rect menuBtn = {Config::SCREEN_WIDTH - 60, 3, 54, 22};
+Rect menuBtn = {Config::SCREEN_WIDTH - 90, 3, 54, 22};
 Rect camBtn = {(int16_t)(menuBtn.x - 46), 3, 42, 22};
 
 void drawMenuButton() {
-    tft.fillRoundRect(menuBtn.x, menuBtn.y, menuBtn.w, menuBtn.h, 4, TFT_NAVY);
-    tft.drawRoundRect(menuBtn.x, menuBtn.y, menuBtn.w, menuBtn.h, 4, TFT_DARKGREY);
+    tft.fillRoundRect(menuBtn.x, menuBtn.y, menuBtn.w, menuBtn.h, 4, TFT_BLACK);
+    tft.drawRoundRect(menuBtn.x, menuBtn.y, menuBtn.w, menuBtn.h, 4, TFT_GREEN);
     tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_WHITE, TFT_NAVY);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.drawString("Menu", menuBtn.x + menuBtn.w / 2, menuBtn.y + menuBtn.h / 2);
     tft.setTextDatum(TL_DATUM);
 }
 
 void drawCamButton() {
-    tft.fillRoundRect(camBtn.x, camBtn.y, camBtn.w, camBtn.h, 4, TFT_NAVY);
-    tft.drawRoundRect(camBtn.x, camBtn.y, camBtn.w, camBtn.h, 4, TFT_DARKGREY);
+    tft.fillRoundRect(camBtn.x, camBtn.y, camBtn.w, camBtn.h, 4, TFT_BLACK);
+    tft.drawRoundRect(camBtn.x, camBtn.y, camBtn.w, camBtn.h, 4, TFT_GREEN);
     tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_WHITE, TFT_NAVY);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.drawString("Cam", camBtn.x + camBtn.w / 2, camBtn.y + camBtn.h / 2);
     tft.setTextDatum(TL_DATUM);
+}
+
+void drawWifiIcon(int16_t rightX, int16_t rowTop, int16_t rowH, int8_t rssi) {
+    uint8_t level;
+    if (rssi >= -55) level = 4;
+    else if (rssi >= -65) level = 3;
+    else if (rssi >= -75) level = 2;
+    else if (rssi >= -85) level = 1;
+    else level = 0;
+
+    constexpr uint8_t BAR_W = 3;
+    constexpr uint8_t BAR_GAP = 2;
+    constexpr uint8_t BAR_COUNT = 4;
+    int16_t baseline = rowTop + rowH - 1;
+    int16_t x = rightX - BAR_COUNT * (BAR_W + BAR_GAP);
+
+    for (uint8_t i = 0; i < BAR_COUNT; i++) {
+        int16_t barH = 3 + i * 2;
+        uint16_t color = (i < level) ? TFT_GREEN : TFT_DARKGREY;
+        tft.fillRect(x, baseline - barH, BAR_W, barH, color);
+        x += BAR_W + BAR_GAP;
+    }
+}
+
+constexpr int16_t WIFI_ICON_W = 22;
+constexpr int16_t WIFI_ICON_H = 14;
+
+void updateWifiIcon() {
+    int16_t iconX = Config::SCREEN_WIDTH - WIFI_ICON_W - 2;
+    int16_t iconY = 2;
+    tft.fillRect(iconX, iconY, WIFI_ICON_W, WIFI_ICON_H, TFT_BLACK);
+    if (WiFi.status() == WL_CONNECTED) {
+        drawWifiIcon(Config::SCREEN_WIDTH - 4, iconY, WIFI_ICON_H, WiFi.RSSI());
+    }
 }
 
 void drawHeader() {
@@ -85,9 +120,10 @@ void drawHeader() {
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setTextSize(1);
     tft.setCursor(6, 10);
-    tft.println("Eiswolfs Flightradar");
+    tft.println("Eiswolfs FR");
     drawCamButton();
     drawMenuButton();
+    updateWifiIcon();
 }
 
 void updateStatusLine() {
@@ -106,13 +142,7 @@ void updateStatusLine() {
         tft.print(timeBuf);
     }
 
-    if (WiFi.status() == WL_CONNECTED) {
-        char rssiBuf[14];
-        snprintf(rssiBuf, sizeof(rssiBuf), "WiFi %ddBm", WiFi.RSSI());
-        tft.setTextDatum(TR_DATUM);
-        tft.drawString(rssiBuf, Config::SCREEN_WIDTH - 4, HEADER_TITLE_H + 2);
-        tft.setTextDatum(TL_DATUM);
-    }
+    updateWifiIcon();
 }
 
 void takeScreenshotWithFeedback() {
@@ -183,6 +213,7 @@ void setup() {
 
     tft.init();
     tft.setRotation(0);
+    tft.setFreeFont(&UiFont11pt);
     tft.invertDisplay(true);
     tft.fillScreen(TFT_BLACK);
 
@@ -200,10 +231,6 @@ void setup() {
     }
     SdStorage::seedDefaultDataFiles();
 
-    // "Allererster Start" erkennen: config.txt existiert noch nicht (wird
-    // erst beim ersten SettingsStore::save()-Aufruf angelegt). Muss VOR
-    // SettingsStore::load() geprueft werden, da load() die Datei nicht
-    // erzeugt, nur liest.
     bool isFirstRun = !SD.exists(Config::SD_SETTINGS_FILE);
 
     SettingsStore::load();
@@ -239,9 +266,6 @@ void setup() {
         }
     }
 
-    // --- Sprachauswahl: NUR beim allerersten Start, direkt nach Touch-
-    //     Kalibrierung und WLAN-Ersteinrichtung, bevor irgendwelche weiteren
-    //     Texte in (falscher) Standardsprache gezeigt werden. ---
     if (isFirstRun) {
         FirstRunLanguageScreen::run(tft);
         SplashScreen::begin(tft);

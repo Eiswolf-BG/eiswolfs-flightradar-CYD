@@ -14,11 +14,12 @@ namespace {
         }
     };
 
-    void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, uint16_t bg = TFT_NAVY) {
-        tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, bg);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_DARKGREY);
+    void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, bool danger = false) {
+        uint16_t accent = danger ? TFT_RED : TFT_GREEN;
+        tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, accent);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_WHITE, bg);
+        tft.setTextColor(accent, TFT_BLACK);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
     }
@@ -59,14 +60,14 @@ namespace {
 
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
-            tft.setTextColor(TFT_WHITE, TFT_BLACK);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.setCursor(10, 10);
             tft.println(I18n::t(StringId::AIRLINE_ADD_TITLE));
 
-            tft.fillRect(8, 40, Config::SCREEN_WIDTH - 16, 30, TFT_NAVY);
-            tft.drawRect(8, 40, Config::SCREEN_WIDTH - 16, 30, TFT_DARKGREY);
+            tft.fillRect(8, 40, Config::SCREEN_WIDTH - 16, 30, TFT_BLACK);
+            tft.drawRect(8, 40, Config::SCREEN_WIDTH - 16, 30, TFT_GREEN);
             tft.setTextSize(2);
-            tft.setTextColor(TFT_WHITE, TFT_NAVY);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.setCursor(14, 47);
             tft.print(buf);
             tft.setTextSize(1);
@@ -76,7 +77,7 @@ namespace {
             for (uint8_t i = 0; i < 7; i++) drawButton(tft, row3Rects[i], String(ROW3[i]));
 
             drawButton(tft, backspaceBtn, "<-");
-            drawButton(tft, cancelBtn, I18n::t(StringId::CANCEL), TFT_MAROON);
+            drawButton(tft, cancelBtn, I18n::t(StringId::CANCEL), true);
             drawButton(tft, confirmBtn, I18n::t(StringId::ADD));
         };
 
@@ -126,10 +127,10 @@ void run(TFT_eSPI& tft) {
     bool done = false;
     while (!done) {
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
         tft.setCursor(10, 8);
         tft.println(I18n::t(StringId::AIRLINE_FILTER_TITLE));
-        tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
         tft.setCursor(10, 26);
         tft.println(I18n::t(StringId::AIRLINE_FILTER_DESC1));
         tft.setCursor(10, 38);
@@ -147,13 +148,13 @@ void run(TFT_eSPI& tft) {
             rowRects[i] = rowRect;
             removeRects[i] = removeRect;
 
-            tft.fillRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_NAVY);
-            tft.drawRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_DARKGREY);
+            tft.fillRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_BLACK);
+            tft.drawRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_GREEN);
             tft.setTextDatum(MC_DATUM);
-            tft.setTextColor(TFT_WHITE, TFT_NAVY);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.drawString(AirlineFilter::icaoAt(i), rowRect.x + rowRect.w / 2, rowRect.y + rowRect.h / 2);
             tft.setTextDatum(TL_DATUM);
-            drawButton(tft, removeRect, "X", TFT_MAROON);
+            drawButton(tft, removeRect, "X", true);
 
             y += ROW_H + ROW_GAP;
         }

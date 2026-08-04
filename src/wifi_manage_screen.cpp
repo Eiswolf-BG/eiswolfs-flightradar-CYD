@@ -3,6 +3,7 @@
 #include "wifi_setup_screen.h"
 #include "touch_input.h"
 #include "config.h"
+#include "i18n.h"
 
 namespace WifiManageScreen {
 
@@ -14,11 +15,12 @@ namespace {
         }
     };
 
-    void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, uint16_t bg = TFT_NAVY) {
-        tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, bg);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_DARKGREY);
+    void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, bool danger = false) {
+        uint16_t accent = danger ? TFT_RED : TFT_GREEN;
+        tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, accent);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_WHITE, bg);
+        tft.setTextColor(accent, TFT_BLACK);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
     }
@@ -32,9 +34,9 @@ void run(TFT_eSPI& tft) {
     bool done = false;
     while (!done) {
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
         tft.setCursor(10, 10);
-        tft.println("WiFi networks");
+        tft.println(I18n::t(StringId::WIFI_NETWORKS_TITLE));
 
         uint8_t count = WifiMgr::networkCount();
         int16_t y = 40;
@@ -50,13 +52,13 @@ void run(TFT_eSPI& tft) {
 
             if (i < count) {
                 drawButton(tft, rowRect, WifiMgr::networkSsid(i));
-                drawButton(tft, removeRect, "X", TFT_MAROON);
+                drawButton(tft, removeRect, "X", true);
             } else {
                 tft.fillRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_BLACK);
-                tft.drawRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_DARKGREY);
+                tft.drawRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_DARKGREEN);
                 tft.setTextDatum(MC_DATUM);
-                tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-                tft.drawString("(empty)", rowRect.x + rowRect.w / 2, rowRect.y + rowRect.h / 2);
+                tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+                tft.drawString(I18n::t(StringId::WIFI_EMPTY_SLOT), rowRect.x + rowRect.w / 2, rowRect.y + rowRect.h / 2);
                 tft.setTextDatum(TL_DATUM);
             }
             y += ROW_H + ROW_GAP;
@@ -65,12 +67,12 @@ void run(TFT_eSPI& tft) {
         Rect addBtn = {10, y, (int16_t)(Config::SCREEN_WIDTH - 20), 40};
         bool canAdd = count < Config::MAX_WIFI_NETWORKS;
         if (canAdd) {
-            drawButton(tft, addBtn, "Add network");
+            drawButton(tft, addBtn, I18n::t(StringId::WIFI_ADD_NETWORK));
         }
         y += 48;
 
         Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
-        drawButton(tft, backBtn, "Back");
+        drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
         TouchInput::Point tap;
         while (true) {

@@ -15,10 +15,10 @@ namespace {
     };
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label) {
-        tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_NAVY);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_DARKGREY);
+        tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_WHITE, TFT_NAVY);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
     }
@@ -29,10 +29,10 @@ namespace {
 
 void run(TFT_eSPI& tft) {
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.setCursor(10, 8);
     tft.println(I18n::t(StringId::LOGFILES_TITLE));
-    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+    tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
     tft.setCursor(10, 30);
     tft.print(I18n::t(StringId::LOADING));
 
@@ -42,12 +42,12 @@ void run(TFT_eSPI& tft) {
     Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
 
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.setCursor(10, 8);
     tft.println(I18n::t(StringId::LOGFILES_TITLE));
 
     if (count == 0) {
-        tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+        tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
         tft.setCursor(10, 40);
         tft.println(I18n::t(StringId::LOGFILES_EMPTY));
     } else {
@@ -55,7 +55,7 @@ void run(TFT_eSPI& tft) {
         int16_t y = 30;
 
         if (count > VISIBLE_ROWS) {
-            tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+            tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
             tft.setCursor(10, y);
             tft.print(String(I18n::t(StringId::LOGFILES_SHOWING_PREFIX)) + VISIBLE_ROWS +
                       I18n::t(StringId::LOGFILES_OF) + count + I18n::t(StringId::LOGFILES_DAYS_SUFFIX));
@@ -66,7 +66,7 @@ void run(TFT_eSPI& tft) {
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.setCursor(10, y);
             tft.print(days[i].date);
-            tft.setTextColor(TFT_WHITE, TFT_BLACK);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.setCursor(110, y);
             tft.print(String(days[i].count) + I18n::t(StringId::LOGFILES_AIRCRAFT_SUFFIX));
             y += 20;

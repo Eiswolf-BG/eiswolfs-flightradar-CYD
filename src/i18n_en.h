@@ -132,6 +132,15 @@ static const char* const I18N_EN[] = {
     "Imperial (ft, kt, nm)",
 
     "Language",
+
+    "Region & Language",
+    "WiFi / Network",
+    "System",
+    "Flight Options",
+
+    "WiFi networks",
+    "Add network",
+    "(empty)",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

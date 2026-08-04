@@ -64,7 +64,7 @@ void run(TFT_eSPI& tft) {
 
     for (uint8_t i = 0; i < 4; i++) {
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
         tft.setTextSize(1);
         tft.setTextDatum(MC_DATUM);
         tft.drawString(I18n::t(StringId::CALIB_TITLE), W / 2, H / 2 - 12);
@@ -88,7 +88,7 @@ void run(TFT_eSPI& tft) {
     TouchInput::saveCalibration();
 
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.setCursor(10, 10);
     tft.println(I18n::t(StringId::CALIB_SAVED));
     delay(800);

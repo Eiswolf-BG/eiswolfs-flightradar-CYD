@@ -43,7 +43,7 @@ static const char* const I18N_IT[] = {
     "Spazio",
     "Connetti",
     "Torna alla lista",
-    "Gia 3 reti salvate.",
+    "Già 3 reti salvate.",
     "Rimuovine una prima.",
     "Connessione...",
     "WiFi: ",
@@ -60,7 +60,7 @@ static const char* const I18N_IT[] = {
     "File del registro",
     "Altre impostazioni >",
     "Allarme emergenza: ",
-    "LED di prossimita: ",
+    "LED di prossimità: ",
     "Battito LED: ",
     "Diario di volo: ",
     "Nascondi veicoli a terra: ",
@@ -72,7 +72,7 @@ static const char* const I18N_IT[] = {
     "Ripristinato. Riavviare il dispositivo!",
     "Ripristino fallito.",
     "Lingua",
-    "Unita",
+    "Unità",
 
     "Compagnie nascoste",
     "Gli aerei di queste compagnie",
@@ -96,7 +96,7 @@ static const char* const I18N_IT[] = {
     "Reimposta registro",
     "Tocca di nuovo per confermare!",
     "Registro reimpostato.",
-    "Tempo di attivita: ",
+    "Tempo di attività: ",
 
     "File del registro",
     "Ancora nessun dato.",
@@ -126,12 +126,21 @@ static const char* const I18N_IT[] = {
     "Salvato: ",
     "Screenshot fallito",
 
-    "Unita",
+    "Unità",
     "Auto (in base alla posizione)",
     "Metrico (km, m, km/h)",
     "Imperiale (ft, kt, nm)",
 
     "Lingua",
+
+    "Regione e lingua",
+    "WiFi / Rete",
+    "Sistema",
+    "Opzioni di volo",
+
+    "Reti WiFi",
+    "Aggiungi rete",
+    "(vuoto)",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

@@ -14,17 +14,18 @@ namespace {
         }
     };
 
-    void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, uint16_t bg = TFT_NAVY) {
-        tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, bg);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_DARKGREY);
+    void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, bool danger = false) {
+        uint16_t accent = danger ? TFT_RED : TFT_GREEN;
+        tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, accent);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_WHITE, bg);
+        tft.setTextColor(accent, TFT_BLACK);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
     }
 
     void drawStatRow(TFT_eSPI& tft, int16_t y, const String& label, const String& value) {
-        tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+        tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
         tft.setCursor(10, y);
         tft.print(label);
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
@@ -39,10 +40,10 @@ namespace {
 
 void run(TFT_eSPI& tft) {
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.setCursor(10, 10);
     tft.println(I18n::t(StringId::STATS_TITLE));
-    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+    tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
     tft.setCursor(10, 44);
     tft.print(I18n::t(StringId::LOADING));
 
@@ -60,7 +61,7 @@ void run(TFT_eSPI& tft) {
 
     auto redraw = [&]() {
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
         tft.setCursor(10, 10);
         tft.println(I18n::t(StringId::STATS_TITLE));
 
@@ -84,12 +85,12 @@ void run(TFT_eSPI& tft) {
         uint32_t upM = (upSec % 3600) / 60;
         char upBuf[8];
         snprintf(upBuf, sizeof(upBuf), "%luh %lum", (unsigned long)upH, (unsigned long)upM);
-        tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+        tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
         tft.setCursor(10, 210);
         tft.print(String(I18n::t(StringId::STATS_UPTIME_PREFIX)) + upBuf);
 
         if (confirmPending) {
-            drawButton(tft, resetBtn, I18n::t(StringId::STATS_RESET_CONFIRM), TFT_MAROON);
+            drawButton(tft, resetBtn, I18n::t(StringId::STATS_RESET_CONFIRM), true);
         } else {
             drawButton(tft, resetBtn, I18n::t(StringId::STATS_RESET_BTN));
         }

@@ -1,12 +1,6 @@
 #pragma once
 #include <Arduino.h>
 
-// Zentrales Uebersetzungssystem: jeder feste UI-Text der App hat eine
-// StringId. Die eigentlichen Uebersetzungen liegen in je einer Datei pro
-// Sprache (i18n_en.h, i18n_de.h, i18n_fr.h, i18n_tr.h, i18n_es.h, i18n_it.h) -
-// jede Datei enthaelt ein Array in GENAU derselben Reihenfolge wie dieses
-// Enum. Neue Menuepunkte/Texte: hier eine neue StringId VOR COUNT einfuegen,
-// dann in ALLEN 6 Sprachdateien an derselben Position ergaenzen.
 enum class StringId : uint8_t {
     OK = 0,
     CANCEL,
@@ -139,17 +133,20 @@ enum class StringId : uint8_t {
 
     LANGUAGE_TITLE,
 
-    COUNT // IMMER als letztes Element - markiert die Gesamtanzahl
+    MENU_CATEGORY_REGION,
+    MENU_CATEGORY_WIFI,
+    MENU_CATEGORY_SYSTEM,
+    MENU_CATEGORY_FLIGHT,
+
+    WIFI_NETWORKS_TITLE,
+    WIFI_ADD_NETWORK,
+    WIFI_EMPTY_SLOT,
+
+    COUNT
 };
 
 namespace I18n {
     constexpr uint8_t LANG_COUNT = 6;
-
-    // Liefert den uebersetzten Text fuer 'id' in der aktuell in den
-    // Einstellungen gewaehlten Sprache (SettingsStore::language()).
     const char* t(StringId id);
-
-    // Eigennamen der Sprachen (fuer das Sprachauswahl-Menue), IMMER im
-    // jeweiligen Idiom selbst geschrieben (z.B. "Deutsch", nicht "German").
     const char* languageName(uint8_t index);
 }

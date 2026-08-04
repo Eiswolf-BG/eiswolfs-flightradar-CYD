@@ -14,11 +14,15 @@ namespace {
         }
     };
 
-    void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, uint16_t bg = TFT_NAVY) {
+    void drawButton(TFT_eSPI& tft, const Rect& r, const String& label,
+                     bool active = false, bool danger = false) {
+        uint16_t accent = danger ? TFT_RED : TFT_GREEN;
+        uint16_t bg = active ? accent : TFT_BLACK;
+        uint16_t fg = active ? TFT_BLACK : accent;
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, bg);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_DARKGREY);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, accent);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_WHITE, bg);
+        tft.setTextColor(fg, bg);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
     }
@@ -43,10 +47,6 @@ namespace {
                            KEY_W, KEY_H};
         }
 
-        // WICHTIG: Backspace muss VOR den Cancel/OK-Buttons enden (mit
-        // Abstand), sonst ueberlappen sich die Tap-Flaechen - Backspace wird
-        // in der Pruef-Reihenfolge zuerst getestet, wuerde also faelschlich
-        // jeden Tap auf "Cancel" abfangen (Bug: Cancel-Button reagierte nicht).
         Rect backspaceBtn = {(int16_t)GRID_LEFT, (int16_t)(GRID_TOP + 4 * (KEY_H + KEY_GAP)),
                               (int16_t)(3 * KEY_W + 2 * KEY_GAP), 30};
         Rect cancelBtn  = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), 110, 40};
@@ -57,21 +57,21 @@ namespace {
 
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
-            tft.setTextColor(TFT_WHITE, TFT_BLACK);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.setCursor(10, 10);
             tft.println(title);
 
-            tft.fillRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_NAVY);
-            tft.drawRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_DARKGREY);
+            tft.fillRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_BLACK);
+            tft.drawRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_GREEN);
             tft.setTextSize(2);
-            tft.setTextColor(TFT_WHITE, TFT_NAVY);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.setCursor(14, 49);
             tft.print(buf);
             tft.setTextSize(1);
 
             for (uint8_t i = 0; i < 12; i++) drawButton(tft, keyRects[i], keys[i]);
             drawButton(tft, backspaceBtn, "<- Backspace");
-            drawButton(tft, cancelBtn, I18n::t(StringId::CANCEL), TFT_MAROON);
+            drawButton(tft, cancelBtn, I18n::t(StringId::CANCEL), false, true);
             drawButton(tft, confirmBtn, I18n::t(StringId::OK));
         };
 
@@ -133,7 +133,7 @@ void run(TFT_eSPI& tft) {
     bool done = false;
     while (!done) {
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
         tft.setCursor(10, 8);
         tft.println(I18n::t(StringId::LOCATION_TITLE));
 
@@ -143,8 +143,7 @@ void run(TFT_eSPI& tft) {
 
         Rect autoRect = {10, y, (int16_t)(Config::SCREEN_WIDTH - 20), ROW_H};
         String autoLabel = I18n::t(StringId::LOCATION_AUTO);
-        drawButton(tft, autoRect, active < 0 ? ("> " + autoLabel) : autoLabel,
-                   active < 0 ? TFT_DARKGREEN : TFT_NAVY);
+        drawButton(tft, autoRect, active < 0 ? ("> " + autoLabel) : autoLabel, active < 0);
         y += ROW_H + ROW_GAP;
 
         Rect rowRects[LocationPresets::MAX_PRESETS];
@@ -163,13 +162,13 @@ void run(TFT_eSPI& tft) {
                 char coords[24];
                 snprintf(coords, sizeof(coords), "%d: %.3f, %.3f", i + 1, lat, lon);
                 String label = (active == (int8_t)i ? "> " : "") + presetWord + " " + coords;
-                drawButton(tft, rowRect, label, (active == (int8_t)i) ? TFT_DARKGREEN : TFT_NAVY);
-                drawButton(tft, removeRect, "X", TFT_MAROON);
+                drawButton(tft, rowRect, label, active == (int8_t)i);
+                drawButton(tft, removeRect, "X", false, true);
             } else {
                 tft.fillRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_BLACK);
-                tft.drawRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_DARKGREY);
+                tft.drawRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_DARKGREEN);
                 tft.setTextDatum(MC_DATUM);
-                tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+                tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
                 String label = presetWord + " " + String(i + 1) + " " + I18n::t(StringId::LOCATION_PRESET_EMPTY);
                 tft.drawString(label, rowRect.x + rowRect.w / 2, rowRect.y + rowRect.h / 2);
                 tft.setTextDatum(TL_DATUM);

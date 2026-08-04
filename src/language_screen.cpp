@@ -14,11 +14,13 @@ namespace {
         }
     };
 
-    void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, uint16_t bg = TFT_NAVY) {
+    void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, bool active = false) {
+        uint16_t bg = active ? TFT_GREEN : TFT_BLACK;
+        uint16_t fg = active ? TFT_BLACK : TFT_GREEN;
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, bg);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_DARKGREY);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_WHITE, bg);
+        tft.setTextColor(fg, bg);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
     }
@@ -37,7 +39,7 @@ void run(TFT_eSPI& tft) {
     bool done = false;
     while (!done) {
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
         tft.setCursor(10, 6);
         tft.println(I18n::t(StringId::LANGUAGE_TITLE));
 
@@ -46,8 +48,7 @@ void run(TFT_eSPI& tft) {
 
         for (uint8_t i = 0; i < I18n::LANG_COUNT; i++) {
             langRects[i] = rowRect(i);
-            drawButton(tft, langRects[i], I18n::languageName(i),
-                       (i == current) ? TFT_DARKGREEN : TFT_NAVY);
+            drawButton(tft, langRects[i], I18n::languageName(i), i == current);
         }
 
         Rect backBtn = rowRect(I18n::LANG_COUNT);

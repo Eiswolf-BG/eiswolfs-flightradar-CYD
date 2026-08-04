@@ -78,10 +78,6 @@ namespace {
     char passwordBuf[64] = {0};
     uint8_t passwordLen = 0;
 
-    // Shift-Verhalten wie am Handy: einmal antippen = NUR der naechste
-    // Buchstabe wird gross geschrieben, danach automatisch wieder klein.
-    // Zweimal schnell hintereinander antippen (Doppeltipp) = Feststelltaste
-    // (bleibt an, bis erneut einmal angetippt wird).
     enum class ShiftState { Off, OneShot, Locked };
     ShiftState shiftState = ShiftState::Off;
     uint32_t lastShiftTapMs = 0;
@@ -95,11 +91,12 @@ namespace {
     Rect cancelBtn = {Config::SCREEN_WIDTH - 34, 4, 30, 24};
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, bool highlighted = false) {
-        uint16_t bg = highlighted ? TFT_DARKGREEN : TFT_NAVY;
+        uint16_t bg = highlighted ? TFT_GREEN : TFT_BLACK;
+        uint16_t fg = highlighted ? TFT_BLACK : TFT_GREEN;
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, bg);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_DARKGREY);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_WHITE, bg);
+        tft.setTextColor(fg, bg);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
     }
@@ -134,9 +131,6 @@ namespace {
                         bool upper = (shiftState != ShiftState::Off);
                         passwordBuf[passwordLen++] = upper ? (char)toupper(k.ch) : k.ch;
                         passwordBuf[passwordLen] = 0;
-                        // Nach genau einem Buchstaben automatisch wieder auf
-                        // klein zurueckfallen - AUSSER die Feststelltaste
-                        // (Doppeltipp) ist aktiv, die bleibt an.
                         if (shiftState == ShiftState::OneShot) shiftState = ShiftState::Off;
                     }
                     break;
@@ -145,13 +139,10 @@ namespace {
                     bool isDoubleTap = (nowMs - lastShiftTapMs) <= SHIFT_DOUBLE_TAP_MS;
                     lastShiftTapMs = nowMs;
                     if (isDoubleTap) {
-                        // Doppeltipp: Feststelltaste an-/ausschalten.
                         shiftState = (shiftState == ShiftState::Locked) ? ShiftState::Off : ShiftState::Locked;
                     } else if (shiftState == ShiftState::Off) {
-                        // Einfacher Tipp: nur der naechste Buchstabe wird gross.
                         shiftState = ShiftState::OneShot;
                     } else {
-                        // Einfacher Tipp waehrend OneShot/Locked schaltet ab.
                         shiftState = ShiftState::Off;
                     }
                     break;
@@ -208,7 +199,7 @@ bool run(TFT_eSPI& tft) {
     WifiMgr::beginScan();
 
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.setTextSize(1);
     tft.setCursor(10, 10);
     tft.println(I18n::t(StringId::WIFI_SCANNING));
@@ -231,7 +222,7 @@ bool run(TFT_eSPI& tft) {
 
             tft.fillScreen(TFT_BLACK);
             tft.setCursor(10, 10);
-            tft.setTextColor(TFT_WHITE, TFT_BLACK);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.println(ssidCount == 0 ? I18n::t(StringId::WIFI_NO_NETWORKS) : I18n::t(StringId::WIFI_SELECT));
             drawCancelButton(tft);
         }
@@ -244,7 +235,7 @@ bool run(TFT_eSPI& tft) {
                 stage = Stage::Done;
                 tft.fillScreen(TFT_BLACK);
                 tft.setCursor(10, 10);
-                tft.setTextColor(TFT_WHITE, TFT_BLACK);
+                tft.setTextColor(TFT_GREEN, TFT_BLACK);
                 tft.println(I18n::t(StringId::WIFI_CONNECTED_BANG));
                 delay(900);
                 return true;
@@ -254,7 +245,7 @@ bool run(TFT_eSPI& tft) {
                 tft.setCursor(10, 10);
                 tft.setTextColor(TFT_RED, TFT_BLACK);
                 tft.println(I18n::t(StringId::WIFI_CONNECTION_FAILED));
-                tft.setTextColor(TFT_WHITE, TFT_BLACK);
+                tft.setTextColor(TFT_GREEN, TFT_BLACK);
                 tft.setCursor(10, 30);
                 tft.println(I18n::t(StringId::WIFI_BACK_TO_LIST_MSG));
                 delay(1400);
@@ -319,7 +310,7 @@ bool run(TFT_eSPI& tft) {
                         tft.setCursor(10, 10);
                         tft.setTextColor(TFT_RED, TFT_BLACK);
                         tft.println(I18n::t(StringId::WIFI_ALREADY_3));
-                        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+                        tft.setTextColor(TFT_GREEN, TFT_BLACK);
                         tft.setCursor(10, 30);
                         tft.println(I18n::t(StringId::WIFI_REMOVE_ONE_FIRST));
                         delay(1600);
@@ -330,7 +321,7 @@ bool run(TFT_eSPI& tft) {
                     stage = Stage::Connecting;
                     tft.fillScreen(TFT_BLACK);
                     tft.setCursor(10, 10);
-                    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+                    tft.setTextColor(TFT_GREEN, TFT_BLACK);
                     tft.println(I18n::t(StringId::WIFI_CONNECTING));
                 } else if (backBtn.contains(tap.x, tap.y)) {
                     stage = Stage::PickSsid;
@@ -363,16 +354,16 @@ bool run(TFT_eSPI& tft) {
             drawCancelButton(tft);
         } else if (stage == Stage::EnterPassword) {
             tft.fillRect(0, 0, Config::SCREEN_WIDTH, KB_TOP - 4, TFT_BLACK);
-            tft.setTextColor(TFT_WHITE, TFT_BLACK);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.setCursor(10, 6);
             tft.printf("%s%s", I18n::t(StringId::WIFI_LABEL_PREFIX), ssidList[selectedIndex].c_str());
             tft.setCursor(10, 22);
-            tft.setTextColor(TFT_WHITE, TFT_BLACK);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.println(I18n::t(StringId::WIFI_PASSWORD_LABEL));
-            tft.fillRect(8, 38, Config::SCREEN_WIDTH - 16, 22, TFT_NAVY);
-            tft.drawRect(8, 38, Config::SCREEN_WIDTH - 16, 22, TFT_DARKGREY);
+            tft.fillRect(8, 38, Config::SCREEN_WIDTH - 16, 22, TFT_BLACK);
+            tft.drawRect(8, 38, Config::SCREEN_WIDTH - 16, 22, TFT_GREEN);
             tft.setCursor(12, 44);
-            tft.setTextColor(TFT_WHITE, TFT_NAVY);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.print(passwordBuf);
 
             int16_t rowY0 = KB_TOP;

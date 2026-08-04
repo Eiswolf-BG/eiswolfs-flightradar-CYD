@@ -30,7 +30,7 @@ namespace {
         int16_t infoTop;
     };
 
-    constexpr int16_t INFO_BAR_H = 50;
+    constexpr int16_t INFO_BAR_H = 64;
 
     Layout computeLayout(int16_t top) {
         Layout L;
@@ -45,7 +45,7 @@ namespace {
         return L;
     }
 
-    constexpr int16_t DETAIL_PANEL_H = 190;
+    constexpr int16_t DETAIL_PANEL_H = 264;
 
     struct HitPoint {
         int16_t x, y;
@@ -177,10 +177,10 @@ namespace {
     }
 
     void drawButton(TFT_eSPI& gfx, const Rect& r, const String& label) {
-        gfx.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_NAVY);
-        gfx.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_DARKGREY);
+        gfx.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
+        gfx.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
         gfx.setTextDatum(MC_DATUM);
-        gfx.setTextColor(TFT_WHITE, TFT_NAVY);
+        gfx.setTextColor(TFT_GREEN, TFT_BLACK);
         gfx.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         gfx.setTextDatum(TL_DATUM);
     }
@@ -210,7 +210,7 @@ namespace {
         gfx.setTextColor(TFT_WHITE, TFT_BLACK);
         for (uint8_t i = 0; i < 3; i++) {
             int16_t x0 = i * segW + 6;
-            gfx.fillCircle(x0, y + 4, 3, items[i].color);
+            gfx.fillCircle(x0, y - 5, 3, items[i].color);
             gfx.setCursor(x0 + 7, y);
             gfx.print(items[i].label);
         }
@@ -279,8 +279,8 @@ namespace {
     void updateLine(TFT_eSPI& gfx, int16_t y, int16_t h, int16_t maxWidth,
                      uint16_t fg, String& cached, const String& newText, bool forceFull) {
         if (!forceFull && cached == newText) return;
-        gfx.fillRect(0, y - 2, Config::SCREEN_WIDTH, h, TFT_NAVY);
-        gfx.setTextColor(fg, TFT_NAVY);
+        gfx.fillRect(0, y - 14, Config::SCREEN_WIDTH, h, TFT_BLACK);
+        gfx.setTextColor(fg, TFT_BLACK);
         printLineTruncated(gfx, 8, y, maxWidth, newText);
         cached = newText;
     }
@@ -291,54 +291,55 @@ namespace {
 
         int16_t panelTop = Config::SCREEN_HEIGHT - DETAIL_PANEL_H;
         constexpr int16_t textMaxWidth = Config::SCREEN_WIDTH - 16;
+        constexpr int16_t LINE_H = 22;
 
         bool forceFull = !lastPanel.valid || strcmp(lastPanel.hex, a.hex) != 0;
         if (forceFull) {
-            gfx.fillRect(0, panelTop, Config::SCREEN_WIDTH, DETAIL_PANEL_H, TFT_NAVY);
-            gfx.drawRect(0, panelTop, Config::SCREEN_WIDTH, DETAIL_PANEL_H, TFT_DARKGREY);
+            gfx.fillRect(0, panelTop, Config::SCREEN_WIDTH, DETAIL_PANEL_H, TFT_BLACK);
+            gfx.drawRect(0, panelTop, Config::SCREEN_WIDTH, DETAIL_PANEL_H, TFT_GREEN);
             lastPanel = PanelState{};
             strncpy(lastPanel.hex, a.hex, sizeof(lastPanel.hex) - 1);
         }
 
-        int16_t y = panelTop + 6;
+        int16_t y = panelTop + 26;
 
         {
             String txt = a.callsign[0] ? a.callsign : a.hex;
             if (forceFull || lastPanel.callsignText != txt) {
-                gfx.fillRect(0, y - 2, Config::SCREEN_WIDTH, 20, TFT_NAVY);
-                gfx.setTextColor(TFT_WHITE, TFT_NAVY);
+                gfx.fillRect(0, y - 22, Config::SCREEN_WIDTH, 28, TFT_BLACK);
+                gfx.setTextColor(TFT_GREEN, TFT_BLACK);
                 gfx.setTextSize(2);
                 printLineTruncated(gfx, 8, y, textMaxWidth, txt);
                 gfx.setTextSize(1);
                 lastPanel.callsignText = txt;
             }
         }
-        y += 22;
+        y += 30;
 
-        updateLine(gfx, y, 15, textMaxWidth, TFT_GREEN, lastPanel.airlineText,
+        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.airlineText,
                    String(a.airlineName), forceFull);
-        y += 15;
+        y += LINE_H;
 
         String modelLine = details.loading
             ? String(I18n::t(StringId::DETAIL_MODEL)) + I18n::t(StringId::DETAIL_LOADING_DOTS)
             : String(I18n::t(StringId::DETAIL_MODEL)) + (details.model[0] ? details.model : I18n::t(StringId::DETAIL_UNKNOWN));
-        updateLine(gfx, y, 15, textMaxWidth, TFT_WHITE, lastPanel.modelText, modelLine, forceFull);
-        y += 15;
+        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.modelText, modelLine, forceFull);
+        y += LINE_H;
 
         String typeLine = String(I18n::t(StringId::DETAIL_TYPE)) + (a.typeCode[0] ? a.typeCode : I18n::t(StringId::DETAIL_UNKNOWN));
-        updateLine(gfx, y, 15, textMaxWidth, TFT_WHITE, lastPanel.typeText, typeLine, forceFull);
-        y += 15;
+        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.typeText, typeLine, forceFull);
+        y += LINE_H;
 
         char buf[48];
         snprintf(buf, sizeof(buf), "%s%.0fm / %.0fft", I18n::t(StringId::DETAIL_ALT),
                  Units::feetToMeters((float)a.altBaroFt), (float)a.altBaroFt);
-        updateLine(gfx, y, 15, textMaxWidth, TFT_WHITE, lastPanel.altText, String(buf), forceFull);
-        y += 15;
+        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.altText, String(buf), forceFull);
+        y += LINE_H;
 
         snprintf(buf, sizeof(buf), "%s%.0fkm/h / %.0fkt", I18n::t(StringId::DETAIL_SPEED),
                  Units::ktToKmh(a.groundSpeedKt), a.groundSpeedKt);
-        updateLine(gfx, y, 15, textMaxWidth, TFT_WHITE, lastPanel.speedText, String(buf), forceFull);
-        y += 15;
+        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.speedText, String(buf), forceFull);
+        y += LINE_H;
 
         String climbLine;
         if (a.vertRateFtMin > 100) {
@@ -350,31 +351,65 @@ namespace {
         } else {
             climbLine = I18n::t(StringId::DETAIL_LEVEL);
         }
-        updateLine(gfx, y, 15, textMaxWidth, TFT_WHITE, lastPanel.climbText, climbLine, forceFull);
-        y += 15;
+        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.climbText, climbLine, forceFull);
+        y += LINE_H;
 
         snprintf(buf, sizeof(buf), "%s%.0fkm / %.0fnm   %s%.0f", I18n::t(StringId::DETAIL_DIST),
                  a.distanceKm, Units::kmToNm(a.distanceKm), I18n::t(StringId::DETAIL_HDG), a.headingDeg);
-        updateLine(gfx, y, 15, textMaxWidth, TFT_WHITE, lastPanel.distHeadingText, String(buf), forceFull);
-        y += 15;
+        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.distHeadingText, String(buf), forceFull);
+        y += LINE_H;
 
         String squawkLine = String(I18n::t(StringId::DETAIL_SQUAWK)) + (a.squawk[0] ? a.squawk : I18n::t(StringId::DETAIL_UNKNOWN));
-        updateLine(gfx, y, 15, textMaxWidth, TFT_WHITE, lastPanel.squawkText, squawkLine, forceFull);
-        y += 15;
+        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.squawkText, squawkLine, forceFull);
+        y += LINE_H;
 
         String seatsLine = a.estSeats > 0
             ? String(I18n::t(StringId::DETAIL_SEATS_EST)) + a.estSeats
             : String(I18n::t(StringId::DETAIL_SEATS_UNKNOWN));
-        updateLine(gfx, y, 15, textMaxWidth, TFT_WHITE, lastPanel.seatsText, seatsLine, forceFull);
-        y += 18;
+        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.seatsText, seatsLine, forceFull);
+        y += 22;
 
         if (forceFull) {
-            gfx.setTextColor(TFT_DARKGREY, TFT_NAVY);
+            gfx.setTextColor(TFT_DARKGREEN, TFT_BLACK);
             gfx.setCursor(8, y);
             gfx.print(I18n::t(StringId::DETAIL_TAP_CLOSE));
         }
 
         lastPanel.valid = true;
+    }
+
+    constexpr uint8_t STAR_COUNT = 28;
+    struct Star {
+        int16_t x, y;
+        uint8_t phase;
+        uint8_t speed;
+    };
+    Star stars[STAR_COUNT];
+    bool starsInitialized = false;
+
+    void initStarsIfNeeded() {
+        if (starsInitialized) return;
+        int16_t panelTop = Config::SCREEN_HEIGHT - DETAIL_PANEL_H;
+        randomSeed((uint32_t)esp_random());
+        for (uint8_t i = 0; i < STAR_COUNT; i++) {
+            stars[i].x = 6 + random(0, Config::SCREEN_WIDTH - 12);
+            stars[i].y = panelTop + 10 + random(0, DETAIL_PANEL_H - 20);
+            stars[i].phase = (uint8_t)random(0, 256);
+            stars[i].speed = 1 + random(0, 3);
+        }
+        starsInitialized = true;
+    }
+
+    void updateDetailPanelStars(TFT_eSPI& gfx) {
+        initStarsIfNeeded();
+        for (uint8_t i = 0; i < STAR_COUNT; i++) {
+            stars[i].phase += stars[i].speed;
+            uint8_t bright = (stars[i].phase < 128)
+                ? (uint8_t)(stars[i].phase * 2)
+                : (uint8_t)((255 - stars[i].phase) * 2);
+            uint16_t color = gfx.color565(0, bright, 0);
+            gfx.drawPixel(stars[i].x, stars[i].y, color);
+        }
     }
 }
 
@@ -470,12 +505,6 @@ void render(TFT_eSPI& tft, int16_t top) {
             tft.drawCircle(pt.x, pt.y, 12, TFT_RED);
         }
 
-        // Rufzeichen als kleines farbiges Label ueber dem Punkt
-        // Transparent zeichnen (KEIN schwarzer Hintergrund-Kasten) - sonst
-        // "beisst" der Label-Hintergrund ein Stueck der Ring-/Fadenkreuz-
-        // Linie weg, wenn sich beides ueberschneidet. Da das Label bei jedem
-        // Sweep-Tick am selben Fleck neu gezeichnet wird, sah das wie
-        // Dauerflackern genau an den Beschriftungen aus.
         tft.setTextColor(color);
         tft.setTextDatum(BC_DATUM);
         const char* label = a.callsign[0] ? a.callsign : a.hex;
@@ -506,21 +535,26 @@ void render(TFT_eSPI& tft, int16_t top) {
         int16_t infoTop = L.infoTop;
         tft.drawFastHLine(0, infoTop, Config::SCREEN_WIDTH, TFT_DARKGREY);
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.setCursor(8, infoTop + 6);
+        tft.setCursor(8, infoTop + 20);
         tft.print(I18n::t(StringId::RADAR_TAP_FOR_DETAILS));
 
         char rangeLabel[8];
         snprintf(rangeLabel, sizeof(rangeLabel), "%.0fkm", rangeKm);
         drawButton(tft, L.rangeBtn, rangeLabel);
 
-        drawLegend(tft, infoTop + 30);
+        drawLegend(tft, infoTop + 44);
     }
 
     tft.endWrite();
 }
 
 void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
-    if (selectedHex[0]) return;
+    if (selectedHex[0]) {
+        tft.startWrite();
+        updateDetailPanelStars(tft);
+        tft.endWrite();
+        return;
+    }
 
     Layout L = computeLayout(top);
     float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
