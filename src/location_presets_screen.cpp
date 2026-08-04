@@ -28,10 +28,10 @@ namespace {
         uint8_t len = 0;
 
         constexpr int16_t KEY_W = 74;
-        constexpr int16_t KEY_H = 40;
-        constexpr int16_t KEY_GAP = 4;
+        constexpr int16_t KEY_H = 34;
+        constexpr int16_t KEY_GAP = 3;
         constexpr int16_t GRID_LEFT = (Config::SCREEN_WIDTH - 3 * KEY_W - 2 * KEY_GAP) / 2;
-        constexpr int16_t GRID_TOP = 90;
+        constexpr int16_t GRID_TOP = 84;
 
         const char* keys[12] = {"1","2","3","4","5","6","7","8","9","-","0","."};
         Rect keyRects[12];
@@ -43,8 +43,12 @@ namespace {
                            KEY_W, KEY_H};
         }
 
+        // WICHTIG: Backspace muss VOR den Cancel/OK-Buttons enden (mit
+        // Abstand), sonst ueberlappen sich die Tap-Flaechen - Backspace wird
+        // in der Pruef-Reihenfolge zuerst getestet, wuerde also faelschlich
+        // jeden Tap auf "Cancel" abfangen (Bug: Cancel-Button reagierte nicht).
         Rect backspaceBtn = {(int16_t)GRID_LEFT, (int16_t)(GRID_TOP + 4 * (KEY_H + KEY_GAP)),
-                              (int16_t)(3 * KEY_W + 2 * KEY_GAP), 36};
+                              (int16_t)(3 * KEY_W + 2 * KEY_GAP), 30};
         Rect cancelBtn  = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), 110, 40};
         Rect confirmBtn = {(int16_t)(Config::SCREEN_WIDTH - 120), (int16_t)(Config::SCREEN_HEIGHT - 50), 110, 40};
 

@@ -78,7 +78,14 @@ namespace {
     char passwordBuf[64] = {0};
     uint8_t passwordLen = 0;
 
-    bool shiftOn = false;
+    // Shift-Verhalten wie am Handy: einmal antippen = NUR der naechste
+    // Buchstabe wird gross geschrieben, danach automatisch wieder klein.
+    // Zweimal schnell hintereinander antippen (Doppeltipp) = Feststelltaste
+    // (bleibt an, bis erneut einmal angetippt wird).
+    enum class ShiftState { Off, OneShot, Locked };
+    ShiftState shiftState = ShiftState::Off;
+    uint32_t lastShiftTapMs = 0;
+    constexpr uint32_t SHIFT_DOUBLE_TAP_MS = 400;
     uint8_t page = 0;
 
     bool skipped = false;
@@ -110,7 +117,7 @@ namespace {
 
     String keyLabel(const KeyDef& k) {
         if (k.label) return String(k.label);
-        char c = shiftOn ? (char)toupper(k.ch) : k.ch;
+        char c = (shiftState != ShiftState::Off) ? (char)toupper(k.ch) : k.ch;
         return String(c);
     }
 
@@ -124,13 +131,31 @@ namespace {
             switch (k.type) {
                 case KeyType::Char:
                     if (passwordLen < sizeof(passwordBuf) - 1) {
-                        passwordBuf[passwordLen++] = shiftOn ? (char)toupper(k.ch) : k.ch;
+                        bool upper = (shiftState != ShiftState::Off);
+                        passwordBuf[passwordLen++] = upper ? (char)toupper(k.ch) : k.ch;
                         passwordBuf[passwordLen] = 0;
+                        // Nach genau einem Buchstaben automatisch wieder auf
+                        // klein zurueckfallen - AUSSER die Feststelltaste
+                        // (Doppeltipp) ist aktiv, die bleibt an.
+                        if (shiftState == ShiftState::OneShot) shiftState = ShiftState::Off;
                     }
                     break;
-                case KeyType::Shift:
-                    shiftOn = !shiftOn;
+                case KeyType::Shift: {
+                    uint32_t nowMs = millis();
+                    bool isDoubleTap = (nowMs - lastShiftTapMs) <= SHIFT_DOUBLE_TAP_MS;
+                    lastShiftTapMs = nowMs;
+                    if (isDoubleTap) {
+                        // Doppeltipp: Feststelltaste an-/ausschalten.
+                        shiftState = (shiftState == ShiftState::Locked) ? ShiftState::Off : ShiftState::Locked;
+                    } else if (shiftState == ShiftState::Off) {
+                        // Einfacher Tipp: nur der naechste Buchstabe wird gross.
+                        shiftState = ShiftState::OneShot;
+                    } else {
+                        // Einfacher Tipp waehrend OneShot/Locked schaltet ab.
+                        shiftState = ShiftState::Off;
+                    }
                     break;
+                }
                 case KeyType::Backspace:
                     if (passwordLen > 0) {
                         passwordLen--;
@@ -153,7 +178,7 @@ namespace {
         Rect rects[N];
         layoutRow(row, y, rects);
         for (size_t i = 0; i < N; i++) {
-            bool hl = (row[i].type == KeyType::Shift && shiftOn);
+            bool hl = (row[i].type == KeyType::Shift && shiftState != ShiftState::Off);
             drawButton(tft, rects[i], keyLabel(row[i]), hl);
         }
     }
@@ -161,7 +186,7 @@ namespace {
     void resetKeyboardState() {
         passwordLen = 0;
         passwordBuf[0] = 0;
-        shiftOn = false;
+        shiftState = ShiftState::Off;
         page = 0;
     }
 

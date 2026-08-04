@@ -35,11 +35,12 @@ namespace {
     Layout computeLayout(int16_t top) {
         Layout L;
         L.infoTop = Config::SCREEN_HEIGHT - INFO_BAR_H;
+        constexpr int16_t TOP_LABEL_MARGIN = 10;
         int16_t maxRadiusByWidth = Config::SCREEN_WIDTH / 2 - 6;
-        int16_t maxRadiusByHeight = (L.infoTop - top) / 2 - 6;
+        int16_t maxRadiusByHeight = (L.infoTop - top - TOP_LABEL_MARGIN) / 2 - 6;
         L.radius = min(maxRadiusByWidth, maxRadiusByHeight);
         L.cx = Config::SCREEN_WIDTH / 2;
-        L.cy = top + L.radius + 6;
+        L.cy = top + L.radius + 6 + TOP_LABEL_MARGIN;
         L.rangeBtn = {(int16_t)(Config::SCREEN_WIDTH - 70), (int16_t)(L.infoTop + 4), 62, 22};
         return L;
     }
@@ -112,6 +113,7 @@ namespace {
         int16_t ys[TRAIL_LEN] = {0};
         uint8_t count = 0;
         uint32_t lastUpdateMs = 0;
+        uint16_t dimColor = TFT_DARKGREEN;
     };
     constexpr uint8_t MAX_TRAILS = Config::MAX_TRACKED_AIRCRAFT;
     TrailEntry trails[MAX_TRAILS];
@@ -452,8 +454,10 @@ void render(TFT_eSPI& tft, int16_t top) {
         bool isEmergency = SettingsStore::emergencyAlertEnabled() && isEmergencySquawk(a.squawk);
 
         TrailEntry* trail = findOrCreateTrail(a.hex);
-        drawTrail(tft, trail, dimColorForAltitude(a.altBaroFt));
+        uint16_t trailColor = dimColorForAltitude(a.altBaroFt);
+        drawTrail(tft, trail, trailColor);
         pushTrailPoint(trail, pt.x, pt.y);
+        if (trail) trail->dimColor = trailColor;
 
         if (isSelected) {
             tft.drawCircle(pt.x, pt.y, 9, TFT_WHITE);
@@ -466,7 +470,13 @@ void render(TFT_eSPI& tft, int16_t top) {
             tft.drawCircle(pt.x, pt.y, 12, TFT_RED);
         }
 
-        tft.setTextColor(color, TFT_BLACK);
+        // Rufzeichen als kleines farbiges Label ueber dem Punkt
+        // Transparent zeichnen (KEIN schwarzer Hintergrund-Kasten) - sonst
+        // "beisst" der Label-Hintergrund ein Stueck der Ring-/Fadenkreuz-
+        // Linie weg, wenn sich beides ueberschneidet. Da das Label bei jedem
+        // Sweep-Tick am selben Fleck neu gezeichnet wird, sah das wie
+        // Dauerflackern genau an den Beschriftungen aus.
+        tft.setTextColor(color);
         tft.setTextDatum(BC_DATUM);
         const char* label = a.callsign[0] ? a.callsign : a.hex;
         tft.drawString(label, pt.x, pt.y - 8);
@@ -515,6 +525,8 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     Layout L = computeLayout(top);
     float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
+    tft.startWrite();
+
     if (prevSweepAngleDeg >= 0.0f) {
         drawSweepLine(tft, L, prevSweepAngleDeg, TFT_BLACK);
         drawStaticBackground(tft, L, rangeKm);
@@ -526,6 +538,21 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
 
     drawSweepLine(tft, L, sweepAngleDeg, TFT_GREEN);
     prevSweepAngleDeg = sweepAngleDeg;
+
+    for (uint8_t i = 0; i < MAX_TRAILS; i++) {
+        if (!trails[i].active) continue;
+
+        bool stillVisible = false;
+        for (uint8_t j = 0; j < MAX_HIT_POINTS; j++) {
+            if (hitPoints[j].valid && strcmp(hitPoints[j].hex, trails[i].hex) == 0) {
+                stillVisible = true;
+                break;
+            }
+        }
+        if (stillVisible) {
+            drawTrail(tft, &trails[i], trails[i].dimColor);
+        }
+    }
 
     for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) {
         if (!hitPoints[i].valid) continue;
@@ -543,12 +570,14 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             tft.drawCircle(hp.x, hp.y, 12, TFT_RED);
         }
 
-        tft.setTextColor(hp.color, TFT_BLACK);
+        tft.setTextColor(hp.color);
         tft.setTextDatum(BC_DATUM);
         const char* label = hp.callsign[0] ? hp.callsign : hp.hex;
         tft.drawString(label, hp.x, hp.y - 8);
         tft.setTextDatum(TL_DATUM);
     }
+
+    tft.endWrite();
 }
 
 bool handleTap(int16_t x, int16_t y, int16_t top) {
