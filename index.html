@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eiswolfs Flightradar CYD - Web Installer</title>
     <!-- ESP Web Tools Installer Script -->
-    <script type="module" src="https://unpkg.com"></script>
-    
+    <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+
     <style>
         :root {
             --bg-color: #0a0f0d;
@@ -36,9 +36,9 @@
             width: 100%;
             position: relative;
         }
-        h1 { 
-            font-size: 26px; 
-            margin-bottom: 5px; 
+        h1 {
+            font-size: 26px;
+            margin-bottom: 5px;
             text-shadow: 0 0 8px rgba(57, 255, 20, 0.6);
         }
         .subtitle {
@@ -59,10 +59,10 @@
             margin-bottom: 25px;
             text-shadow: 0 0 4px rgba(57, 255, 20, 0.4);
         }
-        p { 
-            font-size: 14px; 
-            color: #ffffff; 
-            margin-bottom: 30px; 
+        p {
+            font-size: 14px;
+            color: #ffffff;
+            margin-bottom: 30px;
             line-height: 1.5;
         }
         .instructions {
@@ -75,7 +75,12 @@
             margin-bottom: 30px;
             border-left: 3px solid var(--accent-color);
         }
-        
+        .browser-note {
+            font-size: 11px;
+            color: #6a8f6a;
+            margin-top: 20px;
+        }
+
         /* Customizing the ESP Web Tools button */
         esp-web-install-button {
             --esp-tools-button-bg-color: var(--accent-color);
@@ -85,24 +90,23 @@
     </style>
 </head>
 <body>
-
 <div class="container">
     <h1>FLIGHTRADAR CYD</h1>
     <div class="subtitle">Firmware Flash Utility</div>
     <div class="version-badge">Version: v2.3.2</div>
-    
+
     <p>Install the latest Flightradar firmware directly from your browser to your Cheap Yellow Display.</p>
-    
+
     <div class="instructions">
         1. Connect your CYD via USB cable<br>
         2. Click the "Install" button below<br>
         3. Select the correct COM port<br>
         4. Sit back and wait for the process to finish
     </div>
-
     <!-- References the manifest.json in the same folder -->
     <esp-web-install-button manifest="manifest.json"></esp-web-install-button>
-</div>
 
+    <div class="browser-note">Requires Chrome, Edge, or Opera (Web Serial API)</div>
+</div>
 </body>
 </html>
