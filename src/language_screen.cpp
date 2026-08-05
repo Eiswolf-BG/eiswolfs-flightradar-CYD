@@ -42,7 +42,7 @@ void run(TFT_eSPI& tft) {
     while (!done) {
         tft.fillScreen(TFT_BLACK);
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
-        tft.setCursor(10, 6);
+        tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::LANGUAGE_TITLE));
 
         uint8_t current = SettingsStore::language();

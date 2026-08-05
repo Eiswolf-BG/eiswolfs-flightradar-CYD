@@ -60,7 +60,7 @@ namespace {
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.setCursor(10, 10);
+            tft.setCursor(10, 14);
             tft.println(title);
 
             tft.fillRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_BLACK);
@@ -125,6 +125,113 @@ namespace {
 
         return LocationPresets::addPreset(lat, lon);
     }
+
+    int16_t layoutWrapped(TFT_eSPI& tft, int16_t x, int16_t startY, int16_t maxWidth,
+                          int16_t lineHeight, const String& text, int16_t scrollY,
+                          int16_t viewTop, int16_t viewBottom, bool draw) {
+        int16_t y = startY;
+        int32_t start = 0;
+        int32_t len = text.length();
+        while (start < len) {
+            while (start < len && text[start] == ' ') start++;
+            if (start >= len) break;
+
+            String line = text.substring(start, len);
+            while (tft.textWidth(line) > maxWidth) {
+                int32_t lastSpace = line.lastIndexOf(' ');
+                if (lastSpace <= 0) break;
+                line = line.substring(0, lastSpace);
+            }
+
+            if (draw) {
+                int16_t screenY = y - scrollY;
+                if (screenY >= viewTop && screenY <= viewBottom) {
+                    tft.setCursor(x, screenY);
+                    tft.print(line);
+                }
+            }
+            y += lineHeight;
+            start += line.length();
+        }
+        return y;
+    }
+
+    String truncateForWidth(TFT_eSPI& tft, const String& text, int16_t maxWidth) {
+        String s = text;
+        if (tft.textWidth(s) <= maxWidth) return s;
+        while (s.length() > 1 && tft.textWidth(s + "...") > maxWidth) {
+            s.remove(s.length() - 1);
+        }
+        return s + "...";
+    }
+
+    void runInfoScreen(TFT_eSPI& tft) {
+        MenuStars::reset();
+
+        constexpr int16_t textMaxWidth = Config::SCREEN_WIDTH - 20;
+        constexpr int16_t LINE_H = 16;
+        constexpr int16_t VIEW_TOP = 40;
+        Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+        constexpr int16_t VIEW_BOTTOM = Config::SCREEN_HEIGHT - 60;
+
+        int16_t totalH = VIEW_TOP;
+        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA1), 0, 0, 0, false);
+        totalH += 8;
+        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA2), 0, 0, 0, false);
+        totalH += 8;
+        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA3), 0, 0, 0, false);
+
+        int16_t maxScroll = totalH - VIEW_BOTTOM;
+        if (maxScroll < 0) maxScroll = 0;
+        bool scrollable = maxScroll > 0;
+        int16_t scrollY = 0;
+
+        Rect upBtn   = {(int16_t)(Config::SCREEN_WIDTH - 34), 4, 30, 24};
+        Rect downBtn = {(int16_t)(Config::SCREEN_WIDTH - 34), 30, 30, 24};
+        constexpr int16_t SCROLL_STEP = 48;
+
+        auto redraw = [&]() {
+            tft.fillScreen(TFT_BLACK);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setCursor(10, 14);
+            tft.println(I18n::t(StringId::LOCATION_INFO_TITLE));
+
+            if (scrollable) {
+                drawButton(tft, upBtn, "^");
+                drawButton(tft, downBtn, "v");
+            }
+
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            int16_t y = VIEW_TOP;
+            y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA1), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
+            y += 8;
+            y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA2), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
+            y += 8;
+            layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA3), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
+
+            drawButton(tft, backBtn, I18n::t(StringId::BACK));
+        };
+
+        redraw();
+
+        while (true) {
+            TouchInput::Point tap;
+            if (TouchInput::wasTapped(tap)) {
+                if (backBtn.contains(tap.x, tap.y)) return;
+                if (scrollable && upBtn.contains(tap.x, tap.y) && scrollY > 0) {
+                    scrollY -= SCROLL_STEP;
+                    if (scrollY < 0) scrollY = 0;
+                    redraw();
+                } else if (scrollable && downBtn.contains(tap.x, tap.y) && scrollY < maxScroll) {
+                    scrollY += SCROLL_STEP;
+                    if (scrollY > maxScroll) scrollY = maxScroll;
+                    redraw();
+                }
+            }
+            MenuStars::update(tft);
+            delay(20);
+        }
+    }
 }
 
 void run(TFT_eSPI& tft) {
@@ -137,8 +244,11 @@ void run(TFT_eSPI& tft) {
     while (!done) {
         tft.fillScreen(TFT_BLACK);
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
-        tft.setCursor(10, 8);
+        tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::LOCATION_TITLE));
+
+        Rect infoBtn = {(int16_t)(Config::SCREEN_WIDTH - 40), 2, 30, 24};
+        drawButton(tft, infoBtn, "?");
 
         int8_t active = LocationPresets::activeIndex();
         uint8_t count = LocationPresets::count();
@@ -163,8 +273,9 @@ void run(TFT_eSPI& tft) {
                 double lat = 0, lon = 0;
                 LocationPresets::getLatLon(i, lat, lon);
                 char coords[24];
-                snprintf(coords, sizeof(coords), "%d: %.3f, %.3f", i + 1, lat, lon);
+                snprintf(coords, sizeof(coords), "%d: %.2f, %.2f", i + 1, lat, lon);
                 String label = (active == (int8_t)i ? "> " : "") + presetWord + " " + coords;
+                label = truncateForWidth(tft, label, (int16_t)(rowRect.w - 10));
                 drawButton(tft, rowRect, label, active == (int8_t)i);
                 drawButton(tft, removeRect, "X", false, true);
             } else {
@@ -196,7 +307,10 @@ void run(TFT_eSPI& tft) {
         }
 
         bool handled = false;
-        if (autoRect.contains(tap.x, tap.y)) {
+        if (infoBtn.contains(tap.x, tap.y)) {
+            runInfoScreen(tft);
+            handled = true;
+        } else if (autoRect.contains(tap.x, tap.y)) {
             LocationPresets::setActiveIndex(-1);
             handled = true;
         }

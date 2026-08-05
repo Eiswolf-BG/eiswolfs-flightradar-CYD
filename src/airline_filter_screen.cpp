@@ -63,7 +63,7 @@ namespace {
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.setCursor(10, 10);
+            tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::AIRLINE_ADD_TITLE));
 
             tft.fillRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_BLACK);
@@ -131,7 +131,7 @@ void run(TFT_eSPI& tft) {
     while (!done) {
         tft.fillScreen(TFT_BLACK);
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
-        tft.setCursor(10, 8);
+        tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::AIRLINE_FILTER_TITLE));
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
         tft.setCursor(10, 26);

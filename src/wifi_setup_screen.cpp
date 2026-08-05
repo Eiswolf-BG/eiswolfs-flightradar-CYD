@@ -203,7 +203,7 @@ bool run(TFT_eSPI& tft) {
     tft.fillScreen(TFT_BLACK);
     tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.setTextSize(1);
-    tft.setCursor(10, 10);
+    tft.setCursor(10, 14);
     tft.println(I18n::t(StringId::WIFI_SCANNING));
     drawCancelButton(tft);
 
@@ -223,7 +223,7 @@ bool run(TFT_eSPI& tft) {
             needsRedraw = true;
 
             tft.fillScreen(TFT_BLACK);
-            tft.setCursor(10, 10);
+            tft.setCursor(10, 14);
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.println(ssidCount == 0 ? I18n::t(StringId::WIFI_NO_NETWORKS) : I18n::t(StringId::WIFI_SELECT));
             drawCancelButton(tft);
@@ -236,7 +236,7 @@ bool run(TFT_eSPI& tft) {
                 WifiMgr::addNetwork(ssidList[selectedIndex].c_str(), passwordBuf);
                 stage = Stage::Done;
                 tft.fillScreen(TFT_BLACK);
-                tft.setCursor(10, 10);
+                tft.setCursor(10, 14);
                 tft.setTextColor(TFT_GREEN, TFT_BLACK);
                 tft.println(I18n::t(StringId::WIFI_CONNECTED_BANG));
                 delay(900);
@@ -244,7 +244,7 @@ bool run(TFT_eSPI& tft) {
             } else if (WifiMgr::getState() == WifiMgr::State::Failed) {
                 stage = Stage::Done;
                 tft.fillScreen(TFT_BLACK);
-                tft.setCursor(10, 10);
+                tft.setCursor(10, 14);
                 tft.setTextColor(TFT_RED, TFT_BLACK);
                 tft.println(I18n::t(StringId::WIFI_CONNECTION_FAILED));
                 tft.setTextColor(TFT_GREEN, TFT_BLACK);
@@ -309,7 +309,7 @@ bool run(TFT_eSPI& tft) {
                 } else if (connectBtn.contains(tap.x, tap.y)) {
                     if (WifiMgr::networkCount() >= Config::MAX_WIFI_NETWORKS) {
                         tft.fillScreen(TFT_BLACK);
-                        tft.setCursor(10, 10);
+                        tft.setCursor(10, 14);
                         tft.setTextColor(TFT_RED, TFT_BLACK);
                         tft.println(I18n::t(StringId::WIFI_ALREADY_3));
                         tft.setTextColor(TFT_GREEN, TFT_BLACK);
@@ -322,7 +322,7 @@ bool run(TFT_eSPI& tft) {
                     WifiMgr::connectTo(ssidList[selectedIndex].c_str(), passwordBuf);
                     stage = Stage::Connecting;
                     tft.fillScreen(TFT_BLACK);
-                    tft.setCursor(10, 10);
+                    tft.setCursor(10, 14);
                     tft.setTextColor(TFT_GREEN, TFT_BLACK);
                     tft.println(I18n::t(StringId::WIFI_CONNECTING));
                 } else if (backBtn.contains(tap.x, tap.y)) {
@@ -358,7 +358,7 @@ bool run(TFT_eSPI& tft) {
         } else if (stage == Stage::EnterPassword) {
             tft.fillRect(0, 0, Config::SCREEN_WIDTH, KB_TOP - 4, TFT_BLACK);
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.setCursor(10, 6);
+            tft.setCursor(10, 14);
             tft.printf("%s%s", I18n::t(StringId::WIFI_LABEL_PREFIX), ssidList[selectedIndex].c_str());
             tft.setCursor(10, 22);
             tft.setTextColor(TFT_GREEN, TFT_BLACK);

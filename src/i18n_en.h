@@ -88,6 +88,11 @@ static const char* const I18N_EN[] = {
     "Latitude (e.g. 48.6833)",
     "Longitude (e.g. 9.8333)",
 
+    "How presets work",
+    "Only ONE location is active at a time - either Auto or exactly one preset. Tap an entry to activate it.",
+    "You can also enter the coordinates of any other place - e.g. Milan, New York or Tokyo - and see the live air traffic THERE, no matter where your device actually is!",
+    "Also handy for more precision than automatic IP-based location, e.g. when the device stays in one fixed spot.",
+
     "Statistics",
     "Aircraft logged today",
     "Aircraft logged all-time",

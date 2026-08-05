@@ -92,7 +92,7 @@ void run(TFT_eSPI& tft) {
 
     tft.fillScreen(TFT_BLACK);
     tft.setTextColor(TFT_GREEN, TFT_BLACK);
-    tft.setCursor(10, 10);
+    tft.setCursor(10, 14);
     tft.println(I18n::t(StringId::CALIB_SAVED));
     delay(800);
 }

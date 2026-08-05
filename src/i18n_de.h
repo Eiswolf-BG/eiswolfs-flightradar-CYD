@@ -87,6 +87,10 @@ static const char* const I18N_DE[] = {
     "Preset hinzufügen",
     "Breitengrad (z.B. 48.6833)",
     "Längengrad (z.B. 9.8333)",
+    "Wie Presets funktionieren",
+    "Nur EIN Standort ist zur selben Zeit aktiv - entweder Auto oder genau ein Preset. Tippe einen Eintrag an, um ihn zu aktivieren.",
+    "Du kannst auch die Koordinaten eines beliebigen anderen Ortes eintragen - z.B. Mailand, New York oder Tokio - und siehst DORT den aktuellen Flugverkehr an, egal wo dein Gerät tatsächlich steht!",
+    "Praktisch auch für mehr Genauigkeit als die automatische IP-Standortbestimmung, z.B. wenn das Gerät dauerhaft an einem festen Ort steht.",
 
     "Statistik",
     "Heute geloggte Flugzeuge",

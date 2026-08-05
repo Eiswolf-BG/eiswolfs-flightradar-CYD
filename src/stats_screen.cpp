@@ -46,7 +46,7 @@ namespace {
 void run(TFT_eSPI& tft) {
     tft.fillScreen(TFT_BLACK);
     tft.setTextColor(TFT_GREEN, TFT_BLACK);
-    tft.setCursor(10, 10);
+    tft.setCursor(10, 14);
     tft.println(I18n::t(StringId::STATS_TITLE));
     tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
     tft.setCursor(10, ROW1_Y);
@@ -67,7 +67,7 @@ void run(TFT_eSPI& tft) {
     auto redraw = [&]() {
         tft.fillScreen(TFT_BLACK);
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
-        tft.setCursor(10, 10);
+        tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::STATS_TITLE));
 
         drawStatRow(tft, ROW1_Y, I18n::t(StringId::STATS_TODAY), String(today));

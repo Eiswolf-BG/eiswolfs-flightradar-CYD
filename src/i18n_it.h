@@ -87,6 +87,10 @@ static const char* const I18N_IT[] = {
     "Aggiungi posizione",
     "Latitudine (es. 48.6833)",
     "Longitudine (es. 9.8333)",
+    "Come funzionano i preset",
+    "Solo UNA posizione e attiva alla volta - Auto oppure esattamente un preset. Tocca una voce per attivarla.",
+    "Puoi anche inserire le coordinate di qualsiasi altro luogo - es. Milano, New York o Tokyo - e vedere il traffico aereo in tempo reale LI, indipendentemente da dove si trovi il dispositivo!",
+    "Utile anche per maggiore precisione rispetto alla geolocalizzazione IP automatica, ad esempio se il dispositivo resta sempre in un punto fisso.",
 
     "Statistiche",
     "Aerei registrati oggi",

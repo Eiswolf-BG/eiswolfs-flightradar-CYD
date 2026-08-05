@@ -87,6 +87,10 @@ static const char* const I18N_FR[] = {
     "Ajouter une position",
     "Latitude (ex. 48.6833)",
     "Longitude (ex. 9.8333)",
+    "Comment marchent les presets",
+    "Un SEUL lieu est actif a la fois - soit Auto, soit un preset precis. Touchez une entree pour l'activer.",
+    "Vous pouvez aussi entrer les coordonnees de n'importe quel autre lieu - ex. Milan, New York ou Tokyo - et voir le trafic aerien LA-BAS, peu importe ou se trouve votre appareil !",
+    "Pratique aussi pour plus de precision que la geolocalisation IP automatique, par exemple si l'appareil reste toujours au meme endroit.",
 
     "Statistiques",
     "Avions enregistrés aujourd'hui",

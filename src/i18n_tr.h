@@ -87,6 +87,10 @@ static const char* const I18N_TR[] = {
     "Ön ayar ekle",
     "Enlem (örn. 48.6833)",
     "Boylam (örn. 9.8333)",
+    "On ayarlar nasil calisir",
+    "Aynı anda SADECE bir konum aktiftir - Otomatik veya tam olarak bir on ayar. Aktif etmek icin bir girise dokunun.",
+    "Ayrica baska herhangi bir yerin koordinatlarini da girebilirsiniz - orn. Milano, New York veya Tokyo - ve cihazinizin gercek konumundan bagimsiz olarak ORADAKI canli hava trafigini gorebilirsiniz!",
+    "Cihaz surekli sabit bir yerde kaliyorsa, otomatik IP tabanli konumdan daha hassas olmasi icin de kullanislidir.",
 
     "İstatistikler",
     "Bugün kaydedilen uçaklar",

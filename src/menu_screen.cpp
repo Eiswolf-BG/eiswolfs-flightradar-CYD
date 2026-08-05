@@ -85,7 +85,7 @@ void run(TFT_eSPI& tft) {
 
         if (page == Page::Main) {
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.setCursor(10, 6);
+            tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_SETTINGS));
 
             Rect regionBtn = catRowRect(0);
@@ -121,7 +121,7 @@ void run(TFT_eSPI& tft) {
 
         } else if (page == Page::Region) {
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.setCursor(10, 2);
+            tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_REGION));
 
             Rect languageBtn = rowRect(0);
@@ -149,7 +149,7 @@ void run(TFT_eSPI& tft) {
 
         } else if (page == Page::System) {
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.setCursor(10, 2);
+            tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_SYSTEM));
 
             Rect calibBtn   = rowRect(0);
@@ -204,7 +204,7 @@ void run(TFT_eSPI& tft) {
 
         } else { // Page::Flight
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.setCursor(10, 2);
+            tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_FLIGHT));
 
             Rect statsBtn      = rowRect(0);
