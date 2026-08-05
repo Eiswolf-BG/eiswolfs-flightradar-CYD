@@ -145,6 +145,11 @@ static const char* const I18N_ES[] = {
     "Redes WiFi",
     "Añadir red",
     "(vacío)",
+
+    "Cómo funcionan las redes WiFi",
+    "Puede guardar hasta 3 redes WiFi. Al iniciar, el dispositivo se conecta automáticamente a la que pueda alcanzar en ese momento.",
+    "Útil para uso móvil (oficina, amigos, casa de vacaciones), para WiFi de invitados + principal en el mismo router, o si tiene varios puntos de acceso en casa.",
+    "Elimine una red guardada en cualquier momento con la 'X' roja para liberar un espacio para una nueva.",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,
