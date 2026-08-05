@@ -14,7 +14,7 @@ altitude/speed/model/route details and a proximity LED alert.
 ### 🚀 Option 1: Quick Web Installation (Recommended)
 You can flash the firmware directly from your browser to your CYD display without installing any development tools:
 1. Connect your "Cheap Yellow Display" to your computer using a USB cable.
-2. Open the **[Flightradar Web Flasher](https://github.io)** (requires Google Chrome, Microsoft Edge, or Opera).
+2. Open the **[Flightradar Web Flasher](eiswolf-bg.github.io/eiswolfs-flightradar-CYD)** (requires Google Chrome, Microsoft Edge, or Opera).
 3. Click the **Install** button, select your USB/COM port, and follow the on-screen instructions.
 
 ### 🛠️ Option 2: Manual Compilation (For Developers)
