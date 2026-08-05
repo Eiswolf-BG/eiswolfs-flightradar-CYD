@@ -10,9 +10,11 @@ namespace {
     bool inverted = true; // Dieses Board braucht invertDisplay(true) fuer korrekte Farben (siehe main.cpp)
     bool emergencyAlertOn = true;
     bool proximityAlertOn = true;
+    bool watchlistAlertOn = true;
     bool flightLogbookOn = true;
     bool ledHeartbeatOn = true;
     uint8_t screenTimeoutMin = 0;
+    bool nightDimmingOn = true;
     bool hideGroundVehiclesOn = true;
     uint8_t languageIdx = 0;
     uint8_t unitsModeVal = 0;
@@ -29,6 +31,8 @@ namespace {
             emergencyAlertOn = (value.toInt() != 0);
         } else if (key == "proximity_alert") {
             proximityAlertOn = (value.toInt() != 0);
+        } else if (key == "watchlist_alert") {
+            watchlistAlertOn = (value.toInt() != 0);
         } else if (key == "flight_logbook") {
             flightLogbookOn = (value.toInt() != 0);
         } else if (key == "led_heartbeat") {
@@ -36,6 +40,8 @@ namespace {
         } else if (key == "screen_timeout_min") {
             int v = value.toInt();
             if (v >= 0 && v <= 10) screenTimeoutMin = (uint8_t)v;
+        } else if (key == "night_dimming") {
+            nightDimmingOn = (value.toInt() != 0);
         } else if (key == "hide_ground_vehicles") {
             hideGroundVehiclesOn = (value.toInt() != 0);
         } else if (key == "language") {
@@ -82,9 +88,11 @@ void save() {
     f.printf("invert=%d\n", inverted ? 1 : 0);
     f.printf("emergency_alert=%d\n", emergencyAlertOn ? 1 : 0);
     f.printf("proximity_alert=%d\n", proximityAlertOn ? 1 : 0);
+    f.printf("watchlist_alert=%d\n", watchlistAlertOn ? 1 : 0);
     f.printf("flight_logbook=%d\n", flightLogbookOn ? 1 : 0);
     f.printf("led_heartbeat=%d\n", ledHeartbeatOn ? 1 : 0);
     f.printf("screen_timeout_min=%d\n", screenTimeoutMin);
+    f.printf("night_dimming=%d\n", nightDimmingOn ? 1 : 0);
     f.printf("hide_ground_vehicles=%d\n", hideGroundVehiclesOn ? 1 : 0);
     f.printf("language=%d\n", languageIdx);
     f.printf("units_mode=%d\n", unitsModeVal);
@@ -121,6 +129,13 @@ void setProximityAlertEnabled(bool on) {
     save();
 }
 
+bool watchlistAlertEnabled() { return watchlistAlertOn; }
+
+void setWatchlistAlertEnabled(bool on) {
+    watchlistAlertOn = on;
+    save();
+}
+
 bool flightLogbookEnabled() { return flightLogbookOn; }
 
 void setFlightLogbookEnabled(bool on) {
@@ -142,6 +157,13 @@ void setScreenTimeoutMinutes(uint8_t minutes) {
         screenTimeoutMin = minutes;
         save();
     }
+}
+
+bool nightDimmingEnabled() { return nightDimmingOn; }
+
+void setNightDimmingEnabled(bool on) {
+    nightDimmingOn = on;
+    save();
 }
 
 bool hideGroundVehicles() { return hideGroundVehiclesOn; }

@@ -61,8 +61,7 @@ namespace {
 
         constexpr int16_t textMaxWidth = Config::SCREEN_WIDTH - 20;
         constexpr int16_t LINE_H = 16;
-        constexpr int16_t VIEW_TOP = 40;
-        Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+        constexpr int16_t VIEW_TOP = 36;
         constexpr int16_t VIEW_BOTTOM = Config::SCREEN_HEIGHT - 60;
 
         int16_t totalH = VIEW_TOP;
@@ -77,8 +76,11 @@ namespace {
         bool scrollable = maxScroll > 0;
         int16_t scrollY = 0;
 
-        Rect upBtn   = {(int16_t)(Config::SCREEN_WIDTH - 34), 4, 30, 24};
-        Rect downBtn = {(int16_t)(Config::SCREEN_WIDTH - 34), 30, 30, 24};
+        Rect backBtn = scrollable
+            ? Rect{10, (int16_t)(Config::SCREEN_HEIGHT - 50), 130, 40}
+            : Rect{10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+        Rect upBtn   = {146, (int16_t)(Config::SCREEN_HEIGHT - 50), 38, 40};
+        Rect downBtn = {190, (int16_t)(Config::SCREEN_HEIGHT - 50), 38, 40};
         constexpr int16_t SCROLL_STEP = 48;
 
         auto redraw = [&]() {
@@ -86,11 +88,6 @@ namespace {
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::WIFI_INFO_TITLE));
-
-            if (scrollable) {
-                drawButton(tft, upBtn, "^");
-                drawButton(tft, downBtn, "v");
-            }
 
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             int16_t y = VIEW_TOP;
@@ -101,6 +98,10 @@ namespace {
             layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::WIFI_INFO_PARA3), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
 
             drawButton(tft, backBtn, I18n::t(StringId::BACK));
+            if (scrollable) {
+                drawButton(tft, upBtn, "^");
+                drawButton(tft, downBtn, "v");
+            }
         };
 
         redraw();

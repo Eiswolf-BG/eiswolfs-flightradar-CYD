@@ -68,16 +68,18 @@ bool update(Mode mode, uint32_t nowMs) {
     }
 
     uint32_t interval = (mode == Mode::EmergencyRed) ? RED_BLINK_INTERVAL_MS : GREEN_BLINK_INTERVAL_MS;
-    uint8_t pin = (mode == Mode::EmergencyRed) ? PIN_RED : PIN_GREEN;
+    uint8_t pin = (mode == Mode::EmergencyRed) ? PIN_RED
+                : (mode == Mode::WatchlistBlue) ? PIN_BLUE
+                : PIN_GREEN;
 
     if (nowMs - lastToggleMs >= interval) {
         lastToggleMs = nowMs;
         blinkState = !blinkState;
     }
 
-    digitalWrite(pin, blinkState ? LOW : HIGH);
-    digitalWrite(mode == Mode::EmergencyRed ? PIN_GREEN : PIN_RED, HIGH);
-    digitalWrite(PIN_BLUE, HIGH);
+    digitalWrite(PIN_RED,   (pin == PIN_RED   && blinkState) ? LOW : HIGH);
+    digitalWrite(PIN_GREEN, (pin == PIN_GREEN && blinkState) ? LOW : HIGH);
+    digitalWrite(PIN_BLUE,  (pin == PIN_BLUE  && blinkState) ? LOW : HIGH);
 
     return blinkState;
 }
