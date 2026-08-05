@@ -18,7 +18,7 @@ altitude/speed/model/route details and a proximity LED alert.
 ### Option 1: Quick Web Installation (Recommended)
 You can flash the firmware directly from your browser to your CYD display without installing any development tools:
 1. Connect your "Cheap Yellow Display" to your computer using a USB cable.
-2. Click the **Web Flasher link above** (requires Google Chrome, Microsoft Edge, or Opera).
+2. Click the **Web Flasher link above**.
 3. Click the **Install** button on the web page, select your USB/COM port, and follow the instructions.
 
 ### Option 2: Manual Compilation (For Developers)
