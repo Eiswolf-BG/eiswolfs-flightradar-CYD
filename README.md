@@ -9,14 +9,11 @@ altitude/speed/model/route details and a proximity LED alert.
 
 ![Eiswolfs Flightradar screenshot](images/radar.jpg)
 
-## 🚀 [Click here to open the Flightradar Web Flasher](https://eiswolf-bg.github.io/eiswolfs-flightradar-CYD/)
-
----
-
 ## Getting Started
 
+You can flash the firmware directly from your browser to your CYD display without installing any development tools — [click here to open the Flightradar Web Flasher](https://eiswolf-bg.github.io/eiswolfs-flightradar-CYD/) (requires Chrome, Edge, or Opera).
+
 ### Option 1: Quick Web Installation (Recommended)
-You can flash the firmware directly from your browser to your CYD display without installing any development tools:
 1. Connect your "Cheap Yellow Display" to your computer using a USB cable.
 2. Click the **Web Flasher link above**.
 3. Click the **Install** button on the web page, select your USB/COM port, and follow the instructions.
@@ -141,4 +138,26 @@ See the dedicated section above: [WiFi Manager](#-wifi-manager-up-to-3-saved-net
 
 ## Hardware
 - ESP32-2432S028 ("Cheap Yellow Display", CYD) – ILI9341 2.8" 240x320 touch TFT
-- microSD card slot
+- microSD card (FAT32) for settings, WiFi credentials, and lookup tables
+- No GPS, no speaker required – uses IP geolocation and the onboard RGB LED
+
+### Pinout used
+| Function | Pins |
+|---|---|
+| TFT (VSPI) | MISO=12, MOSI=13, SCLK=14, CS=15, DC=2, BL=21 |
+| Touch (XPT2046) | CLK=25, CS=33, MOSI=32, MISO=39, IRQ=36 |
+| microSD (HSPI) | CLK=18, MISO=19, MOSI=23, CS=5 |
+| RGB LED (active-low) | R=4, G=16, B=17 |
+
+## Data sources
+- Aircraft positions: [adsb.fi](https://adsb.fi) (free, no API key)
+- Aircraft model lookups: [hexdb.io](https://hexdb.io) (free, community-maintained, rate-limited)
+- Location: [ip-api.com](https://ip-api.com) (free IP geolocation)
+
+## Disclaimer
+Aircraft model and seat-count data are estimates from community databases and
+local lookup tables, not live/official figures. This project is for hobby use
+and is not intended for navigation or safety-critical purposes.
+
+## License
+MIT (or add your preferred license here)
