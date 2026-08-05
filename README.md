@@ -66,7 +66,58 @@ currently see.
 
 Any saved network can be removed again at any time via the red "X", freeing up a
 slot for a new one.
+## ✈️ Flight Options — every function in detail
 
+All the functions below are found under **Menu → Flight Options**.
+
+### 📊 Statistics
+Shows at a glance:
+- **Aircraft logged today** – number of distinct aircraft first seen today
+- **Aircraft logged all-time** – total across the entire runtime (all days combined)
+- **Days with sightings** – how many days anything was logged at all
+- **Average per day** – total count divided by number of days
+- **Uptime** – how long the device has been running since the last restart
+
+The **"Reset logbook data"** button (tap twice to confirm) permanently deletes all logged data.
+
+### 📁 Logbook files
+Lists the last several days from the logbook individually, with date and the number of aircraft logged that day. Handy for tracing the history over multiple days instead of only seeing the grand total.
+
+### 📖 Flight logbook (ON/OFF)
+When enabled, the device logs **every newly sighted aircraft** (timestamp, hex code, callsign, registration, type, distance, altitude) into a daily CSV file on the SD card. An aircraft is only logged once per day, even if it crosses the radar multiple times. Survives a same-day restart without logging already-seen aircraft twice. Turning it off saves SD card write cycles if you don't care about the statistics/history.
+
+### 💚 LED heartbeat (ON/OFF)
+A brief **green flash** of the RGB LED on every successful ADS-B data fetch (every 8 seconds) – a quick visual confirmation that the device is actively receiving data and hasn't frozen. Automatically overridden by an active proximity or emergency alert (which take priority), so the indicators never mix.
+
+### 🔔 Proximity LED (ON/OFF)
+The RGB LED **blinks green** whenever an aircraft comes within **3 km** (straight-line distance to the currently active location, see [Location Presets](#-location-presets)). Since the CYD board has no speaker, this replaces an audible alert. Handy for noticing something interesting flying nearby without having to watch the screen.
+
+### 🚨 Emergency alert (ON/OFF)
+Continuously monitors all visible aircraft for one of the three international **emergency squawk codes**:
+- **7500** – hijacking
+- **7600** – radio failure
+- **7700** – general emergency
+
+If the device detects one of these codes, the RGB LED **blinks red rapidly** (noticeably faster/more urgent than the green proximity blink), and a flashing red banner appears in the radar header showing the callsign and squawk code. Takes priority over all other LED indications (proximity, heartbeat).
+
+### 📍 Location Presets
+See the dedicated section above: [Location Presets](#-location-presets) – save up to 3 fixed locations, or enter any place in the world to watch the air traffic there.
+
+### 🏢 Airline filter
+Completely hides aircraft from specific airlines from the radar (they're also excluded from counts/logging). Up to **10 airlines** can be entered (by ICAO code, e.g. `DLH` for Lufthansa, `RYR` for Ryanair). Handy if you live near an airport and don't want certain high-frequency airlines cluttering the radar.
+
+### 🚗 Hide ground vehicles (ON/OFF)
+ADS-B data doesn't only contain aircraft – it can also include **airport ground vehicles** (follow-me cars, pushback tugs, etc., flagged by the API under a separate "C" category). This option hides them so the radar stays focused purely on air traffic.
+
+### 📶 WiFi Manager
+See the dedicated section above: [WiFi Manager](#-wifi-manager-up-to-3-saved-networks) – save up to 3 WiFi networks at once.
+
+---
+
+**Technical notes for the curious:**
+- Flight data is re-fetched from [adsb.fi](https://adsb.fi) every **8 seconds**.
+- Altitude color coding is fixed: **green** < 10,000 ft, **yellow** 10,000–30,000 ft, **red** > 30,000 ft.
+- Radar radius is switchable between **10 / 25 / 50 / 100 km**.
 ## Hardware
 - ESP32-2432S028 ("Cheap Yellow Display", CYD) – ILI9341 2.8" 240x320 touch TFT
 - microSD card (FAT32) for settings, WiFi credentials, and lookup tables
