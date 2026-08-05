@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eiswolfs Flightradar CYD - Web Installer</title>
+    <!-- ESP Web Tools Installer Skript -->
+    <script type="module" src="https://unpkg.com"></script>
+    
+    <style>
+        :root {
+            --bg-color: #0a0f0d;
+            --card-bg: #111a16;
+            --text-color: #39ff14; /* Radar-Grün */
+            --accent-color: #00ff66;
+            --border-color: #1f3a2b;
+        }
+        body {
+            font-family: 'Courier New', Courier, monospace; /* Retro-Look passend zum Radar */
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: var(--card-bg);
+            padding: 40px;
+            border-radius: 15px;
+            border: 2px solid var(--border-color);
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.2);
+            text-align: center;
+            max-width: 450px;
+            width: 100%;
+        }
+        h1 { 
+            font-size: 26px; 
+            margin-bottom: 5px; 
+            text-shadow: 0 0 8px rgba(57, 255, 20, 0.6);
+        }
+        .subtitle {
+            font-size: 12px;
+            color: #88bc88;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+        }
+        p { 
+            font-size: 14px; 
+            color: #ffffff; 
+            margin-bottom: 30px; 
+            line-height: 1.5;
+        }
+        .instructions {
+            text-align: left;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #aae0aa;
+            margin-bottom: 30px;
+            border-left: 3px solid var(--accent-color);
+        }
+        
+        /* Hier wird der ESP-Installationsbutton optisch angepasst */
+        esp-web-install-button {
+            --esp-tools-button-bg-color: var(--accent-color);
+            --esp-tools-button-text-color: #0a0f0d;
+            --esp-tools-button-border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>FLIGHTRADAR CYD</h1>
+    <div class="subtitle">Firmware Flash Utility</div>
+    
+    <p>Installieren Sie die aktuelle Flightradar-Firmware direkt über den Browser auf Ihr Cheap Yellow Display.</p>
+    
+    <div class="instructions">
+        1. CYD per USB-Kabel anschließen<br>
+        2. Auf "Install" klicken<br>
+        3. Den korrekten COM-Port auswählen<br>
+        4. Zurücklehnen und warten
+    </div>
+
+    <!-- Verweist direkt auf Ihre manifest.json im selben Ordner -->
+    <esp-web-install-button manifest="manifest.json"></esp-web-install-button>
+</div>
+
+</body>
+</html>
