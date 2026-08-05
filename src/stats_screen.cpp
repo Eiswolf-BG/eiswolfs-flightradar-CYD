@@ -1,6 +1,7 @@
 #include "stats_screen.h"
 #include "flight_logbook.h"
 #include "touch_input.h"
+#include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
 
@@ -24,12 +25,6 @@ namespace {
         tft.setTextDatum(TL_DATUM);
     }
 
-    // Label (gedaempftes Gruen) direkt ueber dem Wert (helles Gruen) - BEIDE
-    // in derselben Schriftgroesse (Size 1). Bewusst KEINE gemischten
-    // Groessen mehr in einer Zeile: das Zusammenspiel aus Grundlinien-
-    // Verankerung + Size-2-Skalierung unseres Fonts fuehrte trotz
-    // rechnerisch korrektem Abstand zu sichtbaren Ueberschneidungen. Mit
-    // einheitlicher Groesse ist der noetige Abstand simpel und zuverlaessig.
     void drawStatRow(TFT_eSPI& tft, int16_t labelY, const String& label, const String& value) {
         tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
         tft.setCursor(10, labelY);
@@ -108,6 +103,7 @@ void run(TFT_eSPI& tft) {
     };
 
     redraw();
+    MenuStars::reset();
 
     bool done = false;
     while (!done) {
@@ -136,6 +132,7 @@ void run(TFT_eSPI& tft) {
                 done = true;
             }
         }
+        MenuStars::update(tft);
         delay(20);
     }
 }

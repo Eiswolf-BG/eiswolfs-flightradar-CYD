@@ -1,6 +1,7 @@
 #include "logbook_files_screen.h"
 #include "flight_logbook.h"
 #include "touch_input.h"
+#include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
 
@@ -74,6 +75,7 @@ void run(TFT_eSPI& tft) {
     }
 
     drawButton(tft, backBtn, I18n::t(StringId::BACK));
+    MenuStars::reset();
 
     bool done = false;
     while (!done) {
@@ -81,6 +83,7 @@ void run(TFT_eSPI& tft) {
         if (TouchInput::wasTapped(tap) && backBtn.contains(tap.x, tap.y)) {
             done = true;
         }
+        MenuStars::update(tft);
         delay(20);
     }
 }

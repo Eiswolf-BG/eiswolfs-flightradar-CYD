@@ -1,6 +1,7 @@
 #include "location_presets_screen.h"
 #include "location_presets.h"
 #include "touch_input.h"
+#include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
 
@@ -28,6 +29,7 @@ namespace {
     }
 
     String runNumericKeypad(TFT_eSPI& tft, const String& title) {
+        MenuStars::reset();
         char buf[16] = {0};
         uint8_t len = 0;
 
@@ -79,7 +81,7 @@ namespace {
 
         while (!done) {
             TouchInput::Point tap;
-            if (!TouchInput::wasTapped(tap)) { delay(20); continue; }
+            if (!TouchInput::wasTapped(tap)) { MenuStars::update(tft); delay(20); continue; }
 
             bool handled = false;
             for (uint8_t i = 0; i < 12 && !handled; i++) {
@@ -131,6 +133,7 @@ void run(TFT_eSPI& tft) {
     constexpr int16_t REMOVE_BTN_W = 60;
 
     bool done = false;
+    MenuStars::reset();
     while (!done) {
         tft.fillScreen(TFT_BLACK);
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
@@ -188,6 +191,7 @@ void run(TFT_eSPI& tft) {
         TouchInput::Point tap;
         while (true) {
             if (TouchInput::wasTapped(tap)) break;
+            MenuStars::update(tft);
             delay(20);
         }
 

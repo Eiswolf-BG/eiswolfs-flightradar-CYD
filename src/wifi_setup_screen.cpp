@@ -1,6 +1,7 @@
 #include "wifi_setup_screen.h"
 #include "touch_input.h"
 #include "wifi_manager.h"
+#include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
 
@@ -187,6 +188,7 @@ namespace {
 }
 
 bool run(TFT_eSPI& tft) {
+    MenuStars::reset();
     stage = Stage::Scanning;
     skipped = false;
     connectSucceeded = false;
@@ -332,6 +334,7 @@ bool run(TFT_eSPI& tft) {
         }
 
         if (!needsRedraw) {
+            MenuStars::update(tft);
             delay(20);
             continue;
         }

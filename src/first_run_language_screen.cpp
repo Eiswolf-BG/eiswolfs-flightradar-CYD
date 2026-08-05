@@ -1,6 +1,7 @@
 #include "first_run_language_screen.h"
 #include "settings_store.h"
 #include "touch_input.h"
+#include "menu_stars.h"
 #include "i18n.h"
 #include "config.h"
 
@@ -45,9 +46,10 @@ void run(TFT_eSPI& tft) {
         drawButton(tft, langRects[i], I18n::languageName(i));
     }
 
+    MenuStars::reset();
     while (true) {
         TouchInput::Point tap;
-        if (!TouchInput::wasTapped(tap)) { delay(20); continue; }
+        if (!TouchInput::wasTapped(tap)) { MenuStars::update(tft); delay(20); continue; }
 
         for (uint8_t i = 0; i < I18n::LANG_COUNT; i++) {
             if (langRects[i].contains(tap.x, tap.y)) {

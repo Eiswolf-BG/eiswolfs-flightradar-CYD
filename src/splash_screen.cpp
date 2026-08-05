@@ -1,4 +1,5 @@
 #include "splash_screen.h"
+#include "menu_stars.h"
 
 namespace SplashScreen {
 
@@ -10,7 +11,6 @@ namespace {
     constexpr int16_t STATUS_START_Y = 260;
     constexpr uint8_t MAX_STATUS_LINES = 3;
 
-    // Dezente konzentrische Ringe + Fadenkreuz als "Zielfernrohr"-Hintergrund
     void drawRadarReticle(TFT_eSPI& tft, int16_t cx, int16_t cy) {
         uint16_t dim = 0x0320;
         tft.drawCircle(cx, cy, 80, dim);
@@ -20,14 +20,12 @@ namespace {
         tft.drawFastVLine(cx, cy - 80, 160, dim);
     }
 
-    // Echte kleine Jet-Silhouette für den Hintergrund
     void drawMiniJet(TFT_eSPI& tft, int16_t x, int16_t y, uint16_t color) {
         tft.drawLine(x, y - 10, x, y + 12, color);
         tft.drawLine(x - 12, y + 2, x + 12, y + 2, color);
         tft.drawLine(x - 5, y + 10, x + 5, y + 10, color);
     }
 
-    // Echte kleine Helikopter-Silhouette für den Hintergrund
     void drawMiniHeli(TFT_eSPI& tft, int16_t x, int16_t y, uint16_t color) {
         tft.drawLine(x - 8, y - 6, x + 8, y - 6, color);
         tft.drawLine(x, y - 6, x, y + 4, color);
@@ -35,41 +33,33 @@ namespace {
         tft.drawLine(x - 4, y + 7, x + 4, y + 7, color);
     }
 
-    // Haupt-Flugzeug in der Mitte (Unverändert)
     void drawAirplane(TFT_eSPI& tft, int16_t cx) {
         uint16_t color = TFT_GREEN;
 
-        // Rumpf (nur Umriss)
         tft.drawTriangle(cx + 15, 142, cx - 15, 200, cx - 10, 202, color);
 
-        // Deltafluegel (nur Umriss)
         tft.drawTriangle(cx + 5, 164, cx - 47, 175, cx - 3, 179, color);
         tft.drawTriangle(cx + 5, 164, cx + 30, 211, cx - 3, 179, color);
 
-        // Leitwerk (nur Umriss)
         tft.drawTriangle(cx - 11, 198, cx - 23, 201, cx - 6, 210, color);
     }
 }
 
 void begin(TFT_eSPI& tft) {
     startMs = millis();
+    MenuStars::reset();
 
     int16_t cx = tft.width() / 2;
 
     tft.fillScreen(TFT_BLACK);
     drawRadarReticle(tft, cx, 174);
 
-    // Hintergrund-Flugzeuge & Helikopter dezent im Hintergrund - gleicher
-    // gedaempfter Gruenton wie die Radar-Ringe (0x0320), NICHT das volle
-    // TFT_GREEN (das war vorher gleich hell wie das zentrale Flugzeug und
-    // wirkte dadurch nicht wie ein dezenter Hintergrund).
     uint16_t dimGreen = 0x0320;
     drawMiniJet(tft, cx - 45, 135, dimGreen); 
     drawMiniJet(tft, cx + 50, 160, dimGreen); 
     drawMiniHeli(tft, cx - 35, 215, dimGreen);     
     drawMiniHeli(tft, cx + 45, 115, dimGreen);     
 
-    // Zentrales Flugzeug (unverändert im Vordergrund)
     drawAirplane(tft, cx);
 
     tft.setTextDatum(MC_DATUM);
@@ -97,10 +87,12 @@ void setStatusLine(TFT_eSPI& tft, uint8_t slot, const String& text, uint16_t col
     tft.setTextDatum(TL_DATUM);
 }
 
-void waitRemaining() {
+void waitRemaining(TFT_eSPI& tft) {
     uint32_t elapsed = millis() - startMs;
-    if (elapsed < MIN_DISPLAY_MS) {
-        delay(MIN_DISPLAY_MS - elapsed);
+    while (elapsed < MIN_DISPLAY_MS) {
+        MenuStars::update(tft);
+        delay(20);
+        elapsed = millis() - startMs;
     }
 }
 

@@ -1,6 +1,7 @@
 #include "units_screen.h"
 #include "settings_store.h"
 #include "touch_input.h"
+#include "menu_stars.h"
 #include "i18n.h"
 #include "config.h"
 
@@ -40,6 +41,7 @@ void run(TFT_eSPI& tft) {
     StringId labels[MODE_COUNT] = {StringId::UNITS_AUTO, StringId::UNITS_METRIC, StringId::UNITS_IMPERIAL};
 
     bool done = false;
+    MenuStars::reset();
     while (!done) {
         tft.fillScreen(TFT_BLACK);
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
@@ -60,6 +62,7 @@ void run(TFT_eSPI& tft) {
         TouchInput::Point tap;
         while (true) {
             if (TouchInput::wasTapped(tap)) break;
+            MenuStars::update(tft);
             delay(20);
         }
 

@@ -10,6 +10,7 @@
 #include "units_screen.h"
 #include "settings_backup.h"
 #include "settings_store.h"
+#include "menu_stars.h"
 #include "i18n.h"
 #include "config.h"
 
@@ -77,6 +78,7 @@ namespace {
 void run(TFT_eSPI& tft) {
     Page page = Page::Main;
     bool done = false;
+    MenuStars::reset();
 
     while (!done) {
         tft.fillScreen(TFT_BLACK);
@@ -101,6 +103,7 @@ void run(TFT_eSPI& tft) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
+                MenuStars::update(tft);
                 delay(20);
             }
 
@@ -132,6 +135,7 @@ void run(TFT_eSPI& tft) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
+                MenuStars::update(tft);
                 delay(20);
             }
 
@@ -170,6 +174,7 @@ void run(TFT_eSPI& tft) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
+                MenuStars::update(tft);
                 delay(20);
             }
 
@@ -227,6 +232,7 @@ void run(TFT_eSPI& tft) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
+                MenuStars::update(tft);
                 delay(20);
             }
 

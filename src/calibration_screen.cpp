@@ -1,5 +1,6 @@
 #include "calibration_screen.h"
 #include "touch_input.h"
+#include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
 
@@ -21,10 +22,11 @@ namespace {
         tft.fillCircle(x, y, 3, TFT_WHITE);
     }
 
-    RawAvg waitForTap() {
+    RawAvg waitForTap(TFT_eSPI& tft) {
         RawAvg avg;
 
         while (!TouchInput::rawPoint().touched) {
+            MenuStars::update(tft);
             delay(10);
         }
 
@@ -73,7 +75,8 @@ void run(TFT_eSPI& tft) {
         tft.setTextDatum(TL_DATUM);
 
         drawTarget(tft, targets[i].x, targets[i].y);
-        samples[i] = waitForTap();
+        MenuStars::reset();
+        samples[i] = waitForTap(tft);
     }
 
     int16_t xmin = (samples[0].avgX() + samples[3].avgX()) / 2;

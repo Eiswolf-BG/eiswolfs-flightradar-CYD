@@ -29,6 +29,7 @@
 #include "screenshot.h"
 #include "i18n.h"
 #include "first_run_language_screen.h"
+#include "menu_stars.h"
 #include "ui_font.h"
 
 TFT_eSPI tft = TFT_eSPI();
@@ -256,6 +257,7 @@ void setup() {
         uint32_t waitStart = millis();
         while (WifiMgr::getState() == WifiMgr::State::Connecting && millis() - waitStart < 16000) {
             WifiMgr::update();
+            MenuStars::update(tft);
             delay(100);
         }
 
@@ -280,6 +282,7 @@ void setup() {
     while (LocationManager::currentSource() == LocationManager::Source::None &&
            millis() - locStart < 8000) {
         LocationManager::requestIpLookupIfNeeded();
+        MenuStars::update(tft);
         delay(200);
     }
     SplashScreen::setStatusLine(tft, 2, I18n::t(StringId::SPLASH_READY));
@@ -294,7 +297,7 @@ void setup() {
 
     NetTask::begin();
 
-    SplashScreen::waitRemaining();
+    SplashScreen::waitRemaining(tft);
 
     drawHeader();
     updateStatusLine();
