@@ -145,6 +145,10 @@ enum class StringId : uint8_t {
     WIFI_NETWORKS_TITLE,
     WIFI_ADD_NETWORK,
     WIFI_EMPTY_SLOT,
+    WIFI_INFO_TITLE,
+    WIFI_INFO_PARA1,
+    WIFI_INFO_PARA2,
+    WIFI_INFO_PARA3,
 
     COUNT
 };

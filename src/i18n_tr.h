@@ -145,6 +145,11 @@ static const char* const I18N_TR[] = {
     "WiFi ağları",
     "Ağ ekle",
     "(boş)",
+
+    "WiFi ağları nasıl çalışır",
+    "3 adete kadar WiFi ağı kaydedebilirsiniz. Başlangıçta cihaz, o an erişebildiği ağa otomatik olarak bağlanır.",
+    "Taşınabilir kullanım için kullanışlıdır (ofis, arkadaşlar, tatil evi), aynı yönlendiricide misafir + ana WiFi için, veya evde birden fazla erişim noktanız varsa.",
+    "Kayıtlı bir ağı istediğiniz zaman kırmızı 'X' ile kaldırarak yeni bir ağ için yer açabilirsiniz.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

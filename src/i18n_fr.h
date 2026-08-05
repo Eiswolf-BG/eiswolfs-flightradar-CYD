@@ -145,6 +145,11 @@ static const char* const I18N_FR[] = {
     "Réseaux WiFi",
     "Ajouter un réseau",
     "(vide)",
+
+    "Comment marchent les réseaux WiFi",
+    "Vous pouvez enregistrer jusqu'à 3 réseaux WiFi. Au démarrage, l'appareil se connecte automatiquement à celui qu'il peut atteindre.",
+    "Pratique en déplacement (bureau, amis, maison de vacances), pour un WiFi invité + principal sur le même routeur, ou si vous avez plusieurs points d'accès.",
+    "Supprimez un réseau enregistré à tout moment via le 'X' rouge pour libérer une place pour un nouveau.",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

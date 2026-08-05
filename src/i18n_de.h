@@ -145,6 +145,11 @@ static const char* const I18N_DE[] = {
     "WLAN-Netzwerke",
     "Netzwerk hinzufügen",
     "(leer)",
+
+    "Wie WLAN-Netzwerke funktionieren",
+    "Du kannst bis zu 3 WLAN-Netzwerke speichern. Beim Start verbindet sich das Gerät automatisch mit dem, das gerade erreichbar ist.",
+    "Praktisch für unterwegs (Büro, Freunde, Ferienhaus), für Gast- und Haupt-WLAN am selben Router, oder wenn du mehrere Access Points im Haus hast.",
+    "Über das rote 'X' kannst du ein gespeichertes Netzwerk jederzeit wieder entfernen, um Platz für ein neues zu schaffen.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,
