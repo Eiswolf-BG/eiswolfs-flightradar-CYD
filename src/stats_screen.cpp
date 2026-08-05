@@ -24,18 +24,28 @@ namespace {
         tft.setTextDatum(TL_DATUM);
     }
 
-    void drawStatRow(TFT_eSPI& tft, int16_t y, const String& label, const String& value) {
+    // Label (gedaempftes Gruen) direkt ueber dem Wert (helles Gruen) - BEIDE
+    // in derselben Schriftgroesse (Size 1). Bewusst KEINE gemischten
+    // Groessen mehr in einer Zeile: das Zusammenspiel aus Grundlinien-
+    // Verankerung + Size-2-Skalierung unseres Fonts fuehrte trotz
+    // rechnerisch korrektem Abstand zu sichtbaren Ueberschneidungen. Mit
+    // einheitlicher Groesse ist der noetige Abstand simpel und zuverlaessig.
+    void drawStatRow(TFT_eSPI& tft, int16_t labelY, const String& label, const String& value) {
         tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
-        tft.setCursor(10, y);
+        tft.setCursor(10, labelY);
         tft.print(label);
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
-        tft.setTextSize(2);
-        tft.setCursor(10, y + 14);
+        tft.setCursor(10, labelY + 20);
         tft.print(value);
-        tft.setTextSize(1);
     }
 
     constexpr uint32_t CONFIRM_WINDOW_MS = 4000;
+
+    constexpr int16_t ROW1_Y = 44;
+    constexpr int16_t ROW2_Y = 84;
+    constexpr int16_t ROW3_Y = 124;
+    constexpr int16_t ROW4_Y = 164;
+    constexpr int16_t UPTIME_Y = 202;
 }
 
 void run(TFT_eSPI& tft) {
@@ -44,7 +54,7 @@ void run(TFT_eSPI& tft) {
     tft.setCursor(10, 10);
     tft.println(I18n::t(StringId::STATS_TITLE));
     tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
-    tft.setCursor(10, 44);
+    tft.setCursor(10, ROW1_Y);
     tft.print(I18n::t(StringId::LOADING));
 
     uint16_t today = FlightLogbook::todayCount();
@@ -65,19 +75,19 @@ void run(TFT_eSPI& tft) {
         tft.setCursor(10, 10);
         tft.println(I18n::t(StringId::STATS_TITLE));
 
-        drawStatRow(tft, 44, I18n::t(StringId::STATS_TODAY), String(today));
-        drawStatRow(tft, 90, I18n::t(StringId::STATS_ALLTIME), String(allTimeAircraft));
-        drawStatRow(tft, 136, I18n::t(StringId::STATS_DAYS), String(allTimeDays));
+        drawStatRow(tft, ROW1_Y, I18n::t(StringId::STATS_TODAY), String(today));
+        drawStatRow(tft, ROW2_Y, I18n::t(StringId::STATS_ALLTIME), String(allTimeAircraft));
+        drawStatRow(tft, ROW3_Y, I18n::t(StringId::STATS_DAYS), String(allTimeDays));
 
         if (justReset) {
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.setCursor(10, 182);
+            tft.setCursor(10, ROW4_Y);
             tft.print(I18n::t(StringId::STATS_RESET_DONE));
         } else if (allTimeDays > 0) {
             float avgPerDay = (float)allTimeAircraft / (float)allTimeDays;
             char buf[16];
             snprintf(buf, sizeof(buf), "%.1f", avgPerDay);
-            drawStatRow(tft, 182, I18n::t(StringId::STATS_AVG), String(buf));
+            drawStatRow(tft, ROW4_Y, I18n::t(StringId::STATS_AVG), String(buf));
         }
 
         uint32_t upSec = millis() / 1000;
@@ -86,7 +96,7 @@ void run(TFT_eSPI& tft) {
         char upBuf[8];
         snprintf(upBuf, sizeof(upBuf), "%luh %lum", (unsigned long)upH, (unsigned long)upM);
         tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
-        tft.setCursor(10, 210);
+        tft.setCursor(10, UPTIME_Y);
         tft.print(String(I18n::t(StringId::STATS_UPTIME_PREFIX)) + upBuf);
 
         if (confirmPending) {

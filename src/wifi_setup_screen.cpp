@@ -362,7 +362,7 @@ bool run(TFT_eSPI& tft) {
             tft.println(I18n::t(StringId::WIFI_PASSWORD_LABEL));
             tft.fillRect(8, 38, Config::SCREEN_WIDTH - 16, 22, TFT_BLACK);
             tft.drawRect(8, 38, Config::SCREEN_WIDTH - 16, 22, TFT_GREEN);
-            tft.setCursor(12, 44);
+            tft.setCursor(12, 56);
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.print(passwordBuf);
 

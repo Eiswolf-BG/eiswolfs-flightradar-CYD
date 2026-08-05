@@ -64,11 +64,11 @@ namespace {
             tft.setCursor(10, 10);
             tft.println(I18n::t(StringId::AIRLINE_ADD_TITLE));
 
-            tft.fillRect(8, 40, Config::SCREEN_WIDTH - 16, 30, TFT_BLACK);
-            tft.drawRect(8, 40, Config::SCREEN_WIDTH - 16, 30, TFT_GREEN);
+            tft.fillRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_BLACK);
+            tft.drawRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_GREEN);
             tft.setTextSize(2);
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.setCursor(14, 47);
+            tft.setCursor(14, 66);
             tft.print(buf);
             tft.setTextSize(1);
 

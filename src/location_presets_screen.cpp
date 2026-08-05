@@ -65,7 +65,7 @@ namespace {
             tft.drawRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_GREEN);
             tft.setTextSize(2);
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.setCursor(14, 49);
+            tft.setCursor(14, 66);
             tft.print(buf);
             tft.setTextSize(1);
 

@@ -15,7 +15,7 @@ namespace {
     };
 
     const char* const LANGUAGE_NAMES[LANG_COUNT] = {
-        "English", "Deutsch", "Francais", "Turkce", "Espanol", "Italiano"
+        "English", "Deutsch", "Français", "Türkçe", "Español", "Italiano"
     };
 }
 

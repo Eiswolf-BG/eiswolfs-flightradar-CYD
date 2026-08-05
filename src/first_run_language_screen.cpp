@@ -36,9 +36,7 @@ void run(TFT_eSPI& tft) {
     tft.fillScreen(TFT_BLACK);
     tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.setTextDatum(MC_DATUM);
-    tft.setTextSize(2);
     tft.drawString("Language / Sprache", Config::SCREEN_WIDTH / 2, 24);
-    tft.setTextSize(1);
     tft.setTextDatum(TL_DATUM);
 
     Rect langRects[I18n::LANG_COUNT];

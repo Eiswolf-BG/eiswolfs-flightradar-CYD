@@ -71,7 +71,7 @@ namespace {
         delay(1200);
     }
 
-    enum class Page { Main, Region, Wifi, System, Flight };
+    enum class Page { Main, Region, System, Flight };
 }
 
 void run(TFT_eSPI& tft) {
@@ -107,7 +107,7 @@ void run(TFT_eSPI& tft) {
             if (regionBtn.contains(tap.x, tap.y)) {
                 page = Page::Region;
             } else if (wifiBtn.contains(tap.x, tap.y)) {
-                page = Page::Wifi;
+                WifiManageScreen::run(tft);
             } else if (systemBtn.contains(tap.x, tap.y)) {
                 page = Page::System;
             } else if (flightBtn.contains(tap.x, tap.y)) {
@@ -139,29 +139,6 @@ void run(TFT_eSPI& tft) {
                 LanguageScreen::run(tft);
             } else if (unitsBtn.contains(tap.x, tap.y)) {
                 UnitsScreen::run(tft);
-            } else if (backBtn.contains(tap.x, tap.y)) {
-                page = Page::Main;
-            }
-
-        } else if (page == Page::Wifi) {
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.setCursor(10, 2);
-            tft.println(I18n::t(StringId::MENU_CATEGORY_WIFI));
-
-            Rect wifiManageBtn = rowRect(0);
-            Rect backBtn       = rowRect(1);
-
-            drawButton(tft, wifiManageBtn, I18n::t(StringId::MENU_MANAGE_WIFI));
-            drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
-
-            TouchInput::Point tap;
-            while (true) {
-                if (TouchInput::wasTapped(tap)) break;
-                delay(20);
-            }
-
-            if (wifiManageBtn.contains(tap.x, tap.y)) {
-                WifiManageScreen::run(tft);
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::Main;
             }
