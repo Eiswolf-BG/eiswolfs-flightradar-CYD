@@ -11,6 +11,7 @@
 #include "location_manager.h"
 #include "world_map.h"
 #include "airline_filter.h"
+#include "aircraft_watchlist.h"
 #include "i18n.h"
 #include <math.h>
 
@@ -56,6 +57,7 @@ namespace {
         float headingDeg;
         float distanceKm;
         bool isEmergency;
+        bool isWatched;
     };
     constexpr uint8_t MAX_HIT_POINTS = Config::MAX_TRACKED_AIRCRAFT;
     HitPoint hitPoints[MAX_HIT_POINTS];
@@ -487,6 +489,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         uint16_t color = colorForAltitude(a.altBaroFt);
         bool isSelected = selectedHex[0] && strcmp(a.hex, selectedHex) == 0;
         bool isEmergency = SettingsStore::emergencyAlertEnabled() && isEmergencySquawk(a.squawk);
+        bool isWatched = SettingsStore::watchlistAlertEnabled() && AircraftWatchlist::isWatched(a.callsign);
 
         TrailEntry* trail = findOrCreateTrail(a.hex);
         uint16_t trailColor = dimColorForAltitude(a.altBaroFt);
@@ -503,6 +506,8 @@ void render(TFT_eSPI& tft, int16_t top) {
 
         if (isEmergency) {
             tft.drawCircle(pt.x, pt.y, 12, TFT_RED);
+        } else if (isWatched) {
+            tft.drawCircle(pt.x, pt.y, 12, TFT_CYAN);
         }
 
         tft.setTextColor(color);
@@ -518,6 +523,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         hitPoints[i].headingDeg = a.headingDeg;
         hitPoints[i].distanceKm = a.distanceKm;
         hitPoints[i].isEmergency = isEmergency;
+        hitPoints[i].isWatched = isWatched;
         strncpy(hitPoints[i].hex, a.hex, sizeof(hitPoints[i].hex) - 1);
         strncpy(hitPoints[i].callsign, a.callsign, sizeof(hitPoints[i].callsign) - 1);
     }
@@ -602,6 +608,8 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
 
         if (hp.isEmergency) {
             tft.drawCircle(hp.x, hp.y, 12, TFT_RED);
+        } else if (hp.isWatched) {
+            tft.drawCircle(hp.x, hp.y, 12, TFT_CYAN);
         }
 
         tft.setTextColor(hp.color);
@@ -671,22 +679,26 @@ bool handleTap(int16_t x, int16_t y, int16_t top) {
 void updateProximityAlert(uint32_t nowMs) {
     bool anyClose = false;
     bool anyEmergency = false;
+    bool anyWatched = false;
 
     bool proximityOn = SettingsStore::proximityAlertEnabled();
     bool emergencyOn = SettingsStore::emergencyAlertEnabled();
+    bool watchlistOn = SettingsStore::watchlistAlertEnabled();
 
-    if (proximityOn || emergencyOn) {
+    if (proximityOn || emergencyOn || watchlistOn) {
         AircraftTable::lock();
         Aircraft* table = AircraftTable::raw();
         for (uint8_t i = 0; i < AircraftTable::capacity(); i++) {
             if (!table[i].valid) continue;
             if (proximityOn && table[i].distanceKm <= Config::LED_ALERT_RADIUS_KM) anyClose = true;
             if (emergencyOn && isEmergencySquawk(table[i].squawk)) anyEmergency = true;
+            if (watchlistOn && AircraftWatchlist::isWatched(table[i].callsign)) anyWatched = true;
         }
         AircraftTable::unlock();
     }
 
     LedAlert::Mode mode = anyEmergency ? LedAlert::Mode::EmergencyRed
+                         : anyWatched  ? LedAlert::Mode::WatchlistBlue
                          : anyClose    ? LedAlert::Mode::ProximityGreen
                                        : LedAlert::Mode::Off;
 

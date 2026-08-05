@@ -17,6 +17,9 @@ namespace SettingsStore {
     bool proximityAlertEnabled();
     void setProximityAlertEnabled(bool on);
 
+    bool watchlistAlertEnabled();
+    void setWatchlistAlertEnabled(bool on);
+
     bool flightLogbookEnabled();
     void setFlightLogbookEnabled(bool on);
 
@@ -25,6 +28,9 @@ namespace SettingsStore {
 
     uint8_t screenTimeoutMinutes();
     void setScreenTimeoutMinutes(uint8_t minutes);
+
+    bool nightDimmingEnabled();
+    void setNightDimmingEnabled(bool on);
 
     bool hideGroundVehicles();
     void setHideGroundVehicles(bool on);

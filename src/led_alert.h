@@ -9,6 +9,7 @@ namespace LedAlert {
     enum class Mode {
         Off,
         ProximityGreen,
+        WatchlistBlue,
         EmergencyRed,
     };
 

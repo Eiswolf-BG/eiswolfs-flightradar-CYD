@@ -11,6 +11,7 @@
 #include "aircraft_table.h"
 #include "airline_lookup.h"
 #include "airline_filter.h"
+#include "aircraft_watchlist.h"
 #include "sd_storage.h"
 #include "wifi_manager.h"
 #include "location_manager.h"
@@ -49,10 +50,12 @@ bool wasEmergency = false;
 bool bannerBlinkOn = false;
 
 constexpr uint8_t BACKLIGHT_FULL = 255;
+constexpr uint8_t BACKLIGHT_NIGHT_DIM = 90;
 constexpr uint8_t BACKLIGHT_DIMMED = 12;
 constexpr uint8_t BACKLIGHT_PWM_CHANNEL = 0;
 uint32_t lastInteractionMs = 0;
 bool screenDimmed = false;
+bool nightDimActive = false;
 
 struct Rect {
     int16_t x, y, w, h;
@@ -144,6 +147,33 @@ void updateStatusLine() {
     }
 
     updateWifiIcon();
+}
+
+// Prueft, ob die aktuelle Lokalzeit im Nachtdimm-Fenster (22:00-06:00) liegt.
+// Ueber Mitternacht hinweg gerechnet. Solange die Uhrzeit noch nicht per NTP
+// synchronisiert ist, wird false zurueckgegeben statt zu raten (gleiche
+// Pruefung wie in updateStatusLine()).
+bool isNightDimHours() {
+    time_t now = time(nullptr);
+    if (now <= 8 * 3600 * 2) return false;
+
+    struct tm tmNow;
+    localtime_r(&now, &tmNow);
+    int hour = tmNow.tm_hour;
+    return (hour >= 22 || hour < 6);
+}
+
+// Sanfte Nachtdimmung des Backlights zwischen 22:00 und 06:00 Uhr, sofern in
+// den Einstellungen aktiviert. Der Inaktivitaets-Timeout (screenDimmed) hat
+// Vorrang und wird hier nicht ueberschrieben.
+void updateNightDimming() {
+    if (screenDimmed) return;
+
+    bool shouldDim = SettingsStore::nightDimmingEnabled() && isNightDimHours();
+    if (shouldDim != nightDimActive) {
+        ledcWrite(BACKLIGHT_PWM_CHANNEL, shouldDim ? BACKLIGHT_NIGHT_DIM : BACKLIGHT_FULL);
+        nightDimActive = shouldDim;
+    }
 }
 
 void takeScreenshotWithFeedback() {
@@ -240,6 +270,7 @@ void setup() {
     WifiMgr::init();
     LocationPresets::init();
     AirlineFilter::init();
+    AircraftWatchlist::init();
 
     SplashScreen::begin(tft);
     SplashScreen::setStatusLine(tft, 0, I18n::t(StringId::SPLASH_SD_OK), TFT_WHITE);
@@ -314,7 +345,9 @@ void loop() {
         lastInteractionMs = millis();
 
         if (screenDimmed) {
-            ledcWrite(BACKLIGHT_PWM_CHANNEL, BACKLIGHT_FULL);
+            bool shouldNightDim = SettingsStore::nightDimmingEnabled() && isNightDimHours();
+            ledcWrite(BACKLIGHT_PWM_CHANNEL, shouldNightDim ? BACKLIGHT_NIGHT_DIM : BACKLIGHT_FULL);
+            nightDimActive = shouldNightDim;
             screenDimmed = false;
             tapped = false;
         }
@@ -360,6 +393,7 @@ void loop() {
     if (nowMs - lastStatusLineMs >= STATUS_LINE_UPDATE_MS) {
         lastStatusLineMs = nowMs;
         updateStatusLine();
+        updateNightDimming();
     }
 
     uint8_t timeoutMin = SettingsStore::screenTimeoutMinutes();

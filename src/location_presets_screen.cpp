@@ -1,5 +1,7 @@
 #include "location_presets_screen.h"
 #include "location_presets.h"
+#include "location_manager.h"
+#include "airport_lookup.h"
 #include "touch_input.h"
 #include "menu_stars.h"
 #include "config.h"
@@ -170,8 +172,7 @@ namespace {
 
         constexpr int16_t textMaxWidth = Config::SCREEN_WIDTH - 20;
         constexpr int16_t LINE_H = 16;
-        constexpr int16_t VIEW_TOP = 40;
-        Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+        constexpr int16_t VIEW_TOP = 36;
         constexpr int16_t VIEW_BOTTOM = Config::SCREEN_HEIGHT - 60;
 
         int16_t totalH = VIEW_TOP;
@@ -180,14 +181,19 @@ namespace {
         totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA2), 0, 0, 0, false);
         totalH += 8;
         totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA3), 0, 0, 0, false);
+        totalH += 8;
+        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA4), 0, 0, 0, false);
 
         int16_t maxScroll = totalH - VIEW_BOTTOM;
         if (maxScroll < 0) maxScroll = 0;
         bool scrollable = maxScroll > 0;
         int16_t scrollY = 0;
 
-        Rect upBtn   = {(int16_t)(Config::SCREEN_WIDTH - 34), 4, 30, 24};
-        Rect downBtn = {(int16_t)(Config::SCREEN_WIDTH - 34), 30, 30, 24};
+        Rect backBtn = scrollable
+            ? Rect{10, (int16_t)(Config::SCREEN_HEIGHT - 50), 130, 40}
+            : Rect{10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+        Rect upBtn   = {146, (int16_t)(Config::SCREEN_HEIGHT - 50), 38, 40};
+        Rect downBtn = {190, (int16_t)(Config::SCREEN_HEIGHT - 50), 38, 40};
         constexpr int16_t SCROLL_STEP = 48;
 
         auto redraw = [&]() {
@@ -196,20 +202,21 @@ namespace {
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::LOCATION_INFO_TITLE));
 
-            if (scrollable) {
-                drawButton(tft, upBtn, "^");
-                drawButton(tft, downBtn, "v");
-            }
-
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             int16_t y = VIEW_TOP;
             y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA1), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
             y += 8;
             y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA2), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
             y += 8;
-            layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA3), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
+            y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA3), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
+            y += 8;
+            layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA4), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
 
             drawButton(tft, backBtn, I18n::t(StringId::BACK));
+            if (scrollable) {
+                drawButton(tft, upBtn, "^");
+                drawButton(tft, downBtn, "v");
+            }
         };
 
         redraw();
@@ -294,6 +301,25 @@ void run(TFT_eSPI& tft) {
         bool canAdd = count < LocationPresets::MAX_PRESETS;
         if (canAdd) {
             drawButton(tft, addBtn, I18n::t(StringId::LOCATION_ADD));
+        }
+
+        {
+            double activeLat = 0, activeLon = 0;
+            if (active < 0) {
+                LocationManager::getHomeLocation(activeLat, activeLon);
+            } else {
+                LocationPresets::getLatLon((uint8_t)active, activeLat, activeLon);
+            }
+            AirportLookup::Nearest nearest = AirportLookup::findNearest(activeLat, activeLon);
+            if (nearest.found) {
+                char buf[48];
+                snprintf(buf, sizeof(buf), "%s %s (%.0f km)", nearest.icao, nearest.name, nearest.distanceKm);
+                String line = String(I18n::t(StringId::LOCATION_NEAREST_AIRPORT_PREFIX)) + buf;
+                line = truncateForWidth(tft, line, (int16_t)(Config::SCREEN_WIDTH - 20));
+                tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+                tft.setCursor(10, (int16_t)(Config::SCREEN_HEIGHT - 60));
+                tft.print(line);
+            }
         }
 
         Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};

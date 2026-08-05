@@ -6,6 +6,7 @@
 #include "logbook_files_screen.h"
 #include "location_presets_screen.h"
 #include "airline_filter_screen.h"
+#include "aircraft_watchlist_screen.h"
 #include "language_screen.h"
 #include "units_screen.h"
 #include "settings_backup.h"
@@ -24,8 +25,8 @@ namespace {
         }
     };
 
-    constexpr int16_t ROW_H = 24;
-    constexpr int16_t ROW_GAP = 2;
+    constexpr int16_t ROW_H = 22;
+    constexpr int16_t ROW_GAP = 1;
     constexpr int16_t ROW_START_Y = 18;
 
     Rect rowRect(uint8_t index) {
@@ -152,12 +153,13 @@ void run(TFT_eSPI& tft) {
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_SYSTEM));
 
-            Rect calibBtn   = rowRect(0);
-            Rect invertBtn  = rowRect(1);
-            Rect timeoutBtn = rowRect(2);
-            Rect backupBtn  = rowRect(3);
-            Rect restoreBtn = rowRect(4);
-            Rect backBtn    = rowRect(5);
+            Rect calibBtn     = rowRect(0);
+            Rect invertBtn    = rowRect(1);
+            Rect timeoutBtn   = rowRect(2);
+            Rect nightDimBtn  = rowRect(3);
+            Rect backupBtn    = rowRect(4);
+            Rect restoreBtn   = rowRect(5);
+            Rect backBtn      = rowRect(6);
 
             drawButton(tft, calibBtn, I18n::t(StringId::MENU_CALIBRATE));
 
@@ -167,6 +169,7 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, invertBtn, invertLabel);
 
             drawButton(tft, timeoutBtn, screenTimeoutLabel(SettingsStore::screenTimeoutMinutes()));
+            drawButton(tft, nightDimBtn, I18n::t(StringId::MENU_NIGHT_DIMMING) + onOff(SettingsStore::nightDimmingEnabled()));
             drawButton(tft, backupBtn, I18n::t(StringId::MENU_BACKUP));
             drawButton(tft, restoreBtn, I18n::t(StringId::MENU_RESTORE));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
@@ -188,6 +191,8 @@ void run(TFT_eSPI& tft) {
                 uint8_t current = SettingsStore::screenTimeoutMinutes();
                 uint8_t next = (current >= 10) ? 0 : (current + 1);
                 SettingsStore::setScreenTimeoutMinutes(next);
+            } else if (nightDimBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setNightDimmingEnabled(!SettingsStore::nightDimmingEnabled());
             } else if (backupBtn.contains(tap.x, tap.y)) {
                 bool ok = SettingsBackup::backup();
                 showBriefMessage(tft, I18n::t(ok ? StringId::MENU_BACKUP_SAVED : StringId::MENU_BACKUP_FAILED),
@@ -215,8 +220,10 @@ void run(TFT_eSPI& tft) {
             Rect emergencyBtn  = rowRect(5);
             Rect locationBtn   = rowRect(6);
             Rect airlineBtn    = rowRect(7);
-            Rect groundBtn     = rowRect(8);
-            Rect backBtn       = rowRect(9);
+            Rect watchlistBtn      = rowRect(8);
+            Rect watchlistAlertBtn = rowRect(9);
+            Rect groundBtn     = rowRect(10);
+            Rect backBtn       = rowRect(11);
 
             drawButton(tft, statsBtn, I18n::t(StringId::MENU_STATISTICS));
             drawButton(tft, logFilesBtn, I18n::t(StringId::MENU_LOGBOOK_FILES));
@@ -226,6 +233,8 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, emergencyBtn, I18n::t(StringId::MENU_EMERGENCY_ALERT) + onOff(SettingsStore::emergencyAlertEnabled()));
             drawButton(tft, locationBtn, I18n::t(StringId::MENU_LOCATION_PRESETS));
             drawButton(tft, airlineBtn, I18n::t(StringId::MENU_AIRLINE_FILTER));
+            drawButton(tft, watchlistBtn, I18n::t(StringId::MENU_WATCHLIST));
+            drawButton(tft, watchlistAlertBtn, I18n::t(StringId::MENU_WATCHLIST_ALERT) + onOff(SettingsStore::watchlistAlertEnabled()));
             drawButton(tft, groundBtn, I18n::t(StringId::MENU_HIDE_GROUND) + onOff(SettingsStore::hideGroundVehicles()));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
@@ -252,6 +261,10 @@ void run(TFT_eSPI& tft) {
                 LocationPresetsScreen::run(tft);
             } else if (airlineBtn.contains(tap.x, tap.y)) {
                 AirlineFilterScreen::run(tft);
+            } else if (watchlistBtn.contains(tap.x, tap.y)) {
+                AircraftWatchlistScreen::run(tft);
+            } else if (watchlistAlertBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setWatchlistAlertEnabled(!SettingsStore::watchlistAlertEnabled());
             } else if (groundBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setHideGroundVehicles(!SettingsStore::hideGroundVehicles());
             } else if (backBtn.contains(tap.x, tap.y)) {

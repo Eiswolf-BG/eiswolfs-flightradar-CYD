@@ -1,5 +1,6 @@
 #include "splash_screen.h"
 #include "menu_stars.h"
+#include <math.h>
 
 namespace SplashScreen {
 
@@ -20,17 +21,74 @@ namespace {
         tft.drawFastVLine(cx, cy - 80, 160, dim);
     }
 
-    void drawMiniJet(TFT_eSPI& tft, int16_t x, int16_t y, uint16_t color) {
-        tft.drawLine(x, y - 10, x, y + 12, color);
-        tft.drawLine(x - 12, y + 2, x + 12, y + 2, color);
-        tft.drawLine(x - 5, y + 10, x + 5, y + 10, color);
+    // Dreht einen Punkt (px, py) im lokalen Koordinatensystem der kleinen
+    // Deko-Symbole um angleDeg und verschiebt ihn nach (x, y).
+    void rotatePoint(int16_t x, int16_t y, float sinA, float cosA,
+                      float px, float py, int16_t& outX, int16_t& outY) {
+        outX = x + (int16_t)lroundf(px * cosA - py * sinA);
+        outY = y + (int16_t)lroundf(px * sinA + py * cosA);
     }
 
-    void drawMiniHeli(TFT_eSPI& tft, int16_t x, int16_t y, uint16_t color) {
-        tft.drawLine(x - 8, y - 6, x + 8, y - 6, color);
-        tft.drawLine(x, y - 6, x, y + 4, color);
-        tft.drawCircle(x, y + 2, 4, color);
-        tft.drawLine(x - 4, y + 7, x + 4, y + 7, color);
+    // Kleines Flugzeug-Silhouette aus gefuellten Dreiecken (Rumpf, Tragflaechen,
+    // Leitwerk), analog zum grossen Flugzeug in der Mitte, aber schlichter und
+    // in beliebiger Richtung (angleDeg, 0 = Nase zeigt nach oben).
+    void drawMiniJet(TFT_eSPI& tft, int16_t x, int16_t y, uint16_t color, float angleDeg) {
+        float rad = angleDeg * (PI / 180.0f);
+        float s = sinf(rad), c = cosf(rad);
+
+        int16_t nx, ny, flx, fly, frx, fry;
+        rotatePoint(x, y, s, c, 0, -11, nx, ny);
+        rotatePoint(x, y, s, c, -3, 11, flx, fly);
+        rotatePoint(x, y, s, c, 3, 11, frx, fry);
+        tft.fillTriangle(nx, ny, flx, fly, frx, fry, color);
+
+        int16_t wlx, wly, wrx, wry, wcx, wcy;
+        rotatePoint(x, y, s, c, -13, 3, wlx, wly);
+        rotatePoint(x, y, s, c, 13, 3, wrx, wry);
+        rotatePoint(x, y, s, c, 0, -3, wcx, wcy);
+        tft.fillTriangle(wlx, wly, wrx, wry, wcx, wcy, color);
+
+        int16_t tlx, tly, trx, try_, ttx, tty;
+        rotatePoint(x, y, s, c, -5, 8, tlx, tly);
+        rotatePoint(x, y, s, c, 5, 8, trx, try_);
+        rotatePoint(x, y, s, c, 0, 13, ttx, tty);
+        tft.fillTriangle(tlx, tly, trx, try_, ttx, tty, color);
+    }
+
+    // Kleiner Helikopter: Rotorkreis mit Blaettern, gefuellter Rumpf, Heckausleger
+    // mit Leitwerk. angleDeg bestimmt die Flugrichtung (0 = Nase nach oben).
+    void drawMiniHeli(TFT_eSPI& tft, int16_t x, int16_t y, uint16_t color, float angleDeg) {
+        float rad = angleDeg * (PI / 180.0f);
+        float s = sinf(rad), c = cosf(rad);
+
+        int16_t rcx, rcy;
+        rotatePoint(x, y, s, c, 0, -7, rcx, rcy);
+        tft.drawCircle(rcx, rcy, 6, color);
+
+        int16_t b1x, b1y, b2x, b2y;
+        rotatePoint(x, y, s, c, -7, -7, b1x, b1y);
+        rotatePoint(x, y, s, c, 7, -7, b2x, b2y);
+        tft.drawLine(b1x, b1y, b2x, b2y, color);
+        rotatePoint(x, y, s, c, 0, -13, b1x, b1y);
+        rotatePoint(x, y, s, c, 0, -1, b2x, b2y);
+        tft.drawLine(b1x, b1y, b2x, b2y, color);
+
+        int16_t cx1, cy1, cx2, cy2, cx3, cy3;
+        rotatePoint(x, y, s, c, 0, -6, cx1, cy1);
+        rotatePoint(x, y, s, c, -4, 4, cx2, cy2);
+        rotatePoint(x, y, s, c, 4, 4, cx3, cy3);
+        tft.fillTriangle(cx1, cy1, cx2, cy2, cx3, cy3, color);
+
+        int16_t tbx1, tby1, tbx2, tby2;
+        rotatePoint(x, y, s, c, 0, 4, tbx1, tby1);
+        rotatePoint(x, y, s, c, 0, 12, tbx2, tby2);
+        tft.drawLine(tbx1, tby1, tbx2, tby2, color);
+
+        int16_t fx1, fy1, fx2, fy2, fx3, fy3;
+        rotatePoint(x, y, s, c, -3, 10, fx1, fy1);
+        rotatePoint(x, y, s, c, 3, 10, fx2, fy2);
+        rotatePoint(x, y, s, c, 0, 15, fx3, fy3);
+        tft.fillTriangle(fx1, fy1, fx2, fy2, fx3, fy3, color);
     }
 
     void drawAirplane(TFT_eSPI& tft, int16_t cx) {
@@ -55,10 +113,10 @@ void begin(TFT_eSPI& tft) {
     drawRadarReticle(tft, cx, 174);
 
     uint16_t dimGreen = 0x0320;
-    drawMiniJet(tft, cx - 45, 135, dimGreen); 
-    drawMiniJet(tft, cx + 50, 160, dimGreen); 
-    drawMiniHeli(tft, cx - 35, 215, dimGreen);     
-    drawMiniHeli(tft, cx + 45, 115, dimGreen);     
+    drawMiniJet(tft, cx - 45, 135, dimGreen, 25.0f);
+    drawMiniJet(tft, cx + 50, 160, dimGreen, 160.0f);
+    drawMiniHeli(tft, cx - 35, 215, dimGreen, 250.0f);
+    drawMiniHeli(tft, cx + 45, 115, dimGreen, 100.0f);
 
     drawAirplane(tft, cx);
 

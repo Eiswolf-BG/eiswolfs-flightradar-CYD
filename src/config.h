@@ -31,6 +31,7 @@ namespace Config {
     constexpr const char* SD_ROOT_DIR              = "/Flightradar_cyd";
     constexpr const char* SD_AIRLINES_CSV          = "/Flightradar_cyd/airlines.csv";
     constexpr const char* SD_AIRCRAFT_TYPES_CSV    = "/Flightradar_cyd/aircraft_types.csv";
+    constexpr const char* SD_AIRPORTS_CSV          = "/Flightradar_cyd/airports.csv";
     constexpr const char* SD_LOG_DIR               = "/Flightradar_cyd/logs";
     constexpr const char* SD_SCREENSHOT_DIR         = "/Flightradar_cyd/screenshots";
     constexpr const char* SD_SETTINGS_FILE         = "/Flightradar_cyd/config.txt";
