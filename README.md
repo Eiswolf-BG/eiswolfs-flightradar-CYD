@@ -33,6 +33,8 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Adjustable range** (10/25/50/100 km) via on-screen button
 - **Touch-driven WiFi setup** and on-screen keyboard for first-time configuration, with up to 3 saved networks (see [WiFi Manager](#-wifi-manager-up-to-3-saved-networks) below)
 - **Location presets** – save up to 3 fixed locations, or point the radar at any place in the world (see [Location Presets](#-location-presets) below)
+- **Aircraft watchlist** – track up to 5 specific flights by callsign, with a cyan radar ring and blue LED alert when one appears (see [Watchlist](#-watchlist) below)
+- **Night dimming** – automatically dims the backlight to a softer (but still readable) level between 22:00 and 06:00 local time (see [Night Dimming](#-night-dimming) below)
 - **IP-based geolocation** (no GPS module needed) to center the radar on your location
 - **Proximity LED alert** – the onboard RGB LED blinks green when an aircraft is within 3 km (no speaker on this board, so this replaces an audible alert)
 - **Dual-core design** – all networking (WiFi, ADS-B polling, aircraft detail lookups) runs on Core 0, while the display and touch input run on Core 1, so the UI never freezes during a network request
@@ -65,6 +67,8 @@ live air traffic *there* instead, regardless of where your device physically is.
 A "?" info button right on the Location Presets screen explains all of this
 again directly on the device.
 
+The screen also shows the **nearest known airport** (from a built-in list of ~34 major airports worldwide) to whichever location is currently active - handy to see exactly where a foreign preset points to, or why a location has a lot of air traffic. If the airport name doesn't fit on one line, it scrolls horizontally like a marquee.
+
 ### 📶 WiFi Manager (up to 3 saved networks)
 Under **Menu → WiFi/Network** you can save up to 3 WiFi networks at once (not
 just one). On boot, the device automatically connects to whichever one it can
@@ -82,6 +86,11 @@ currently see.
 
 Any saved network can be removed again at any time via the red "X", freeing up a
 slot for a new one.
+
+### 🌙 Night Dimming
+Between 22:00 and 06:00 local time, the backlight automatically dims to a softer brightness level - still perfectly readable, but easier on the eyes if the device sits in a bedroom or living room around the clock. This is separate from (and gentler than) the existing inactivity timeout dimming, which kicks in after a period of no touch input regardless of time of day.
+
+Toggle it under **Menu → System → "Night dimming"**. When you tap the screen while it's night-dimmed, it wakes back up to the soft night level (not full brightness) if it's still within the night window - no sudden bright flash in a dark room.
 
 ## ✈️ Flight Options — every function in detail
 
@@ -116,6 +125,9 @@ Continuously monitors all visible aircraft for one of the three international **
 - **7700** – general emergency
 
 If the device detects one of these codes, the RGB LED **blinks red rapidly** (noticeably faster/more urgent than the green proximity blink), and a flashing red banner appears in the radar header showing the callsign and squawk code. Takes priority over all other LED indications (proximity, heartbeat).
+
+### 🎯 Watchlist
+Track up to **5 specific flights** by their exact callsign (e.g. `DLH441`) - unlike the Airline Filter, which matches whole airlines, this targets one specific flight. As soon as a watched aircraft appears anywhere within the current radar range, it gets a **cyan ring** on the radar and the **RGB LED blinks blue** - handy for spotting a particular flight, e.g. when someone you know is arriving. Takes priority over the normal proximity alert, but not over an emergency squawk. Menu → Flight Options → **"Watchlist"** / **"Watchlist alert"**.
 
 ### 📍 Location Presets
 See the dedicated section above: [Location Presets](#-location-presets) – save up to 3 fixed locations, or enter any place in the world to watch the air traffic there.
