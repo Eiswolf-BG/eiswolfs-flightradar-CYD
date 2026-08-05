@@ -4,12 +4,12 @@ A live ADS-B flight radar running on the ESP32 "Cheap Yellow Display" (CYD,
 ESP32-2432S028), showing nearby aircraft on a rotating radar screen with
 altitude/speed/model/route details and a proximity LED alert.
 
-![platform](https://shields.io)
-![framework](https://shields.io)
+![platform](https://img.shields.io/badge/platform-ESP32--2432S028-yellow)
+![framework](https://img.shields.io/badge/framework-Arduino%20%2F%20PlatformIO-blue)
 
 ![Eiswolfs Flightradar screenshot](images/radar.jpg)
 
-## 🚀 [Click here to open the Flightradar Web Flasher](https://github.io)
+## 🚀 [Click here to open the Flightradar Web Flasher](https://eiswolf-bg.github.io/eiswolfs-flightradar-CYD/)
 
 ---
 
