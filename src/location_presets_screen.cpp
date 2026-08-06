@@ -188,8 +188,15 @@ namespace {
     // anderer Standort aktiviert wurde) - merkt sich Text + Ringpuffer und
     // setzt den Scroll-Fortschritt zurueck.
     void setupMarquee(TFT_eSPI& tft, const String& text, int16_t viewportW) {
+        // WICHTIG: textWidth() haengt von der aktuell gesetzten Textgroesse
+        // ab. Der Marquee wird in Size 2 gezeichnet (siehe drawMarquee),
+        // also muss hier ebenfalls Size 2 aktiv sein, sonst wird die
+        // Breite falsch (zu schmal) gemessen und der Text ragt beim
+        // Zeichnen ueber den verfuegbaren Platz hinaus.
+        tft.setTextSize(2);
         airportMarquee.text = text;
         airportMarquee.needsScroll = tft.textWidth(text) > viewportW;
+        tft.setTextSize(1);
         String withGap = text + "     "; // 5 Leerzeichen Luecke vor der Wiederholung
         airportMarquee.ring = withGap + withGap;
         airportMarquee.charOffset = 0;
@@ -213,10 +220,16 @@ namespace {
 
         tft.fillRect(x, y - h + 4, w, h, TFT_BLACK);
         tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+        // Groessere Schrift fuer den Nearest-Airport-Marquee (auf Wunsch
+        // vergroessert von Size 1 auf Size 2) - nach dem Zeichnen wieder auf
+        // Size 1 zurueckstellen, damit nachfolgender Code (z.B. der
+        // "Zurueck"-Button) nicht versehentlich auch vergroessert wird.
+        tft.setTextSize(2);
         tft.setCursor(x, y);
 
         if (!airportMarquee.needsScroll) {
             tft.print(airportMarquee.text);
+            tft.setTextSize(1);
             return;
         }
 
@@ -231,6 +244,7 @@ namespace {
         }
 
         tft.print(marqueeWindow(tft, airportMarquee.ring, airportMarquee.charOffset, w));
+        tft.setTextSize(1);
     }
 
     void runInfoScreen(TFT_eSPI& tft) {
