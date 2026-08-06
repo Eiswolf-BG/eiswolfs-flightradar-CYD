@@ -58,6 +58,7 @@ static const char* const I18N_DE[] = {
     "Bildschirm-Timeout: ",
     "Nachtdimmung (22-6 Uhr): ",
     "Statistik",
+    "Verlauf",
     "Logbuch-Dateien",
     "Weitere Einstellungen >",
     "Notfall-Alarm: ",
@@ -116,6 +117,10 @@ static const char* const I18N_DE[] = {
     "Nochmal tippen zum Bestätigen!",
     "Flugbuch-Daten zurückgesetzt.",
     "Laufzeit: ",
+    "Verlauf (letzte 7 Tage)",
+    "Noch keine Flugbuch-Einträge.",
+    "Wie der Verlauf funktioniert",
+    "Zeigt die Anzahl neu geloggter Flugzeuge pro Tag, für bis zu die letzten 7 Tage mit Flugbuch-Daten. Die Balkenhöhe ist relativ zum verkehrsreichsten angezeigten Tag - ein höherer Balken bedeutet mehr geloggte Flugzeuge an diesem Tag. Die Zahl über jedem Balken ist der genaue Wert.",
 
     "Logbuch-Dateien",
     "Noch keine Flugbuch-Einträge.",
@@ -123,6 +128,9 @@ static const char* const I18N_DE[] = {
     " von ",
     " Tagen",
     " Flugzeuge",
+    "Export per Webbrowser",
+    "Das Gerät bietet auch eine kleine Webseite zum Exportieren des kompletten Flugbuchs an. Im selben WLAN einfach im Browser aufrufen:",
+    "Keine WLAN-Verbindung - die Export-Seite ist nur erreichbar, solange eine Netzwerkverbindung besteht.",
 
     "Für Details antippen",
 

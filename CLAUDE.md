@@ -144,3 +144,35 @@ mit Foto vom echten Display), bevor der Code als fertig gilt.
 Keine akuten offenen Bugs bekannt (Stand v2.3.2). Mögliche Ideen für später,
 falls der Nutzer danach fragt: weitere Menüs mit Info-Buttons versehen,
 ggf. weitere Sprachen, ggf. Export/Teilen der Logbuch-Daten.
+## Standard-Workflow: Push & Release
+
+Bei JEDEM Release-Push (egal ob großes Feature oder kleiner Bugfix) automatisch
+folgende Schritte in dieser Reihenfolge:
+
+1. Prüfen, ob seit dem letzten Commit neue/geänderte Features hinzugekommen
+   sind, die für Endnutzer sichtbar sind (neue Menüpunkte, geändertes
+   Verhalten, neue Screens) - falls ja, **README.md entsprechend ergänzen**
+   (gleicher Stil: Emoji-Überschriften, Ankerlinks zwischen "Features"-Liste
+   und den Deep-Dive-Sektionen, kurze Beispiele wo sinnvoll). Reine interne
+   Bugfixes/Refactorings ohne sichtbare Nutzerauswirkung brauchen keinen
+   README-Eintrag.
+2. Code committen (aussagekräftige Commit-Message).
+3. Falls es sich um einen Versionssprung handelt: Git-Tag mit
+   Versionsnummer + Beschreibung der Änderungen erstellen.
+4. Prüfen, ob `index.html` (Web-Flasher) noch die alte Versionsnummer zeigt -
+   falls ja, aktualisieren.
+5. Prüfen, ob `bootloader.bin`, `firmware.bin`, `partitions.bin` im
+   Hauptverzeichnis dem aktuellen Build in `.pio/build/esp32dev/`
+   entsprechen - falls nicht, von dort kopieren.
+6. Alle diese Änderungen (Code + README + Web-Flasher-Dateien) zusammen
+   committen und pushen (`git push`, plus `git push origin vX.Y.Z` falls ein
+   Tag erstellt wurde).
+7. Kurze Zusammenfassung am Ende: was committet/getaggt/gepusht wurde, und
+   ob die README aktualisiert wurde (und falls ja, welche Abschnitte).
+   ## Nach jedem erfolgreichen Build automatisch flashen
+
+Sobald `pio run` (Build) erfolgreich ohne Fehler durchgelaufen ist, IMMER direkt
+im Anschluss auch flashen (`pio run --target upload`), ohne extra danach zu
+fragen - außer der Nutzer sagt ausdrücklich "nur bauen, nicht flashen" o.ä.
+Kurz danach bestätigen, dass der Upload ebenfalls erfolgreich war (inkl.
+"[SUCCESS]"-Zeile am Ende).

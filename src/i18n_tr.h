@@ -58,6 +58,7 @@ static const char* const I18N_TR[] = {
     "Ekran zaman aşımı: ",
     "Gece kısma (22-06): ",
     "İstatistikler",
+    "Geçmiş",
     "Kayıt defteri dosyaları",
     "Diğer ayarlar >",
     "Acil durum alarmı: ",
@@ -116,6 +117,10 @@ static const char* const I18N_TR[] = {
     "Onaylamak için tekrar dokunun!",
     "Kayıt defteri sıfırlandı.",
     "Çalışma süresi: ",
+    "Geçmiş (son 7 gün)",
+    "Henüz kayıt yok.",
+    "Geçmiş grafiği nasıl çalışır",
+    "Kayıt defteri verisi bulunan son 7 güne kadar, günlük olarak yeni kaydedilen uçak sayısını gösterir. Çubuk yüksekliği gösterilen en yoğun güne göredir - daha yüksek bir çubuk o gün daha fazla uçak kaydedildiği anlamına gelir. Her çubuğun üzerindeki sayı tam değeri gösterir.",
 
     "Kayıt defteri dosyaları",
     "Henüz kayıt yok.",
@@ -123,6 +128,9 @@ static const char* const I18N_TR[] = {
     " / ",
     " gün gösteriliyor",
     " uçak",
+    "Web tarayıcısı ile dışa aktarma",
+    "Cihaz ayrıca tam kayıt defterini dışa aktarmak için küçük bir web sayfası da sunar. Aynı WiFi ağındayken tarayıcıda şu adresi açmanız yeterli:",
+    "WiFi bağlantısı yok - dışa aktarma sayfasına yalnızca bir ağ bağlantısı varken ulaşılabilir.",
 
     "Detaylar için dokunun",
 

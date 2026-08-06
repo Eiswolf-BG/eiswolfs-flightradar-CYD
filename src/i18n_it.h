@@ -58,6 +58,7 @@ static const char* const I18N_IT[] = {
     "Spegnimento schermo: ",
     "Attenuazione notte (22-6): ",
     "Statistiche",
+    "Cronologia",
     "File del registro",
     "Altre impostazioni >",
     "Allarme emergenza: ",
@@ -116,6 +117,10 @@ static const char* const I18N_IT[] = {
     "Tocca di nuovo per confermare!",
     "Registro reimpostato.",
     "Tempo di attività: ",
+    "Cronologia (ultimi 7 giorni)",
+    "Ancora nessun dato.",
+    "Come funziona la cronologia",
+    "Mostra il numero di aerei registrati di recente per giorno, fino agli ultimi 7 giorni con dati di registro. L'altezza della barra è relativa al giorno più trafficato mostrato - una barra più alta significa che sono stati registrati più aerei quel giorno. Il numero sopra ogni barra è il valore esatto.",
 
     "File del registro",
     "Ancora nessun dato.",
@@ -123,6 +128,9 @@ static const char* const I18N_IT[] = {
     " di ",
     " giorni",
     " aerei",
+    "Esportazione tramite browser web",
+    "Il dispositivo offre anche una piccola pagina web per esportare l'intero registro. Connesso alla stessa rete WiFi, apri semplicemente un browser e vai su:",
+    "Nessuna connessione WiFi - la pagina di esportazione è raggiungibile solo quando è attiva una connessione di rete.",
 
     "Tocca per i dettagli",
 

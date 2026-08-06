@@ -58,6 +58,7 @@ static const char* const I18N_FR[] = {
     "Extinction écran : ",
     "Assombrissement nuit (22h-6h) : ",
     "Statistiques",
+    "Historique",
     "Fichiers du journal",
     "Plus de réglages >",
     "Alerte urgence : ",
@@ -116,6 +117,10 @@ static const char* const I18N_FR[] = {
     "Retouchez pour confirmer !",
     "Journal réinitialisé.",
     "Durée de fonctionnement : ",
+    "Historique (7 derniers jours)",
+    "Aucune entrée pour le moment.",
+    "Comment fonctionne l'historique",
+    "Affiche le nombre d'avions nouvellement enregistrés par jour, pour les 7 derniers jours avec des données de journal. La hauteur de la barre est relative au jour le plus chargé affiché - une barre plus haute signifie plus d'avions enregistrés ce jour-là. Le nombre au-dessus de chaque barre est la valeur exacte.",
 
     "Fichiers du journal",
     "Aucune entrée pour le moment.",
@@ -123,6 +128,9 @@ static const char* const I18N_FR[] = {
     " derniers sur ",
     " jours",
     " avions",
+    "Export via navigateur web",
+    "L'appareil propose aussi une petite page web pour exporter le journal complet. Connecté au même réseau WiFi, ouvrez simplement un navigateur et allez sur :",
+    "Pas de connexion WiFi - la page d'export n'est accessible que lorsqu'une connexion réseau est active.",
 
     "Touchez pour les détails",
 

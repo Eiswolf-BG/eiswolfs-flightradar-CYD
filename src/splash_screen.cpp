@@ -122,13 +122,10 @@ void begin(TFT_eSPI& tft) {
 
     tft.setTextDatum(MC_DATUM);
 
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.setTextSize(3);
-    tft.drawString("Eiswolfs", cx, 40);
-
-    tft.setTextSize(2);
     tft.setTextColor(TFT_GREEN, TFT_BLACK);
-    tft.drawString("Flightradar", cx, 78);
+    tft.setTextSize(2);
+    tft.drawString("Eiswolfs", cx, 28);
+    tft.drawString("Flightradar", cx, 60);
 
     tft.setTextDatum(TL_DATUM);
     tft.setTextSize(1);

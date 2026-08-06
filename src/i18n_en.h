@@ -58,6 +58,7 @@ static const char* const I18N_EN[] = {
     "Screen timeout: ",
     "Night dimming (10pm-6am): ",
     "Statistics",
+    "History chart",
     "Logbook files",
     "More settings >",
     "Emergency alert: ",
@@ -117,6 +118,10 @@ static const char* const I18N_EN[] = {
     "Tap again to confirm!",
     "Logbook data reset.",
     "Uptime: ",
+    "History (last 7 days)",
+    "No logbook entries yet.",
+    "How the history chart works",
+    "Shows the number of newly logged aircraft per day, for up to the last 7 days with logbook data. Bar height is relative to the busiest day shown - a taller bar means more aircraft were logged that day. The number above each bar is the exact count.",
 
     "Logbook files",
     "No logbook entries yet.",
@@ -124,6 +129,9 @@ static const char* const I18N_EN[] = {
     " of ",
     " days",
     " aircraft",
+    "Export via web browser",
+    "The device also runs a small web page for exporting the full logbook. While connected to the same WiFi network, open a browser and go to:",
+    "No WiFi connection - the export page is only reachable while connected to a network.",
 
     "Tap for details",
 

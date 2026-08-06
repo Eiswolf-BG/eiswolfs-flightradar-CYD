@@ -3,6 +3,7 @@
 #include "calibration_screen.h"
 #include "wifi_manage_screen.h"
 #include "stats_screen.h"
+#include "stats_history_screen.h"
 #include "logbook_files_screen.h"
 #include "location_presets_screen.h"
 #include "airline_filter_screen.h"
@@ -213,19 +214,21 @@ void run(TFT_eSPI& tft) {
             tft.println(I18n::t(StringId::MENU_CATEGORY_FLIGHT));
 
             Rect statsBtn      = rowRect(0);
-            Rect logFilesBtn   = rowRect(1);
-            Rect logbookBtn    = rowRect(2);
-            Rect heartbeatBtn  = rowRect(3);
-            Rect proximityBtn  = rowRect(4);
-            Rect emergencyBtn  = rowRect(5);
-            Rect locationBtn   = rowRect(6);
-            Rect airlineBtn    = rowRect(7);
-            Rect watchlistBtn      = rowRect(8);
-            Rect watchlistAlertBtn = rowRect(9);
-            Rect groundBtn     = rowRect(10);
-            Rect backBtn       = rowRect(11);
+            Rect statsHistoryBtn = rowRect(1);
+            Rect logFilesBtn   = rowRect(2);
+            Rect logbookBtn    = rowRect(3);
+            Rect heartbeatBtn  = rowRect(4);
+            Rect proximityBtn  = rowRect(5);
+            Rect emergencyBtn  = rowRect(6);
+            Rect locationBtn   = rowRect(7);
+            Rect airlineBtn    = rowRect(8);
+            Rect watchlistBtn      = rowRect(9);
+            Rect watchlistAlertBtn = rowRect(10);
+            Rect groundBtn     = rowRect(11);
+            Rect backBtn       = rowRect(12);
 
             drawButton(tft, statsBtn, I18n::t(StringId::MENU_STATISTICS));
+            drawButton(tft, statsHistoryBtn, I18n::t(StringId::MENU_STATS_HISTORY));
             drawButton(tft, logFilesBtn, I18n::t(StringId::MENU_LOGBOOK_FILES));
             drawButton(tft, logbookBtn, I18n::t(StringId::MENU_FLIGHT_LOGBOOK) + onOff(SettingsStore::flightLogbookEnabled()));
             drawButton(tft, heartbeatBtn, I18n::t(StringId::MENU_LED_HEARTBEAT) + onOff(SettingsStore::ledHeartbeatEnabled()));
@@ -247,6 +250,8 @@ void run(TFT_eSPI& tft) {
 
             if (statsBtn.contains(tap.x, tap.y)) {
                 StatsScreen::run(tft);
+            } else if (statsHistoryBtn.contains(tap.x, tap.y)) {
+                StatsHistoryScreen::run(tft);
             } else if (logFilesBtn.contains(tap.x, tap.y)) {
                 LogbookFilesScreen::run(tft);
             } else if (logbookBtn.contains(tap.x, tap.y)) {

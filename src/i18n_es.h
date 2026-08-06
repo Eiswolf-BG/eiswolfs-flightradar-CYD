@@ -58,6 +58,7 @@ static const char* const I18N_ES[] = {
     "Apagado de pantalla: ",
     "Atenuación nocturna (22-6h): ",
     "Estadísticas",
+    "Historial",
     "Archivos del registro",
     "Más ajustes >",
     "Alerta de emergencia: ",
@@ -116,6 +117,10 @@ static const char* const I18N_ES[] = {
     "¡Toque de nuevo para confirmar!",
     "Registro reiniciado.",
     "Tiempo activo: ",
+    "Historial (últimos 7 días)",
+    "Aún no hay registros.",
+    "Cómo funciona el historial",
+    "Muestra el número de aviones recién registrados por día, para hasta los últimos 7 días con datos de registro. La altura de la barra es relativa al día más ocupado mostrado - una barra más alta significa que se registraron más aviones ese día. El número sobre cada barra es el valor exacto.",
 
     "Archivos del registro",
     "Aún no hay registros.",
@@ -123,6 +128,9 @@ static const char* const I18N_ES[] = {
     " de ",
     " días",
     " aviones",
+    "Exportar por navegador web",
+    "El dispositivo también ofrece una pequeña página web para exportar el registro completo. Conectado a la misma red WiFi, simplemente abra un navegador y vaya a:",
+    "Sin conexión WiFi - la página de exportación solo es accesible mientras haya una conexión de red.",
 
     "Toque para ver detalles",
 

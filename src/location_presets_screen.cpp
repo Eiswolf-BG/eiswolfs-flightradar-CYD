@@ -167,6 +167,72 @@ namespace {
         return s + "...";
     }
 
+    // Laufschrift fuer den "Naechster Flughafen"-Text: statt ihn mit "..."
+    // abzuschneiden, scrollt er horizontal durch, falls er nicht in die
+    // verfuegbare Breite passt. BEWUSST OHNE tft.setViewport() (das hatte
+    // im Zusammenspiel mit unserem eigenen Font dazu gefuehrt, dass der Text
+    // komplett unsichtbar wurde) - stattdessen wird bei jedem Schritt einfach
+    // der Text-Ausschnitt neu berechnet, der garantiert in die Breite passt.
+    struct Marquee {
+        String text;
+        String ring;          // text + Luecke, doppelt aneinandergehaengt
+        bool needsScroll = false;
+        int32_t charOffset = 0;
+        uint32_t lastStepMs = 0;
+    };
+    Marquee airportMarquee;
+
+    constexpr uint32_t MARQUEE_STEP_MS = 200; // alle 200ms ein Zeichen weiter
+
+    // Einmal aufrufen, wenn sich der anzuzeigende Text aendert (z.B. weil ein
+    // anderer Standort aktiviert wurde) - merkt sich Text + Ringpuffer und
+    // setzt den Scroll-Fortschritt zurueck.
+    void setupMarquee(TFT_eSPI& tft, const String& text, int16_t viewportW) {
+        airportMarquee.text = text;
+        airportMarquee.needsScroll = tft.textWidth(text) > viewportW;
+        String withGap = text + "     "; // 5 Leerzeichen Luecke vor der Wiederholung
+        airportMarquee.ring = withGap + withGap;
+        airportMarquee.charOffset = 0;
+        airportMarquee.lastStepMs = millis();
+    }
+
+    // Liefert den laengsten Ausschnitt ab startIdx, der noch in maxWidth
+    // passt - OHNE "..." anzuhaengen (im Gegensatz zu truncateForWidth).
+    String marqueeWindow(TFT_eSPI& tft, const String& src, int32_t startIdx, int16_t maxWidth) {
+        String s = src.substring(startIdx);
+        while (s.length() > 1 && tft.textWidth(s) > maxWidth) {
+            s.remove(s.length() - 1);
+        }
+        return s;
+    }
+
+    // Bei jedem Aufruf (auch in der Warteschleife) neu zeichnen - wenn der
+    // Text nicht scrollen muss, wird er einfach normal (fest) angezeigt.
+    void drawMarquee(TFT_eSPI& tft, int16_t x, int16_t y, int16_t w, int16_t h) {
+        if (airportMarquee.text.length() == 0) return;
+
+        tft.fillRect(x, y - h + 4, w, h, TFT_BLACK);
+        tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+        tft.setCursor(x, y);
+
+        if (!airportMarquee.needsScroll) {
+            tft.print(airportMarquee.text);
+            return;
+        }
+
+        uint32_t now = millis();
+        if (now - airportMarquee.lastStepMs >= MARQUEE_STEP_MS) {
+            airportMarquee.lastStepMs = now;
+            airportMarquee.charOffset++;
+            // Zurueck an den Anfang, sobald der erste (nicht doppelte)
+            // Text+Luecke-Block durchgelaufen ist.
+            int32_t singleLen = (int32_t)airportMarquee.text.length() + 5;
+            if (airportMarquee.charOffset >= singleLen) airportMarquee.charOffset = 0;
+        }
+
+        tft.print(marqueeWindow(tft, airportMarquee.ring, airportMarquee.charOffset, w));
+    }
+
     void runInfoScreen(TFT_eSPI& tft) {
         MenuStars::reset();
 
@@ -303,6 +369,9 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, addBtn, I18n::t(StringId::LOCATION_ADD));
         }
 
+        constexpr int16_t AIRPORT_LINE_X = 10;
+        constexpr int16_t AIRPORT_LINE_W = Config::SCREEN_WIDTH - 20;
+        int16_t airportLineY = (int16_t)(Config::SCREEN_HEIGHT - 60);
         {
             double activeLat = 0, activeLon = 0;
             if (active < 0) {
@@ -315,10 +384,10 @@ void run(TFT_eSPI& tft) {
                 char buf[48];
                 snprintf(buf, sizeof(buf), "%s %s (%.0f km)", nearest.icao, nearest.name, nearest.distanceKm);
                 String line = String(I18n::t(StringId::LOCATION_NEAREST_AIRPORT_PREFIX)) + buf;
-                line = truncateForWidth(tft, line, (int16_t)(Config::SCREEN_WIDTH - 20));
-                tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
-                tft.setCursor(10, (int16_t)(Config::SCREEN_HEIGHT - 60));
-                tft.print(line);
+                setupMarquee(tft, line, AIRPORT_LINE_W);
+                drawMarquee(tft, AIRPORT_LINE_X, airportLineY, AIRPORT_LINE_W, 20);
+            } else {
+                airportMarquee.text = "";
             }
         }
 
@@ -328,6 +397,7 @@ void run(TFT_eSPI& tft) {
         TouchInput::Point tap;
         while (true) {
             if (TouchInput::wasTapped(tap)) break;
+            drawMarquee(tft, AIRPORT_LINE_X, airportLineY, AIRPORT_LINE_W, 20);
             MenuStars::update(tft);
             delay(20);
         }

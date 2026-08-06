@@ -9,6 +9,7 @@
 #include "aircraft_details.h"
 #include "flight_logbook.h"
 #include "led_alert.h"
+#include "web_export_server.h"
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -22,10 +23,20 @@ namespace {
 
     Aircraft tempTable[Config::MAX_TRACKED_AIRCRAFT];
 
+    bool webServerStarted = false;
+
     void taskFunc(void*) {
         for (;;) {
             WifiMgr::update();
             LocationManager::update();
+
+            if (!webServerStarted && WifiMgr::getState() == WifiMgr::State::Connected) {
+                WebExportServer::begin();
+                webServerStarted = true;
+            }
+            if (webServerStarted) {
+                WebExportServer::update();
+            }
 
             AircraftDetails::update();
 

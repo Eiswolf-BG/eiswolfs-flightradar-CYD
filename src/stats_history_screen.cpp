@@ -1,12 +1,11 @@
-#include "logbook_files_screen.h"
+#include "stats_history_screen.h"
 #include "flight_logbook.h"
 #include "touch_input.h"
 #include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
-#include <WiFi.h>
 
-namespace LogbookFilesScreen {
+namespace StatsHistoryScreen {
 
 namespace {
     struct Rect {
@@ -16,17 +15,24 @@ namespace {
         }
     };
 
-    void drawButton(TFT_eSPI& tft, const Rect& r, const String& label) {
+    void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, bool danger = false) {
+        uint16_t accent = danger ? TFT_RED : TFT_GREEN;
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, accent);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(accent, TFT_BLACK);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
     }
 
     constexpr uint8_t MAX_DAYS_QUERIED = 31;
-    constexpr uint8_t VISIBLE_ROWS = 10;
+    constexpr uint8_t MAX_BARS = 7;
+
+    constexpr int16_t CHART_TOP = 60;
+    constexpr int16_t CHART_BOTTOM = 210;
+    constexpr int16_t LABEL_RESERVE_TOP = 16;
+    constexpr int16_t USABLE_BAR_HEIGHT = (CHART_BOTTOM - CHART_TOP) - LABEL_RESERVE_TOP;
+    constexpr int16_t DAY_LABEL_Y = CHART_BOTTOM + 14;
 
     int16_t layoutWrapped(TFT_eSPI& tft, int16_t x, int16_t startY, int16_t maxWidth,
                           int16_t lineHeight, const String& text, int16_t scrollY,
@@ -66,17 +72,8 @@ namespace {
         constexpr int16_t VIEW_TOP = 36;
         constexpr int16_t VIEW_BOTTOM = Config::SCREEN_HEIGHT - 60;
 
-        bool wifiConnected = WiFi.status() == WL_CONNECTED;
-        String urlLine = wifiConnected ? ("http://" + WiFi.localIP().toString() + "/") : String();
-
         int16_t totalH = VIEW_TOP;
-        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOGFILES_INFO_PARA1), 0, 0, 0, false);
-        totalH += 8;
-        if (wifiConnected) {
-            totalH += LINE_H;
-        } else {
-            totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOGFILES_INFO_PARA2), 0, 0, 0, false);
-        }
+        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::STATS_HISTORY_INFO_PARA1), 0, 0, 0, false);
 
         int16_t maxScroll = totalH - VIEW_BOTTOM;
         if (maxScroll < 0) maxScroll = 0;
@@ -94,23 +91,11 @@ namespace {
             tft.fillScreen(TFT_BLACK);
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.setCursor(10, 14);
-            tft.println(I18n::t(StringId::LOGFILES_INFO_TITLE));
+            tft.println(I18n::t(StringId::STATS_HISTORY_INFO_TITLE));
 
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             int16_t y = VIEW_TOP;
-            y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOGFILES_INFO_PARA1), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
-            y += 8;
-            if (wifiConnected) {
-                int16_t screenY = y - scrollY;
-                if (screenY >= VIEW_TOP && screenY <= VIEW_BOTTOM) {
-                    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-                    tft.setCursor(10, screenY);
-                    tft.print(urlLine);
-                }
-            } else {
-                tft.setTextColor(TFT_GREEN, TFT_BLACK);
-                layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOGFILES_INFO_PARA2), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
-            }
+            layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::STATS_HISTORY_INFO_PARA1), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
 
             drawButton(tft, backBtn, I18n::t(StringId::BACK));
             if (scrollable) {
@@ -145,13 +130,21 @@ void run(TFT_eSPI& tft) {
     tft.fillScreen(TFT_BLACK);
     tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.setCursor(10, 14);
-    tft.println(I18n::t(StringId::LOGFILES_TITLE));
+    tft.println(I18n::t(StringId::STATS_HISTORY_TITLE));
     tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
     tft.setCursor(10, 30);
     tft.print(I18n::t(StringId::LOADING));
 
     FlightLogbook::DayEntry days[MAX_DAYS_QUERIED];
     uint8_t count = FlightLogbook::listDays(days, MAX_DAYS_QUERIED);
+
+    uint8_t barCount = (count > MAX_BARS) ? MAX_BARS : count;
+    uint8_t startIdx = count - barCount;
+
+    uint32_t maxCount = 0;
+    for (uint8_t i = startIdx; i < count; i++) {
+        if (days[i].count > maxCount) maxCount = days[i].count;
+    }
 
     Rect infoBtn = {(int16_t)(Config::SCREEN_WIDTH - 40), 2, 30, 24};
     Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
@@ -162,33 +155,48 @@ void run(TFT_eSPI& tft) {
         tft.fillScreen(TFT_BLACK);
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
         tft.setCursor(10, 14);
-        tft.println(I18n::t(StringId::LOGFILES_TITLE));
+        tft.println(I18n::t(StringId::STATS_HISTORY_TITLE));
         drawButton(tft, infoBtn, "?");
 
-        if (count == 0) {
+        if (barCount == 0) {
             tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
             tft.setCursor(10, 40);
-            tft.println(I18n::t(StringId::LOGFILES_EMPTY));
+            tft.println(I18n::t(StringId::STATS_HISTORY_EMPTY));
         } else {
-            uint8_t startIdx = (count > VISIBLE_ROWS) ? (count - VISIBLE_ROWS) : 0;
-            int16_t y = 30;
+            tft.drawFastHLine(10, CHART_BOTTOM, (int16_t)(Config::SCREEN_WIDTH - 20), TFT_DARKGREEN);
 
-            if (count > VISIBLE_ROWS) {
-                tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
-                tft.setCursor(10, y);
-                tft.print(String(I18n::t(StringId::LOGFILES_SHOWING_PREFIX)) + VISIBLE_ROWS +
-                          I18n::t(StringId::LOGFILES_OF) + count + I18n::t(StringId::LOGFILES_DAYS_SUFFIX));
-                y += 16;
-            }
+            int16_t barW = (int16_t)((Config::SCREEN_WIDTH - 20 - (barCount - 1) * 6) / barCount);
+            int16_t x = 10;
 
             for (uint8_t i = startIdx; i < count; i++) {
-                tft.setTextColor(TFT_GREEN, TFT_BLACK);
-                tft.setCursor(10, y);
-                tft.print(days[i].date);
-                tft.setTextColor(TFT_GREEN, TFT_BLACK);
-                tft.setCursor(110, y);
-                tft.print(String(days[i].count) + I18n::t(StringId::LOGFILES_AIRCRAFT_SUFFIX));
-                y += 20;
+                uint32_t dayCount = days[i].count;
+
+                if (dayCount == 0) {
+                    tft.drawFastHLine(x, CHART_BOTTOM, barW, TFT_DARKGREEN);
+                } else {
+                    int16_t barH = (maxCount > 0)
+                        ? (int16_t)((uint32_t)USABLE_BAR_HEIGHT * dayCount / maxCount)
+                        : 0;
+                    if (barH < 2) barH = 2;
+                    int16_t barTop = CHART_BOTTOM - barH;
+
+                    tft.fillRoundRect(x, barTop, barW, barH, 2, TFT_GREEN);
+
+                    tft.setTextDatum(BC_DATUM);
+                    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+                    tft.drawString(String(dayCount), x + barW / 2, barTop - 2);
+                    tft.setTextDatum(TL_DATUM);
+                }
+
+                const char* date = days[i].date;
+                size_t dateLen = strlen(date);
+                String dayLabel = dateLen >= 2 ? String(date + dateLen - 2) : String(date);
+                tft.setTextDatum(TC_DATUM);
+                tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+                tft.drawString(dayLabel, x + barW / 2, DAY_LABEL_Y);
+                tft.setTextDatum(TL_DATUM);
+
+                x += barW + 6;
             }
         }
 
