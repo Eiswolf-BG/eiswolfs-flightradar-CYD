@@ -182,6 +182,12 @@ namespace {
     };
     Marquee airportMarquee;
 
+    // Etwas kuerzeres Intervall als frueher fuer einen ruhigeren Lauf.
+    // WICHTIG: der Cursor wird beim Zeichnen IMMER exakt auf x gesetzt
+    // (nie davor/danach verschoben) - ein Versuch mit pixelgenauer
+    // Sub-Zeichen-Verschiebung (Cursor links von x) hat zu einem
+    // fehlerhaft gezeichneten Zeichen ausserhalb des geloeschten Bereichs
+    // gefuehrt (sichtbar als gruener Kasten links vom Text).
     constexpr uint32_t MARQUEE_STEP_MS = 200; // alle 200ms ein Zeichen weiter
 
     // Einmal aufrufen, wenn sich der anzuzeigende Text aendert (z.B. weil ein
@@ -197,7 +203,7 @@ namespace {
         airportMarquee.text = text;
         airportMarquee.needsScroll = tft.textWidth(text) > viewportW;
         tft.setTextSize(1);
-        String withGap = text + "     "; // 5 Leerzeichen Luecke vor der Wiederholung
+        String withGap = text + "   "; // 3 Leerzeichen Luecke vor der Wiederholung
         airportMarquee.ring = withGap + withGap;
         airportMarquee.charOffset = 0;
         airportMarquee.lastStepMs = millis();
@@ -218,7 +224,15 @@ namespace {
     void drawMarquee(TFT_eSPI& tft, int16_t x, int16_t y, int16_t w, int16_t h) {
         if (airportMarquee.text.length() == 0) return;
 
-        tft.fillRect(x, y - h + 4, w, h, TFT_BLACK);
+        // Der geloeschte Bereich muss zur tatsaechlichen Texthoehe bei
+        // Size 2 passen (~16px), nicht zur alten Size-1-Hoehe - sonst
+        // bleiben oben Reste vom vorherigen Frame stehen (sichtbar als
+        // Strich ueber dem Text). Etwas grosszuegiger nach oben (start
+        // bei y-20) als vorher, da ein einzelner Frame-Ausreisser sonst
+        // noch sichtbar blieb.
+        constexpr int16_t MARQUEE_CLEAR_TOP = 20;
+        constexpr int16_t MARQUEE_CLEAR_H = 26;
+        tft.fillRect(x, y - MARQUEE_CLEAR_TOP, w, MARQUEE_CLEAR_H, TFT_BLACK);
         tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
         // Groessere Schrift fuer den Nearest-Airport-Marquee (auf Wunsch
         // vergroessert von Size 1 auf Size 2) - nach dem Zeichnen wieder auf
@@ -239,7 +253,7 @@ namespace {
             airportMarquee.charOffset++;
             // Zurueck an den Anfang, sobald der erste (nicht doppelte)
             // Text+Luecke-Block durchgelaufen ist.
-            int32_t singleLen = (int32_t)airportMarquee.text.length() + 5;
+            int32_t singleLen = (int32_t)airportMarquee.text.length() + 3;
             if (airportMarquee.charOffset >= singleLen) airportMarquee.charOffset = 0;
         }
 
@@ -411,8 +425,8 @@ void run(TFT_eSPI& tft) {
         TouchInput::Point tap;
         while (true) {
             if (TouchInput::wasTapped(tap)) break;
-            drawMarquee(tft, AIRPORT_LINE_X, airportLineY, AIRPORT_LINE_W, 20);
             MenuStars::update(tft);
+            drawMarquee(tft, AIRPORT_LINE_X, airportLineY, AIRPORT_LINE_W, 20);
             delay(20);
         }
 
