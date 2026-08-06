@@ -8,6 +8,7 @@
 #include "location_presets_screen.h"
 #include "airline_filter_screen.h"
 #include "aircraft_watchlist_screen.h"
+#include "aircraft_list_screen.h"
 #include "language_screen.h"
 #include "units_screen.h"
 #include "settings_backup.h"
@@ -42,6 +43,16 @@ namespace {
     Rect catRowRect(uint8_t index) {
         return {10, (int16_t)(CAT_START_Y + index * (CAT_ROW_H + CAT_ROW_GAP)),
                 (int16_t)(Config::SCREEN_WIDTH - 20), CAT_ROW_H};
+    }
+
+    // Eigene, etwas kompaktere Zeilenhoehe NUR fuer die Flugoptionen-Seite:
+    // die normale rowRect()-Hoehe (22px) liess bei 13 Eintraegen schon keinen
+    // Platz mehr fuer einen weiteren - andere Seiten (Region/System) bleiben
+    // bei der normalen Hoehe unveraendert, um dort nichts zu verschieben.
+    constexpr int16_t FLIGHT_ROW_H = 20;
+    Rect flightRowRect(uint8_t index) {
+        return {10, (int16_t)(ROW_START_Y + index * (FLIGHT_ROW_H + ROW_GAP)),
+                (int16_t)(Config::SCREEN_WIDTH - 20), FLIGHT_ROW_H};
     }
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label,
@@ -213,20 +224,22 @@ void run(TFT_eSPI& tft) {
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_FLIGHT));
 
-            Rect statsBtn      = rowRect(0);
-            Rect statsHistoryBtn = rowRect(1);
-            Rect logFilesBtn   = rowRect(2);
-            Rect logbookBtn    = rowRect(3);
-            Rect heartbeatBtn  = rowRect(4);
-            Rect proximityBtn  = rowRect(5);
-            Rect emergencyBtn  = rowRect(6);
-            Rect locationBtn   = rowRect(7);
-            Rect airlineBtn    = rowRect(8);
-            Rect watchlistBtn      = rowRect(9);
-            Rect watchlistAlertBtn = rowRect(10);
-            Rect groundBtn     = rowRect(11);
-            Rect backBtn       = rowRect(12);
+            Rect aircraftListBtn = flightRowRect(0);
+            Rect statsBtn      = flightRowRect(1);
+            Rect statsHistoryBtn = flightRowRect(2);
+            Rect logFilesBtn   = flightRowRect(3);
+            Rect logbookBtn    = flightRowRect(4);
+            Rect heartbeatBtn  = flightRowRect(5);
+            Rect proximityBtn  = flightRowRect(6);
+            Rect emergencyBtn  = flightRowRect(7);
+            Rect locationBtn   = flightRowRect(8);
+            Rect airlineBtn    = flightRowRect(9);
+            Rect watchlistBtn      = flightRowRect(10);
+            Rect watchlistAlertBtn = flightRowRect(11);
+            Rect groundBtn     = flightRowRect(12);
+            Rect backBtn       = flightRowRect(13);
 
+            drawButton(tft, aircraftListBtn, I18n::t(StringId::MENU_AIRCRAFT_LIST));
             drawButton(tft, statsBtn, I18n::t(StringId::MENU_STATISTICS));
             drawButton(tft, statsHistoryBtn, I18n::t(StringId::MENU_STATS_HISTORY));
             drawButton(tft, logFilesBtn, I18n::t(StringId::MENU_LOGBOOK_FILES));
@@ -248,7 +261,14 @@ void run(TFT_eSPI& tft) {
                 delay(20);
             }
 
-            if (statsBtn.contains(tap.x, tap.y)) {
+            if (aircraftListBtn.contains(tap.x, tap.y)) {
+                if (AircraftListScreen::run(tft)) {
+                    // Ein Flugzeug wurde in der Liste ausgewaehlt - direkt bis
+                    // zum Radar zurueckspringen (mit offenem Detail-Panel),
+                    // statt in der Flugoptionen-Seite stehen zu bleiben.
+                    done = true;
+                }
+            } else if (statsBtn.contains(tap.x, tap.y)) {
                 StatsScreen::run(tft);
             } else if (statsHistoryBtn.contains(tap.x, tap.y)) {
                 StatsHistoryScreen::run(tft);

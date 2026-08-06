@@ -193,6 +193,29 @@ in dieser Reihenfolge:
    sonst schlägt `pio run --target upload` fehl, weil es die Datei unter
    dem Namen `firmware.bin` erwartet.
 
+   SICHERHEITSPROBLEM bei dieser Umbenennung: Falls im
+   `.pio/build/esp32dev/`-Ordner bereits eine `CYD-flightradar.bin` von
+   einem vorherigen Release liegt (weil Alex vergessen hat, sie nach dem
+   Release manuell zu löschen), darf das Umbenennen NICHT einfach
+   übersprungen werden (z.B. weil ein `mv`/Kopiervorgang auf eine bereits
+   existierende Zieldatei fehlschlägt oder stillschweigend nichts tut) -
+   sonst verwendet Alex beim nächsten GitHub-Release versehentlich die
+   ALTE, veraltete `CYD-flightradar.bin`, obwohl der frisch gebaute Code
+   neuer ist. Das ist ein ernsthaftes Risiko (veraltete Firmware wird
+   veröffentlicht, ohne dass es auffällt). Deshalb bei JEDEM Release als
+   expliziter, nicht überspringbarer Schritt:
+   a) Prüfen, ob im `.pio/build/esp32dev/`-Ordner bereits eine Datei
+      namens `CYD-flightradar.bin` existiert.
+   b) Falls ja: diese alte Datei IMMER ZUERST LÖSCHEN, bevor die aktuelle
+      `firmware.bin` umbenannt wird (nicht überspringen, nicht
+      stillschweigend stehen lassen).
+   c) Danach die aktuelle `firmware.bin` zu `CYD-flightradar.bin`
+      umbenennen (wie oben beschrieben).
+   d) Am Ende der Release-Zusammenfassung IMMER explizit erwähnen, ob eine
+      alte `CYD-flightradar.bin` gefunden und gelöscht wurde, damit Alex
+      das mitbekommt (z.B. "Hinweis: eine alte CYD-flightradar.bin lag
+      noch im Ordner und wurde vor dem Umbenennen gelöscht").
+
 ## Nach jedem erfolgreichen Build automatisch flashen
 
 Sobald `pio run` (Build) erfolgreich ohne Fehler durchgelaufen ist, IMMER direkt

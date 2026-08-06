@@ -179,6 +179,14 @@ static const char* const I18N_EN[] = {
     "You can save up to 3 WiFi networks. On boot, the device automatically connects to whichever one it can currently reach.",
     "Handy for portable use (office, friends, holiday home), for guest + main WiFi on the same router, or if you have multiple access points around the house.",
     "Remove a saved network anytime via the red 'X' to free up a slot for a new one.",
+
+    "Aircraft list",
+    "Aircraft in range",
+    "No aircraft in range",
+    "Sorted by: ",
+    "Distance",
+    "Altitude",
+    "Callsign",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

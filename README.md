@@ -33,10 +33,11 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Bearing indicator** – with an aircraft selected, a dotted line plus a heading-in-degrees label points from the radar center to the compass edge, showing exactly which direction to look to spot it in the sky (not to be confused with the aircraft's own heading arrow)
 - **Empty-sky timer** – when no aircraft are currently in range, the info bar counts up how long the sky's been empty instead of showing the usual "tap for details" hint
 - **Adjustable range** (10/25/50/100 km) via on-screen button
+- **Aircraft list view** – a sortable list (by distance, altitude, or callsign) of every aircraft currently in range, tap any row to jump straight to its detail panel (see [Aircraft List](#-aircraft-list) below)
 - **Touch-driven WiFi setup** and on-screen keyboard for first-time configuration, with up to 3 saved networks (see [WiFi Manager](#-wifi-manager-up-to-3-saved-networks) below)
 - **Location presets** – save up to 3 fixed locations, or point the radar at any place in the world (see [Location Presets](#-location-presets) below)
 - **Aircraft watchlist** – track up to 5 specific flights by callsign, with a cyan radar ring and blue LED alert when one appears (see [Watchlist](#-watchlist) below)
-- **Night dimming** – automatically dims the backlight to a softer (but still readable) level between 22:00 and 06:00 local time (see [Night Dimming](#-night-dimming) below)
+- **Night dimming** – automatically dims the backlight, plus the radar's aircraft markers and sweep line, to a softer (but still readable) look between 22:00 and 06:00 local time (see [Night Dimming](#-night-dimming) below)
 - **History chart** – a simple 7-day bar chart of logged aircraft counts, right next to the plain logbook file list (see [History Chart](#-history-chart) below)
 - **Web export** – a small built-in web page (reachable via the device's IP while on the same WiFi) to download the complete flight logbook as one merged CSV file (see [Web Export](#-web-export) below)
 - **IP-based geolocation** (no GPS module needed) to center the radar on your location
@@ -97,9 +98,14 @@ Between 22:00 and 06:00 local time, the backlight automatically dims to a softer
 
 Toggle it under **Menu → System → "Night dimming"**. When you tap the screen while it's night-dimmed, it wakes back up to the soft night level (not full brightness) if it's still within the night window - no sudden bright flash in a dark room.
 
+Since this update, the same night window also softens the **radar screen itself** — aircraft markers and the rotating sweep line switch to darker green/yellow/red tones, so the whole display is easier on the eyes at night, not just the backlight. No separate toggle needed - it uses the same **Night dimming** setting.
+
 ## ✈️ Flight Options — every function in detail
 
 All the functions below are found under **Menu → Flight Options**.
+
+### 📋 Aircraft List
+Menu → Flight Options → **"Aircraft list"** (top entry) shows every aircraft currently visible on the radar as a scrollable, sortable list instead of dots — handy for a quick text overview instead of parsing the radar view. Shows callsign, altitude (color-coded the same way as the radar: green/yellow/red), and distance for each entry. A button at the top cycles the sort order through **distance → altitude → callsign**. Emergency squawks get a red border, watched aircraft (see [Watchlist](#-watchlist)) a cyan one, matching the radar's own markers. Tap any row to jump straight back to the radar with that aircraft's detail panel already open.
 
 ### 📊 Statistics
 Shows at a glance:

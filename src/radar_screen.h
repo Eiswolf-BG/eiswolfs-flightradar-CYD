@@ -8,6 +8,12 @@ namespace RadarScreen {
     bool handleTap(int16_t x, int16_t y, int16_t top);
     void updateProximityAlert(uint32_t nowMs);
 
+    // Waehlt ein Flugzeug programmgesteuert aus (z.B. von der Flugzeugliste
+    // aus, nicht per Antippen auf dem Radar) - damit beim naechsten render()
+    // sofort das Detail-Panel fuer dieses Flugzeug erscheint, so als haette
+    // man es direkt im Radar angetippt.
+    void selectAircraft(const char* hex);
+
     struct EmergencyInfo {
         bool active = false;
         char callsign[9] = {0};

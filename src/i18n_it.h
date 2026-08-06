@@ -178,6 +178,14 @@ static const char* const I18N_IT[] = {
     "Puoi salvare fino a 3 reti WiFi. All'avvio, il dispositivo si connette automaticamente a quella che riesce a raggiungere in quel momento.",
     "Utile per l'uso portatile (ufficio, amici, casa vacanze), per WiFi ospiti + principale sullo stesso router, o se hai più punti di accesso in casa.",
     "Rimuovi una rete salvata in qualsiasi momento tramite la 'X' rossa per liberare uno slot per una nuova.",
+
+    "Elenco aerei",
+    "Aerei nel raggio",
+    "Nessun aereo nel raggio",
+    "Ordinato per: ",
+    "Distanza",
+    "Altitudine",
+    "Nominativo",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

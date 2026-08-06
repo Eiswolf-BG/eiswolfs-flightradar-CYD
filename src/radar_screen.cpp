@@ -14,6 +14,7 @@
 #include "aircraft_watchlist.h"
 #include "i18n.h"
 #include <math.h>
+#include <time.h>
 
 namespace RadarScreen {
 
@@ -84,10 +85,44 @@ namespace {
     float prevSweepAngleDeg = -1.0f;
     constexpr float SWEEP_DEGREES_PER_SEC = 45.0f;
 
-    uint16_t colorForAltitude(int32_t altFt) {
-        if (altFt < Config::COLOR_LOW_ALT_THRESHOLD_FT) return TFT_GREEN;
-        if (altFt < Config::COLOR_MID_ALT_THRESHOLD_FT) return TFT_YELLOW;
-        return TFT_RED;
+    // Gleiches Nachtdimm-Fenster wie main.cpp::isNightDimHours() (22:00-06:00,
+    // ueber Mitternacht hinweg gerechnet). Hier bewusst dupliziert statt
+    // geteilt, siehe CLAUDE.md-Konvention ("jeder Screen unabhaengig
+    // lauffaehig, kein gemeinsames Modul fuer solche Kleinigkeiten").
+    bool isNightHours() {
+        time_t now = time(nullptr);
+        if (now <= 8 * 3600 * 2) return false; // Uhrzeit noch nicht per NTP synchronisiert
+        struct tm tmNow;
+        localtime_r(&now, &tmNow);
+        int hour = tmNow.tm_hour;
+        return (hour >= 22 || hour < 6);
+    }
+
+    // Nur aktiv, wenn der Nutzer die Nachtdimmung (Menue > System) eingeschaltet
+    // hat UND wir gerade im Nachtfenster sind - dieselbe Einstellung, die sonst
+    // nur die Hintergrundbeleuchtung dimmt, dimmt jetzt zusaetzlich auch die
+    // Radar-Farben (Flugzeug-Marker + Sweep-Linie), damit das Display nachts
+    // insgesamt weniger blendet.
+    bool nightDimActiveNow() {
+        return SettingsStore::nightDimmingEnabled() && isNightHours();
+    }
+
+    // Farbe je nach Flughoehe - gedaempft (dunkleres Gruen/Oliv/Rot) waehrend
+    // der Nachtdimmung. Bewusst eigene, etwas hellere Toene als
+    // dimColorForAltitude() weiter unten (das ist die IMMER dunklere
+    // Trail-Farbe hinter jedem Flugzeug) - sonst waeren Kopf-Marker und
+    // Trail nachts nicht mehr auseinanderzuhalten.
+    uint16_t colorForAltitude(TFT_eSPI& gfx, int32_t altFt) {
+        bool dim = nightDimActiveNow();
+        if (altFt < Config::COLOR_LOW_ALT_THRESHOLD_FT)
+            return dim ? gfx.color565(0, 160, 0) : TFT_GREEN;
+        if (altFt < Config::COLOR_MID_ALT_THRESHOLD_FT)
+            return dim ? gfx.color565(160, 160, 0) : TFT_YELLOW;
+        return dim ? gfx.color565(160, 30, 0) : TFT_RED;
+    }
+
+    uint16_t sweepLineColor(TFT_eSPI& gfx) {
+        return nightDimActiveNow() ? gfx.color565(0, 110, 0) : TFT_GREEN;
     }
 
     // Zeigt die PEILUNG (nicht zu verwechseln mit der Flugrichtung/heading)
@@ -518,7 +553,7 @@ void render(TFT_eSPI& tft, int16_t top) {
     drawWorldMap(tft, L);
     drawStaticBackground(tft, L, rangeKm);
 
-    drawSweepLine(tft, L, sweepAngleDeg, TFT_GREEN);
+    drawSweepLine(tft, L, sweepAngleDeg, sweepLineColor(tft));
     prevSweepAngleDeg = sweepAngleDeg;
 
     tft.fillCircle(L.cx, L.cy, 3, TFT_WHITE);
@@ -554,7 +589,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         RadarMath::PolarCoord polar{a.distanceKm, a.bearingDeg};
         RadarMath::ScreenPoint pt = RadarMath::toScreen(polar, L.cx, L.cy, L.radius, rangeKm);
 
-        uint16_t color = colorForAltitude(a.altBaroFt);
+        uint16_t color = colorForAltitude(tft, a.altBaroFt);
         bool isSelected = selectedHex[0] && strcmp(a.hex, selectedHex) == 0;
         bool isEmergency = SettingsStore::emergencyAlertEnabled() && isEmergencySquawk(a.squawk);
         bool isWatched = SettingsStore::watchlistAlertEnabled() && AircraftWatchlist::isWatched(a.callsign);
@@ -671,7 +706,7 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     sweepAngleDeg += SWEEP_DEGREES_PER_SEC * (deltaMs / 1000.0f);
     if (sweepAngleDeg >= 360.0f) sweepAngleDeg -= 360.0f;
 
-    drawSweepLine(tft, L, sweepAngleDeg, TFT_GREEN);
+    drawSweepLine(tft, L, sweepAngleDeg, sweepLineColor(tft));
     prevSweepAngleDeg = sweepAngleDeg;
 
     for (uint8_t i = 0; i < MAX_TRAILS; i++) {
@@ -769,6 +804,16 @@ bool handleTap(int16_t x, int16_t y, int16_t top) {
     }
 
     return true;
+}
+
+void selectAircraft(const char* hex) {
+    strncpy(selectedHex, hex, sizeof(selectedHex) - 1);
+    AircraftDetails::request(hex);
+    // Erzwingt einen kompletten Neuaufbau des Detail-Panels beim naechsten
+    // render() - wichtig, falls der Bildschirm zwischenzeitlich von einem
+    // anderen Screen (z.B. der Flugzeugliste) ueberschrieben wurde, sonst
+    // wuerden unveraenderte Zeilen faelschlich als "schon da" uebersprungen.
+    lastPanel.valid = false;
 }
 
 void updateProximityAlert(uint32_t nowMs) {
