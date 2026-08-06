@@ -19,6 +19,9 @@ static const char* const I18N_TR[] = {
     "WiFi BAŞARISIZ",
     "Konum alınıyor...",
     "Hazır!",
+    "Günaydın",
+    "İyi günler",
+    "İyi akşamlar",
 
     "Bu uygulama için bir",
     "SD kart",
@@ -134,6 +137,7 @@ static const char* const I18N_TR[] = {
     "WiFi bağlantısı yok - dışa aktarma sayfasına yalnızca bir ağ bağlantısı varken ulaşılabilir.",
 
     "Detaylar için dokunun",
+    "Boş gökyüzü: ",
 
     "Model: ",
     "Tip: ",

@@ -318,9 +318,18 @@ void setup() {
     }
     SplashScreen::setStatusLine(tft, 2, I18n::t(StringId::SPLASH_READY));
 
+    // Sobald die IP-Geolocation einen UTC-Offset geliefert hat, die
+    // Zeitzone entsprechend setzen - Zeitstempel (Flugbuch, Log-Dateinamen)
+    // zeigen dann die ECHTE Ortszeit statt UTC, automatisch weltweit richtig.
     if (LocationManager::hasUtcOffset()) {
         configTime(LocationManager::utcOffsetSeconds(), 0, "pool.ntp.org", "time.nist.gov");
     }
+
+    // ERST JETZT die Begruessung zeichnen - vorher (siehe oben) war die
+    // Zeitzone noch nicht gesetzt, configTime() lief noch mit UTC statt
+    // Ortszeit, was in vielen Zeitzonen zu einer falschen Tageszeit-
+    // Einschaetzung gefuehrt haette (z.B. UTC-Nachmittag = Ortszeit-Abend).
+    SplashScreen::showGreeting(tft);
 
     AircraftTable::init();
     AirlineLookup::init();

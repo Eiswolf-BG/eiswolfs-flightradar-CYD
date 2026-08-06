@@ -30,6 +30,8 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Real ADS-B data** via the free [adsb.fi](https://adsb.fi) API, refreshed every 8 seconds
 - **Color-coded aircraft** by altitude (green `<10k ft`, yellow `10-30k ft`, red `>30k ft`) with an on-screen legend
 - **Tap an aircraft** to open a detail panel: callsign, airline, aircraft model (via [hexdb.io](https://hexdb.io)), altitude/speed/distance/heading in both metric and aviation units, estimated seat count
+- **Bearing indicator** – with an aircraft selected, a dotted line plus a heading-in-degrees label points from the radar center to the compass edge, showing exactly which direction to look to spot it in the sky (not to be confused with the aircraft's own heading arrow)
+- **Empty-sky timer** – when no aircraft are currently in range, the info bar counts up how long the sky's been empty instead of showing the usual "tap for details" hint
 - **Adjustable range** (10/25/50/100 km) via on-screen button
 - **Touch-driven WiFi setup** and on-screen keyboard for first-time configuration, with up to 3 saved networks (see [WiFi Manager](#-wifi-manager-up-to-3-saved-networks) below)
 - **Location presets** – save up to 3 fixed locations, or point the radar at any place in the world (see [Location Presets](#-location-presets) below)
@@ -42,6 +44,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Dual-core design** – all networking (WiFi, ADS-B polling, aircraft detail lookups) runs on Core 0, while the display and touch input run on Core 1, so the UI never freezes during a network request
 - Data (airline names, aircraft-type seat estimates) loaded from CSV files on the SD card, auto-seeded on first boot
 - **6 languages** (English, German, French, Turkish, Spanish, Italian), selectable on first boot or anytime from the menu
+- **Time-of-day greeting** – once WiFi and the timezone are set, the splash screen greets you with "Good morning" / "Good day" / "Good evening" based on your local time
 
 ## Feature Deep-Dive
 

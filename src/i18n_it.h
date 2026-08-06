@@ -19,6 +19,9 @@ static const char* const I18N_IT[] = {
     "WiFi FALLITO",
     "Rilevamento posizione...",
     "Pronto!",
+    "Buongiorno",
+    "Buon pomeriggio",
+    "Buonasera",
 
     "Questa app richiede",
     "una scheda SD",
@@ -134,6 +137,7 @@ static const char* const I18N_IT[] = {
     "Nessuna connessione WiFi - la pagina di esportazione è raggiungibile solo quando è attiva una connessione di rete.",
 
     "Tocca per i dettagli",
+    "Cielo vuoto da ",
 
     "Modello: ",
     "Tipo: ",

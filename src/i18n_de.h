@@ -19,6 +19,9 @@ static const char* const I18N_DE[] = {
     "WLAN FEHLGESCHLAGEN",
     "Ermittle Standort...",
     "Bereit!",
+    "Guten Morgen",
+    "Guten Tag",
+    "Guten Abend",
 
     "Für diese App wird",
     "eine SD-Karte",
@@ -134,6 +137,7 @@ static const char* const I18N_DE[] = {
     "Keine WLAN-Verbindung - die Export-Seite ist nur erreichbar, solange eine Netzwerkverbindung besteht.",
 
     "Für Details antippen",
+    "Leerer Himmel seit ",
 
     "Modell: ",
     "Typ: ",

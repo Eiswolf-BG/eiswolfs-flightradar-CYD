@@ -19,6 +19,9 @@ static const char* const I18N_EN[] = {
     "WiFi FAILED",
     "Getting location...",
     "Ready!",
+    "Good morning",
+    "Good day",
+    "Good evening",
 
     "For this app a",
     "SD card is",
@@ -135,6 +138,7 @@ static const char* const I18N_EN[] = {
     "No WiFi connection - the export page is only reachable while connected to a network.",
 
     "Tap for details",
+    "Empty sky for ",
 
     "Model: ",
     "Type: ",

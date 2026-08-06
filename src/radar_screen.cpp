@@ -90,6 +90,50 @@ namespace {
         return TFT_RED;
     }
 
+    // Zeigt die PEILUNG (nicht zu verwechseln mit der Flugrichtung/heading)
+    // zum aktuell ausgewaehlten Flugzeug: eine duenne, gepunktete Linie vom
+    // Radar-Zentrum zum Kreisrand in Richtung bearingDeg, plus die Gradzahl
+    // direkt ausserhalb des Rings. Hilft dabei, das Flugzeug tatsaechlich am
+    // Himmel zu finden ("in diese Richtung schauen"). Nur fuer den Moment
+    // des Zeichnens relevant - beim naechsten Sweep-Tick/Redraw wird sie vom
+    // normalen Hintergrund-Redraw automatisch mit geloescht und neu gesetzt.
+    void drawBearingIndicator(TFT_eSPI& gfx, const Layout& L, float bearingDeg) {
+        double rad = bearingDeg * PI / 180.0;
+        double s = sin(rad), c = cos(rad);
+
+        // Gepunktete Linie: kurze Segmente statt einer durchgezogenen Linie,
+        // damit sie sich optisch von den Kompass-Kreuzlinien und Ringen
+        // unterscheidet und nicht wie ein staendiges UI-Element wirkt.
+        constexpr uint8_t DOT_COUNT = 10;
+        for (uint8_t i = 0; i < DOT_COUNT; i++) {
+            if (i % 2 != 0) continue; // nur jedes zweite Segment zeichnen
+            float t0 = (float)i / DOT_COUNT;
+            float t1 = (float)(i + 1) / DOT_COUNT;
+            int16_t x0 = L.cx + (int16_t)lround(t0 * L.radius * s);
+            int16_t y0 = L.cy - (int16_t)lround(t0 * L.radius * c);
+            int16_t x1 = L.cx + (int16_t)lround(t1 * L.radius * s);
+            int16_t y1 = L.cy - (int16_t)lround(t1 * L.radius * c);
+            gfx.drawLine(x0, y0, x1, y1, TFT_WHITE);
+        }
+
+        // Gradzahl knapp ausserhalb des Rings, an der Stelle wo die Peilung
+        // den Kreisrand durchstoesst. Der Radius-Kreis nutzt fast die volle
+        // Bildschirmbreite (siehe computeLayout(): nur 6px Rand) - ein Label
+        // ausserhalb des Rings wuerde bei Ost/West-Peilungen ueber den
+        // sichtbaren Bereich hinausragen. Deshalb: Label-Position an die
+        // Bildschirmgrenzen clampen statt stur dem Winkel zu folgen.
+        int16_t labelX = L.cx + (int16_t)lround((L.radius + 10) * s);
+        int16_t labelY = L.cy - (int16_t)lround((L.radius + 10) * c);
+        labelX = constrain(labelX, (int16_t)14, (int16_t)(Config::SCREEN_WIDTH - 14));
+        labelY = constrain(labelY, (int16_t)10, (int16_t)(L.cy + L.radius + 8));
+        char buf[6];
+        snprintf(buf, sizeof(buf), "%.0f", bearingDeg);
+        gfx.setTextDatum(MC_DATUM);
+        gfx.setTextColor(TFT_WHITE, TFT_BLACK);
+        gfx.drawString(buf, labelX, labelY);
+        gfx.setTextDatum(TL_DATUM);
+    }
+
     // kurzer Kursstrich in Flugrichtung (headingDeg) MIT Pfeilspitze am Ende -
     // eine reine Linie ohne Spitze war nicht eindeutig lesbar (nicht erkennbar,
     // welches Ende "vorne" ist). Die Spitze besteht aus zwei kurzen Strichen,
@@ -491,6 +535,7 @@ void render(TFT_eSPI& tft, int16_t top) {
 
     bool selectionStillPresent = false;
     Aircraft selected{};
+    uint8_t visibleCount = 0; // nach allen Filtern (Reichweite, Bodenfahrzeuge, Airline-Filter)
 
     for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) hitPoints[i].valid = false;
 
@@ -503,6 +548,8 @@ void render(TFT_eSPI& tft, int16_t top) {
         if (SettingsStore::hideGroundVehicles() && a.category[0] == 'C') continue;
 
         if (AirlineFilter::isHidden(a.callsign)) continue;
+
+        visibleCount++;
 
         RadarMath::PolarCoord polar{a.distanceKm, a.bearingDeg};
         RadarMath::ScreenPoint pt = RadarMath::toScreen(polar, L.cx, L.cy, L.radius, rangeKm);
@@ -522,6 +569,7 @@ void render(TFT_eSPI& tft, int16_t top) {
             tft.drawCircle(pt.x, pt.y, 9, TFT_WHITE);
             selectionStillPresent = true;
             selected = a;
+            drawBearingIndicator(tft, L, a.bearingDeg);
         }
         drawAircraftMarker(tft, pt.x, pt.y, a.headingDeg, color);
 
@@ -549,6 +597,12 @@ void render(TFT_eSPI& tft, int16_t top) {
         strncpy(hitPoints[i].callsign, a.callsign, sizeof(hitPoints[i].callsign) - 1);
     }
 
+    // "Leerer Himmel"-Timer: merkt sich, wann zuletzt mindestens ein
+    // Flugzeug sichtbar war (nach allen Filtern). Statisch, damit der Wert
+    // über mehrere render()-Aufrufe hinweg erhalten bleibt.
+    static uint32_t lastAircraftSeenMs = millis();
+    if (visibleCount > 0) lastAircraftSeenMs = millis();
+
     if (selectedHex[0] && !selectionStillPresent) {
         selectedHex[0] = 0;
     }
@@ -563,7 +617,21 @@ void render(TFT_eSPI& tft, int16_t top) {
         tft.drawFastHLine(0, infoTop, Config::SCREEN_WIDTH, TFT_DARKGREY);
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
         tft.setCursor(8, infoTop + 20);
-        tft.print(I18n::t(StringId::RADAR_TAP_FOR_DETAILS));
+        if (visibleCount == 0) {
+            // Kein Flugzeug in Reichweite - statt des "Fuer Details
+            // antippen"-Hinweises (der hier ohnehin ins Leere liefe) zeigen
+            // wir an, wie lange der Himmel schon leer ist.
+            uint32_t emptySec = (millis() - lastAircraftSeenMs) / 1000;
+            char buf[24];
+            if (emptySec < 60) {
+                snprintf(buf, sizeof(buf), "%lus", (unsigned long)emptySec);
+            } else {
+                snprintf(buf, sizeof(buf), "%lum %02lus", (unsigned long)(emptySec / 60), (unsigned long)(emptySec % 60));
+            }
+            tft.print(String(I18n::t(StringId::RADAR_EMPTY_SKY_PREFIX)) + buf);
+        } else {
+            tft.print(I18n::t(StringId::RADAR_TAP_FOR_DETAILS));
+        }
 
         char rangeLabel[8];
         snprintf(rangeLabel, sizeof(rangeLabel), "%.0fkm", rangeKm);
