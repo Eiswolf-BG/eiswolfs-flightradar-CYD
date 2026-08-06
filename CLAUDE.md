@@ -169,10 +169,21 @@ folgende Schritte in dieser Reihenfolge:
    Tag erstellt wurde).
 7. Kurze Zusammenfassung am Ende: was committet/getaggt/gepusht wurde, und
    ob die README aktualisiert wurde (und falls ja, welche Abschnitte).
-   ## Nach jedem erfolgreichen Build automatisch flashen
+8. ERST DANACH (nach Schritt 5, wenn bootloader/firmware/partitions bereits
+   ins Hauptverzeichnis kopiert sind): die `firmware.bin` im
+   `.pio/build/esp32dev/`-Ordner zusätzlich zu `CYD-flightradar.bin`
+   umbenennen (bzw. kopieren) - das ist die Datei für den GitHub-Release-
+   Upload, erspart das manuelle Umbenennen nach jedem Release. WICHTIG:
+   diese Umbenennung darf NICHT vor dem Auto-Flash (siehe unten) passieren,
+   sonst schlägt `pio run --target upload` fehl, weil es die Datei unter
+   dem Namen `firmware.bin` erwartet.
+
+## Nach jedem erfolgreichen Build automatisch flashen
 
 Sobald `pio run` (Build) erfolgreich ohne Fehler durchgelaufen ist, IMMER direkt
 im Anschluss auch flashen (`pio run --target upload`), ohne extra danach zu
 fragen - außer der Nutzer sagt ausdrücklich "nur bauen, nicht flashen" o.ä.
 Kurz danach bestätigen, dass der Upload ebenfalls erfolgreich war (inkl.
 "[SUCCESS]"-Zeile am Ende).
+
+Bitte diese Regel jetzt in die CLAUDE.md-Datei einpflegen.

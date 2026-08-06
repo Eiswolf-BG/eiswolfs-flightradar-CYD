@@ -8,6 +8,18 @@ namespace FlightLogbook {
 
     uint16_t todayCount();
 
+    struct TopAltitude {
+        bool found = false;
+        char callsign[9] = {0};
+        int32_t altitudeFt = 0;
+    };
+
+    // Sucht in der heutigen Logbuch-Datei den Eintrag mit der hoechsten
+    // geloggten Flughoehe (jeweils die Hoehe BEIM ERSTEN Sichten, nicht der
+    // aktuelle Wert) und gibt dessen Rufzeichen + Hoehe zurueck. found=false,
+    // wenn heute noch nichts geloggt wurde oder die Datei fehlt.
+    TopAltitude todayMaxAltitude();
+
     void computeAllTimeStats(uint32_t& totalAircraft, uint16_t& totalDays);
 
     struct DayEntry {

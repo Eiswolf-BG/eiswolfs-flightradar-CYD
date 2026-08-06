@@ -105,6 +105,7 @@ Shows at a glance:
 - **Days with sightings** – how many days anything was logged at all
 - **Average per day** – total count divided by number of days
 - **Uptime** – how long the device has been running since the last restart
+- **Highest flight today** – callsign and altitude of whichever aircraft was logged at the greatest altitude today (the altitude at first sighting, not necessarily its current one), e.g. "DLH441 (38000 ft)"
 
 The **"Reset logbook data"** button (tap twice to confirm) permanently deletes all logged data.
 

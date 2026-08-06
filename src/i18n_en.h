@@ -118,6 +118,7 @@ static const char* const I18N_EN[] = {
     "Tap again to confirm!",
     "Logbook data reset.",
     "Uptime: ",
+    "Highest flight today: ",
     "History (last 7 days)",
     "No logbook entries yet.",
     "How the history chart works",

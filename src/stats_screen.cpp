@@ -36,11 +36,12 @@ namespace {
 
     constexpr uint32_t CONFIRM_WINDOW_MS = 4000;
 
-    constexpr int16_t ROW1_Y = 44;
-    constexpr int16_t ROW2_Y = 84;
-    constexpr int16_t ROW3_Y = 124;
-    constexpr int16_t ROW4_Y = 164;
-    constexpr int16_t UPTIME_Y = 202;
+    constexpr int16_t ROW1_Y = 40;
+    constexpr int16_t ROW2_Y = 76;
+    constexpr int16_t ROW3_Y = 112;
+    constexpr int16_t ROW4_Y = 148;
+    constexpr int16_t UPTIME_Y = 184;
+    constexpr int16_t TOP_ALT_Y = 204; // "Hoechster Flug heute" - einzeilig, daher naeher an UPTIME als die anderen Rows
 }
 
 void run(TFT_eSPI& tft) {
@@ -56,6 +57,7 @@ void run(TFT_eSPI& tft) {
     uint32_t allTimeAircraft = 0;
     uint16_t allTimeDays = 0;
     FlightLogbook::computeAllTimeStats(allTimeAircraft, allTimeDays);
+    FlightLogbook::TopAltitude topAlt = FlightLogbook::todayMaxAltitude();
 
     Rect resetBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 100), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
     Rect backBtn  = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
@@ -93,6 +95,14 @@ void run(TFT_eSPI& tft) {
         tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
         tft.setCursor(10, UPTIME_Y);
         tft.print(String(I18n::t(StringId::STATS_UPTIME_PREFIX)) + upBuf);
+
+        if (topAlt.found) {
+            String csign = topAlt.callsign[0] ? String(topAlt.callsign) : "?";
+            char altBuf[24];
+            snprintf(altBuf, sizeof(altBuf), "%s (%ld ft)", csign.c_str(), (long)topAlt.altitudeFt);
+            tft.setCursor(10, TOP_ALT_Y);
+            tft.print(String(I18n::t(StringId::STATS_TOP_ALTITUDE_PREFIX)) + altBuf);
+        }
 
         if (confirmPending) {
             drawButton(tft, resetBtn, I18n::t(StringId::STATS_RESET_CONFIRM), true);

@@ -191,6 +191,58 @@ void update() {
 
 uint16_t todayCount() { return seenCount; }
 
+TopAltitude todayMaxAltitude() {
+    TopAltitude result;
+
+    SdMutex::Guard guard;
+    if (currentDateStr[0] == 0) return result; // Uhrzeit noch nicht bekannt
+
+    char filename[64];
+    logFilename(filename, sizeof(filename));
+    if (!SD.exists(filename)) return result;
+
+    File f = SD.open(filename, FILE_READ);
+    if (!f) return result;
+
+    bool firstLine = true;
+    while (f.available()) {
+        String line = f.readStringUntil('\n');
+        if (firstLine) { firstLine = false; continue; } // CSV-Header ueberspringen
+        if (line.length() == 0) continue;
+
+        // Spalten: timestamp,hex,callsign,reg,type,distance_km,altitude_ft
+        int commaIdx[6];
+        int found = 0;
+        int searchFrom = 0;
+        for (int c = 0; c < 6; c++) {
+            int idx = line.indexOf(',', searchFrom);
+            if (idx < 0) break;
+            commaIdx[c] = idx;
+            searchFrom = idx + 1;
+            found++;
+        }
+        if (found < 6) continue; // unvollstaendige/kaputte Zeile ueberspringen
+
+        String callsign = line.substring(commaIdx[1] + 1, commaIdx[2]);
+        String altStr = line.substring(commaIdx[5] + 1);
+        altStr.trim();
+        if (altStr.length() == 0) continue;
+
+        int32_t alt = altStr.toInt();
+        if (alt > result.altitudeFt || !result.found) {
+            result.found = true;
+            result.altitudeFt = alt;
+            callsign.trim();
+            strncpy(result.callsign, callsign.c_str(), sizeof(result.callsign) - 1);
+            result.callsign[sizeof(result.callsign) - 1] = 0;
+        }
+        yield();
+    }
+    f.close();
+
+    return result;
+}
+
 void computeAllTimeStats(uint32_t& totalAircraft, uint16_t& totalDays) {
     totalAircraft = 0;
     totalDays = 0;

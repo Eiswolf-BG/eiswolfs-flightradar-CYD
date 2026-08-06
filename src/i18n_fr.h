@@ -117,6 +117,7 @@ static const char* const I18N_FR[] = {
     "Retouchez pour confirmer !",
     "Journal réinitialisé.",
     "Durée de fonctionnement : ",
+    "Vol le plus haut aujourd'hui : ",
     "Historique (7 derniers jours)",
     "Aucune entrée pour le moment.",
     "Comment fonctionne l'historique",

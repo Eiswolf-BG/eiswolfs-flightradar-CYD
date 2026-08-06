@@ -117,6 +117,7 @@ static const char* const I18N_IT[] = {
     "Tocca di nuovo per confermare!",
     "Registro reimpostato.",
     "Tempo di attività: ",
+    "Volo più alto oggi: ",
     "Cronologia (ultimi 7 giorni)",
     "Ancora nessun dato.",
     "Come funziona la cronologia",
