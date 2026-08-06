@@ -622,11 +622,17 @@ void render(TFT_eSPI& tft, int16_t top) {
             // antippen"-Hinweises (der hier ohnehin ins Leere liefe) zeigen
             // wir an, wie lange der Himmel schon leer ist.
             uint32_t emptySec = (millis() - lastAircraftSeenMs) / 1000;
-            char buf[24];
+            char buf[16];
             if (emptySec < 60) {
                 snprintf(buf, sizeof(buf), "%lus", (unsigned long)emptySec);
             } else {
-                snprintf(buf, sizeof(buf), "%lum %02lus", (unsigned long)(emptySec / 60), (unsigned long)(emptySec % 60));
+                // Ab der ersten vollen Minute NUR noch Minuten anzeigen (ohne
+                // Sekunden) - "1min 05s" war zu lang und stiess an den
+                // Reichweiten-Button rechts daneben. Abgerundet (60-119s =
+                // "1min", 120-179s = "2min", usw.) - intuitiv wie eine
+                // normale Stoppuhr-Minutenanzeige.
+                unsigned long minutes = emptySec / 60;
+                snprintf(buf, sizeof(buf), "%lumin", minutes);
             }
             tft.print(String(I18n::t(StringId::RADAR_EMPTY_SKY_PREFIX)) + buf);
         } else {

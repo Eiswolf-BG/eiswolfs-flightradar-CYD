@@ -164,7 +164,12 @@ namespace {
 
         constexpr int16_t textMaxWidth = Config::SCREEN_WIDTH - 20;
         constexpr int16_t LINE_H = 16;
-        constexpr int16_t VIEW_TOP = 36;
+        // VIEW_TOP haengt davon ab, wie viele Zeilen der Titel tatsaechlich
+        // braucht (je nach Sprache 1 oder 2 Zeilen) - vorher "trocken"
+        // (draw=false) berechnen, damit der Fliesstext nicht in eine
+        // zweizeilige Titelueberschrift hineinlaeuft.
+        int16_t titleEndY = layoutWrapped(tft, 10, 14, textMaxWidth, LINE_H, I18n::t(StringId::WATCHLIST_INFO_TITLE), 0, 0, 0, false);
+        const int16_t VIEW_TOP = titleEndY + 4;
         constexpr int16_t VIEW_BOTTOM = Config::SCREEN_HEIGHT - 60;
 
         int16_t totalH = VIEW_TOP;
@@ -187,8 +192,11 @@ namespace {
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.setCursor(10, 14);
-            tft.println(I18n::t(StringId::WATCHLIST_INFO_TITLE));
+            // Titel kann laenger als eine Zeile sein - ueber denselben
+            // layoutWrapped()-Mechanismus wie den Fliesstext zeichnen, statt
+            // println() (das keinen wortweisen Umbruch macht und mitten im
+            // Wort abschneidet/umbricht).
+            layoutWrapped(tft, 10, 14, textMaxWidth, LINE_H, I18n::t(StringId::WATCHLIST_INFO_TITLE), 0, 0, Config::SCREEN_HEIGHT, true);
 
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             int16_t y = VIEW_TOP;
@@ -234,17 +242,22 @@ void run(TFT_eSPI& tft) {
     MenuStars::reset();
     while (!done) {
         tft.fillScreen(TFT_BLACK);
+
+        // Kleiner "?"-Info-Button oben rechts, gleiches Muster wie bei den
+        // Standort-Presets/dem WLAN-Manager. ZUERST zeichnen, damit Titel/
+        // Beschreibung bewusst unterhalb davon beginnen (der Titel + zwei
+        // Beschreibungszeilen liefen vorher UNTER dem Button durch und
+        // wurden dadurch teilweise verdeckt/abgeschnitten).
+        Rect infoBtn = {(int16_t)(Config::SCREEN_WIDTH - 40), 2, 30, 24};
+        drawButton(tft, infoBtn, "?");
+
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::WATCHLIST_TITLE));
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
-        tft.setCursor(10, 26);
+        tft.setCursor(10, 40);
         tft.println(I18n::t(StringId::WATCHLIST_DESC1));
-        tft.setCursor(10, 38);
+        tft.setCursor(10, 52);
         tft.println(I18n::t(StringId::WATCHLIST_DESC2));
-
-        Rect infoBtn = {(int16_t)(Config::SCREEN_WIDTH - 40), 2, 30, 24};
-        drawButton(tft, infoBtn, "?");
 
         uint8_t count = AircraftWatchlist::count();
         int16_t y = 56;
