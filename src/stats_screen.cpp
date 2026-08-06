@@ -36,12 +36,12 @@ namespace {
 
     constexpr uint32_t CONFIRM_WINDOW_MS = 4000;
 
-    constexpr int16_t ROW1_Y = 40;
-    constexpr int16_t ROW2_Y = 76;
-    constexpr int16_t ROW3_Y = 112;
-    constexpr int16_t ROW4_Y = 148;
-    constexpr int16_t UPTIME_Y = 184;
-    constexpr int16_t TOP_ALT_Y = 204; // "Hoechster Flug heute" - einzeilig, daher naeher an UPTIME als die anderen Rows
+    constexpr int16_t ROW1_Y = 38;
+    constexpr int16_t ROW2_Y = 72;
+    constexpr int16_t ROW3_Y = 106;
+    constexpr int16_t ROW4_Y = 140;
+    constexpr int16_t UPTIME_Y = 174;
+    constexpr int16_t TOP_ALT_Y = 194; // zweizeilig wie drawStatRow (Label + Wert)
 }
 
 void run(TFT_eSPI& tft) {
@@ -100,8 +100,7 @@ void run(TFT_eSPI& tft) {
             String csign = topAlt.callsign[0] ? String(topAlt.callsign) : "?";
             char altBuf[24];
             snprintf(altBuf, sizeof(altBuf), "%s (%ld ft)", csign.c_str(), (long)topAlt.altitudeFt);
-            tft.setCursor(10, TOP_ALT_Y);
-            tft.print(String(I18n::t(StringId::STATS_TOP_ALTITUDE_PREFIX)) + altBuf);
+            drawStatRow(tft, TOP_ALT_Y, I18n::t(StringId::STATS_TOP_ALTITUDE_PREFIX), String(altBuf));
         }
 
         if (confirmPending) {

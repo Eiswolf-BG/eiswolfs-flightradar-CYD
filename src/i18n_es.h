@@ -117,7 +117,7 @@ static const char* const I18N_ES[] = {
     "¡Toque de nuevo para confirmar!",
     "Registro reiniciado.",
     "Tiempo activo: ",
-    "Vuelo más alto hoy: ",
+    "Vuelo más alto hoy",
     "Historial (últimos 7 días)",
     "Aún no hay registros.",
     "Cómo funciona el historial",

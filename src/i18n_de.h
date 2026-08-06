@@ -117,7 +117,7 @@ static const char* const I18N_DE[] = {
     "Nochmal tippen zum Bestätigen!",
     "Flugbuch-Daten zurückgesetzt.",
     "Laufzeit: ",
-    "Höchster Flug heute: ",
+    "Höchster Flug heute",
     "Verlauf (letzte 7 Tage)",
     "Noch keine Flugbuch-Einträge.",
     "Wie der Verlauf funktioniert",

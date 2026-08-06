@@ -117,7 +117,7 @@ static const char* const I18N_TR[] = {
     "Onaylamak için tekrar dokunun!",
     "Kayıt defteri sıfırlandı.",
     "Çalışma süresi: ",
-    "Bugünkü en yüksek uçuş: ",
+    "Bugünkü en yüksek uçuş",
     "Geçmiş (son 7 gün)",
     "Henüz kayıt yok.",
     "Geçmiş grafiği nasıl çalışır",
