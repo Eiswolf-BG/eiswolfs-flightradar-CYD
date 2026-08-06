@@ -90,13 +90,34 @@ namespace {
         return TFT_RED;
     }
 
+    // kurzer Kursstrich in Flugrichtung (headingDeg) MIT Pfeilspitze am Ende -
+    // eine reine Linie ohne Spitze war nicht eindeutig lesbar (nicht erkennbar,
+    // welches Ende "vorne" ist). Die Spitze besteht aus zwei kurzen Strichen,
+    // die knapp vor der Linienspitze schraeg nach aussen abzweigen (klassisches
+    // Chevron-/Pfeilkopf-Symbol, wie bei ATC-Radardarstellungen ueblich).
     void drawAircraftMarker(TFT_eSPI& gfx, int16_t x, int16_t y, float headingDeg, uint16_t color) {
         gfx.fillCircle(x, y, 5, color);
 
         double rad = headingDeg * PI / 180.0;
         int16_t dx = (int16_t)(sin(rad) * 10);
         int16_t dy = (int16_t)(-cos(rad) * 10);
-        gfx.drawLine(x, y, x + dx, y + dy, color);
+        int16_t tipX = x + dx;
+        int16_t tipY = y + dy;
+        gfx.drawLine(x, y, tipX, tipY, color);
+
+        // Pfeilspitze: zwei kurze Striche von der Spitze aus, je 150 Grad
+        // zur Kurslinie zurueckgeklappt (also leicht "nach hinten" zeigend,
+        // wie bei einem Pfeilkopf "^" ueblich).
+        constexpr double WING_ANGLE_RAD = 150.0 * PI / 180.0;
+        constexpr int16_t WING_LEN = 4;
+        double wing1 = rad + WING_ANGLE_RAD;
+        double wing2 = rad - WING_ANGLE_RAD;
+        int16_t w1x = tipX + (int16_t)(sin(wing1) * WING_LEN);
+        int16_t w1y = tipY + (int16_t)(-cos(wing1) * WING_LEN);
+        int16_t w2x = tipX + (int16_t)(sin(wing2) * WING_LEN);
+        int16_t w2y = tipY + (int16_t)(-cos(wing2) * WING_LEN);
+        gfx.drawLine(tipX, tipY, w1x, w1y, color);
+        gfx.drawLine(tipX, tipY, w2x, w2y, color);
     }
 
     uint16_t dimColorForAltitude(int32_t altFt) {

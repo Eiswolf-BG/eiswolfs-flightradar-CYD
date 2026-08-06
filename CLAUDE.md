@@ -146,8 +146,18 @@ falls der Nutzer danach fragt: weitere Menüs mit Info-Buttons versehen,
 ggf. weitere Sprachen, ggf. Export/Teilen der Logbuch-Daten.
 ## Standard-Workflow: Push & Release
 
-Bei JEDEM Release-Push (egal ob großes Feature oder kleiner Bugfix) automatisch
-folgende Schritte in dieser Reihenfolge:
+WICHTIG - wann dieser Workflow startet: Der komplette Release-Workflow
+(README-Update, Commit, Tag, Push) darf NUR gestartet werden, wenn Alex
+EXPLIZIT danach fragt (z.B. "lass pushen", "können wir releasen", "mach den
+Release-Workflow"). Ein einfaches "ja" auf eine Rückfrage (z.B. zu einer
+CLAUDE.md-Änderung oder einem anderen Detail) ist KEINE Aufforderung, den
+Release-Workflow zu starten. Bei kleineren Fixes/Änderungen bitte NUR bauen
+und flashen (siehe Abschnitt "Nach jedem erfolgreichen Build automatisch
+flashen" unten), aber NICHT committen/taggen/pushen, bis ausdrücklich danach
+gefragt wird.
+
+Sobald der Workflow explizit angefordert wurde, automatisch folgende Schritte
+in dieser Reihenfolge:
 
 1. Prüfen, ob seit dem letzten Commit neue/geänderte Features hinzugekommen
    sind, die für Endnutzer sichtbar sind (neue Menüpunkte, geändertes
@@ -160,7 +170,12 @@ folgende Schritte in dieser Reihenfolge:
 3. Falls es sich um einen Versionssprung handelt: Git-Tag mit
    Versionsnummer + Beschreibung der Änderungen erstellen.
 4. Prüfen, ob `index.html` (Web-Flasher) noch die alte Versionsnummer zeigt -
-   falls ja, aktualisieren.
+   falls ja, aktualisieren. **NICHT OPTIONAL, darf bei KEINEM Release-Push
+   übersprungen werden** - auch nicht bei kleinen Patch-Versionen. Immer als
+   fester Doppel-Schritt zusammen mit Schritt 1 (README) behandeln: wann
+   immer die README (oder auch nur die Versionsnummer) auf eine neue Version
+   aktualisiert wird, IMMER im selben Zug auch `index.html` prüfen und
+   synchron mitziehen.
 5. Prüfen, ob `bootloader.bin`, `firmware.bin`, `partitions.bin` im
    Hauptverzeichnis dem aktuellen Build in `.pio/build/esp32dev/`
    entsprechen - falls nicht, von dort kopieren.

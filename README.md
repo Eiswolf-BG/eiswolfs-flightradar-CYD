@@ -26,7 +26,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 ---
 
 ## Features
-- **Live radar screen** – circular radar view, sized to the full screen width, with a rotating green sweep line
+- **Live radar screen** – circular radar view, sized to the full screen width, with a rotating green sweep line; each aircraft marker's heading line ends in a small arrowhead, so its direction of travel is unambiguous at a glance
 - **Real ADS-B data** via the free [adsb.fi](https://adsb.fi) API, refreshed every 8 seconds
 - **Color-coded aircraft** by altitude (green `<10k ft`, yellow `10-30k ft`, red `>30k ft`) with an on-screen legend
 - **Tap an aircraft** to open a detail panel: callsign, airline, aircraft model (via [hexdb.io](https://hexdb.io)), altitude/speed/distance/heading in both metric and aviation units, estimated seat count
