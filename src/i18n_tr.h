@@ -229,6 +229,8 @@ static const char* const I18N_TR[] = {
     ". Bir sonraki başlatmadan itibaren WiFi otomatik olarak bağlanacak.",
 
     "örn. Ev, İş, Tatil evi",
+
+    "Kara aracı",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

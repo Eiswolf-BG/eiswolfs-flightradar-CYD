@@ -33,10 +33,20 @@ namespace {
     };
 
     constexpr int16_t INFO_BAR_H = 64;
+    // Zusaetzliche Hoehe fuer die zweite Legenden-Zeile (Bodenfahrzeug-
+    // Marker-Erklaerung), nur reserviert, wenn Bodenfahrzeuge tatsaechlich
+    // angezeigt werden (SettingsStore::hideGroundVehicles() == false) -
+    // ansonsten bleibt die Infoleiste genau so hoch wie bisher und der
+    // Radarkreis behaelt seine gewohnte Groesse.
+    constexpr int16_t INFO_BAR_GROUND_ROW_H = 18;
+
+    int16_t infoBarHeight() {
+        return SettingsStore::hideGroundVehicles() ? INFO_BAR_H : (int16_t)(INFO_BAR_H + INFO_BAR_GROUND_ROW_H);
+    }
 
     Layout computeLayout(int16_t top) {
         Layout L;
-        L.infoTop = Config::SCREEN_HEIGHT - INFO_BAR_H;
+        L.infoTop = Config::SCREEN_HEIGHT - infoBarHeight();
         constexpr int16_t TOP_LABEL_MARGIN = 10;
         int16_t maxRadiusByWidth = Config::SCREEN_WIDTH / 2 - 6;
         int16_t maxRadiusByHeight = (L.infoTop - top - TOP_LABEL_MARGIN) / 2 - 6;
@@ -59,6 +69,7 @@ namespace {
         float distanceKm;
         bool isEmergency;
         bool isWatched;
+        bool isGroundVehicle;
     };
     constexpr uint8_t MAX_HIT_POINTS = Config::MAX_TRACKED_AIRCRAFT;
     HitPoint hitPoints[MAX_HIT_POINTS];
@@ -228,6 +239,17 @@ namespace {
         return nightDimActiveNow() ? gfx.color565(0, 110, 0) : TFT_GREEN;
     }
 
+    // Feste Blau-Farbe fuer Bodenfahrzeug-Marker (ADS-B-Emitter-Kategorie
+    // "C*", z.B. Flughafen-Fahrzeuge) - bewusst unabhaengig von
+    // colorForAltitude(), da Bodenfahrzeuge praktisch immer auf 0ft stehen
+    // und sonst dieselbe Farbe wie niedrig fliegende Flugzeuge haetten,
+    // was die optische Unterscheidung (Quadrat vs. Kreis) unnoetig
+    // erschweren wuerde. Bei Nachtdimmung gedaempft, gleiches Muster wie
+    // colorForAltitude().
+    uint16_t colorForGroundVehicle(TFT_eSPI& gfx) {
+        return nightDimActiveNow() ? gfx.color565(0, 0, 160) : TFT_BLUE;
+    }
+
     // Zeigt die PEILUNG (nicht zu verwechseln mit der Flugrichtung/heading)
     // zum aktuell ausgewaehlten Flugzeug: eine duenne, gepunktete Linie vom
     // Radar-Zentrum zum Kreisrand in Richtung bearingDeg, plus die Gradzahl
@@ -302,6 +324,15 @@ namespace {
         gfx.drawLine(tipX, tipY, w2x, w2y, color);
     }
 
+    // Eigener Marker fuer Bodenfahrzeuge (ADS-B-Kategorie "C*") - ein
+    // gefuelltes Quadrat statt Kreis+Pfeilkopf, damit sie auf dem Radar
+    // klar von echten Flugzeugen zu unterscheiden sind (Heading/Kurs ist
+    // bei Bodenfahrzeugen ausserdem meist nicht aussagekraeftig).
+    void drawGroundVehicleMarker(TFT_eSPI& gfx, int16_t x, int16_t y, uint16_t color) {
+        constexpr int16_t HALF = 4;
+        gfx.fillRect((int16_t)(x - HALF), (int16_t)(y - HALF), (int16_t)(2 * HALF), (int16_t)(2 * HALF), color);
+    }
+
     void printLineTruncated(TFT_eSPI& gfx, int16_t x, int16_t y, int16_t maxWidth, const String& text) {
         String s = text;
         if (gfx.textWidth(s) > maxWidth) {
@@ -357,6 +388,18 @@ namespace {
             gfx.fillCircle(x0, y - 5, 3, items[i].color);
             gfx.setCursor(x0 + 7, y);
             gfx.print(items[i].label);
+        }
+
+        // Zweite Legenden-Zeile fuer die blauen Bodenfahrzeug-Quadrate - nur
+        // wenn sie ueberhaupt sichtbar sind (Flugoptionen >
+        // "Bodenfahrzeuge ausblenden" == aus). infoBarHeight() reserviert
+        // den dafuer noetigen zusaetzlichen Platz nur in diesem Fall, siehe
+        // computeLayout().
+        if (!SettingsStore::hideGroundVehicles()) {
+            int16_t gy = (int16_t)(y + INFO_BAR_GROUND_ROW_H);
+            gfx.fillRect(3, (int16_t)(gy - 8), 6, 6, colorForGroundVehicle(gfx));
+            gfx.setCursor(13, gy);
+            gfx.print(I18n::t(StringId::LEGEND_GROUND_VEHICLE));
         }
     }
 
@@ -629,7 +672,12 @@ void render(TFT_eSPI& tft, int16_t top) {
         RadarMath::PolarCoord polar{a.distanceKm, a.bearingDeg};
         RadarMath::ScreenPoint pt = RadarMath::toScreen(polar, L.cx, L.cy, L.radius, rangeKm);
 
-        uint16_t color = colorForAltitude(tft, a.altBaroFt);
+        // ADS-B-Emitter-Kategorie "C*" = Bodenfahrzeug (nur ueberhaupt
+        // sichtbar, wenn "Bodenfahrzeuge ausblenden" aus ist, siehe Filter
+        // oben) - eigene Farbe/Marker statt der hoehenbasierten Flugzeug-
+        // Darstellung, siehe drawGroundVehicleMarker()/colorForGroundVehicle().
+        bool isGroundVehicle = a.category[0] == 'C';
+        uint16_t color = isGroundVehicle ? colorForGroundVehicle(tft) : colorForAltitude(tft, a.altBaroFt);
         bool isSelected = selectedHex[0] && strcmp(a.hex, selectedHex) == 0;
         bool isEmergency = SettingsStore::emergencyAlertEnabled() && isEmergencySquawk(a.squawk);
         bool isWatched = SettingsStore::watchlistAlertEnabled() && AircraftWatchlist::isWatched(a.callsign);
@@ -640,7 +688,11 @@ void render(TFT_eSPI& tft, int16_t top) {
             selected = a;
             drawBearingIndicator(tft, L, a.bearingDeg);
         }
-        drawAircraftMarker(tft, pt.x, pt.y, a.headingDeg, color);
+        if (isGroundVehicle) {
+            drawGroundVehicleMarker(tft, pt.x, pt.y, color);
+        } else {
+            drawAircraftMarker(tft, pt.x, pt.y, a.headingDeg, color);
+        }
 
         if (isEmergency) {
             tft.drawCircle(pt.x, pt.y, 12, TFT_RED);
@@ -662,6 +714,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         hitPoints[i].distanceKm = a.distanceKm;
         hitPoints[i].isEmergency = isEmergency;
         hitPoints[i].isWatched = isWatched;
+        hitPoints[i].isGroundVehicle = isGroundVehicle;
         strncpy(hitPoints[i].hex, a.hex, sizeof(hitPoints[i].hex) - 1);
         strncpy(hitPoints[i].callsign, a.callsign, sizeof(hitPoints[i].callsign) - 1);
     }
@@ -747,7 +800,11 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             // einfach in Schwarz nachgezeichnet - das macht sie pixelgenau
             // wieder unsichtbar, ohne irgendetwas ausserhalb dieser Formen zu
             // beruehren.
-            drawAircraftMarker(tft, hp.x, hp.y, hp.headingDeg, TFT_BLACK);
+            if (hp.isGroundVehicle) {
+                drawGroundVehicleMarker(tft, hp.x, hp.y, TFT_BLACK);
+            } else {
+                drawAircraftMarker(tft, hp.x, hp.y, hp.headingDeg, TFT_BLACK);
+            }
             if (hp.isEmergency || hp.isWatched) {
                 tft.drawCircle(hp.x, hp.y, 12, TFT_BLACK);
             }
@@ -759,7 +816,11 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             continue;
         }
 
-        drawAircraftMarker(tft, hp.x, hp.y, hp.headingDeg, hp.color);
+        if (hp.isGroundVehicle) {
+            drawGroundVehicleMarker(tft, hp.x, hp.y, hp.color);
+        } else {
+            drawAircraftMarker(tft, hp.x, hp.y, hp.headingDeg, hp.color);
+        }
 
         if (hp.isEmergency) {
             tft.drawCircle(hp.x, hp.y, 12, TFT_RED);

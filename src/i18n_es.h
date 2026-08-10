@@ -229,6 +229,8 @@ static const char* const I18N_ES[] = {
     ". A partir del próximo inicio, el WiFi se conectará automáticamente.",
 
     "ej. Casa, Trabajo, Casa de vacaciones",
+
+    "Vehículo terrestre",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

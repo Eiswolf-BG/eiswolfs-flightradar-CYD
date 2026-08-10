@@ -275,6 +275,13 @@ enum class StringId : uint8_t {
     // gemeint ist (Preset-Name wie "Zuhause", nicht z.B. ein Ort/Adresse).
     LOCATION_NAME_HINT,
 
+    // Legenden-Eintrag auf dem Radar-Screen (radar_screen.cpp::drawLegend)
+    // fuer die blauen Quadrat-Marker der Bodenfahrzeuge - nur sichtbar,
+    // wenn "Bodenfahrzeuge ausblenden" AUS ist (Flugoptionen), da die
+    // Fahrzeuge dann als eigene Legenden-Zeile unter den drei
+    // Hoehen-Farbstufen erscheinen.
+    LEGEND_GROUND_VEHICLE,
+
     COUNT
 };
 
