@@ -228,6 +228,8 @@ static const char* const I18N_EN[] = {
     "Setup Complete",
     "The setup process is now complete. All data has been saved to the SD card in the folder ",
     ". From the next boot, WiFi will connect automatically.",
+
+    "e.g. Home, Work, Holiday home",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

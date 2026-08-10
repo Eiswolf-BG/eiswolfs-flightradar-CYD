@@ -268,6 +268,13 @@ enum class StringId : uint8_t {
     FIRST_RUN_COMPLETE_BODY1,
     FIRST_RUN_COMPLETE_BODY2,
 
+    // Hinweis mit Beispielnamen unter dem Titel der Namens-Tastatur
+    // (location_presets_screen.cpp::runPresetNameKeypad UND
+    // address_search_screen.cpp::runNameKeypad, beide spiegeln sich) -
+    // ohne jeden Hinweis wussten Einsteiger nicht, was fuer ein Name hier
+    // gemeint ist (Preset-Name wie "Zuhause", nicht z.B. ein Ort/Adresse).
+    LOCATION_NAME_HINT,
+
     COUNT
 };
 

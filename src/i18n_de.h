@@ -227,6 +227,8 @@ static const char* const I18N_DE[] = {
     "Einrichtung abgeschlossen",
     "Der Einrichtungsprozess ist jetzt abgeschlossen. Alle Daten wurden auf der SD-Karte im Ordner ",
     " abgespeichert. Ab dem nächsten Start verbindet sich das WLAN automatisch.",
+
+    "z.B. Zuhause, Arbeit, Ferienhaus",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

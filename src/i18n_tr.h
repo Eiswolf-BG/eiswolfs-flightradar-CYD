@@ -227,6 +227,8 @@ static const char* const I18N_TR[] = {
     "Kurulum Tamamlandı",
     "Kurulum işlemi artık tamamlandı. Tüm veriler SD karttaki şu klasöre kaydedildi: ",
     ". Bir sonraki başlatmadan itibaren WiFi otomatik olarak bağlanacak.",
+
+    "örn. Ev, İş, Tatil evi",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,
