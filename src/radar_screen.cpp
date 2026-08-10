@@ -209,10 +209,7 @@ namespace {
     }
 
     // Farbe je nach Flughoehe - gedaempft (dunkleres Gruen/Oliv) waehrend der
-    // Nachtdimmung. Bewusst eigene, etwas hellere Toene als
-    // dimColorForAltitude() weiter unten (das ist die IMMER dunklere
-    // Trail-Farbe hinter jedem Flugzeug) - sonst waeren Kopf-Marker und
-    // Trail nachts nicht mehr auseinanderzuhalten.
+    // Nachtdimmung.
     //
     // Die rote Hoehenstufe wird bewusst NICHT gedaempft: der bisherige
     // Dimm-Ton (160,30,0) sah auf dem Display eher orange-braun statt rot
@@ -303,83 +300,6 @@ namespace {
         int16_t w2y = tipY + (int16_t)(-cos(wing2) * WING_LEN);
         gfx.drawLine(tipX, tipY, w1x, w1y, color);
         gfx.drawLine(tipX, tipY, w2x, w2y, color);
-    }
-
-    uint16_t dimColorForAltitude(int32_t altFt) {
-        if (altFt < Config::COLOR_LOW_ALT_THRESHOLD_FT) return TFT_DARKGREEN;
-        if (altFt < Config::COLOR_MID_ALT_THRESHOLD_FT) return TFT_OLIVE;
-        return TFT_MAROON;
-    }
-
-    constexpr uint8_t TRAIL_LEN = 4;
-    constexpr uint32_t TRAIL_STALE_MS = Config::FETCH_INTERVAL_MS * 3;
-
-    struct TrailEntry {
-        char hex[7] = {0};
-        bool active = false;
-        int16_t xs[TRAIL_LEN] = {0};
-        int16_t ys[TRAIL_LEN] = {0};
-        uint8_t count = 0;
-        uint32_t lastUpdateMs = 0;
-        uint16_t dimColor = TFT_DARKGREEN;
-    };
-    constexpr uint8_t MAX_TRAILS = Config::MAX_TRACKED_AIRCRAFT;
-    TrailEntry trails[MAX_TRAILS];
-
-    // Alle Trails verwerfen, z.B. wenn sich der Radius (rangeKm) aendert:
-    // die gespeicherten Punkte sind Bildschirm-Pixelkoordinaten, die unter
-    // der ALTEN Skalierung berechnet wurden. Ohne diesen Reset zieht jedes
-    // Flugzeug fuer ein paar Heartbeat-Takte eine falsche "Schwanz"-Linie
-    // von der alten zur neuen Position, bis sich der kurze Ringpuffer
-    // (TRAIL_LEN=4) mit neuen, konsistenten Punkten gefuellt hat.
-    void clearTrails() {
-        for (uint8_t i = 0; i < MAX_TRAILS; i++) trails[i] = TrailEntry{};
-    }
-
-    void pruneStaleTrails() {
-        uint32_t now = millis();
-        for (uint8_t i = 0; i < MAX_TRAILS; i++) {
-            if (trails[i].active && now - trails[i].lastUpdateMs > TRAIL_STALE_MS) {
-                trails[i] = TrailEntry{};
-            }
-        }
-    }
-
-    TrailEntry* findOrCreateTrail(const char* hex) {
-        int16_t freeIdx = -1;
-        for (uint8_t i = 0; i < MAX_TRAILS; i++) {
-            if (trails[i].active && strcmp(trails[i].hex, hex) == 0) return &trails[i];
-            if (!trails[i].active && freeIdx < 0) freeIdx = (int16_t)i;
-        }
-        if (freeIdx < 0) return nullptr;
-        trails[freeIdx] = TrailEntry{};
-        strncpy(trails[freeIdx].hex, hex, sizeof(trails[freeIdx].hex) - 1);
-        trails[freeIdx].active = true;
-        return &trails[freeIdx];
-    }
-
-    void pushTrailPoint(TrailEntry* t, int16_t x, int16_t y) {
-        if (!t) return;
-        if (t->count < TRAIL_LEN) {
-            t->xs[t->count] = x;
-            t->ys[t->count] = y;
-            t->count++;
-        } else {
-            for (uint8_t i = 1; i < TRAIL_LEN; i++) {
-                t->xs[i - 1] = t->xs[i];
-                t->ys[i - 1] = t->ys[i];
-            }
-            t->xs[TRAIL_LEN - 1] = x;
-            t->ys[TRAIL_LEN - 1] = y;
-        }
-        t->lastUpdateMs = millis();
-    }
-
-    void drawTrail(TFT_eSPI& gfx, const TrailEntry* t, uint16_t color) {
-        if (!t || t->count < 2) return;
-        for (uint8_t i = 1; i < t->count; i++) {
-            gfx.drawLine(t->xs[i - 1], t->ys[i - 1], t->xs[i], t->ys[i], color);
-        }
     }
 
     void printLineTruncated(TFT_eSPI& gfx, int16_t x, int16_t y, int16_t maxWidth, const String& text) {
@@ -696,8 +616,6 @@ void render(TFT_eSPI& tft, int16_t top) {
 
     for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) hitPoints[i].valid = false;
 
-    pruneStaleTrails();
-
     for (uint8_t i = 0; i < count && i < MAX_HIT_POINTS; i++) {
         Aircraft& a = snapshot[i];
         if (a.distanceKm > rangeKm * 1.05f) continue;
@@ -715,12 +633,6 @@ void render(TFT_eSPI& tft, int16_t top) {
         bool isSelected = selectedHex[0] && strcmp(a.hex, selectedHex) == 0;
         bool isEmergency = SettingsStore::emergencyAlertEnabled() && isEmergencySquawk(a.squawk);
         bool isWatched = SettingsStore::watchlistAlertEnabled() && AircraftWatchlist::isWatched(a.callsign);
-
-        TrailEntry* trail = findOrCreateTrail(a.hex);
-        uint16_t trailColor = dimColorForAltitude(a.altBaroFt);
-        drawTrail(tft, trail, trailColor);
-        pushTrailPoint(trail, pt.x, pt.y);
-        if (trail) trail->dimColor = trailColor;
 
         if (isSelected) {
             tft.drawCircle(pt.x, pt.y, 9, TFT_WHITE);
@@ -819,28 +731,31 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     drawSweepLine(tft, L, sweepAngleDeg, sweepLineColor(tft));
     prevSweepAngleDeg = sweepAngleDeg;
 
-    for (uint8_t i = 0; i < MAX_TRAILS; i++) {
-        if (!trails[i].active) continue;
-
-        bool stillVisible = false;
-        for (uint8_t j = 0; j < MAX_HIT_POINTS; j++) {
-            if (hitPoints[j].valid && strcmp(hitPoints[j].hex, trails[i].hex) == 0) {
-                stillVisible = true;
-                break;
-            }
-        }
-        if (stillVisible) {
-            drawTrail(tft, &trails[i], trails[i].dimColor);
-        }
-    }
-
     for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) {
         if (!hitPoints[i].valid) continue;
         const HitPoint& hp = hitPoints[i];
 
         bool inAlertRange = hp.distanceKm <= Config::LED_ALERT_RADIUS_KM;
         if (inAlertRange && !ledBlinkOn) {
-            tft.fillRect(hp.x - 20, hp.y - 18, 40, 30, TFT_BLACK);
+            // Blink-Aus-Phase: frueher wurde hier ein pauschales 40x30px
+            // schwarzes Rechteck gezeichnet, um den Marker zu "verstecken" -
+            // das hat dabei aber auch die Radar-Ringe/Kompasslinien darunter
+            // ueberdeckt (bei jeder Hoehenfarbe gleichermassen, da diese
+            // Blink-Logik rein distanzbasiert ist). Stattdessen werden hier
+            // jetzt exakt dieselben Formen, die beim normalen Zeichnen weiter
+            // unten entstehen (Marker, Notfall-/Beobachtungs-Ring, Label),
+            // einfach in Schwarz nachgezeichnet - das macht sie pixelgenau
+            // wieder unsichtbar, ohne irgendetwas ausserhalb dieser Formen zu
+            // beruehren.
+            drawAircraftMarker(tft, hp.x, hp.y, hp.headingDeg, TFT_BLACK);
+            if (hp.isEmergency || hp.isWatched) {
+                tft.drawCircle(hp.x, hp.y, 12, TFT_BLACK);
+            }
+            tft.setTextColor(TFT_BLACK);
+            tft.setTextDatum(BC_DATUM);
+            const char* blinkLabel = hp.callsign[0] ? hp.callsign : hp.hex;
+            tft.drawString(blinkLabel, hp.x, hp.y - 8);
+            tft.setTextDatum(TL_DATUM);
             continue;
         }
 
@@ -939,7 +854,6 @@ bool handleTap(int16_t x, int16_t y, int16_t top) {
     if (L.rangeBtn.contains(x, y)) {
         uint8_t idx = (SettingsStore::rangeIndex() + 1) % Config::RANGE_STEP_COUNT;
         SettingsStore::setRangeIndex(idx);
-        clearTrails();
         return true;
     }
 
@@ -966,7 +880,6 @@ bool handleTap(int16_t x, int16_t y, int16_t top) {
         uint8_t idx = SettingsStore::rangeIndex();
         idx = (idx == 0) ? (Config::RANGE_STEP_COUNT - 1) : (idx - 1);
         SettingsStore::setRangeIndex(idx);
-        clearTrails();
         lastEmptyTapMs = 0;
     }
 
