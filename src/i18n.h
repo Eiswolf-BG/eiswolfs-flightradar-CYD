@@ -214,6 +214,13 @@ enum class StringId : uint8_t {
     WEBUI_INFO_PARA1,
     WEBUI_INFO_PARA2,
 
+    // Kleines Info-Fenster, das beim Antippen des Wetter-Icons im Header
+    // erscheint (siehe main.cpp/showWeatherInfo()) - erklaert, dass das
+    // Wetter zum aktuell aktiven Standort (bzw. aktivem Standort-Preset)
+    // gehoert.
+    WEATHER_INFO_TITLE,
+    WEATHER_INFO_BODY,
+
     COUNT
 };
 

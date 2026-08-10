@@ -59,6 +59,24 @@ namespace {
                 (int16_t)(Config::SCREEN_WIDTH - 20), FLIGHT_ROW_H};
     }
 
+    // Eigene, groesser berechnete Zeilenhoehe NUR fuer die System-Seite: mit
+    // nur 10 Eintraegen (vs. z.B. 14 auf der Flugoptionen-Seite) liess die
+    // normale rowRect()-Hoehe (22px) unten viel ungenutzten Platz frei. Die
+    // Hoehe wird hier stattdessen aus der tatsaechlich verfuegbaren
+    // Bildschirmflaeche errechnet, sodass die Buttons den Platz bis knapp
+    // ueber den Bildschirmrand ausfuellen - andere Seiten bleiben bei ihren
+    // eigenen, unveraenderten Zeilenhoehen.
+    constexpr uint8_t SYSTEM_ROW_COUNT = 10;
+    constexpr int16_t SYSTEM_ROW_GAP = 4;
+    constexpr int16_t SYSTEM_START_Y = 18;
+    constexpr int16_t SYSTEM_END_Y = Config::SCREEN_HEIGHT - 10;
+    constexpr int16_t SYSTEM_ROW_H =
+        (SYSTEM_END_Y - SYSTEM_START_Y - (SYSTEM_ROW_COUNT - 1) * SYSTEM_ROW_GAP) / SYSTEM_ROW_COUNT;
+    Rect systemRowRect(uint8_t index) {
+        return {10, (int16_t)(SYSTEM_START_Y + index * (SYSTEM_ROW_H + SYSTEM_ROW_GAP)),
+                (int16_t)(Config::SCREEN_WIDTH - 20), SYSTEM_ROW_H};
+    }
+
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label,
                      bool active = false, bool danger = false) {
         uint16_t accent = danger ? TFT_RED : TFT_GREEN;
@@ -305,16 +323,19 @@ void run(TFT_eSPI& tft) {
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_SYSTEM));
 
-            Rect calibBtn     = rowRect(0);
-            Rect invertBtn    = rowRect(1);
-            Rect brightnessBtn = rowRect(2);
-            Rect timeoutBtn   = rowRect(3);
-            Rect nightDimBtn  = rowRect(4);
-            Rect backupBtn    = rowRect(5);
-            Rect restoreBtn   = rowRect(6);
-            Rect aboutBtn     = rowRect(7);
-            Rect webuiBtn     = rowRect(8);
-            Rect backBtn      = rowRect(9);
+            Rect calibBtn     = systemRowRect(0);
+            Rect invertBtn    = systemRowRect(1);
+            Rect brightnessBtn = systemRowRect(2);
+            Rect timeoutBtn   = systemRowRect(3);
+            Rect nightDimBtn  = systemRowRect(4);
+            Rect backupBtn    = systemRowRect(5);
+            Rect restoreBtn   = systemRowRect(6);
+            Rect webuiBtn     = systemRowRect(7);
+            // "Info" (About) steht bewusst als letzter Punkt direkt ueber dem
+            // Zurueck-Button - so bleibt seine Position stabil, egal wie
+            // viele weitere Punkte davor noch dazukommen.
+            Rect aboutBtn     = systemRowRect(8);
+            Rect backBtn      = systemRowRect(9);
 
             drawButton(tft, calibBtn, I18n::t(StringId::MENU_CALIBRATE));
 
@@ -328,8 +349,8 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, nightDimBtn, I18n::t(StringId::MENU_NIGHT_DIMMING) + onOff(SettingsStore::nightDimmingEnabled()));
             drawButton(tft, backupBtn, I18n::t(StringId::MENU_BACKUP));
             drawButton(tft, restoreBtn, I18n::t(StringId::MENU_RESTORE));
-            drawButton(tft, aboutBtn, I18n::t(StringId::MENU_ABOUT));
             drawButton(tft, webuiBtn, I18n::t(StringId::MENU_LOGBOOK_WEBUI));
+            drawButton(tft, aboutBtn, I18n::t(StringId::MENU_ABOUT));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -376,17 +397,24 @@ void run(TFT_eSPI& tft) {
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_FLIGHT));
 
+            // Reine An/Aus-Schalter (Heartbeat, Notfall-Alarm, Naeherungs-LED,
+            // Beobachtungsalarm, Bodenfahrzeuge-Filter) stehen bewusst
+            // gemeinsam am Ende der Liste, direkt ueber dem Zurueck-Button -
+            // und darunter wiederum die LED-gesteuerten Alarme (Heartbeat,
+            // Notfall, Naeherung, Beobachtung; siehe LedAlert::Mode)
+            // zusammenhaengend vor dem nicht-LED-basierten
+            // Bodenfahrzeuge-Filter.
             Rect aircraftListBtn = flightRowRect(0);
             Rect statsBtn      = flightRowRect(1);
             Rect statsHistoryBtn = flightRowRect(2);
             Rect logFilesBtn   = flightRowRect(3);
             Rect logbookBtn    = flightRowRect(4);
-            Rect heartbeatBtn  = flightRowRect(5);
-            Rect proximityBtn  = flightRowRect(6);
-            Rect emergencyBtn  = flightRowRect(7);
-            Rect locationBtn   = flightRowRect(8);
-            Rect airlineBtn    = flightRowRect(9);
-            Rect watchlistBtn      = flightRowRect(10);
+            Rect locationBtn   = flightRowRect(5);
+            Rect airlineBtn    = flightRowRect(6);
+            Rect watchlistBtn      = flightRowRect(7);
+            Rect heartbeatBtn  = flightRowRect(8);
+            Rect emergencyBtn  = flightRowRect(9);
+            Rect proximityBtn  = flightRowRect(10);
             Rect watchlistAlertBtn = flightRowRect(11);
             Rect groundBtn     = flightRowRect(12);
             Rect backBtn       = flightRowRect(13);
@@ -396,12 +424,12 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, statsHistoryBtn, I18n::t(StringId::MENU_STATS_HISTORY));
             drawButton(tft, logFilesBtn, I18n::t(StringId::MENU_LOGBOOK_FILES));
             drawButton(tft, logbookBtn, I18n::t(StringId::MENU_FLIGHT_LOGBOOK) + onOff(SettingsStore::flightLogbookEnabled()));
-            drawButton(tft, heartbeatBtn, I18n::t(StringId::MENU_LED_HEARTBEAT) + onOff(SettingsStore::ledHeartbeatEnabled()));
-            drawButton(tft, proximityBtn, I18n::t(StringId::MENU_PROXIMITY_LED) + onOff(SettingsStore::proximityAlertEnabled()));
-            drawButton(tft, emergencyBtn, I18n::t(StringId::MENU_EMERGENCY_ALERT) + onOff(SettingsStore::emergencyAlertEnabled()));
             drawButton(tft, locationBtn, I18n::t(StringId::MENU_LOCATION_PRESETS));
             drawButton(tft, airlineBtn, I18n::t(StringId::MENU_AIRLINE_FILTER));
             drawButton(tft, watchlistBtn, I18n::t(StringId::MENU_WATCHLIST));
+            drawButton(tft, heartbeatBtn, I18n::t(StringId::MENU_LED_HEARTBEAT) + onOff(SettingsStore::ledHeartbeatEnabled()));
+            drawButton(tft, emergencyBtn, I18n::t(StringId::MENU_EMERGENCY_ALERT) + onOff(SettingsStore::emergencyAlertEnabled()));
+            drawButton(tft, proximityBtn, I18n::t(StringId::MENU_PROXIMITY_LED) + onOff(SettingsStore::proximityAlertEnabled()));
             drawButton(tft, watchlistAlertBtn, I18n::t(StringId::MENU_WATCHLIST_ALERT) + onOff(SettingsStore::watchlistAlertEnabled()));
             drawButton(tft, groundBtn, I18n::t(StringId::MENU_HIDE_GROUND) + onOff(SettingsStore::hideGroundVehicles()));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
@@ -440,18 +468,18 @@ void run(TFT_eSPI& tft) {
                     // vorhandene alte Datei weiterzuschreiben.
                     SettingsStore::setFlightLogbookSessionFile("");
                 }
-            } else if (heartbeatBtn.contains(tap.x, tap.y)) {
-                SettingsStore::setLedHeartbeatEnabled(!SettingsStore::ledHeartbeatEnabled());
-            } else if (proximityBtn.contains(tap.x, tap.y)) {
-                SettingsStore::setProximityAlertEnabled(!SettingsStore::proximityAlertEnabled());
-            } else if (emergencyBtn.contains(tap.x, tap.y)) {
-                SettingsStore::setEmergencyAlertEnabled(!SettingsStore::emergencyAlertEnabled());
             } else if (locationBtn.contains(tap.x, tap.y)) {
                 LocationPresetsScreen::run(tft);
             } else if (airlineBtn.contains(tap.x, tap.y)) {
                 AirlineFilterScreen::run(tft);
             } else if (watchlistBtn.contains(tap.x, tap.y)) {
                 AircraftWatchlistScreen::run(tft);
+            } else if (heartbeatBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setLedHeartbeatEnabled(!SettingsStore::ledHeartbeatEnabled());
+            } else if (emergencyBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setEmergencyAlertEnabled(!SettingsStore::emergencyAlertEnabled());
+            } else if (proximityBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setProximityAlertEnabled(!SettingsStore::proximityAlertEnabled());
             } else if (watchlistAlertBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setWatchlistAlertEnabled(!SettingsStore::watchlistAlertEnabled());
             } else if (groundBtn.contains(tap.x, tap.y)) {

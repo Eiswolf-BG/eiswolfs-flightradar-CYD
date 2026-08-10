@@ -200,6 +200,9 @@ static const char* const I18N_TR[] = {
     "Kayıt Defteri / WebUI",
     "Bu web sayfası, uçuş kayıt defterini doğrudan tarayıcıdan görüntülemenizi, indirmenizi ve tek tek silmenizi sağlar. Aynı WiFi ağındayken tarayıcıyı açıp şu adrese gidin:",
     "WiFi bağlantısı yok - sayfaya yalnızca bir ağ bağlantısı varken erişilebilir.",
+
+    "Hava Durumu",
+    "Hava durumu simgesi, aktif konumunuz için güncel hava durumunu gösterir. Bir konum ön ayarı seçiliyse, bunun yerine o ön ayarın hava durumu gösterilir.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

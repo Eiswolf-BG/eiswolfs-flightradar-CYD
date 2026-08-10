@@ -201,6 +201,9 @@ static const char* const I18N_EN[] = {
     "Logbook / WebUI",
     "This web page lets you view, download and individually delete the flight logbook right from a browser. While connected to the same WiFi network, open a browser and go to:",
     "No WiFi connection - the page is only reachable while connected to a network.",
+
+    "Weather",
+    "The weather icon shows the current weather for your active location. If a location preset is selected, its weather is shown instead.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

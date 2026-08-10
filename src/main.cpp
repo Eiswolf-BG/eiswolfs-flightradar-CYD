@@ -164,6 +164,100 @@ void drawWeatherIcon() {
     }
 }
 
+// Einfacher Zeilenumbruch fuer Fliesstext, analog zu layoutWrapped() in
+// menu_screen.cpp/webui_screen.cpp (siehe "keine geteilten Module"-Konvention
+// - jede Screen-Datei hat ihre eigene kleine Kopie). Ohne Scroll-Unterstuetzung,
+// da der Infotext des Wetter-Popups kurz genug ist, um immer komplett in die
+// verfuegbare Boxhoehe zu passen.
+int16_t weatherInfoLayoutWrapped(TFT_eSPI& tftRef, int16_t x, int16_t startY,
+                                  int16_t maxWidth, int16_t lineHeight, const String& text) {
+    int16_t y = startY;
+    int32_t start = 0;
+    int32_t len = text.length();
+    while (start < len) {
+        while (start < len && text[start] == ' ') start++;
+        if (start >= len) break;
+
+        String line = text.substring(start, len);
+        while (tftRef.textWidth(line) > maxWidth) {
+            int32_t lastSpace = line.lastIndexOf(' ');
+            if (lastSpace <= 0) break;
+            line = line.substring(0, lastSpace);
+        }
+
+        tftRef.setCursor(x, y);
+        tftRef.print(line);
+        y += lineHeight;
+        start += line.length();
+    }
+    return y;
+}
+
+void weatherInfoDrawButton(TFT_eSPI& tftRef, const Rect& r, const String& label) {
+    tftRef.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
+    tftRef.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+    tftRef.setTextDatum(MC_DATUM);
+    tftRef.setTextColor(TFT_GREEN, TFT_BLACK);
+    tftRef.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
+    tftRef.setTextDatum(TL_DATUM);
+}
+
+// Kleines Info-Fenster beim Antippen des Wetter-Icons im Header - erklaert,
+// dass das angezeigte Wetter immer zum aktuell aktiven Standort (bzw.
+// aktivem Standort-Preset, siehe LocationManager::getHomeLocation())
+// gehoert. Gleicher geboxter Overlay-Stil wie confirmLogbookEnable() in
+// menu_screen.cpp, hier aber ohne Warnfarbe und nur mit einem
+// Zurueck-Button, da rein informativ (keine Bestaetigung noetig).
+void showWeatherInfo(TFT_eSPI& tftRef) {
+    constexpr int16_t BOX_X = 4;
+    constexpr int16_t BOX_Y = 4;
+    constexpr int16_t BOX_W = Config::SCREEN_WIDTH - 2 * BOX_X;
+    constexpr int16_t BOX_H = Config::SCREEN_HEIGHT - 2 * BOX_Y;
+    constexpr int16_t TEXT_MAX_WIDTH = BOX_W - 20;
+    constexpr int16_t LINE_H = 16;
+    constexpr int16_t TITLE_Y = BOX_Y + 16;
+    // Eine Leerzeile Abstand zwischen Titel und Fliesstext.
+    constexpr int16_t VIEW_TOP = TITLE_Y + 12 + LINE_H;
+
+    constexpr int16_t BTN_H = 36;
+    constexpr int16_t BOTTOM_MARGIN = 8;
+    constexpr int16_t BACK_Y = BOX_Y + BOX_H - BOTTOM_MARGIN - BTN_H;
+
+    String body = I18n::t(StringId::WEATHER_INFO_BODY);
+
+    Rect backBtn = {(int16_t)(BOX_X + 10), BACK_Y, (int16_t)(BOX_W - 20), BTN_H};
+
+    MenuStars::reset();
+
+    auto redraw = [&]() {
+        tftRef.fillScreen(TFT_BLACK);
+        tftRef.drawRoundRect(BOX_X, BOX_Y, BOX_W, BOX_H, 6, TFT_GREEN);
+
+        tftRef.setTextDatum(MC_DATUM);
+        tftRef.setTextColor(TFT_GREEN, TFT_BLACK);
+        tftRef.setTextSize(2);
+        tftRef.drawString(I18n::t(StringId::WEATHER_INFO_TITLE), BOX_X + BOX_W / 2, TITLE_Y);
+        tftRef.setTextSize(1);
+        tftRef.setTextDatum(TL_DATUM);
+
+        tftRef.setTextColor(TFT_GREEN, TFT_BLACK);
+        weatherInfoLayoutWrapped(tftRef, BOX_X + 10, VIEW_TOP, TEXT_MAX_WIDTH, LINE_H, body);
+
+        weatherInfoDrawButton(tftRef, backBtn, I18n::t(StringId::BACK));
+    };
+
+    redraw();
+
+    while (true) {
+        TouchInput::Point tap;
+        if (TouchInput::wasTapped(tap)) {
+            if (backBtn.contains(tap.x, tap.y)) return;
+        }
+        MenuStars::update(tftRef);
+        delay(20);
+    }
+}
+
 void drawWifiIcon(int16_t rightX, int16_t rowTop, int16_t rowH, int8_t rssi) {
     uint8_t level;
     if (rssi >= -55) level = 4;
@@ -464,6 +558,11 @@ void loop() {
     if (tapped) {
         if (menuBtn.contains(tap.x, tap.y)) {
             MenuScreen::run(tft);
+            drawHeader();
+            updateStatusLine();
+            forceRedraw = true;
+        } else if (weatherIconRect.contains(tap.x, tap.y)) {
+            showWeatherInfo(tft);
             drawHeader();
             updateStatusLine();
             forceRedraw = true;

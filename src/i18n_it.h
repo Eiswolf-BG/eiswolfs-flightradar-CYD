@@ -200,6 +200,9 @@ static const char* const I18N_IT[] = {
     "Registro / WebUI",
     "Questa pagina web permette di visualizzare, scaricare ed eliminare singolarmente il registro di volo direttamente dal browser. Connesso alla stessa rete WiFi, apri un browser e vai a:",
     "Nessuna connessione WiFi - la pagina è raggiungibile solo mentre è attiva una connessione di rete.",
+
+    "Meteo",
+    "L'icona meteo mostra le condizioni meteo attuali per la tua posizione attiva. Se è selezionata una posizione salvata, viene mostrato invece il meteo di quella posizione.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

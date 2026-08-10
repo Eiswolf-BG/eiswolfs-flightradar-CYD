@@ -200,6 +200,9 @@ static const char* const I18N_FR[] = {
     "Journal / WebUI",
     "Cette page web permet de consulter, télécharger et supprimer individuellement le journal de vol directement depuis un navigateur. Connecté au même réseau WiFi, ouvrez simplement un navigateur et allez à :",
     "Pas de connexion WiFi - la page n'est accessible que lorsqu'une connexion réseau est établie.",
+
+    "Météo",
+    "L'icône météo indique la situation actuelle pour votre position active. Si une position enregistrée est sélectionnée, sa météo est affichée à la place.",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,
