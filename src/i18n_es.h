@@ -204,7 +204,21 @@ static const char* const I18N_ES[] = {
     "Clima",
     "El icono del clima muestra el clima actual de tu ubicación activa. Si hay una ubicación guardada seleccionada, se muestra el clima de esa ubicación en su lugar.",
 
-    "Consejo: en itilog.com (https://www.itilog.com/) introduce tu dirección gratis y obtén al instante sus coordenadas exactas. Merece la pena - la geolocalización automática por IP puede fallar fácilmente por 20-30 km, así que podrías oír un avión mientras el radar permanece vacío. Con las coordenadas exactas guardadas como preset, el LED de proximidad realmente parpadea al ritmo del avión que tienes encima.",
+    "Añadir ubicación",
+    "Introducir coordenadas",
+    "Buscar por dirección",
+    "Introduce tu dirección",
+    "Buscando...",
+    "Sin resultados. Prueba otra ortografía.",
+    "Error en la búsqueda. Revisa tu conexión WiFi.",
+    "¿Es este el lugar correcto?",
+    "Usar esta ubicación",
+    "Intentar de nuevo",
+    "Cancelar",
+    "Configura tu ubicación exacta",
+    "La geolocalización automática por IP puede fallar fácilmente por 20-30 km - podrías oír un avión mientras el radar permanece vacío. Introduce tu dirección ahora para obtener coordenadas exactas y una experiencia mucho mejor. El LED de proximidad parpadeará entonces realmente al ritmo del avión que tienes encima. También puedes hacerlo más tarde en cualquier momento desde Menú > Opciones de vuelo > Ubicaciones guardadas.",
+    "Introducir dirección",
+    "Omitir",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

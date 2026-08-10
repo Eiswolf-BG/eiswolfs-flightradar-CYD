@@ -2,6 +2,7 @@
 #include "location_presets.h"
 #include "location_manager.h"
 #include "airport_lookup.h"
+#include "address_search_screen.h"
 #include "touch_input.h"
 #include "menu_stars.h"
 #include "config.h"
@@ -229,7 +230,7 @@ namespace {
         return confirmed ? String(buf) : String();
     }
 
-    bool addPresetFlow(TFT_eSPI& tft) {
+    bool addPresetByCoordsFlow(TFT_eSPI& tft) {
         String latStr = runNumericKeypad(tft, I18n::t(StringId::LOCATION_LAT_PROMPT));
         if (latStr.length() == 0) return false;
 
@@ -242,6 +243,33 @@ namespace {
 
         String name = runPresetNameKeypad(tft);
         return LocationPresets::addPreset(lat, lon, name);
+    }
+
+    // Erster Schritt beim Antippen von "+": manuelle Koordinaten oder
+    // Adresssuche (AddressSearchScreen, kuemmert sich dort bereits selbst
+    // um Namensvergabe + Speichern als Preset).
+    bool addPresetFlow(TFT_eSPI& tft) {
+        MenuStars::reset();
+        tft.fillScreen(TFT_BLACK);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setCursor(10, 14);
+        tft.println(I18n::t(StringId::LOCATION_ADD_CHOICE_TITLE));
+
+        Rect addressBtn = {10, 90, (int16_t)(Config::SCREEN_WIDTH - 20), 44};
+        Rect coordsBtn  = {10, 144, (int16_t)(Config::SCREEN_WIDTH - 20), 44};
+        Rect cancelBtn  = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+        drawButton(tft, addressBtn, I18n::t(StringId::LOCATION_ADD_BY_ADDRESS));
+        drawButton(tft, coordsBtn, I18n::t(StringId::LOCATION_ADD_BY_COORDS));
+        drawButton(tft, cancelBtn, I18n::t(StringId::CANCEL), false, true);
+
+        while (true) {
+            TouchInput::Point tap;
+            if (!TouchInput::wasTapped(tap)) { MenuStars::update(tft); delay(20); continue; }
+
+            if (addressBtn.contains(tap.x, tap.y)) return AddressSearchScreen::run(tft);
+            if (coordsBtn.contains(tap.x, tap.y)) return addPresetByCoordsFlow(tft);
+            if (cancelBtn.contains(tap.x, tap.y)) return false;
+        }
     }
 
     // Kurze Meldung unten am Bildschirmrand, z.B. wenn beim Antippen des
@@ -406,8 +434,6 @@ namespace {
         totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA4), 0, 0, 0, false);
         totalH += 8;
         totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA5), 0, 0, 0, false);
-        totalH += 8;
-        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA6), 0, 0, 0, false);
 
         int16_t maxScroll = totalH - VIEW_BOTTOM;
         if (maxScroll < 0) maxScroll = 0;
@@ -437,9 +463,7 @@ namespace {
             y += 8;
             y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA4), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
             y += 8;
-            y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA5), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
-            y += 8;
-            layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA6), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
+            layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA5), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
 
             drawButton(tft, backBtn, I18n::t(StringId::BACK));
             if (scrollable) {
