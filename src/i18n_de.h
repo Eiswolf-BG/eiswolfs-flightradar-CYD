@@ -204,7 +204,21 @@ static const char* const I18N_DE[] = {
     "Wetter",
     "Das Wetter-Icon zeigt die aktuelle Wetterlage für deinen aktiven Standort. Ist ein Standort-Preset ausgewählt, wird stattdessen dessen Wetter angezeigt.",
 
-    "Tipp: Auf itilog.com (https://www.itilog.com/) kannst du kostenlos deine Adresse eingeben und bekommst sofort die exakten Koordinaten dafür. Das lohnt sich - die automatische IP-Standortbestimmung kann leicht 20-30 km danebenliegen, sodass du ein Flugzeug zwar hörst, der Radar aber leer bleibt. Mit den exakten Koordinaten als Preset eingetragen, blinkt die Näherungs-LED wirklich im Takt mit dem Flugzeug über dir.",
+    "Standort hinzufügen",
+    "Koordinaten eingeben",
+    "Per Adresse suchen",
+    "Adresse eingeben",
+    "Suche läuft...",
+    "Keine Ergebnisse. Andere Schreibweise versuchen.",
+    "Suche fehlgeschlagen. WLAN-Verbindung prüfen.",
+    "Ist das der richtige Ort?",
+    "Diesen Standort verwenden",
+    "Erneut versuchen",
+    "Abbrechen",
+    "Exakten Standort einrichten",
+    "Die automatische IP-Standortbestimmung kann leicht 20-30 km danebenliegen - du hörst vielleicht ein Flugzeug, während der Radar leer bleibt. Trage jetzt deine Adresse für exakte Koordinaten ein, für ein deutlich besseres Erlebnis. Die Näherungs-LED blinkt dann wirklich im Takt mit dem Flugzeug über dir. Du kannst das auch später jederzeit über Menü > Flugoptionen > Standort-Presets nachholen.",
+    "Adresse eingeben",
+    "Überspringen",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

@@ -205,7 +205,21 @@ static const char* const I18N_EN[] = {
     "Weather",
     "The weather icon shows the current weather for your active location. If a location preset is selected, its weather is shown instead.",
 
-    "Tip: at itilog.com (https://www.itilog.com/) you can enter your address for free and instantly get its exact coordinates. It's worth it - automatic IP-based location can easily be off by 20-30 km, so you might hear a plane overhead while the radar stays empty. With the exact coordinates entered as a preset, the proximity LED really does blink in sync with the aircraft above you.",
+    "Add Location",
+    "Enter coordinates",
+    "Search by address",
+    "Enter your address",
+    "Searching...",
+    "No results found. Try a different spelling.",
+    "Search failed. Check your WiFi connection.",
+    "Is this the right place?",
+    "Use this location",
+    "Try again",
+    "Cancel",
+    "Set Your Exact Location",
+    "Automatic IP-based location can easily be 20-30 km off - you might hear a plane overhead while the radar stays empty. Enter your address now for exact coordinates and a much better experience. The proximity LED will then really blink in sync with the aircraft above you. You can also do this later anytime via Menu > Flight Options > Location Presets.",
+    "Enter Address",
+    "Skip",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

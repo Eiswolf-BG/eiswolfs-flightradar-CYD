@@ -1,0 +1,87 @@
+#include "first_run_location_screen.h"
+#include "address_search_screen.h"
+#include "location_presets.h"
+#include "touch_input.h"
+#include "menu_stars.h"
+#include "config.h"
+#include "i18n.h"
+
+namespace FirstRunLocationScreen {
+
+namespace {
+    struct Rect {
+        int16_t x, y, w, h;
+        bool contains(int16_t px, int16_t py) const {
+            return px >= x && px < x + w && py >= y && py < y + h;
+        }
+    };
+
+    void drawButton(TFT_eSPI& tft, const Rect& r, const String& label) {
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
+        tft.setTextDatum(TL_DATUM);
+    }
+
+    // Lokale Kopie, siehe Konvention in location_presets_screen.cpp.
+    int16_t layoutWrapped(TFT_eSPI& tft, int16_t x, int16_t startY, int16_t maxWidth,
+                           int16_t lineHeight, const String& text) {
+        int16_t y = startY;
+        int32_t start = 0;
+        int32_t len = text.length();
+        while (start < len) {
+            while (start < len && text[start] == ' ') start++;
+            if (start >= len) break;
+            String line = text.substring(start, len);
+            while (tft.textWidth(line) > maxWidth) {
+                int32_t lastSpace = line.lastIndexOf(' ');
+                if (lastSpace <= 0) break;
+                line = line.substring(0, lastSpace);
+            }
+            tft.setCursor(x, y);
+            tft.print(line);
+            y += lineHeight;
+            start += line.length();
+        }
+        return y;
+    }
+}
+
+void run(TFT_eSPI& tft) {
+    MenuStars::reset();
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setCursor(10, 14);
+    tft.println(I18n::t(StringId::FIRST_RUN_LOCATION_TITLE));
+
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    layoutWrapped(tft, 10, 40, (int16_t)(Config::SCREEN_WIDTH - 20), 18,
+                  I18n::t(StringId::FIRST_RUN_LOCATION_BODY));
+
+    Rect setBtn  = {10, (int16_t)(Config::SCREEN_HEIGHT - 96), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+    Rect skipBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+    drawButton(tft, setBtn, I18n::t(StringId::FIRST_RUN_LOCATION_SET_BTN));
+    drawButton(tft, skipBtn, I18n::t(StringId::FIRST_RUN_LOCATION_SKIP_BTN));
+
+    while (true) {
+        TouchInput::Point tap;
+        if (!TouchInput::wasTapped(tap)) { MenuStars::update(tft); delay(20); continue; }
+
+        if (setBtn.contains(tap.x, tap.y)) {
+            if (AddressSearchScreen::run(tft)) {
+                // Direkt aktivieren - das ist der ganze Sinn dieses
+                // Screens (sofort beim ersten Start den praezisen
+                // Standort nutzen, statt weiter auf Auto/IP zu bleiben).
+                uint8_t idx = LocationPresets::count();
+                if (idx > 0) LocationPresets::setActiveIndex((int8_t)(idx - 1));
+            }
+            return;
+        }
+        if (skipBtn.contains(tap.x, tap.y)) {
+            return;
+        }
+    }
+}
+
+}

@@ -24,6 +24,13 @@ namespace Config {
     constexpr const char* IP_GEO_HOST = "ip-api.com";
     constexpr const char* IP_GEO_PATH = "/json/?fields=status,lat,lon,offset,countryCode";
 
+    // Adresssuche (AddressSearchScreen) - kostenloser, anmeldefreier
+    // Geokodierungs-Dienst (OpenStreetMap Nominatim). Deren Nutzungsregeln
+    // verlangen einen aussagekraeftigen User-Agent statt des HTTPClient-
+    // Standardwerts, siehe https://operations.osmfoundation.org/policies/nominatim/.
+    constexpr const char* NOMINATIM_HOST = "nominatim.openstreetmap.org";
+    constexpr const char* NOMINATIM_USER_AGENT = "EiswolfsFlightradarCYD (github.com/Eiswolf-BG/eiswolfs-flightradar-CYD)";
+
     struct GpsPinPair { uint8_t rx; uint8_t tx; const char* label; };
     constexpr GpsPinPair GPS_PIN_CANDIDATES[] = {
         {22, 27, "G22/G27"}

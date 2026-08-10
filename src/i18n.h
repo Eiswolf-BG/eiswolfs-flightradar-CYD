@@ -221,11 +221,30 @@ enum class StringId : uint8_t {
     WEATHER_INFO_TITLE,
     WEATHER_INFO_BODY,
 
-    // Zusaetzlicher Info-Absatz im Standort-Presets-Screen (Menue >
-    // Flugoptionen > Standort-Presets > "?") mit Tipp zu itilog.com fuer
-    // exakte Koordinaten - deutlich genauer als die automatische
-    // IP-Standortbestimmung (die leicht 20-30km danebenliegen kann).
-    LOCATION_INFO_PARA6,
+    // Adresssuche (AddressSearchScreen) - Standort per Adresseingabe statt
+    // manueller Koordinaten, per kostenlosem Nominatim-Geokodierungsdienst.
+    // Erreichbar sowohl beim Ersteinrichten (nach der Sprachauswahl) als
+    // auch jederzeit ueber Standort-Presets > "+".
+    LOCATION_ADD_CHOICE_TITLE,
+    LOCATION_ADD_BY_COORDS,
+    LOCATION_ADD_BY_ADDRESS,
+    ADDRESS_SEARCH_TITLE,
+    ADDRESS_SEARCH_SEARCHING,
+    ADDRESS_SEARCH_NO_RESULTS,
+    ADDRESS_SEARCH_ERROR,
+    ADDRESS_SEARCH_CONFIRM_TITLE,
+    ADDRESS_SEARCH_USE_THIS,
+    ADDRESS_SEARCH_TRY_AGAIN,
+    ADDRESS_SEARCH_CANCEL,
+
+    // Grosser Hinweis-Screen beim allerersten Start (nur einmalig, nach der
+    // Sprachauswahl) - erklaert den Genauigkeitsvorteil eines per Adresse
+    // gesetzten Standorts gegenueber der automatischen IP-Standort-
+    // bestimmung, mit direktem Einstieg in die Adresssuche. Ueberspringbar.
+    FIRST_RUN_LOCATION_TITLE,
+    FIRST_RUN_LOCATION_BODY,
+    FIRST_RUN_LOCATION_SET_BTN,
+    FIRST_RUN_LOCATION_SKIP_BTN,
 
     COUNT
 };
