@@ -230,6 +230,8 @@ static const char* const I18N_EN[] = {
     ". From the next boot, WiFi will connect automatically.",
 
     "e.g. Home, Work, Holiday home",
+
+    "Ground vehicle",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,
