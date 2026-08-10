@@ -152,9 +152,6 @@ static const char* const I18N_FR[] = {
     "Vol en palier",
     "Squawk : ",
 
-    "Enregistré : ",
-    "Échec de la capture d'écran",
-
     "Unités",
     "Auto (selon la position)",
     "Métrique (km, m, km/h)",
@@ -198,6 +195,11 @@ static const char* const I18N_FR[] = {
     "Sans nom",
     "Presets pleins - supprimez-en un d'abord",
     "Lors de l'ajout d'une position, vous pouvez lui donner un nom (ex. \"Maison\"), affiché ensuite dans la liste. Touchez le texte défilant de l'aéroport le plus proche pour l'ajouter directement comme nouvelle position avec son nom.",
+
+    "Journal / WebUI",
+    "Journal / WebUI",
+    "Cette page web permet de consulter, télécharger et supprimer individuellement le journal de vol directement depuis un navigateur. Connecté au même réseau WiFi, ouvrez simplement un navigateur et allez à :",
+    "Pas de connexion WiFi - la page n'est accessible que lorsqu'une connexion réseau est établie.",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

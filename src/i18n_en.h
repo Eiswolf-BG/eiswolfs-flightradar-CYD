@@ -153,9 +153,6 @@ static const char* const I18N_EN[] = {
     "Level flight",
     "Squawk: ",
 
-    "Saved: ",
-    "Screenshot failed",
-
     "Units",
     "Auto (by location)",
     "Metric (km, m, km/h)",
@@ -199,6 +196,11 @@ static const char* const I18N_EN[] = {
     "Skip name",
     "Presets full - remove one first",
     "When adding a preset you can give it a name (e.g. \"Home\"), which is then shown in the overview. Tap the nearest-airport ticker to add it directly as a new preset with its name.",
+
+    "Logbook / WebUI",
+    "Logbook / WebUI",
+    "This web page lets you view, download and individually delete the flight logbook right from a browser. While connected to the same WiFi network, open a browser and go to:",
+    "No WiFi connection - the page is only reachable while connected to a network.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,
