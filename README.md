@@ -146,6 +146,8 @@ It always follows whichever location is currently active, including active [loca
 
 Powered by the free [Open-Meteo](https://open-meteo.com) API (no API key needed). Refreshed automatically in the background every 10 minutes, or immediately after switching to a different location.
 
+Tap the icon for a small info popup explaining that the shown weather always reflects your currently active location.
+
 ### 📖 Flight logbook (ON/OFF)
 When enabled, the device logs **every newly sighted aircraft** (timestamp, hex code, callsign, registration, type, distance, altitude) into a CSV file on the SD card. An aircraft is only logged once per activation, even if it crosses the radar multiple times.
 
