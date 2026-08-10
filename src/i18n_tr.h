@@ -203,6 +203,8 @@ static const char* const I18N_TR[] = {
 
     "Hava Durumu",
     "Hava durumu simgesi, aktif konumunuz için güncel hava durumunu gösterir. Bir konum ön ayarı seçiliyse, bunun yerine o ön ayarın hava durumu gösterilir.",
+
+    "İpucu: itilog.com (https://www.itilog.com/) adresinden adresinizi ücretsiz girerek anında tam koordinatlarınızı alabilirsiniz. Buna değer - otomatik IP tabanlı konum belirleme kolayca 20-30 km sapabilir, böylece üstünüzden geçen bir uçağı duyarken radar boş kalabilir. Tam koordinatlar bir ön ayar olarak girildiğinde, yakınlık LED'i gerçekten üstünüzdeki uçakla aynı ritimde yanıp söner.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

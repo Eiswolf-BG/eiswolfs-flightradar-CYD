@@ -203,6 +203,8 @@ static const char* const I18N_FR[] = {
 
     "Météo",
     "L'icône météo indique la situation actuelle pour votre position active. Si une position enregistrée est sélectionnée, sa météo est affichée à la place.",
+
+    "Astuce : sur itilog.com (https://www.itilog.com/), entrez gratuitement votre adresse pour obtenir ses coordonnées exactes. Cela en vaut la peine - la localisation automatique par IP peut facilement se tromper de 20 à 30 km, si bien que vous entendez un avion alors que le radar reste vide. Avec les coordonnées exactes enregistrées comme preset, la LED de proximité clignote vraiment en rythme avec l'avion au-dessus de vous.",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

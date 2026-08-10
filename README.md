@@ -23,6 +23,10 @@ You can flash the firmware directly from your browser to your CYD display withou
 2. Insert a FAT32-formatted microSD card into your display.
 3. On first boot: Calibrate the touchscreen and configure your Wi-Fi via the built-in on-screen keyboard.
 
+**Tip:** for the best experience, set your exact location as a Location Preset (Menu → Flight Options → Location Presets) instead of relying on automatic IP-based geolocation. IP geolocation can easily be off by 20-30 km - you might hear a plane outside your window while the radar screen stays empty because the device thinks you're somewhere else entirely.
+
+To get your exact coordinates for free, visit [itilog.com](https://www.itilog.com/), enter your address, and copy the resulting latitude/longitude into a new Location Preset. With your precise location set, the proximity LED blinks in sync with aircraft you can actually hear overhead.
+
 ---
 
 ## Features
