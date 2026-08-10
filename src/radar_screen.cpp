@@ -107,18 +107,23 @@ namespace {
         return SettingsStore::nightDimmingEnabled() && isNightHours();
     }
 
-    // Farbe je nach Flughoehe - gedaempft (dunkleres Gruen/Oliv/Rot) waehrend
-    // der Nachtdimmung. Bewusst eigene, etwas hellere Toene als
+    // Farbe je nach Flughoehe - gedaempft (dunkleres Gruen/Oliv) waehrend der
+    // Nachtdimmung. Bewusst eigene, etwas hellere Toene als
     // dimColorForAltitude() weiter unten (das ist die IMMER dunklere
     // Trail-Farbe hinter jedem Flugzeug) - sonst waeren Kopf-Marker und
     // Trail nachts nicht mehr auseinanderzuhalten.
+    //
+    // Die rote Hoehenstufe wird bewusst NICHT gedaempft: der bisherige
+    // Dimm-Ton (160,30,0) sah auf dem Display eher orange-braun statt rot
+    // aus und war dadurch nicht mehr klar von der gelben Stufe zu
+    // unterscheiden. Rot bleibt deshalb Tag und Nacht der reine TFT_RED-Ton.
     uint16_t colorForAltitude(TFT_eSPI& gfx, int32_t altFt) {
         bool dim = nightDimActiveNow();
         if (altFt < Config::COLOR_LOW_ALT_THRESHOLD_FT)
             return dim ? gfx.color565(0, 160, 0) : TFT_GREEN;
         if (altFt < Config::COLOR_MID_ALT_THRESHOLD_FT)
             return dim ? gfx.color565(160, 160, 0) : TFT_YELLOW;
-        return dim ? gfx.color565(160, 30, 0) : TFT_RED;
+        return TFT_RED;
     }
 
     uint16_t sweepLineColor(TFT_eSPI& gfx) {
@@ -220,6 +225,16 @@ namespace {
     constexpr uint8_t MAX_TRAILS = Config::MAX_TRACKED_AIRCRAFT;
     TrailEntry trails[MAX_TRAILS];
 
+    // Alle Trails verwerfen, z.B. wenn sich der Radius (rangeKm) aendert:
+    // die gespeicherten Punkte sind Bildschirm-Pixelkoordinaten, die unter
+    // der ALTEN Skalierung berechnet wurden. Ohne diesen Reset zieht jedes
+    // Flugzeug fuer ein paar Heartbeat-Takte eine falsche "Schwanz"-Linie
+    // von der alten zur neuen Position, bis sich der kurze Ringpuffer
+    // (TRAIL_LEN=4) mit neuen, konsistenten Punkten gefuellt hat.
+    void clearTrails() {
+        for (uint8_t i = 0; i < MAX_TRAILS; i++) trails[i] = TrailEntry{};
+    }
+
     void pruneStaleTrails() {
         uint32_t now = millis();
         for (uint8_t i = 0; i < MAX_TRAILS; i++) {
@@ -303,10 +318,16 @@ namespace {
             snprintf(highLabel, sizeof(highLabel), ">30k ft");
         }
 
+        // Dieselbe colorForAltitude()-Funktion wie fuer die Flugzeug-Marker
+        // selbst verwenden (mit einer typischen Hoehe je Band) - sonst zeigt
+        // die Legende bei aktiver Nachtdimmung (22-6 Uhr) die HELLEN Farben,
+        // waehrend die Marker/Beschriftungen auf dem Radar bereits gedaempft
+        // sind. Das fuehrte dazu, dass z.B. ein rotes Flugzeug nachts eher
+        // dunkelorange wirkte, obwohl die Legende noch reines Rot zeigte.
         struct { uint16_t color; const char* label; } items[3] = {
-            {TFT_GREEN,  lowLabel},
-            {TFT_YELLOW, midLabel},
-            {TFT_RED,    highLabel},
+            {colorForAltitude(gfx, 0),                                   lowLabel},
+            {colorForAltitude(gfx, Config::COLOR_LOW_ALT_THRESHOLD_FT),  midLabel},
+            {colorForAltitude(gfx, Config::COLOR_MID_ALT_THRESHOLD_FT),  highLabel},
         };
         int16_t segW = Config::SCREEN_WIDTH / 3;
         gfx.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -774,6 +795,7 @@ bool handleTap(int16_t x, int16_t y, int16_t top) {
     if (L.rangeBtn.contains(x, y)) {
         uint8_t idx = (SettingsStore::rangeIndex() + 1) % Config::RANGE_STEP_COUNT;
         SettingsStore::setRangeIndex(idx);
+        clearTrails();
         return true;
     }
 
@@ -800,6 +822,7 @@ bool handleTap(int16_t x, int16_t y, int16_t top) {
         uint8_t idx = SettingsStore::rangeIndex();
         idx = (idx == 0) ? (Config::RANGE_STEP_COUNT - 1) : (idx - 1);
         SettingsStore::setRangeIndex(idx);
+        clearTrails();
         lastEmptyTapMs = 0;
     }
 

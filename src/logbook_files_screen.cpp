@@ -16,17 +16,22 @@ namespace {
         }
     };
 
-    void drawButton(TFT_eSPI& tft, const Rect& r, const String& label) {
+    void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, bool danger = false) {
+        uint16_t accent = danger ? TFT_RED : TFT_GREEN;
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, accent);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(accent, TFT_BLACK);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
     }
 
     constexpr uint8_t MAX_DAYS_QUERIED = 31;
     constexpr uint8_t VISIBLE_ROWS = 10;
+
+    // Erste Inhaltszeile eine Zeile tiefer als frueher (30) ansetzen, damit
+    // sie nicht mit dem "?"-Info-Button oben rechts (y=2..26) kollidiert.
+    constexpr int16_t ROWS_START_Y = 50;
 
     int16_t layoutWrapped(TFT_eSPI& tft, int16_t x, int16_t startY, int16_t maxWidth,
                           int16_t lineHeight, const String& text, int16_t scrollY,
@@ -147,7 +152,7 @@ void run(TFT_eSPI& tft) {
     tft.setCursor(10, 14);
     tft.println(I18n::t(StringId::LOGFILES_TITLE));
     tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
-    tft.setCursor(10, 30);
+    tft.setCursor(10, ROWS_START_Y);
     tft.print(I18n::t(StringId::LOADING));
 
     FlightLogbook::DayEntry days[MAX_DAYS_QUERIED];
@@ -165,13 +170,16 @@ void run(TFT_eSPI& tft) {
         tft.println(I18n::t(StringId::LOGFILES_TITLE));
         drawButton(tft, infoBtn, "?");
 
+        Rect deleteRects[VISIBLE_ROWS];
+        uint8_t deleteCount = 0;
+        uint8_t startIdx = (count > VISIBLE_ROWS) ? (count - VISIBLE_ROWS) : 0;
+
         if (count == 0) {
             tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
-            tft.setCursor(10, 40);
+            tft.setCursor(10, ROWS_START_Y);
             tft.println(I18n::t(StringId::LOGFILES_EMPTY));
         } else {
-            uint8_t startIdx = (count > VISIBLE_ROWS) ? (count - VISIBLE_ROWS) : 0;
-            int16_t y = 30;
+            int16_t y = ROWS_START_Y;
 
             if (count > VISIBLE_ROWS) {
                 tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
@@ -188,6 +196,15 @@ void run(TFT_eSPI& tft) {
                 tft.setTextColor(TFT_GREEN, TFT_BLACK);
                 tft.setCursor(110, y);
                 tft.print(String(days[i].count) + I18n::t(StringId::LOGFILES_AIRCRAFT_SUFFIX));
+
+                // Jede Datei einzeln loeschbar (selber Stil wie das rote 'X'
+                // bei den WLAN-Netzwerken) - keine Bestaetigung noetig, das
+                // globale "Flugbuch zuruecksetzen" im Statistik-Screen
+                // bleibt fuer den Alles-loeschen-Fall.
+                Rect delBtn = {(int16_t)(Config::SCREEN_WIDTH - 34), (int16_t)(y - 15), 30, 18};
+                drawButton(tft, delBtn, "X", true);
+                deleteRects[deleteCount++] = delBtn;
+
                 y += 20;
             }
         }
@@ -201,9 +218,18 @@ void run(TFT_eSPI& tft) {
             delay(20);
         }
 
-        if (infoBtn.contains(tap.x, tap.y)) {
+        bool handled = false;
+        for (uint8_t i = 0; i < deleteCount; i++) {
+            if (deleteRects[i].contains(tap.x, tap.y)) {
+                FlightLogbook::deleteFile(days[startIdx + i].date);
+                count = FlightLogbook::listDays(days, MAX_DAYS_QUERIED);
+                handled = true;
+                break;
+            }
+        }
+        if (!handled && infoBtn.contains(tap.x, tap.y)) {
             runInfoScreen(tft);
-        } else if (backBtn.contains(tap.x, tap.y)) {
+        } else if (!handled && backBtn.contains(tap.x, tap.y)) {
             done = true;
         }
     }

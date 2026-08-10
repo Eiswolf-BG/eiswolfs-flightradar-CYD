@@ -11,6 +11,10 @@ namespace SettingsStore {
     bool displayInverted();
     void setDisplayInverted(bool inverted);
 
+    // Display-Helligkeit in Prozent (Config::BRIGHTNESS_MIN_PERCENT..MAX_PERCENT).
+    uint8_t brightnessPercent();
+    void setBrightnessPercent(uint8_t percent);
+
     bool emergencyAlertEnabled();
     void setEmergencyAlertEnabled(bool on);
 
@@ -22,6 +26,20 @@ namespace SettingsStore {
 
     bool flightLogbookEnabled();
     void setFlightLogbookEnabled(bool on);
+
+    // Unix-Zeitstempel (Sekunden), zu dem das Flugbuch zuletzt eingeschaltet
+    // wurde. 0 = unbekannt/nicht gesetzt. FlightLogbook::update() nutzt dies,
+    // um die Aufzeichnung nach genau 24 Stunden automatisch wieder
+    // auszuschalten (SD-Karten-Schutz, siehe Bestaetigungsdialog im Menue).
+    uint32_t flightLogbookEnabledAtEpoch();
+    void setFlightLogbookEnabledAtEpoch(uint32_t epoch);
+
+    // Dateiname (ohne ".csv", z.B. "2026-08-06" oder "2026-08-06_2") der
+    // aktuell laufenden Flugbuch-Sitzung. "" = keine Sitzungsdatei
+    // hinterlegt (Flugbuch aus, oder naechste Aktivierung soll eine neue
+    // Datei anlegen). Siehe FlightLogbook::ensureSessionFile().
+    String flightLogbookSessionFile();
+    void setFlightLogbookSessionFile(const String& label);
 
     bool ledHeartbeatEnabled();
     void setLedHeartbeatEnabled(bool on);

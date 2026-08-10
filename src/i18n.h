@@ -19,9 +19,6 @@ enum class StringId : uint8_t {
     SPLASH_WIFI_FAILED,
     SPLASH_GETTING_LOCATION,
     SPLASH_READY,
-    SPLASH_GREETING_MORNING,
-    SPLASH_GREETING_DAY,
-    SPLASH_GREETING_EVENING,
 
     SD_REQUIRED_LINE1,
     SD_REQUIRED_LINE2,
@@ -185,6 +182,19 @@ enum class StringId : uint8_t {
     AIRCRAFT_LIST_SORT_DISTANCE,
     AIRCRAFT_LIST_SORT_ALTITUDE,
     AIRCRAFT_LIST_SORT_CALLSIGN,
+
+    MENU_ABOUT,
+    ABOUT_DESC1,
+    ABOUT_DESC2,
+    ABOUT_VERSION_PREFIX,
+
+    MENU_BRIGHTNESS_PREFIX,
+    BRIGHTNESS_TITLE,
+
+    // Grosse Warn-Ueberlage beim Einschalten des Flugbuchs (Menue >
+    // Flugoptionen > Flugbuch), erklaert die 24h-Sicherheitsabschaltung.
+    MENU_LOGBOOK_WARNING_TITLE,
+    MENU_LOGBOOK_WARNING_BODY,
 
     COUNT
 };

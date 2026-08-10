@@ -136,7 +136,10 @@ void run(TFT_eSPI& tft) {
     tft.print(I18n::t(StringId::LOADING));
 
     FlightLogbook::DayEntry days[MAX_DAYS_QUERIED];
-    uint8_t count = FlightLogbook::listDays(days, MAX_DAYS_QUERIED);
+    // listDaySummaries() statt listDays(): mehrere Sitzungs-Dateien am
+    // selben Kalendertag (z.B. nach erneutem Einschalten) sollen hier
+    // weiterhin als EIN Balken pro Tag zaehlen statt als mehrere.
+    uint8_t count = FlightLogbook::listDaySummaries(days, MAX_DAYS_QUERIED);
 
     uint8_t barCount = (count > MAX_BARS) ? MAX_BARS : count;
     uint8_t startIdx = count - barCount;

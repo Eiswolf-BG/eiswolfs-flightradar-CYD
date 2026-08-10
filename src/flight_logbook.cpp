@@ -14,19 +14,57 @@ namespace {
     constexpr uint16_t MAX_SEEN = 400;
     char seenHex[MAX_SEEN][7];
     uint16_t seenCount = 0;
-    char currentDateStr[11] = {0};
 
-    bool computeDateStr(char* out, size_t outSize) {
-        time_t now = time(nullptr);
-        if (now < 8 * 3600 * 2) return false;
-        struct tm tmNow;
-        localtime_r(&now, &tmNow);
-        snprintf(out, outSize, "%04d-%02d-%02d", tmNow.tm_year + 1900, tmNow.tm_mon + 1, tmNow.tm_mday);
-        return true;
+    // Datei der aktuell laufenden Aufzeichnungs-Sitzung (ohne ".csv"), z.B.
+    // "2026-08-06" fuer die erste Sitzung eines Tages oder "2026-08-06_2"
+    // fuer ein erneutes Einschalten am selben Tag. Leer = noch nicht
+    // aufgeloest (Uhrzeit noch nicht synchronisiert oder Flugbuch aus).
+    char currentSessionFile[16] = {0};
+
+    void formatDateFromEpoch(uint32_t epoch, char* out, size_t outSize) {
+        time_t t = (time_t)epoch;
+        struct tm tmv;
+        localtime_r(&t, &tmv);
+        snprintf(out, outSize, "%04d-%02d-%02d", tmv.tm_year + 1900, tmv.tm_mon + 1, tmv.tm_mday);
+    }
+
+    // Findet fuer den gegebenen Aktivierungszeitpunkt eine noch nicht
+    // existierende Logbuch-Datei: "<Datum>.csv" fuer die erste Sitzung
+    // eines Tages, "<Datum>_2.csv", "_3.csv" usw. fuer erneutes Einschalten
+    // am selben Tag - so bekommt jede Sitzung ihre eigene, im
+    // Logbuch-Dateien-Screen einzeln loeschbare Datei, statt in eine
+    // bestehende hineinzuschreiben.
+    void resolveSessionFilename(uint32_t epoch, char* out, size_t outSize) {
+        char dateStr[11];
+        formatDateFromEpoch(epoch, dateStr, sizeof(dateStr));
+
+        char path[64];
+        snprintf(path, sizeof(path), "%s/%s.csv", Config::SD_LOG_DIR, dateStr);
+        if (!SD.exists(path)) {
+            strncpy(out, dateStr, outSize - 1);
+            out[outSize - 1] = 0;
+            return;
+        }
+
+        for (uint8_t suffix = 2; suffix <= 50; suffix++) {
+            char candidate[16];
+            snprintf(candidate, sizeof(candidate), "%s_%d", dateStr, suffix);
+            snprintf(path, sizeof(path), "%s/%s.csv", Config::SD_LOG_DIR, candidate);
+            if (!SD.exists(path)) {
+                strncpy(out, candidate, outSize - 1);
+                out[outSize - 1] = 0;
+                return;
+            }
+        }
+
+        // Sehr unwahrscheinlicher Fall (>50 Sitzungen an einem Tag): letzten
+        // Kandidaten weiterverwenden statt endlos zu suchen.
+        strncpy(out, dateStr, outSize - 1);
+        out[outSize - 1] = 0;
     }
 
     void logFilename(char* out, size_t outSize) {
-        snprintf(out, outSize, "%s/%s.csv", Config::SD_LOG_DIR, currentDateStr);
+        snprintf(out, outSize, "%s/%s.csv", Config::SD_LOG_DIR, currentSessionFile);
     }
 
     bool alreadySeen(const char* hex) {
@@ -59,7 +97,7 @@ namespace {
         return lines;
     }
 
-    void loadSeenFromTodayFile() {
+    void loadSeenFromCurrentFile() {
         seenCount = 0;
         char filename[64];
         logFilename(filename, sizeof(filename));
@@ -108,14 +146,32 @@ namespace {
         f.close();
     }
 
-    void ensureCurrentDate() {
-        char today[11];
-        if (!computeDateStr(today, sizeof(today))) return;
+    // Loest die Datei der aktuellen Sitzung auf (einmalig pro Sitzung) bzw.
+    // uebernimmt sie nach einem Neustart erneut aus den Einstellungen -
+    // nur aufrufen, wenn das Flugbuch gerade eingeschaltet ist.
+    void ensureSessionFile() {
+        time_t now = time(nullptr);
+        if (now <= 8 * 3600 * 2) return; // Uhrzeit noch nicht synchronisiert
 
-        if (strcmp(today, currentDateStr) != 0) {
-            strncpy(currentDateStr, today, sizeof(currentDateStr) - 1);
-            loadSeenFromTodayFile();
+        String persisted = SettingsStore::flightLogbookSessionFile();
+        if (persisted.length() > 0) {
+            if (strcmp(currentSessionFile, persisted.c_str()) != 0) {
+                strncpy(currentSessionFile, persisted.c_str(), sizeof(currentSessionFile) - 1);
+                currentSessionFile[sizeof(currentSessionFile) - 1] = 0;
+                loadSeenFromCurrentFile();
+            }
+            return;
         }
+
+        // Keine Sitzungsdatei hinterlegt - entweder frisches Einschalten
+        // (menu_screen.cpp loescht den Eintrag beim Umschalten bewusst) oder
+        // Migration von einer alten Firmware ohne Sitzungslogik. In beiden
+        // Faellen jetzt eine neue, garantiert einzigartige Datei anlegen.
+        uint32_t enabledAt = SettingsStore::flightLogbookEnabledAtEpoch();
+        if (enabledAt == 0) enabledAt = (uint32_t)now;
+        resolveSessionFilename(enabledAt, currentSessionFile, sizeof(currentSessionFile));
+        SettingsStore::setFlightLogbookSessionFile(currentSessionFile);
+        seenCount = 0;
     }
 
     void writeLogLine(File& f, const Aircraft& a) {
@@ -140,16 +196,39 @@ namespace {
 
 void init() {
     SdMutex::Guard guard;
-    ensureCurrentDate();
+    if (SettingsStore::flightLogbookEnabled()) {
+        ensureSessionFile();
+    }
 }
 
 void update() {
     if (!SettingsStore::flightLogbookEnabled()) return;
 
+    // 24h-Sicherheitsabschaltung: verhindert, dass ein unbemerkt aktives
+    // Flugbuch die SD-Karte nach und nach vollschreibt (siehe
+    // Bestaetigungsdialog beim Einschalten in menu_screen.cpp). Nur pruefen,
+    // wenn die Uhrzeit schon synchronisiert ist.
+    time_t nowCheck = time(nullptr);
+    if (nowCheck > 8 * 3600 * 2) {
+        uint32_t enabledAt = SettingsStore::flightLogbookEnabledAtEpoch();
+        if (enabledAt == 0) {
+            // Migrations-Fall: Flugbuch war schon vor diesem Update aktiv
+            // (alte Einstellungsdatei ohne Zeitstempel) - Startzeitpunkt
+            // jetzt setzen, damit die 24h-Grenze trotzdem sicher greift.
+            SettingsStore::setFlightLogbookEnabledAtEpoch((uint32_t)nowCheck);
+        } else if ((uint32_t)nowCheck >= enabledAt &&
+                   (uint32_t)nowCheck - enabledAt >= 24UL * 3600UL) {
+            SettingsStore::setFlightLogbookEnabled(false);
+            SettingsStore::setFlightLogbookEnabledAtEpoch(0);
+            SettingsStore::setFlightLogbookSessionFile("");
+            return;
+        }
+    }
+
     SdMutex::Guard guard;
 
-    ensureCurrentDate();
-    if (currentDateStr[0] == 0) return;
+    ensureSessionFile();
+    if (currentSessionFile[0] == 0) return;
 
     static Aircraft snapshot[Config::MAX_TRACKED_AIRCRAFT];
     uint8_t count = 0;
@@ -195,7 +274,7 @@ TopAltitude todayMaxAltitude() {
     TopAltitude result;
 
     SdMutex::Guard guard;
-    if (currentDateStr[0] == 0) return result; // Uhrzeit noch nicht bekannt
+    if (currentSessionFile[0] == 0) return result; // noch keine Sitzungsdatei bekannt
 
     char filename[64];
     logFilename(filename, sizeof(filename));
@@ -288,6 +367,7 @@ uint8_t listDays(DayEntry* out, uint8_t maxEntries) {
                 uint32_t lines = countLinesFast(entry);
 
                 strncpy(out[filled].date, dateOnly.c_str(), sizeof(out[filled].date) - 1);
+                out[filled].date[sizeof(out[filled].date) - 1] = 0;
                 out[filled].count = (lines > 0) ? (lines - 1) : 0;
                 filled++;
             }
@@ -298,6 +378,53 @@ uint8_t listDays(DayEntry* out, uint8_t maxEntries) {
     dir.close();
 
     return filled;
+}
+
+uint8_t listDaySummaries(DayEntry* out, uint8_t maxEntries) {
+    // Scannt grosszuegiger als maxEntries, damit auch bei vielen einzelnen
+    // Sitzungs-Dateien pro Tag noch korrekt pro Kalendertag aufsummiert
+    // wird, bevor auf die angeforderte Anzahl Tage begrenzt wird.
+    constexpr uint8_t MAX_RAW_SCAN = 90;
+    static DayEntry raw[MAX_RAW_SCAN];
+    uint8_t rawCount = listDays(raw, MAX_RAW_SCAN);
+
+    uint8_t outCount = 0;
+    for (uint8_t i = 0; i < rawCount; i++) {
+        char dayKey[11];
+        strncpy(dayKey, raw[i].date, 10);
+        dayKey[10] = 0;
+
+        int8_t existing = -1;
+        for (uint8_t j = 0; j < outCount; j++) {
+            if (strcmp(out[j].date, dayKey) == 0) { existing = j; break; }
+        }
+        if (existing >= 0) {
+            out[existing].count += raw[i].count;
+        } else if (outCount < maxEntries) {
+            strncpy(out[outCount].date, dayKey, sizeof(out[outCount].date) - 1);
+            out[outCount].date[sizeof(out[outCount].date) - 1] = 0;
+            out[outCount].count = raw[i].count;
+            outCount++;
+        }
+    }
+    return outCount;
+}
+
+bool deleteFile(const char* label) {
+    SdMutex::Guard guard;
+
+    char path[64];
+    snprintf(path, sizeof(path), "%s/%s.csv", Config::SD_LOG_DIR, label);
+    if (!SD.exists(path)) return false;
+
+    bool ok = SD.remove(path);
+    if (ok && strcmp(label, currentSessionFile) == 0) {
+        // Die gerade aktive Sitzungsdatei wurde geloescht - Dopplungs-Liste
+        // zuruecksetzen, damit neue Sichtungen wieder korrekt in die (beim
+        // naechsten Schreibvorgang neu angelegte) Datei geloggt werden.
+        seenCount = 0;
+    }
+    return ok;
 }
 
 void resetAllData() {
@@ -323,8 +450,10 @@ void resetAllData() {
     }
 
     seenCount = 0;
-    currentDateStr[0] = 0;
-    ensureCurrentDate();
+    currentSessionFile[0] = 0;
+    if (SettingsStore::flightLogbookEnabled()) {
+        ensureSessionFile();
+    }
 }
 
 }
