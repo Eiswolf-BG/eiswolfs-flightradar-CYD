@@ -221,6 +221,12 @@ static const char* const I18N_IT[] = {
     "Salta",
 
     "Suggerimento: usa il pulsante \"Cerca per indirizzo\" quando aggiungi un preset (\"+\") per ottenere subito coordinate esatte per il tuo indirizzo - molto più preciso della geolocalizzazione IP automatica, che può sbagliare facilmente di 20-30 km. Con la tua posizione esatta impostata, il LED di prossimità lampeggia davvero al ritmo dell'aereo che senti sopra di te.",
+
+    "es. Via Esempio 12, 00100 Roma",
+
+    "Configurazione completata",
+    "Il processo di configurazione è ora completato. Tutti i dati sono stati salvati sulla scheda SD nella cartella ",
+    ". Dal prossimo avvio, il WiFi si connetterà automaticamente.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

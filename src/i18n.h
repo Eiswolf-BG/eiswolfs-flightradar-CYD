@@ -254,6 +254,20 @@ enum class StringId : uint8_t {
     // Ersteinrichtungs-Screen (FIRST_RUN_LOCATION_BODY) und im README.
     LOCATION_INFO_PARA6,
 
+    // Format-Hinweis unter dem Titel der Adresssuche (AddressSearchScreen)
+    // - ein Beispiel im lokalen Format (Strasse Hausnr., PLZ Ort), da das
+    // einzelne Freitextfeld sonst ohne jeden Hinweis war und Nutzer nicht
+    // wussten, was/in welcher Reihenfolge sie eingeben sollen.
+    ADDRESS_SEARCH_HINT,
+
+    // Letzter Screen der Ersteinrichtung (nach der Standort-Adresssuche,
+    // main.cpp) - bestaetigt den Abschluss der Einrichtung, nennt den
+    // SD-Karten-Ordner, in dem alle Daten liegen, und weist darauf hin,
+    // dass sich das WLAN ab dem naechsten Start automatisch verbindet.
+    FIRST_RUN_COMPLETE_TITLE,
+    FIRST_RUN_COMPLETE_BODY1,
+    FIRST_RUN_COMPLETE_BODY2,
+
     COUNT
 };
 

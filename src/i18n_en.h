@@ -222,6 +222,12 @@ static const char* const I18N_EN[] = {
     "Skip",
 
     "Tip: use the \"Search by address\" button when adding a preset (\"+\") to get exact coordinates for your address instantly - much more accurate than automatic IP-based location, which can easily be 20-30 km off. With your exact location set, the proximity LED really does blink in sync with the aircraft you can hear overhead.",
+
+    "e.g. Main Street 12, 12345 Springfield",
+
+    "Setup Complete",
+    "The setup process is now complete. All data has been saved to the SD card in the folder ",
+    ". From the next boot, WiFi will connect automatically.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

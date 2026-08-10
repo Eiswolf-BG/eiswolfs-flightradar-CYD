@@ -221,6 +221,12 @@ static const char* const I18N_ES[] = {
     "Omitir",
 
     "Consejo: usa el botón \"Buscar por dirección\" al añadir un preset (\"+\") para obtener al instante coordenadas exactas de tu dirección - mucho más preciso que la geolocalización automática por IP, que puede fallar fácilmente por 20-30 km. Con tu ubicación exacta configurada, el LED de proximidad realmente parpadea al ritmo del avión que oyes encima de ti.",
+
+    "ej. Calle Ejemplo 12, 28001 Madrid",
+
+    "Configuración completada",
+    "El proceso de configuración ya ha finalizado. Todos los datos se han guardado en la tarjeta SD, en la carpeta ",
+    ". A partir del próximo inicio, el WiFi se conectará automáticamente.",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

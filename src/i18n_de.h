@@ -221,6 +221,12 @@ static const char* const I18N_DE[] = {
     "Überspringen",
 
     "Tipp: Über den Button \"Per Adresse suchen\" beim Anlegen eines Presets (\"+\") bekommst du sofort exakte Koordinaten für deine Adresse - viel genauer als die automatische IP-Standortbestimmung, die leicht 20-30 km danebenliegen kann. Mit dem exakten Standort als Preset blinkt die Näherungs-LED wirklich im Takt mit dem Flugzeug, das du gerade über dir hörst.",
+
+    "z.B. Musterstraße 12, 12345 Musterstadt",
+
+    "Einrichtung abgeschlossen",
+    "Der Einrichtungsprozess ist jetzt abgeschlossen. Alle Daten wurden auf der SD-Karte im Ordner ",
+    " abgespeichert. Ab dem nächsten Start verbindet sich das WLAN automatisch.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

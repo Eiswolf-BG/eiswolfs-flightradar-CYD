@@ -221,6 +221,12 @@ static const char* const I18N_FR[] = {
     "Passer",
 
     "Astuce : utilisez le bouton \"Rechercher par adresse\" lors de l'ajout d'un preset (\"+\") pour obtenir instantanément des coordonnées exactes pour votre adresse - bien plus précis que la localisation automatique par IP, qui peut facilement se tromper de 20 à 30 km. Avec votre position exacte enregistrée, la LED de proximité clignote vraiment en rythme avec l'avion que vous entendez au-dessus de vous.",
+
+    "ex. Rue Example 12, 75000 Paris",
+
+    "Configuration terminée",
+    "Le processus de configuration est maintenant terminé. Toutes les données ont été enregistrées sur la carte SD dans le dossier ",
+    ". À partir du prochain démarrage, le WiFi se connectera automatiquement.",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

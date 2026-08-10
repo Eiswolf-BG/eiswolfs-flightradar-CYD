@@ -97,16 +97,19 @@ namespace {
     constexpr const char* DIGITS = "1234567890";
     constexpr const char* ROW1 = "QWERTYUIOP";
     constexpr const char* ROW2 = "ASDFGHJKL";
-    constexpr const char* ROW3 = "ZXCVBNM";
+    // Um Komma und Bindestrich erweitert (7->9 Tasten) - Adressen wie eine
+    // Hausnummer "45/3" oder "Strasse 12, Ort" waren sonst gar nicht
+    // eintippbar, da die Tastatur bisher keinerlei Satzzeichen enthielt.
+    constexpr const char* ROW3 = "ZXCVBNM,-";
 
-    // Sonderzeichen-Seite: nur Zeichen, die bereits an anderer Stelle in
-    // der App verwendet werden (i18n_de/fr/tr/es/it.h) - der Font
-    // (UiFont11pt, deckt U+0020-U+015F ab) stellt sie garantiert korrekt
-    // dar. Deckt die in DE/FR/ES/IT/TR-Adressen gaengigsten Sonderzeichen ab.
-    constexpr const char* SPEC0[6] = {"À", "Á", "Â", "Ä", "Ç", "É"};
-    constexpr const char* SPEC1[6] = {"È", "Ê", "Ë", "Í", "Î", "Ñ"};
-    constexpr const char* SPEC2[6] = {"Ó", "Ò", "Ô", "Ö", "Ù", "Ú"};
-    constexpr const char* SPEC3[6] = {"Û", "Ü", "ß", "Ğ", "İ", "Ş"};
+    // Sonderzeichen-Seite: gegenueber der ersten Version wurden die seltenen
+    // Â/Ë/Î/Û gegen die fuer Adressen wichtigen Satzzeichen "/", ".", "'", "-"
+    // getauscht (Hausnummern wie "45/3", Abkuerzungen wie "Str.", Apostroph-
+    // Namen).
+    constexpr const char* SPEC0[6] = {"À", "Á", "Ä", "Ç", "É", "È"};
+    constexpr const char* SPEC1[6] = {"Ê", "Í", "Ñ", "Ó", "Ò", "Ô"};
+    constexpr const char* SPEC2[6] = {"Ö", "Ù", "Ú", "Ü", "ß", "Ğ"};
+    constexpr const char* SPEC3[6] = {"İ", "Ş", "/", ".", "'", "-"};
 
     // Gibt die eingegebene Adresse zurueck, oder einen leeren String, wenn
     // der Nutzer abgebrochen hat.
@@ -119,7 +122,22 @@ namespace {
 
         constexpr int16_t KEY_H = 30;
         constexpr int16_t KEY_GAP = 3;
-        constexpr int16_t ROW0_Y = 78;
+        constexpr int16_t FIELD_H = 34;
+
+        // Kopfbereich (Titel + Format-Hinweis) einmal zeichnen, um seine
+        // tatsaechliche Hoehe per getCursorY() zu messen (variiert je nach
+        // Sprache/Uebersetzungslaenge) - Eingabefeld und Tastatur-Start
+        // werden daraus abgeleitet statt wie zuvor eine feste Pixelposition
+        // (78) anzunehmen. redraw() unten zeichnet denselben Kopf bei jedem
+        // Aufruf identisch neu.
+        tft.fillScreen(TFT_BLACK);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setCursor(10, 14);
+        tft.println(I18n::t(StringId::ADDRESS_SEARCH_TITLE));
+        tft.setTextColor(TFT_CYAN, TFT_BLACK);
+        tft.println(I18n::t(StringId::ADDRESS_SEARCH_HINT));
+        int16_t fieldY = (int16_t)(tft.getCursorY() + 4);
+        int16_t ROW0_Y = (int16_t)(fieldY + FIELD_H + 8);
 
         auto layoutRow = [&](int16_t y, Rect* outRects, uint8_t n) {
             int16_t usableW = Config::SCREEN_WIDTH - 8;
@@ -131,11 +149,11 @@ namespace {
             }
         };
 
-        Rect digitRects[10], row1Rects[10], row2Rects[9], row3Rects[7];
+        Rect digitRects[10], row1Rects[10], row2Rects[9], row3Rects[9];
         layoutRow(ROW0_Y, digitRects, 10);
         layoutRow((int16_t)(ROW0_Y + (KEY_H + KEY_GAP)), row1Rects, 10);
         layoutRow((int16_t)(ROW0_Y + 2 * (KEY_H + KEY_GAP)), row2Rects, 9);
-        layoutRow((int16_t)(ROW0_Y + 3 * (KEY_H + KEY_GAP)), row3Rects, 7);
+        layoutRow((int16_t)(ROW0_Y + 3 * (KEY_H + KEY_GAP)), row3Rects, 9);
 
         Rect specRects[4][6];
         for (uint8_t r = 0; r < 4; r++) {
@@ -145,7 +163,7 @@ namespace {
         Rect spaceBtn     = {4, (int16_t)(ROW0_Y + 4 * (KEY_H + KEY_GAP)), 150, KEY_H};
         Rect backspaceBtn = {158, (int16_t)(ROW0_Y + 4 * (KEY_H + KEY_GAP)), (int16_t)(Config::SCREEN_WIDTH - 8 - 154), KEY_H};
 
-        constexpr int16_t BTN_ROW_Y = ROW0_Y + 5 * (KEY_H + KEY_GAP);
+        int16_t BTN_ROW_Y = (int16_t)(ROW0_Y + 5 * (KEY_H + KEY_GAP));
         constexpr int16_t BTN_W = (Config::SCREEN_WIDTH - 8 - 2 * KEY_GAP) / 3;
         Rect toggleBtn = {4, BTN_ROW_Y, BTN_W, KEY_H};
         Rect cancelBtn = {(int16_t)(4 + BTN_W + KEY_GAP), BTN_ROW_Y, BTN_W, KEY_H};
@@ -160,12 +178,14 @@ namespace {
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::ADDRESS_SEARCH_TITLE));
+            tft.setTextColor(TFT_CYAN, TFT_BLACK);
+            tft.println(I18n::t(StringId::ADDRESS_SEARCH_HINT));
 
-            tft.fillRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_BLACK);
-            tft.drawRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_GREEN);
+            tft.fillRect(8, fieldY, Config::SCREEN_WIDTH - 16, FIELD_H, TFT_BLACK);
+            tft.drawRect(8, fieldY, Config::SCREEN_WIDTH - 16, FIELD_H, TFT_GREEN);
             tft.setTextSize(2);
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.setCursor(14, 66);
+            tft.setCursor(14, (int16_t)(fieldY + 26));
             tft.print(visibleTail(tft, buf, (int16_t)(Config::SCREEN_WIDTH - 28)));
             tft.setTextSize(1);
 
@@ -173,7 +193,7 @@ namespace {
                 for (uint8_t i = 0; i < 10; i++) drawButton(tft, digitRects[i], String(DIGITS[i]));
                 for (uint8_t i = 0; i < 10; i++) drawButton(tft, row1Rects[i], String(ROW1[i]));
                 for (uint8_t i = 0; i < 9; i++) drawButton(tft, row2Rects[i], String(ROW2[i]));
-                for (uint8_t i = 0; i < 7; i++) drawButton(tft, row3Rects[i], String(ROW3[i]));
+                for (uint8_t i = 0; i < 9; i++) drawButton(tft, row3Rects[i], String(ROW3[i]));
             } else {
                 for (uint8_t i = 0; i < 6; i++) drawButton(tft, specRects[0][i], SPEC0[i]);
                 for (uint8_t i = 0; i < 6; i++) drawButton(tft, specRects[1][i], SPEC1[i]);
@@ -217,7 +237,7 @@ namespace {
                         handled = true;
                     }
                 }
-                for (uint8_t i = 0; i < 7 && !handled; i++) {
+                for (uint8_t i = 0; i < 9 && !handled; i++) {
                     if (row3Rects[i].contains(tap.x, tap.y)) {
                         char s[2] = {ROW3[i], 0};
                         appendUtf8(buf, len, CAP, s);
