@@ -3,6 +3,7 @@
 #include "sd_mutex.h"
 #include "sd_storage.h"
 #include <SD.h>
+#include <cstring>
 
 namespace LocationPresets {
 
@@ -12,6 +13,11 @@ namespace {
     struct Preset {
         double lat = 0;
         double lon = 0;
+        // Optionaler, vom Nutzer vergebener Name (z.B. "Zuhause") oder vom
+        // naechstgelegenen Flughafen uebernommen - leer, wenn keiner gesetzt
+        // wurde. 16 Zeichen + Nullterminierung reichen fuer eine gut lesbare
+        // Zeile in der Preset-Liste.
+        char name[17] = {0};
     };
 
     Preset presets[MAX_PRESETS];
@@ -26,7 +32,7 @@ namespace {
         if (!f) return;
         f.printf("active=%d\n", (int)activeIdx);
         for (uint8_t i = 0; i < presetCount; i++) {
-            f.printf("%.6f,%.6f\n", presets[i].lat, presets[i].lon);
+            f.printf("%.6f,%.6f,%s\n", presets[i].lat, presets[i].lon, presets[i].name);
         }
         f.close();
     }
@@ -55,12 +61,23 @@ namespace {
                 }
             }
 
-            int comma = line.indexOf(',');
-            if (comma < 0) continue;
+            int comma1 = line.indexOf(',');
+            if (comma1 < 0) continue;
             if (presetCount >= MAX_PRESETS) break;
 
-            presets[presetCount].lat = line.substring(0, comma).toDouble();
-            presets[presetCount].lon = line.substring(comma + 1).toDouble();
+            // Der Name ist ein optionales drittes Feld - aeltere,
+            // gespeicherte Presets (vor diesem Feature) haben nur
+            // "lat,lon" ohne zweites Komma, dann bleibt der Name leer.
+            int comma2 = line.indexOf(',', comma1 + 1);
+            presets[presetCount].lat = line.substring(0, comma1).toDouble();
+            if (comma2 < 0) {
+                presets[presetCount].lon = line.substring(comma1 + 1).toDouble();
+                presets[presetCount].name[0] = 0;
+            } else {
+                presets[presetCount].lon = line.substring(comma1 + 1, comma2).toDouble();
+                String nm = line.substring(comma2 + 1);
+                strncpy(presets[presetCount].name, nm.c_str(), sizeof(presets[presetCount].name) - 1);
+            }
             presetCount++;
         }
         f.close();
@@ -81,10 +98,16 @@ void getLatLon(uint8_t index, double& lat, double& lon) {
     lon = presets[index].lon;
 }
 
-bool addPreset(double lat, double lon) {
+String getName(uint8_t index) {
+    if (index >= presetCount) return String();
+    return String(presets[index].name);
+}
+
+bool addPreset(double lat, double lon, const String& name) {
     if (presetCount >= MAX_PRESETS) return false;
     presets[presetCount].lat = lat;
     presets[presetCount].lon = lon;
+    strncpy(presets[presetCount].name, name.c_str(), sizeof(presets[presetCount].name) - 1);
     presetCount++;
     saveToSd();
     return true;

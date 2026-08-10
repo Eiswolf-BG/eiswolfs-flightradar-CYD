@@ -194,6 +194,10 @@ static const char* const I18N_DE[] = {
 
     "Achtung!!!",
     "Das Flugbuch speichert dauerhaft alle sichtbaren Flugzeuge auf der SD-Karte. Damit sie sich nicht unbemerkt füllt und die Logbuch-Menüs nicht langsam werden, schaltet es sich nach 24 Stunden automatisch wieder aus.",
+    "Name (optional):",
+    "Ohne Namen",
+    "Presets voll - zuerst einen entfernen",
+    "Beim Anlegen eines Presets kannst du ihm einen Namen geben (z.B. \"Zuhause\"), der dann in der Übersicht angezeigt wird. Tippe auf die Laufschrift mit dem nächsten Flughafen, um ihn direkt als neuen Preset mit seinem Namen zu übernehmen.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

@@ -194,6 +194,10 @@ static const char* const I18N_FR[] = {
 
     "Attention !!!",
     "Le journal de vol enregistre en continu tous les avions visibles sur la carte SD. Pour éviter qu'elle se remplisse sans que vous le remarquiez, il se désactive automatiquement au bout de 24 heures.",
+    "Nom (optionnel) :",
+    "Sans nom",
+    "Presets pleins - supprimez-en un d'abord",
+    "Lors de l'ajout d'une position, vous pouvez lui donner un nom (ex. \"Maison\"), affiché ensuite dans la liste. Touchez le texte défilant de l'aéroport le plus proche pour l'ajouter directement comme nouvelle position avec son nom.",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

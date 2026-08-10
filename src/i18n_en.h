@@ -195,6 +195,10 @@ static const char* const I18N_EN[] = {
 
     "Warning!!!",
     "The logbook permanently saves every visible aircraft to the SD card. To stop it filling up unnoticed and slowing down the logbook menus, it automatically switches off again after 24 hours.",
+    "Name (optional):",
+    "Skip name",
+    "Presets full - remove one first",
+    "When adding a preset you can give it a name (e.g. \"Home\"), which is then shown in the overview. Tap the nearest-airport ticker to add it directly as a new preset with its name.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

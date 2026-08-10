@@ -196,6 +196,14 @@ enum class StringId : uint8_t {
     MENU_LOGBOOK_WARNING_TITLE,
     MENU_LOGBOOK_WARNING_BODY,
 
+    // Preset-Name beim Anlegen (optional), "Presets voll"-Hinweis beim
+    // Antippen der Naechster-Flughafen-Laufschrift, sowie ein zusaetzlicher
+    // Info-Absatz dazu (Menue > Flugoptionen > Standort-Presets > "?").
+    LOCATION_NAME_PROMPT,
+    LOCATION_NAME_SKIP,
+    LOCATION_PRESETS_FULL,
+    LOCATION_INFO_PARA5,
+
     COUNT
 };
 

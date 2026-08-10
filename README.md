@@ -74,7 +74,9 @@ live air traffic *there* instead, regardless of where your device physically is.
 A "?" info button right on the Location Presets screen explains all of this
 again directly on the device.
 
-The screen also shows the **nearest known airport** (from a built-in list of ~34 major airports worldwide) to whichever location is currently active - handy to see exactly where a foreign preset points to, or why a location has a lot of air traffic. If the airport name doesn't fit on one line, it scrolls horizontally like a marquee.
+**Naming presets:** when adding a preset, you can optionally give it a name (e.g. "Home"), which is then shown in the overview instead of the raw coordinates.
+
+The screen also shows the **nearest known airport** (from a built-in list of ~34 major airports worldwide) to whichever location is currently active - handy to see exactly where a foreign preset points to, or why a location has a lot of air traffic. If the airport name doesn't fit on one line, it scrolls horizontally like a marquee. This ticker is tappable (shown with a thin green border) - tapping it adds that airport directly as a new preset with its name and coordinates, using the same local airport database on the SD card, no internet lookup needed.
 
 ### 📶 WiFi Manager (up to 3 saved networks)
 Under **Menu → WiFi/Network** you can save up to 3 WiFi networks at once (not
