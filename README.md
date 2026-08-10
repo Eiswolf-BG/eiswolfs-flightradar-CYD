@@ -23,6 +23,8 @@ You can flash the firmware directly from your browser to your CYD display withou
 2. Insert a FAT32-formatted microSD card into your display.
 3. On first boot: Calibrate the touchscreen and configure your Wi-Fi via the built-in on-screen keyboard.
 
+**Guided first-time setup:** after language selection, a one-time (skippable) screen explains why setting your exact location gives a much better experience than automatic IP-based location, and offers to set it up right there via the address search. A final setup-complete screen then confirms everything is saved and ready before you enter the app.
+
 **Tip:** for the best experience, set your exact location as a Location Preset (Menu → Flight Options → Location Presets → "+" → Search by address). Just type your address and the device looks up the exact coordinates for you automatically - no need to look anything up yourself. This is much more accurate than automatic IP-based location, which can easily be off by 20-30 km - you might hear a plane outside your window while the radar screen stays empty because the device thinks you're somewhere else entirely. With your precise location set, the proximity LED blinks in sync with aircraft you can actually hear overhead. You'll also be prompted to set this up right during first-time setup.
 
 ---
@@ -37,7 +39,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Adjustable range** (10/25/50/100 km) via on-screen button
 - **Aircraft list view** – a sortable list (by distance, altitude, or callsign) of every aircraft currently in range, tap any row to jump straight to its detail panel (see [Aircraft List](#-aircraft-list) below)
 - **Touch-driven WiFi setup** and on-screen keyboard for first-time configuration, with up to 3 saved networks (see [WiFi Manager](#-wifi-manager-up-to-3-saved-networks) below)
-- **Location presets** – save up to 3 fixed locations, or point the radar at any place in the world (see [Location Presets](#-location-presets) below)
+- **Location presets** – save up to 3 fixed locations, or point the radar at any place in the world, including a native in-device address search for setting your exact location (see [Location Presets](#-location-presets) below)
 - **Aircraft watchlist** – track up to 5 specific flights by callsign, with a cyan radar ring and blue LED alert when one appears (see [Watchlist](#-watchlist) below)
 - **Night dimming** – automatically dims the backlight, plus the radar's aircraft markers and sweep line, to a softer (but still readable) look between 22:00 and 06:00 local time (see [Night Dimming](#-night-dimming) below)
 - **History chart** – a simple 7-day bar chart of logged aircraft counts, right next to the plain logbook file list (see [History Chart](#-history-chart) below)
@@ -80,6 +82,8 @@ again directly on the device.
 **Naming presets:** when adding a preset, you can optionally give it a name (e.g. "Home"), which is then shown in the overview instead of the raw coordinates.
 
 The screen also shows the **nearest known airport** (from a built-in list of ~34 major airports worldwide) to whichever location is currently active - handy to see exactly where a foreign preset points to, or why a location has a lot of air traffic. If the airport name doesn't fit on one line, it scrolls horizontally like a marquee. This ticker is tappable (shown with a thin green border) - tapping it adds that airport directly as a new preset with its name and coordinates, using the same local airport database on the SD card, no internet lookup needed.
+
+**Search by address:** when adding a preset ("+"), you can either enter coordinates manually or tap "Search by address" to type a plain address (e.g. "Main Street 12, 12345 Springfield") - the device geocodes it via the free OpenStreetMap Nominatim service and shows you the matching place to confirm before saving it as a preset. The address keyboard includes a format hint and punctuation keys (comma, hyphen, slash, period, apostrophe) so house numbers like "45/3" can actually be entered. This is much more accurate than automatic IP-based location, which can easily be off by 20-30 km. The preset-naming screen also shows example names (e.g. "Home, Work, Holiday home") so it's clear what's being asked for.
 
 ### 📶 WiFi Manager (up to 3 saved networks)
 Under **Menu → WiFi/Network** you can save up to 3 WiFi networks at once (not
