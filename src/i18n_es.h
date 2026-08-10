@@ -133,7 +133,7 @@ static const char* const I18N_ES[] = {
     "El dispositivo también ofrece una pequeña página web para exportar el registro completo. Conectado a la misma red WiFi, simplemente abra un navegador y vaya a:",
     "Sin conexión WiFi - la página de exportación solo es accesible mientras haya una conexión de red.",
 
-    "Toque para ver detalles",
+    "Toque un avión para ver más detalles",
     "Cielo vacío desde hace ",
 
     "Modelo: ",

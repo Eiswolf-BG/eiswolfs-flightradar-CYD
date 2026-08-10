@@ -73,6 +73,100 @@ namespace {
 
     bool ledBlinkOn = true;
 
+    // "Leerer Himmel"-Timer: merkt sich, wann zuletzt mindestens ein
+    // Flugzeug sichtbar war (nach allen Filtern) - namespace-weit statt
+    // lokal in render(), da tick() (siehe dort) den Wert bei jedem Tick
+    // (alle 80ms) braucht, um den Sekundenzaehler fluessig hochzuzaehlen,
+    // statt nur alle paar Sekunden bei einem render()-Aufruf.
+    uint32_t lastAircraftSeenMs = millis();
+
+    // Laufschrift fuer die Info-Zeile unten (Tap-Hinweis bzw. "Leerer
+    // Himmel"-Timer) - gleiches Grundprinzip wie der Naechster-Flughafen-
+    // Text in location_presets_screen.cpp (bewusst dupliziert, kein
+    // gemeinsames Modul, siehe CLAUDE.md-Konvention "jeder Screen
+    // unabhaengig lauffaehig"). Wird bei jedem tick()-Aufruf (alle 80ms)
+    // statt nur bei Aenderung neu gezeichnet, damit der Text fluessig und
+    // endlos durchlaeuft.
+    struct InfoMarquee {
+        String text;
+        String ring;          // text + Luecke, doppelt aneinandergehaengt
+        bool needsScroll = false;
+        int32_t charOffset = 0;
+        uint32_t lastStepMs = 0;
+    };
+    InfoMarquee infoMarquee;
+
+    enum class InfoMsgKind { None, TapForDetails, EmptySky };
+    InfoMsgKind infoMarqueeKind = InfoMsgKind::None;
+
+    constexpr uint32_t INFO_MARQUEE_STEP_MS = 200; // alle 200ms ein Zeichen weiter
+
+    // Baut Text + Ring-Puffer neu auf und setzt den Scroll-Fortschritt
+    // zurueck - nur aufrufen, wenn sich die ART der Nachricht aendert
+    // (Tap-Hinweis <-> Leerer-Himmel-Timer), siehe updateInfoMarqueeText()
+    // fuer den Fall, dass sich nur der Sekundenwert aendert.
+    void setupInfoMarquee(TFT_eSPI& tft, const String& text, int16_t viewportW) {
+        tft.setTextSize(1);
+        infoMarquee.text = text;
+        infoMarquee.needsScroll = tft.textWidth(text) > viewportW;
+        String withGap = text + "   "; // 3 Leerzeichen Luecke vor der Wiederholung
+        infoMarquee.ring = withGap + withGap;
+        infoMarquee.charOffset = 0;
+        infoMarquee.lastStepMs = millis();
+    }
+
+    // Aktualisiert nur den angezeigten Text (z.B. weil die Sekundenzahl des
+    // "Leerer Himmel"-Timers weitergezaehlt hat), OHNE den Scroll-
+    // Fortschritt zurueckzusetzen - so laeuft die Laufschrift trotz des
+    // sich staendig aendernden Zaehlers fluessig weiter, statt bei jedem
+    // Tick neu am Anfang zu beginnen.
+    void updateInfoMarqueeText(const String& text) {
+        infoMarquee.text = text;
+        String withGap = text + "   ";
+        infoMarquee.ring = withGap + withGap;
+    }
+
+    // Liefert den laengsten Ausschnitt ab startIdx, der noch in maxWidth
+    // passt - OHNE "..." anzuhaengen.
+    String infoMarqueeWindow(TFT_eSPI& tft, const String& src, int32_t startIdx, int16_t maxWidth) {
+        String s = src.substring(startIdx);
+        while (s.length() > 1 && tft.textWidth(s) > maxWidth) {
+            s.remove(s.length() - 1);
+        }
+        return s;
+    }
+
+    // Zeichnet die Info-Zeile neu - wenn der Text nicht scrollen muss, wird
+    // er einfach normal (fest) angezeigt.
+    void drawInfoMarquee(TFT_eSPI& tft, int16_t x, int16_t y, int16_t w) {
+        if (infoMarquee.text.length() == 0) return;
+
+        constexpr int16_t CLEAR_TOP = 16;
+        constexpr int16_t CLEAR_H = 20;
+        tft.fillRect(x, y - CLEAR_TOP, w, CLEAR_H, TFT_BLACK);
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextSize(1);
+        tft.setCursor(x, y);
+
+        if (!infoMarquee.needsScroll) {
+            tft.print(infoMarquee.text);
+            return;
+        }
+
+        uint32_t now = millis();
+        if (now - infoMarquee.lastStepMs >= INFO_MARQUEE_STEP_MS) {
+            infoMarquee.lastStepMs = now;
+            infoMarquee.charOffset++;
+            // Zurueck an den Anfang, sobald der erste (nicht doppelte)
+            // Text+Luecke-Block durchgelaufen ist - so entsteht die
+            // Endlosschleife.
+            int32_t singleLen = (int32_t)infoMarquee.text.length() + 3;
+            if (infoMarquee.charOffset >= singleLen) infoMarquee.charOffset = 0;
+        }
+
+        tft.print(infoMarqueeWindow(tft, infoMarquee.ring, infoMarquee.charOffset, w));
+    }
+
     bool isEmergencySquawk(const char* squawk) {
         if (!squawk[0]) return false;
         for (uint8_t i = 0; i < Config::EMERGENCY_SQUAWK_COUNT; i++) {
@@ -653,10 +747,6 @@ void render(TFT_eSPI& tft, int16_t top) {
         strncpy(hitPoints[i].callsign, a.callsign, sizeof(hitPoints[i].callsign) - 1);
     }
 
-    // "Leerer Himmel"-Timer: merkt sich, wann zuletzt mindestens ein
-    // Flugzeug sichtbar war (nach allen Filtern). Statisch, damit der Wert
-    // über mehrere render()-Aufrufe hinweg erhalten bleibt.
-    static uint32_t lastAircraftSeenMs = millis();
     if (visibleCount > 0) lastAircraftSeenMs = millis();
 
     if (selectedHex[0] && !selectionStillPresent) {
@@ -671,29 +761,11 @@ void render(TFT_eSPI& tft, int16_t top) {
         lastPanel.valid = false;
         int16_t infoTop = L.infoTop;
         tft.drawFastHLine(0, infoTop, Config::SCREEN_WIDTH, TFT_DARKGREY);
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.setCursor(8, infoTop + 20);
-        if (visibleCount == 0) {
-            // Kein Flugzeug in Reichweite - statt des "Fuer Details
-            // antippen"-Hinweises (der hier ohnehin ins Leere liefe) zeigen
-            // wir an, wie lange der Himmel schon leer ist.
-            uint32_t emptySec = (millis() - lastAircraftSeenMs) / 1000;
-            char buf[16];
-            if (emptySec < 60) {
-                snprintf(buf, sizeof(buf), "%lus", (unsigned long)emptySec);
-            } else {
-                // Ab der ersten vollen Minute NUR noch Minuten anzeigen (ohne
-                // Sekunden) - "1min 05s" war zu lang und stiess an den
-                // Reichweiten-Button rechts daneben. Abgerundet (60-119s =
-                // "1min", 120-179s = "2min", usw.) - intuitiv wie eine
-                // normale Stoppuhr-Minutenanzeige.
-                unsigned long minutes = emptySec / 60;
-                snprintf(buf, sizeof(buf), "%lumin", minutes);
-            }
-            tft.print(String(I18n::t(StringId::RADAR_EMPTY_SKY_PREFIX)) + buf);
-        } else {
-            tft.print(I18n::t(StringId::RADAR_TAP_FOR_DETAILS));
-        }
+        // Der Info-Text (Tap-Hinweis bzw. "Leerer Himmel"-Timer) wird NICHT
+        // mehr hier gezeichnet, sondern laufend in tick() als Laufschrift
+        // (siehe dort) - render() laeuft nur bei geaenderten Flugdaten
+        // (alle paar Sekunden), tick() dagegen alle 80ms, was fuer eine
+        // fluessige Laufschrift-Animation noetig ist.
 
         char rangeLabel[8];
         snprintf(rangeLabel, sizeof(rangeLabel), "%.0fkm", rangeKm);
@@ -769,6 +841,61 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
         tft.drawString(label, hp.x, hp.y - 8);
         tft.setTextDatum(TL_DATUM);
     }
+
+    // Info-Zeile unten (Tap-Hinweis bzw. "Leerer Himmel"-Timer) als
+    // durchlaufende Laufschrift - siehe InfoMarquee weiter oben.
+    // visibleCount wird hier bewusst erneut aus hitPoints[] gezaehlt
+    // (statt aus render() uebernommen), da tick() unabhaengig von render()
+    // laeuft und so auch den "Leerer Himmel"-Sekundenzaehler fluessig
+    // hochzaehlen kann, ohne auf den naechsten render()-Aufruf warten zu
+    // muessen.
+    uint8_t visibleCountNow = 0;
+    for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) {
+        if (hitPoints[i].valid) visibleCountNow++;
+    }
+    if (visibleCountNow > 0) lastAircraftSeenMs = millis();
+
+    String infoText;
+    InfoMsgKind kind;
+    if (visibleCountNow == 0) {
+        kind = InfoMsgKind::EmptySky;
+        uint32_t emptySec = (millis() - lastAircraftSeenMs) / 1000;
+        char buf[16];
+        if (emptySec < 60) {
+            snprintf(buf, sizeof(buf), "%lus", (unsigned long)emptySec);
+        } else {
+            // Ab der ersten vollen Minute NUR noch Minuten anzeigen (ohne
+            // Sekunden) - abgerundet (60-119s = "1min", 120-179s = "2min",
+            // usw.) - intuitiv wie eine normale Stoppuhr-Minutenanzeige.
+            unsigned long minutes = emptySec / 60;
+            snprintf(buf, sizeof(buf), "%lumin", minutes);
+        }
+        infoText = String(I18n::t(StringId::RADAR_EMPTY_SKY_PREFIX)) + buf;
+    } else {
+        kind = InfoMsgKind::TapForDetails;
+        infoText = I18n::t(StringId::RADAR_TAP_FOR_DETAILS);
+    }
+
+    constexpr int16_t INFO_TEXT_X = 8;
+    constexpr int16_t INFO_TEXT_GAP = 6;
+    int16_t infoTextY = L.infoTop + 20;
+    int16_t infoTextW = L.rangeBtn.x - INFO_TEXT_X - INFO_TEXT_GAP;
+
+    if (kind != infoMarqueeKind) {
+        // Die ART der Nachricht hat sich geaendert (z.B. letztes Flugzeug
+        // verschwunden) - Laufschrift komplett neu aufsetzen und von vorne
+        // beginnen.
+        infoMarqueeKind = kind;
+        setupInfoMarquee(tft, infoText, infoTextW);
+    } else {
+        // Gleiche Art wie zuvor (z.B. weiterhin "Leerer Himmel", nur die
+        // Sekundenzahl hat sich geaendert) - Text aktualisieren, aber NICHT
+        // den Scroll-Fortschritt zuruecksetzen, sonst wuerde die
+        // Laufschrift bei jedem Sekundenwechsel neu von vorne beginnen statt
+        // fluessig durchzulaufen.
+        updateInfoMarqueeText(infoText);
+    }
+    drawInfoMarquee(tft, INFO_TEXT_X, infoTextY, infoTextW);
 
     tft.endWrite();
 }

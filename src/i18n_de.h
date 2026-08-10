@@ -133,7 +133,7 @@ static const char* const I18N_DE[] = {
     "Das Gerät bietet auch eine kleine Webseite zum Exportieren des kompletten Flugbuchs an. Im selben WLAN einfach im Browser aufrufen:",
     "Keine WLAN-Verbindung - die Export-Seite ist nur erreichbar, solange eine Netzwerkverbindung besteht.",
 
-    "Für Details antippen",
+    "Für mehr Details ein Flugzeug antippen",
     "Leerer Himmel seit ",
 
     "Modell: ",
