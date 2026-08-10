@@ -200,6 +200,9 @@ static const char* const I18N_DE[] = {
     "Logbuch / WebUI",
     "Über diese Webseite kannst du das Flugbuch direkt im Browser ansehen, herunterladen und einzeln löschen. Im selben WLAN einfach im Browser aufrufen:",
     "Keine WLAN-Verbindung - die Seite ist nur erreichbar, solange eine Netzwerkverbindung besteht.",
+
+    "Wetter",
+    "Das Wetter-Icon zeigt die aktuelle Wetterlage für deinen aktiven Standort. Ist ein Standort-Preset ausgewählt, wird stattdessen dessen Wetter angezeigt.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,
