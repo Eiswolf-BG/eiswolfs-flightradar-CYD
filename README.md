@@ -98,7 +98,7 @@ Any saved network can be removed again at any time via the red "X", freeing up a
 slot for a new one.
 
 ### 🌙 Night Dimming
-Between 22:00 and 06:00 local time, the backlight automatically dims to a softer brightness level - still perfectly readable, but easier on the eyes if the device sits in a bedroom or living room around the clock. This is separate from (and gentler than) the existing inactivity timeout dimming, which kicks in after a period of no touch input regardless of time of day.
+Between 22:00 and 06:00 local time, the backlight automatically dims to a softer brightness level - still perfectly readable, but easier on the eyes if the device sits in a bedroom or living room around the clock. This is separate from the inactivity screen timeout (**Menu → System → "Timeout"**), which turns the display fully off after a period of no touch input, regardless of time of day - handy if you just want the flight logbook running in the background without needing the screen. Tapping the screen wakes it back up to your configured brightness (or the soft night level above, if it's still within the night window).
 
 Toggle it under **Menu → System → "Night dimming"**. When you tap the screen while it's night-dimmed, it wakes back up to the soft night level (not full brightness) if it's still within the night window - no sudden bright flash in a dark room.
 
