@@ -10,6 +10,7 @@
 #include "flight_logbook.h"
 #include "led_alert.h"
 #include "web_export_server.h"
+#include "weather.h"
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -39,6 +40,7 @@ namespace {
             }
 
             AircraftDetails::update();
+            Weather::update();
 
             if (millis() - lastFetchMs >= Config::FETCH_INTERVAL_MS) {
                 lastFetchMs = millis();
