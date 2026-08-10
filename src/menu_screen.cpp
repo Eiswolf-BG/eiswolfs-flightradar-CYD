@@ -398,23 +398,23 @@ void run(TFT_eSPI& tft) {
             tft.println(I18n::t(StringId::MENU_CATEGORY_FLIGHT));
 
             // Reine An/Aus-Schalter (Heartbeat, Notfall-Alarm, Naeherungs-LED,
-            // Beobachtungsalarm, Bodenfahrzeuge-Filter) stehen bewusst
-            // gemeinsam am Ende der Liste, direkt ueber dem Zurueck-Button -
-            // und darunter wiederum die LED-gesteuerten Alarme (Heartbeat,
-            // Notfall, Naeherung, Beobachtung; siehe LedAlert::Mode)
-            // zusammenhaengend vor dem nicht-LED-basierten
-            // Bodenfahrzeuge-Filter.
+            // Flugbuch, Beobachtungsalarm, Bodenfahrzeuge-Filter) stehen
+            // bewusst gemeinsam am Ende der Liste, direkt ueber dem
+            // Zurueck-Button - zuerst die LED-gesteuerten Alarme (Heartbeat,
+            // Notfall, Naeherung; siehe LedAlert::Mode) zusammenhaengend,
+            // danach die beiden nicht-LED-basierten Schalter Flugbuch und
+            // Beobachtungsalarm sowie zuletzt der Bodenfahrzeuge-Filter.
             Rect aircraftListBtn = flightRowRect(0);
             Rect statsBtn      = flightRowRect(1);
             Rect statsHistoryBtn = flightRowRect(2);
             Rect logFilesBtn   = flightRowRect(3);
-            Rect logbookBtn    = flightRowRect(4);
-            Rect locationBtn   = flightRowRect(5);
-            Rect airlineBtn    = flightRowRect(6);
-            Rect watchlistBtn      = flightRowRect(7);
-            Rect heartbeatBtn  = flightRowRect(8);
-            Rect emergencyBtn  = flightRowRect(9);
-            Rect proximityBtn  = flightRowRect(10);
+            Rect locationBtn   = flightRowRect(4);
+            Rect airlineBtn    = flightRowRect(5);
+            Rect watchlistBtn      = flightRowRect(6);
+            Rect heartbeatBtn  = flightRowRect(7);
+            Rect emergencyBtn  = flightRowRect(8);
+            Rect proximityBtn  = flightRowRect(9);
+            Rect logbookBtn    = flightRowRect(10);
             Rect watchlistAlertBtn = flightRowRect(11);
             Rect groundBtn     = flightRowRect(12);
             Rect backBtn       = flightRowRect(13);
@@ -423,13 +423,13 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, statsBtn, I18n::t(StringId::MENU_STATISTICS));
             drawButton(tft, statsHistoryBtn, I18n::t(StringId::MENU_STATS_HISTORY));
             drawButton(tft, logFilesBtn, I18n::t(StringId::MENU_LOGBOOK_FILES));
-            drawButton(tft, logbookBtn, I18n::t(StringId::MENU_FLIGHT_LOGBOOK) + onOff(SettingsStore::flightLogbookEnabled()));
             drawButton(tft, locationBtn, I18n::t(StringId::MENU_LOCATION_PRESETS));
             drawButton(tft, airlineBtn, I18n::t(StringId::MENU_AIRLINE_FILTER));
             drawButton(tft, watchlistBtn, I18n::t(StringId::MENU_WATCHLIST));
             drawButton(tft, heartbeatBtn, I18n::t(StringId::MENU_LED_HEARTBEAT) + onOff(SettingsStore::ledHeartbeatEnabled()));
             drawButton(tft, emergencyBtn, I18n::t(StringId::MENU_EMERGENCY_ALERT) + onOff(SettingsStore::emergencyAlertEnabled()));
             drawButton(tft, proximityBtn, I18n::t(StringId::MENU_PROXIMITY_LED) + onOff(SettingsStore::proximityAlertEnabled()));
+            drawButton(tft, logbookBtn, I18n::t(StringId::MENU_FLIGHT_LOGBOOK) + onOff(SettingsStore::flightLogbookEnabled()));
             drawButton(tft, watchlistAlertBtn, I18n::t(StringId::MENU_WATCHLIST_ALERT) + onOff(SettingsStore::watchlistAlertEnabled()));
             drawButton(tft, groundBtn, I18n::t(StringId::MENU_HIDE_GROUND) + onOff(SettingsStore::hideGroundVehicles()));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
@@ -454,6 +454,18 @@ void run(TFT_eSPI& tft) {
                 StatsHistoryScreen::run(tft);
             } else if (logFilesBtn.contains(tap.x, tap.y)) {
                 LogbookFilesScreen::run(tft);
+            } else if (locationBtn.contains(tap.x, tap.y)) {
+                LocationPresetsScreen::run(tft);
+            } else if (airlineBtn.contains(tap.x, tap.y)) {
+                AirlineFilterScreen::run(tft);
+            } else if (watchlistBtn.contains(tap.x, tap.y)) {
+                AircraftWatchlistScreen::run(tft);
+            } else if (heartbeatBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setLedHeartbeatEnabled(!SettingsStore::ledHeartbeatEnabled());
+            } else if (emergencyBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setEmergencyAlertEnabled(!SettingsStore::emergencyAlertEnabled());
+            } else if (proximityBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setProximityAlertEnabled(!SettingsStore::proximityAlertEnabled());
             } else if (logbookBtn.contains(tap.x, tap.y)) {
                 if (SettingsStore::flightLogbookEnabled()) {
                     // Ausschalten ist immer unbedenklich - keine Bestaetigung noetig.
@@ -468,18 +480,6 @@ void run(TFT_eSPI& tft) {
                     // vorhandene alte Datei weiterzuschreiben.
                     SettingsStore::setFlightLogbookSessionFile("");
                 }
-            } else if (locationBtn.contains(tap.x, tap.y)) {
-                LocationPresetsScreen::run(tft);
-            } else if (airlineBtn.contains(tap.x, tap.y)) {
-                AirlineFilterScreen::run(tft);
-            } else if (watchlistBtn.contains(tap.x, tap.y)) {
-                AircraftWatchlistScreen::run(tft);
-            } else if (heartbeatBtn.contains(tap.x, tap.y)) {
-                SettingsStore::setLedHeartbeatEnabled(!SettingsStore::ledHeartbeatEnabled());
-            } else if (emergencyBtn.contains(tap.x, tap.y)) {
-                SettingsStore::setEmergencyAlertEnabled(!SettingsStore::emergencyAlertEnabled());
-            } else if (proximityBtn.contains(tap.x, tap.y)) {
-                SettingsStore::setProximityAlertEnabled(!SettingsStore::proximityAlertEnabled());
             } else if (watchlistAlertBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setWatchlistAlertEnabled(!SettingsStore::watchlistAlertEnabled());
             } else if (groundBtn.contains(tap.x, tap.y)) {

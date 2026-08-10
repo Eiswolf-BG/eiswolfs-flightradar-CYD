@@ -52,7 +52,6 @@ bool wasEmergency = false;
 bool bannerBlinkOn = false;
 
 constexpr uint8_t BACKLIGHT_FULL = 255;
-constexpr uint8_t BACKLIGHT_DIMMED = 12;
 constexpr uint8_t BACKLIGHT_PWM_CHANNEL = 0;
 uint32_t lastInteractionMs = 0;
 bool screenDimmed = false;
@@ -605,7 +604,16 @@ void loop() {
     if (!screenDimmed && timeoutMin > 0) {
         uint32_t timeoutMs = (uint32_t)timeoutMin * 60000UL;
         if (nowMs - lastInteractionMs >= timeoutMs) {
-            ledcWrite(BACKLIGHT_PWM_CHANNEL, min(BACKLIGHT_DIMMED, normalBacklightPwm()));
+            // Bewusst ganz aus (0) statt nur gedimmt - fuer den
+            // Bildschirm-Timeout (Menue > System > Timeout). Dimmen
+            // uebernimmt bereits der separate Nachtmodus
+            // (updateNightDimming()); der Inaktivitaets-Timeout soll das
+            // Display wirklich abschalten, z.B. fuer Plane-Spotter, die nur
+            // das Flugbuch mitlaufen lassen wollen, ohne den Screen zu
+            // brauchen. Ein Antippen weckt ihn ueber den screenDimmed-Zweig
+            // oben wieder auf die eingestellte Helligkeit (bzw. Nachtmodus-
+            // Helligkeit, falls gerade Nachtstunden sind).
+            ledcWrite(BACKLIGHT_PWM_CHANNEL, 0);
             screenDimmed = true;
         }
     }
