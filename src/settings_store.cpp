@@ -2,16 +2,23 @@
 #include "config.h"
 #include "sd_mutex.h"
 #include <SD.h>
+#include <cstring>
 
 namespace SettingsStore {
 
 namespace {
     uint8_t rangeIdx = Config::DEFAULT_RANGE_INDEX;
     bool inverted = true; // Dieses Board braucht invertDisplay(true) fuer korrekte Farben (siehe main.cpp)
+    uint8_t brightnessPct = Config::BRIGHTNESS_MAX_PERCENT;
     bool emergencyAlertOn = true;
     bool proximityAlertOn = true;
     bool watchlistAlertOn = true;
-    bool flightLogbookOn = true;
+    // MUSS bei einer frischen Installation aus sein - sonst schreibt sich
+    // die SD-Karte unbemerkt voll (siehe Bestaetigungsdialog beim
+    // Einschalten in menu_screen.cpp + 24h-Auto-Aus in flight_logbook.cpp).
+    bool flightLogbookOn = false;
+    uint32_t logbookEnabledAtEpoch = 0;
+    char logbookSessionFile[16] = {0};
     bool ledHeartbeatOn = true;
     uint8_t screenTimeoutMin = 0;
     bool nightDimmingOn = true;
@@ -27,6 +34,11 @@ namespace {
             }
         } else if (key == "invert") {
             inverted = (value.toInt() != 0);
+        } else if (key == "brightness_percent") {
+            int v = value.toInt();
+            if (v >= Config::BRIGHTNESS_MIN_PERCENT && v <= Config::BRIGHTNESS_MAX_PERCENT) {
+                brightnessPct = (uint8_t)v;
+            }
         } else if (key == "emergency_alert") {
             emergencyAlertOn = (value.toInt() != 0);
         } else if (key == "proximity_alert") {
@@ -35,6 +47,11 @@ namespace {
             watchlistAlertOn = (value.toInt() != 0);
         } else if (key == "flight_logbook") {
             flightLogbookOn = (value.toInt() != 0);
+        } else if (key == "logbook_enabled_at") {
+            logbookEnabledAtEpoch = (uint32_t)value.toInt();
+        } else if (key == "logbook_session_file") {
+            strncpy(logbookSessionFile, value.c_str(), sizeof(logbookSessionFile) - 1);
+            logbookSessionFile[sizeof(logbookSessionFile) - 1] = 0;
         } else if (key == "led_heartbeat") {
             ledHeartbeatOn = (value.toInt() != 0);
         } else if (key == "screen_timeout_min") {
@@ -77,6 +94,15 @@ void load() {
         applyKeyValue(key, value);
     }
     f.close();
+
+    // Sicherheitsregel: das Flugbuch darf nach einem Neustart nur dann
+    // aktiv bleiben, wenn auch ein gueltiger Einschalt-Zeitstempel
+    // vorhanden ist - kein Zeitstempel bedeutet garantiert AUS, egal was in
+    // "flight_logbook" steht (verhindert unbemerktes Weiterlaufen z.B. nach
+    // einem Firmware-Update oder einer manuell bearbeiteten Datei).
+    if (flightLogbookOn && logbookEnabledAtEpoch == 0) {
+        flightLogbookOn = false;
+    }
 }
 
 void save() {
@@ -86,10 +112,13 @@ void save() {
     if (!f) return;
     f.printf("range_index=%d\n", rangeIdx);
     f.printf("invert=%d\n", inverted ? 1 : 0);
+    f.printf("brightness_percent=%d\n", brightnessPct);
     f.printf("emergency_alert=%d\n", emergencyAlertOn ? 1 : 0);
     f.printf("proximity_alert=%d\n", proximityAlertOn ? 1 : 0);
     f.printf("watchlist_alert=%d\n", watchlistAlertOn ? 1 : 0);
     f.printf("flight_logbook=%d\n", flightLogbookOn ? 1 : 0);
+    f.printf("logbook_enabled_at=%lu\n", (unsigned long)logbookEnabledAtEpoch);
+    f.printf("logbook_session_file=%s\n", logbookSessionFile);
     f.printf("led_heartbeat=%d\n", ledHeartbeatOn ? 1 : 0);
     f.printf("screen_timeout_min=%d\n", screenTimeoutMin);
     f.printf("night_dimming=%d\n", nightDimmingOn ? 1 : 0);
@@ -113,6 +142,15 @@ bool displayInverted() { return inverted; }
 void setDisplayInverted(bool inv) {
     inverted = inv;
     save();
+}
+
+uint8_t brightnessPercent() { return brightnessPct; }
+
+void setBrightnessPercent(uint8_t percent) {
+    if (percent >= Config::BRIGHTNESS_MIN_PERCENT && percent <= Config::BRIGHTNESS_MAX_PERCENT) {
+        brightnessPct = percent;
+        save();
+    }
 }
 
 bool emergencyAlertEnabled() { return emergencyAlertOn; }
@@ -140,6 +178,21 @@ bool flightLogbookEnabled() { return flightLogbookOn; }
 
 void setFlightLogbookEnabled(bool on) {
     flightLogbookOn = on;
+    save();
+}
+
+uint32_t flightLogbookEnabledAtEpoch() { return logbookEnabledAtEpoch; }
+
+void setFlightLogbookEnabledAtEpoch(uint32_t epoch) {
+    logbookEnabledAtEpoch = epoch;
+    save();
+}
+
+String flightLogbookSessionFile() { return String(logbookSessionFile); }
+
+void setFlightLogbookSessionFile(const String& label) {
+    strncpy(logbookSessionFile, label.c_str(), sizeof(logbookSessionFile) - 1);
+    logbookSessionFile[sizeof(logbookSessionFile) - 1] = 0;
     save();
 }
 

@@ -45,7 +45,8 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Dual-core design** – all networking (WiFi, ADS-B polling, aircraft detail lookups) runs on Core 0, while the display and touch input run on Core 1, so the UI never freezes during a network request
 - Data (airline names, aircraft-type seat estimates) loaded from CSV files on the SD card, auto-seeded on first boot
 - **6 languages** (English, German, French, Turkish, Spanish, Italian), selectable on first boot or anytime from the menu
-- **Time-of-day greeting** – once WiFi and the timezone are set, the splash screen greets you with "Good morning" / "Good day" / "Good evening" based on your local time
+- **Adjustable brightness** (10-100% in 10% steps, Menu → System → "Brightness") with a live preview as you tap
+- **About screen** (Menu → System → "About") shows the project name, a short description, and the current firmware version
 
 ## Feature Deep-Dive
 
@@ -126,7 +127,7 @@ Shows the last up to **7 days** from the flight logbook as a simple bar chart �
 A "?" info button on the History chart screen explains how it works directly on the device.
 
 ### 📁 Logbook files
-Lists the last several days from the logbook individually, with date and the number of aircraft logged that day. Handy for tracing the history over multiple days instead of only seeing the grand total.
+Lists the last several days from the logbook individually, with date and the number of aircraft logged that day. Handy for tracing the history over multiple days instead of only seeing the grand total. Each file has its own red "X" to delete it individually.
 
 ### 🌐 Web Export
 In addition to viewing the logbook on the device itself, a small built-in web page lets you export the **complete flight logbook** as a single merged CSV file – handy for opening in Excel, Numbers, or Google Sheets. It starts automatically in the background as soon as the device connects to WiFi. Deliberately **export-only, no live radar tracking over the web** – that would just burn resources for little benefit.
@@ -136,7 +137,13 @@ In addition to viewing the logbook on the device itself, a small built-in web pa
 Don't know the device's current IP? The "?" info button on the **Logbook files** screen shows it live on the device.
 
 ### 📖 Flight logbook (ON/OFF)
-When enabled, the device logs **every newly sighted aircraft** (timestamp, hex code, callsign, registration, type, distance, altitude) into a daily CSV file on the SD card. An aircraft is only logged once per day, even if it crosses the radar multiple times. Survives a same-day restart without logging already-seen aircraft twice. Turning it off saves SD card write cycles if you don't care about the statistics/history.
+When enabled, the device logs **every newly sighted aircraft** (timestamp, hex code, callsign, registration, type, distance, altitude) into a CSV file on the SD card. An aircraft is only logged once per activation, even if it crosses the radar multiple times.
+
+**Off by default, with a safety net:** because an unnoticed, permanently running logbook can quietly fill up the SD card and slow down the logbook menus, this is **disabled by default** and comes with two safeguards:
+- Turning it on shows a full-screen warning explaining the behavior below, which you have to confirm.
+- Once on, it **automatically switches off again after 24 hours** – and stays off after a restart unless it was actually turned on with a valid timestamp (so it can never silently keep running forever, even across power cycles or firmware updates).
+
+Each time you turn it on, a **new CSV file** is created for that session (e.g. `2026-08-06.csv`, or `2026-08-06_2.csv` for a second activation on the same day) instead of endlessly appending to one growing file – see [Logbook files](#-logbook-files) above for deleting them individually. Turning it off saves SD card write cycles if you don't care about the statistics/history.
 
 ### 💚 LED heartbeat (ON/OFF)
 A brief **green flash** of the RGB LED on every successful ADS-B data fetch (every 8 seconds) – a quick visual confirmation that the device is actively receiving data and hasn't frozen. Automatically overridden by an active proximity or emergency alert (which take priority), so the indicators never mix.

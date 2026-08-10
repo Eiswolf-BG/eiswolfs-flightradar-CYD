@@ -159,6 +159,18 @@ gefragt wird.
 Sobald der Workflow explizit angefordert wurde, automatisch folgende Schritte
 in dieser Reihenfolge:
 
+0. Versionsnummer festlegen: Die neue Versionsnummer kommt IMMER exakt von
+   Alex - er nennt sie im Push-Wunsch (z.B. über Claude/den Sandbox-
+   Assistenten: "Alex will auf Version X.Y.Z pushen"). Karl trägt GENAU
+   diese Nummer in `Config::APP_VERSION` (`src/config.h`) ein - niemals
+   selbst hochzählen, erraten oder von der letzten Version ableiten (auch
+   nicht bei kleinen Patches). Das gilt auch für größere Sprünge (z.B.
+   2.6 -> 3.0), die Alex bewusst und absichtlich machen kann - Karl
+   übernimmt in jedem Fall die genannte Nummer 1:1, ohne eigene Annahmen.
+   Falls im Push-Wunsch keine explizite Versionsnummer genannt wurde, bei
+   Alex nachfragen statt zu raten. Erst NACH dem Eintragen der korrekten
+   Nummer: einmal sauber `pio run` bauen, DANACH erst der Rest des
+   bekannten Workflows (README, Tag, index.html, Bin-Dateien, Commit/Push).
 1. Prüfen, ob seit dem letzten Commit neue/geänderte Features hinzugekommen
    sind, die für Endnutzer sichtbar sind (neue Menüpunkte, geändertes
    Verhalten, neue Screens) - falls ja, **README.md entsprechend ergänzen**

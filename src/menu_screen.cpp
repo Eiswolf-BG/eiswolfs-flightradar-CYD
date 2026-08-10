@@ -9,6 +9,8 @@
 #include "airline_filter_screen.h"
 #include "aircraft_watchlist_screen.h"
 #include "aircraft_list_screen.h"
+#include "about_screen.h"
+#include "brightness_screen.h"
 #include "language_screen.h"
 #include "units_screen.h"
 #include "settings_backup.h"
@@ -16,6 +18,7 @@
 #include "menu_stars.h"
 #include "i18n.h"
 #include "config.h"
+#include <time.h>
 
 namespace MenuScreen {
 
@@ -76,6 +79,10 @@ namespace {
         return prefix + String(minutes) + " min";
     }
 
+    String brightnessLabel(uint8_t percent) {
+        return String(I18n::t(StringId::MENU_BRIGHTNESS_PREFIX)) + String(percent) + "%";
+    }
+
     void showBriefMessage(TFT_eSPI& tft, const String& msg, uint16_t color) {
         tft.fillRect(0, Config::SCREEN_HEIGHT - 18, Config::SCREEN_WIDTH, 18, TFT_BLACK);
         tft.setTextColor(color, TFT_BLACK);
@@ -83,6 +90,138 @@ namespace {
         tft.drawString(msg, Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT - 9);
         tft.setTextDatum(TL_DATUM);
         delay(1200);
+    }
+
+    // Wie die einfache layoutWrapped()-Variante, aber mit optionalem
+    // Scroll-Offset und Sichtfenster (scrollY/viewTop/viewBottom) - Zeilen
+    // ausserhalb des Sichtfensters werden uebersprungen. Mit draw=false wird
+    // nur die Gesamthoehe berechnet, ohne etwas zu zeichnen (fuer die
+    // Scroll-Bedarfspruefung vorab).
+    int16_t layoutWrapped(TFT_eSPI& tft, int16_t x, int16_t startY, int16_t maxWidth,
+                          int16_t lineHeight, const String& text, int16_t scrollY,
+                          int16_t viewTop, int16_t viewBottom, bool draw) {
+        int16_t y = startY;
+        int32_t start = 0;
+        int32_t len = text.length();
+        while (start < len) {
+            while (start < len && text[start] == ' ') start++;
+            if (start >= len) break;
+
+            String line = text.substring(start, len);
+            while (tft.textWidth(line) > maxWidth) {
+                int32_t lastSpace = line.lastIndexOf(' ');
+                if (lastSpace <= 0) break;
+                line = line.substring(0, lastSpace);
+            }
+
+            if (draw) {
+                int16_t screenY = y - scrollY;
+                if (screenY >= viewTop && screenY <= viewBottom) {
+                    tft.setCursor(x, screenY);
+                    tft.print(line);
+                }
+            }
+            y += lineHeight;
+            start += line.length();
+        }
+        return y;
+    }
+
+    // Warn-Ueberlage, die praktisch den kompletten Bildschirm einnimmt (nur
+    // ein paar Pixel Rand) und vor dem Einschalten des Flugbuchs erklaert,
+    // warum es sich nach 24h automatisch wieder abschaltet. "Achtung!!!"
+    // steht ganz oben, mit einer Leerzeile Abstand zum Fliesstext darunter;
+    // der Text scrollt bei Bedarf (laengere Uebersetzungen) ueber eigene
+    // Pfeil-Buttons, OK/Zurueck bleiben dabei immer unten fix und
+    // kollisionsfrei sichtbar. Sternchen laufen im Hintergrund mit, wie auf
+    // allen anderen Menue-Screens (nur der Radar-Screen selbst spart sich
+    // das wegen der CPU-Last durch Abfragen/Zeichnen). Gibt true zurueck,
+    // wenn "OK" angetippt wurde, false bei "Zurueck".
+    bool confirmLogbookEnable(TFT_eSPI& tft) {
+        constexpr int16_t BOX_X = 4;
+        constexpr int16_t BOX_Y = 4;
+        constexpr int16_t BOX_W = Config::SCREEN_WIDTH - 2 * BOX_X;
+        constexpr int16_t BOX_H = Config::SCREEN_HEIGHT - 2 * BOX_Y;
+        constexpr int16_t TEXT_MAX_WIDTH = BOX_W - 20;
+        constexpr int16_t LINE_H = 16;
+        constexpr int16_t TITLE_Y = BOX_Y + 16;
+        // Eine Leerzeile Abstand zwischen "Achtung!!!" und dem Fliesstext.
+        constexpr int16_t VIEW_TOP = TITLE_Y + 12 + LINE_H;
+
+        constexpr int16_t BTN_H = 36;
+        constexpr int16_t BTN_GAP = 8;
+        constexpr int16_t BOTTOM_MARGIN = 8;
+        constexpr int16_t CANCEL_Y = BOX_Y + BOX_H - BOTTOM_MARGIN - BTN_H;
+        constexpr int16_t OK_Y = CANCEL_Y - BTN_GAP - BTN_H;
+        constexpr int16_t SCROLL_ROW_H = 28;
+        constexpr int16_t SCROLL_ROW_GAP = 8;
+
+        // Ohne Scroll-Pfeile verfuegbare Texthoehe zuerst pruefen - nur wenn
+        // der Text da nicht reinpasst, wird zusaetzlich Platz fuer die
+        // Pfeile reserviert (mehr Text-Platz bei kurzen Uebersetzungen).
+        constexpr int16_t VIEW_BOTTOM_NO_SCROLL = OK_Y - 8;
+        constexpr int16_t VIEW_BOTTOM_SCROLL = VIEW_BOTTOM_NO_SCROLL - SCROLL_ROW_H - SCROLL_ROW_GAP;
+
+        String body = I18n::t(StringId::MENU_LOGBOOK_WARNING_BODY);
+        int16_t totalH = layoutWrapped(tft, BOX_X + 10, VIEW_TOP, TEXT_MAX_WIDTH, LINE_H, body, 0, 0, 0, false);
+
+        bool scrollable = (totalH - VIEW_BOTTOM_NO_SCROLL) > 0;
+        int16_t viewBottom = scrollable ? VIEW_BOTTOM_SCROLL : VIEW_BOTTOM_NO_SCROLL;
+        int16_t maxScroll = totalH - viewBottom;
+        if (maxScroll < 0) maxScroll = 0;
+        int16_t scrollY = 0;
+        constexpr int16_t SCROLL_STEP = 48;
+
+        Rect okBtn     = {(int16_t)(BOX_X + 10), OK_Y, (int16_t)(BOX_W - 20), BTN_H};
+        Rect cancelBtn = {(int16_t)(BOX_X + 10), CANCEL_Y, (int16_t)(BOX_W - 20), BTN_H};
+        int16_t scrollRowY = VIEW_BOTTOM_SCROLL + SCROLL_ROW_GAP;
+        Rect upBtn   = {(int16_t)(BOX_X + BOX_W / 2 - 64), scrollRowY, 60, SCROLL_ROW_H};
+        Rect downBtn = {(int16_t)(BOX_X + BOX_W / 2 + 4), scrollRowY, 60, SCROLL_ROW_H};
+
+        MenuStars::reset();
+
+        auto redraw = [&]() {
+            tft.fillScreen(TFT_BLACK);
+            tft.drawRoundRect(BOX_X, BOX_Y, BOX_W, BOX_H, 6, TFT_RED);
+
+            tft.setTextDatum(MC_DATUM);
+            tft.setTextColor(TFT_RED, TFT_BLACK);
+            tft.setTextSize(2);
+            tft.drawString(I18n::t(StringId::MENU_LOGBOOK_WARNING_TITLE), BOX_X + BOX_W / 2, TITLE_Y);
+            tft.setTextSize(1);
+            tft.setTextDatum(TL_DATUM);
+
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            layoutWrapped(tft, BOX_X + 10, VIEW_TOP, TEXT_MAX_WIDTH, LINE_H, body, scrollY, VIEW_TOP, viewBottom, true);
+
+            drawButton(tft, okBtn, I18n::t(StringId::OK));
+            drawButton(tft, cancelBtn, I18n::t(StringId::BACK));
+            if (scrollable) {
+                drawButton(tft, upBtn, "^");
+                drawButton(tft, downBtn, "v");
+            }
+        };
+
+        redraw();
+
+        while (true) {
+            TouchInput::Point tap;
+            if (TouchInput::wasTapped(tap)) {
+                if (okBtn.contains(tap.x, tap.y)) return true;
+                if (cancelBtn.contains(tap.x, tap.y)) return false;
+                if (scrollable && upBtn.contains(tap.x, tap.y) && scrollY > 0) {
+                    scrollY -= SCROLL_STEP;
+                    if (scrollY < 0) scrollY = 0;
+                    redraw();
+                } else if (scrollable && downBtn.contains(tap.x, tap.y) && scrollY < maxScroll) {
+                    scrollY += SCROLL_STEP;
+                    if (scrollY > maxScroll) scrollY = maxScroll;
+                    redraw();
+                }
+            }
+            MenuStars::update(tft);
+            delay(20);
+        }
     }
 
     enum class Page { Main, Region, System, Flight };
@@ -167,11 +306,13 @@ void run(TFT_eSPI& tft) {
 
             Rect calibBtn     = rowRect(0);
             Rect invertBtn    = rowRect(1);
-            Rect timeoutBtn   = rowRect(2);
-            Rect nightDimBtn  = rowRect(3);
-            Rect backupBtn    = rowRect(4);
-            Rect restoreBtn   = rowRect(5);
-            Rect backBtn      = rowRect(6);
+            Rect brightnessBtn = rowRect(2);
+            Rect timeoutBtn   = rowRect(3);
+            Rect nightDimBtn  = rowRect(4);
+            Rect backupBtn    = rowRect(5);
+            Rect restoreBtn   = rowRect(6);
+            Rect aboutBtn     = rowRect(7);
+            Rect backBtn      = rowRect(8);
 
             drawButton(tft, calibBtn, I18n::t(StringId::MENU_CALIBRATE));
 
@@ -180,10 +321,12 @@ void run(TFT_eSPI& tft) {
                                       : I18n::t(StringId::MENU_DISPLAY_NORMAL);
             drawButton(tft, invertBtn, invertLabel);
 
+            drawButton(tft, brightnessBtn, brightnessLabel(SettingsStore::brightnessPercent()));
             drawButton(tft, timeoutBtn, screenTimeoutLabel(SettingsStore::screenTimeoutMinutes()));
             drawButton(tft, nightDimBtn, I18n::t(StringId::MENU_NIGHT_DIMMING) + onOff(SettingsStore::nightDimmingEnabled()));
             drawButton(tft, backupBtn, I18n::t(StringId::MENU_BACKUP));
             drawButton(tft, restoreBtn, I18n::t(StringId::MENU_RESTORE));
+            drawButton(tft, aboutBtn, I18n::t(StringId::MENU_ABOUT));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -199,6 +342,8 @@ void run(TFT_eSPI& tft) {
                 bool newState = !SettingsStore::displayInverted();
                 SettingsStore::setDisplayInverted(newState);
                 tft.invertDisplay(newState);
+            } else if (brightnessBtn.contains(tap.x, tap.y)) {
+                BrightnessScreen::run(tft);
             } else if (timeoutBtn.contains(tap.x, tap.y)) {
                 uint8_t current = SettingsStore::screenTimeoutMinutes();
                 uint8_t next = (current >= 10) ? 0 : (current + 1);
@@ -215,6 +360,8 @@ void run(TFT_eSPI& tft) {
                     showBriefMessage(tft, I18n::t(ok ? StringId::MENU_RESTORED : StringId::MENU_RESTORE_FAILED),
                                      ok ? TFT_GREEN : TFT_RED);
                 }
+            } else if (aboutBtn.contains(tap.x, tap.y)) {
+                AboutScreen::run(tft);
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::Main;
             }
@@ -275,7 +422,19 @@ void run(TFT_eSPI& tft) {
             } else if (logFilesBtn.contains(tap.x, tap.y)) {
                 LogbookFilesScreen::run(tft);
             } else if (logbookBtn.contains(tap.x, tap.y)) {
-                SettingsStore::setFlightLogbookEnabled(!SettingsStore::flightLogbookEnabled());
+                if (SettingsStore::flightLogbookEnabled()) {
+                    // Ausschalten ist immer unbedenklich - keine Bestaetigung noetig.
+                    SettingsStore::setFlightLogbookEnabled(false);
+                    SettingsStore::setFlightLogbookEnabledAtEpoch(0);
+                    SettingsStore::setFlightLogbookSessionFile("");
+                } else if (confirmLogbookEnable(tft)) {
+                    SettingsStore::setFlightLogbookEnabled(true);
+                    SettingsStore::setFlightLogbookEnabledAtEpoch((uint32_t)time(nullptr));
+                    // Leerer Eintrag erzwingt eine frische Sitzungsdatei beim
+                    // naechsten FlightLogbook::update() statt eine evtl. noch
+                    // vorhandene alte Datei weiterzuschreiben.
+                    SettingsStore::setFlightLogbookSessionFile("");
+                }
             } else if (heartbeatBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setLedHeartbeatEnabled(!SettingsStore::ledHeartbeatEnabled());
             } else if (proximityBtn.contains(tap.x, tap.y)) {

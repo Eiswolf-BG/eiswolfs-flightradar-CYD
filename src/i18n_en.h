@@ -19,9 +19,6 @@ static const char* const I18N_EN[] = {
     "WiFi FAILED",
     "Getting location...",
     "Ready!",
-    "Good morning",
-    "Good day",
-    "Good evening",
 
     "For this app a",
     "SD card is",
@@ -187,6 +184,17 @@ static const char* const I18N_EN[] = {
     "Distance",
     "Altitude",
     "Callsign",
+
+    "About",
+    "Live ADS-B flight radar",
+    "for the ESP32 CYD board.",
+    "Version: ",
+
+    "Brightness: ",
+    "Brightness",
+
+    "Warning!!!",
+    "The logbook permanently saves every visible aircraft to the SD card. To stop it filling up unnoticed and slowing down the logbook menus, it automatically switches off again after 24 hours.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

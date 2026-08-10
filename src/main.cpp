@@ -50,12 +50,27 @@ bool wasEmergency = false;
 bool bannerBlinkOn = false;
 
 constexpr uint8_t BACKLIGHT_FULL = 255;
-constexpr uint8_t BACKLIGHT_NIGHT_DIM = 90;
 constexpr uint8_t BACKLIGHT_DIMMED = 12;
 constexpr uint8_t BACKLIGHT_PWM_CHANNEL = 0;
 uint32_t lastInteractionMs = 0;
 bool screenDimmed = false;
 bool nightDimActive = false;
+
+// Wandelt die Nutzer-Helligkeit (Menue > System > Helligkeit, 10-100%) in
+// einen PWM-Wert 0-255 um - ersetzt das bisher fest verdrahtete
+// BACKLIGHT_FULL als "normale" Helligkeit ueberall unten.
+uint8_t normalBacklightPwm() {
+    return (uint8_t)((uint16_t)SettingsStore::brightnessPercent() * 255 / 100);
+}
+
+// Nachtmodus-Helligkeit RELATIV zur normalen Helligkeit (siehe
+// Config::NIGHT_DIM_REDUCTION_PERCENT) statt eines festen Absolutwerts -
+// so bleibt der Dimm-Effekt bei JEDER eingestellten Normalhelligkeit
+// spuerbar, auch bei schon niedrig eingestellter Helligkeit.
+uint8_t nightDimBacklightPwm() {
+    uint32_t normal = normalBacklightPwm();
+    return (uint8_t)(normal * (100 - Config::NIGHT_DIM_REDUCTION_PERCENT) / 100);
+}
 
 struct Rect {
     int16_t x, y, w, h;
@@ -133,7 +148,22 @@ void drawHeader() {
 void updateStatusLine() {
     if (wasEmergency) return;
 
-    tft.fillRect(0, HEADER_TITLE_H, Config::SCREEN_WIDTH, STATUS_LINE_H, TFT_BLACK);
+    // Die Uhrzeit nutzt den global gesetzten 11pt-Font (setFreeFont() in
+    // setup()) ueber setCursor()+print() - bei GFXFF-Fonts ist das
+    // baseline-verankert, der Text waechst also nach OBEN (siehe
+    // CLAUDE.md-Hinweis zu diesem Pitfall). Die Ziffern-Glyphen sind laut
+    // Font-Metrik 8px hoch und reichen damit bis y=HEADER_TITLE_H-6 - also
+    // OBERHALB des schmalen STATUS_LINE_H-Bereichs, der hier bisher allein
+    // geloescht wurde. Dadurch blieben alte Ziffern-Reste stehen und
+    // ueberlagerten sich mit den neuen (am sichtbarsten bei der letzten
+    // Minutenziffer, die sich am haeufigsten aendert). Deshalb hier gezielt
+    // NUR unter der Uhrzeit einen hoeheren Bereich loeschen - nicht die
+    // ganze Zeile, sonst wuerde das jede Sekunde in die Cam/Menu-Buttons
+    // hineinschneiden, die bis y=25 reichen.
+    constexpr int16_t CLOCK_CLEAR_W = 50;
+    constexpr int16_t CLOCK_CLEAR_TOP = HEADER_TITLE_H - 10;
+    tft.fillRect(0, CLOCK_CLEAR_TOP, CLOCK_CLEAR_W, CONTENT_TOP - CLOCK_CLEAR_TOP, TFT_BLACK);
+    tft.fillRect(CLOCK_CLEAR_W, HEADER_TITLE_H, Config::SCREEN_WIDTH - CLOCK_CLEAR_W, STATUS_LINE_H, TFT_BLACK);
     tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
 
     time_t now = time(nullptr);
@@ -171,7 +201,7 @@ void updateNightDimming() {
 
     bool shouldDim = SettingsStore::nightDimmingEnabled() && isNightDimHours();
     if (shouldDim != nightDimActive) {
-        ledcWrite(BACKLIGHT_PWM_CHANNEL, shouldDim ? BACKLIGHT_NIGHT_DIM : BACKLIGHT_FULL);
+        ledcWrite(BACKLIGHT_PWM_CHANNEL, shouldDim ? nightDimBacklightPwm() : normalBacklightPwm());
         nightDimActive = shouldDim;
     }
 }
@@ -250,7 +280,7 @@ void setup() {
 
     ledcSetup(BACKLIGHT_PWM_CHANNEL, 5000, 8);
     ledcAttachPin(TFT_BL, BACKLIGHT_PWM_CHANNEL);
-    ledcWrite(BACKLIGHT_PWM_CHANNEL, BACKLIGHT_FULL);
+    ledcWrite(BACKLIGHT_PWM_CHANNEL, normalBacklightPwm());
 
     TouchInput::begin();
     LedAlert::begin();
@@ -266,6 +296,11 @@ void setup() {
 
     SettingsStore::load();
     tft.invertDisplay(SettingsStore::displayInverted());
+    // Der erste ledcWrite() oben (vor SettingsStore::load()) kannte die
+    // gespeicherte Helligkeit noch nicht und hat den Default (100%)
+    // angewendet - hier mit dem jetzt geladenen Wert korrigieren, gleiches
+    // Nachziehen wie bei invertDisplay() direkt drueber.
+    ledcWrite(BACKLIGHT_PWM_CHANNEL, normalBacklightPwm());
 
     WifiMgr::init();
     LocationPresets::init();
@@ -273,6 +308,12 @@ void setup() {
     AircraftWatchlist::init();
 
     SplashScreen::begin(tft);
+    // Sofort einen ersten Sternen-Frame zeichnen, statt erst auf die naechste
+    // Warteschleife (WLAN/Standort) zu warten - sonst blieb der Sternenhimmel
+    // bei schnellem Boot (gespeichertes WLAN, schnelle Standortermittlung)
+    // fast die ganze Splash-Anzeige ueber unsichtbar und "poppte" erst kurz
+    // vor dem Radarscreen auf.
+    MenuStars::update(tft);
     SplashScreen::setStatusLine(tft, 0, I18n::t(StringId::SPLASH_SD_OK), TFT_WHITE);
 
     if (!TouchInput::loadCalibration()) {
@@ -302,6 +343,7 @@ void setup() {
     if (isFirstRun) {
         FirstRunLanguageScreen::run(tft);
         SplashScreen::begin(tft);
+        MenuStars::update(tft);
         SplashScreen::setStatusLine(tft, 0, I18n::t(StringId::SPLASH_SD_OK), TFT_WHITE);
     }
 
@@ -310,7 +352,15 @@ void setup() {
     SplashScreen::setStatusLine(tft, 2, I18n::t(StringId::SPLASH_GETTING_LOCATION));
     LocationManager::init();
     uint32_t locStart = millis();
-    while (LocationManager::currentSource() == LocationManager::Source::None &&
+    // Bewusst NICHT nur warten, solange noch GAR KEINE Position bekannt ist:
+    // ab dem zweiten Boot ist meistens schon eine gespeicherte Position da
+    // (Source::Persisted, siehe LocationManager::init()), wodurch diese
+    // Schleife sofort uebersprungen wurde und requestIpLookupIfNeeded() nie
+    // wieder lief. Genau die liefert aber auch die UTC-Zeitzonenverschiebung
+    // (inkl. Sommer-/Winterzeit) - ohne sie blieb die Uhr dauerhaft auf UTC
+    // stehen (in Mitteleuropa je nach Jahreszeit 1-2h falsch).
+    while ((LocationManager::currentSource() == LocationManager::Source::None ||
+            !LocationManager::hasUtcOffset()) &&
            millis() - locStart < 8000) {
         LocationManager::requestIpLookupIfNeeded();
         MenuStars::update(tft);
@@ -324,12 +374,6 @@ void setup() {
     if (LocationManager::hasUtcOffset()) {
         configTime(LocationManager::utcOffsetSeconds(), 0, "pool.ntp.org", "time.nist.gov");
     }
-
-    // ERST JETZT die Begruessung zeichnen - vorher (siehe oben) war die
-    // Zeitzone noch nicht gesetzt, configTime() lief noch mit UTC statt
-    // Ortszeit, was in vielen Zeitzonen zu einer falschen Tageszeit-
-    // Einschaetzung gefuehrt haette (z.B. UTC-Nachmittag = Ortszeit-Abend).
-    SplashScreen::showGreeting(tft);
 
     AircraftTable::init();
     AirlineLookup::init();
@@ -355,7 +399,7 @@ void loop() {
 
         if (screenDimmed) {
             bool shouldNightDim = SettingsStore::nightDimmingEnabled() && isNightDimHours();
-            ledcWrite(BACKLIGHT_PWM_CHANNEL, shouldNightDim ? BACKLIGHT_NIGHT_DIM : BACKLIGHT_FULL);
+            ledcWrite(BACKLIGHT_PWM_CHANNEL, shouldNightDim ? nightDimBacklightPwm() : normalBacklightPwm());
             nightDimActive = shouldNightDim;
             screenDimmed = false;
             tapped = false;
@@ -409,7 +453,7 @@ void loop() {
     if (!screenDimmed && timeoutMin > 0) {
         uint32_t timeoutMs = (uint32_t)timeoutMin * 60000UL;
         if (nowMs - lastInteractionMs >= timeoutMs) {
-            ledcWrite(BACKLIGHT_PWM_CHANNEL, BACKLIGHT_DIMMED);
+            ledcWrite(BACKLIGHT_PWM_CHANNEL, min(BACKLIGHT_DIMMED, normalBacklightPwm()));
             screenDimmed = true;
         }
     }

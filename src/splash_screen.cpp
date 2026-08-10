@@ -1,6 +1,5 @@
 #include "splash_screen.h"
 #include "menu_stars.h"
-#include "i18n.h"
 #include <math.h>
 
 namespace SplashScreen {
@@ -130,30 +129,6 @@ void begin(TFT_eSPI& tft) {
 
     tft.setTextDatum(TL_DATUM);
     tft.setTextSize(1);
-}
-
-void showGreeting(TFT_eSPI& tft) {
-    // Ohne per NTP synchronisierte Uhrzeit koennen wir die Tageszeit nicht
-    // bestimmen - dann lieber nichts anzeigen als zu raten (gleiches Muster
-    // wie bei der Nachtdimmung in main.cpp::isNightDimHours()).
-    time_t now = time(nullptr);
-    if (now <= 8 * 3600 * 2) return;
-
-    struct tm tmNow;
-    localtime_r(&now, &tmNow);
-    int h = tmNow.tm_hour;
-
-    StringId greetingId;
-    if (h < 12) greetingId = StringId::SPLASH_GREETING_MORNING;
-    else if (h < 18) greetingId = StringId::SPLASH_GREETING_DAY;
-    else greetingId = StringId::SPLASH_GREETING_EVENING;
-
-    int16_t cx = tft.width() / 2;
-    tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
-    tft.setTextSize(1);
-    tft.drawString(I18n::t(greetingId), cx, 84);
-    tft.setTextDatum(TL_DATUM);
 }
 
 void setStatusLine(TFT_eSPI& tft, uint8_t slot, const String& text, uint16_t color) {

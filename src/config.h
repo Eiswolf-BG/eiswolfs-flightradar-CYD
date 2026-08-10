@@ -2,6 +2,25 @@
 #include <Arduino.h>
 
 namespace Config {
+    // Wird bei jedem Versions-Release von Karl aktualisiert (siehe
+    // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
+    // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
+    // Git-Tag passen.
+    constexpr const char* APP_VERSION = "2.7.3";
+
+    // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
+    // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
+    // ein Defekt wirken statt wie eine Einstellung.
+    constexpr uint8_t BRIGHTNESS_MIN_PERCENT = 10;
+    constexpr uint8_t BRIGHTNESS_MAX_PERCENT = 100;
+    constexpr uint8_t BRIGHTNESS_STEP_PERCENT = 10;
+
+    // Nachtmodus (22-6 Uhr) dimmt relativ zur jeweils eingestellten normalen
+    // Helligkeit, nicht auf einen festen Absolutwert - sonst waere der
+    // Dimm-Effekt bei niedrig eingestellter Normalhelligkeit wirkungslos
+    // oder wuerde das Display nachts sogar heller machen als tagsueber.
+    constexpr uint8_t NIGHT_DIM_REDUCTION_PERCENT = 40;
+
     constexpr const char* IP_GEO_HOST = "ip-api.com";
     constexpr const char* IP_GEO_PATH = "/json/?fields=status,lat,lon,offset,countryCode";
 

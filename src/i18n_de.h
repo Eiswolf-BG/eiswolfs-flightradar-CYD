@@ -19,9 +19,6 @@ static const char* const I18N_DE[] = {
     "WLAN FEHLGESCHLAGEN",
     "Ermittle Standort...",
     "Bereit!",
-    "Guten Morgen",
-    "Guten Tag",
-    "Guten Abend",
 
     "Für diese App wird",
     "eine SD-Karte",
@@ -186,6 +183,17 @@ static const char* const I18N_DE[] = {
     "Distanz",
     "Höhe",
     "Rufzeichen",
+
+    "Info",
+    "Live-ADS-B-Flugradar für",
+    "das ESP32 CYD-Display.",
+    "Version: ",
+
+    "Helligkeit: ",
+    "Helligkeit",
+
+    "Achtung!!!",
+    "Das Flugbuch speichert dauerhaft alle sichtbaren Flugzeuge auf der SD-Karte. Damit sie sich nicht unbemerkt füllt und die Logbuch-Menüs nicht langsam werden, schaltet es sich nach 24 Stunden automatisch wieder aus.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

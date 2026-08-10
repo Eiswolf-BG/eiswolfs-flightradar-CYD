@@ -19,9 +19,6 @@ static const char* const I18N_IT[] = {
     "WiFi FALLITO",
     "Rilevamento posizione...",
     "Pronto!",
-    "Buongiorno",
-    "Buon pomeriggio",
-    "Buonasera",
 
     "Questa app richiede",
     "una scheda SD",
@@ -186,6 +183,17 @@ static const char* const I18N_IT[] = {
     "Distanza",
     "Altitudine",
     "Nominativo",
+
+    "Informazioni",
+    "Radar di volo ADS-B live",
+    "per il display ESP32 CYD.",
+    "Versione: ",
+
+    "Luminosità: ",
+    "Luminosità",
+
+    "Attenzione!!!",
+    "Il diario di volo salva permanentemente tutti gli aerei visibili sulla scheda SD. Per evitare che si riempia senza che te ne accorga e che i menu diventino lenti, si disattiva automaticamente dopo 24 ore.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

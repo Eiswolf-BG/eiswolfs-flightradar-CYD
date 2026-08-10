@@ -19,9 +19,6 @@ static const char* const I18N_TR[] = {
     "WiFi BAŞARISIZ",
     "Konum alınıyor...",
     "Hazır!",
-    "Günaydın",
-    "İyi günler",
-    "İyi akşamlar",
 
     "Bu uygulama için bir",
     "SD kart",
@@ -186,6 +183,17 @@ static const char* const I18N_TR[] = {
     "Mesafe",
     "İrtifa",
     "Çağrı işareti",
+
+    "Hakkında",
+    "ESP32 CYD ekranı için",
+    "canlı ADS-B uçuş radarı.",
+    "Sürüm: ",
+
+    "Parlaklık: ",
+    "Parlaklık",
+
+    "Dikkat!!!",
+    "Kayıt defteri, görüntülenen tüm uçakları SD karta sürekli kaydeder. Kartın fark edilmeden dolmaması ve menülerin yavaşlamaması için 24 saat sonra otomatik olarak kapanır.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,
