@@ -119,9 +119,16 @@ namespace {
     // "Leerer Himmel"-Timers weitergezaehlt hat), OHNE den Scroll-
     // Fortschritt zurueckzusetzen - so laeuft die Laufschrift trotz des
     // sich staendig aendernden Zaehlers fluessig weiter, statt bei jedem
-    // Tick neu am Anfang zu beginnen.
-    void updateInfoMarqueeText(const String& text) {
+    // Tick neu am Anfang zu beginnen. needsScroll wird trotzdem bei JEDEM
+    // Aufruf neu bestimmt (nicht nur einmalig in setupInfoMarquee) - sonst
+    // blieb der "Leerer Himmel"-Timer dauerhaft ohne Scrollen stehen, weil
+    // der allererste Text ("...seit 0s") noch kurz genug war und die
+    // Laufschrift-Funktion spaeter (z.B. bei "...seit 5min") nie erneut
+    // geprueft hat, ob der inzwischen laengere Text nun doch scrollen muss.
+    void updateInfoMarqueeText(TFT_eSPI& tft, const String& text, int16_t viewportW) {
+        tft.setTextSize(1);
         infoMarquee.text = text;
+        infoMarquee.needsScroll = tft.textWidth(text) > viewportW;
         String withGap = text + "   ";
         infoMarquee.ring = withGap + withGap;
     }
@@ -761,11 +768,21 @@ void render(TFT_eSPI& tft, int16_t top) {
         lastPanel.valid = false;
         int16_t infoTop = L.infoTop;
         tft.drawFastHLine(0, infoTop, Config::SCREEN_WIDTH, TFT_DARKGREY);
-        // Der Info-Text (Tap-Hinweis bzw. "Leerer Himmel"-Timer) wird NICHT
-        // mehr hier gezeichnet, sondern laufend in tick() als Laufschrift
-        // (siehe dort) - render() laeuft nur bei geaenderten Flugdaten
-        // (alle paar Sekunden), tick() dagegen alle 80ms, was fuer eine
-        // fluessige Laufschrift-Animation noetig ist.
+        // Der eigentliche Text/Scroll-Fortschritt der Info-Zeile (Tap-
+        // Hinweis bzw. "Leerer Himmel"-Timer) wird weiterhin laufend in
+        // tick() aktualisiert (siehe dort) - HIER aber trotzdem sofort mit
+        // dem aktuellen Stand neu gezeichnet (statt bis zum naechsten
+        // tick() zu warten). Der obige fillRect() ganz oben in render()
+        // hat die Zeile naemlich gerade erst geloescht, und render() laeuft
+        // nur bei jedem Fetch-Zyklus (ca. alle 8s, zeitgleich mit dem
+        // Heartbeat-Blinken) - ohne dieses sofortige Nachzeichnen blieb die
+        // Zeile bis zu 80ms lang leer, sichtbar als kurzes Blinken im
+        // Heartbeat-Takt.
+        constexpr int16_t INFO_TEXT_X = 8;
+        constexpr int16_t INFO_TEXT_GAP = 6;
+        int16_t infoTextY = infoTop + 20;
+        int16_t infoTextW = L.rangeBtn.x - INFO_TEXT_X - INFO_TEXT_GAP;
+        drawInfoMarquee(tft, INFO_TEXT_X, infoTextY, infoTextW);
 
         char rangeLabel[8];
         snprintf(rangeLabel, sizeof(rangeLabel), "%.0fkm", rangeKm);
@@ -893,7 +910,7 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
         // den Scroll-Fortschritt zuruecksetzen, sonst wuerde die
         // Laufschrift bei jedem Sekundenwechsel neu von vorne beginnen statt
         // fluessig durchzulaufen.
-        updateInfoMarqueeText(infoText);
+        updateInfoMarqueeText(tft, infoText, infoTextW);
     }
     drawInfoMarquee(tft, INFO_TEXT_X, infoTextY, infoTextW);
 
