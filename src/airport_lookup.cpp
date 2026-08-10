@@ -39,6 +39,8 @@ Nearest findNearest(double lat, double lon) {
             bestDistanceKm = distanceKm;
             result.found = true;
             result.distanceKm = distanceKm;
+            result.lat = aptLat;
+            result.lon = aptLon;
             strncpy(result.icao, icao.c_str(), sizeof(result.icao) - 1);
             strncpy(result.name, name.c_str(), sizeof(result.name) - 1);
         }

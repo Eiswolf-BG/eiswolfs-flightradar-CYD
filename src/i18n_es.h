@@ -194,6 +194,10 @@ static const char* const I18N_ES[] = {
 
     "¡Atención!!!",
     "El registro de vuelos guarda permanentemente todos los aviones visibles en la tarjeta SD. Para evitar que se llene sin que lo note y que los menús se vuelvan lentos, se desactiva automáticamente después de 24 horas.",
+    "Nombre (opcional):",
+    "Sin nombre",
+    "Ubicaciones llenas - elimine una primero",
+    "Al añadir una ubicación puede darle un nombre (ej. \"Casa\"), que luego se muestra en la lista. Toque el texto en movimiento del aeropuerto más cercano para añadirlo directamente como nueva ubicación con su nombre.",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

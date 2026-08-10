@@ -194,6 +194,10 @@ static const char* const I18N_IT[] = {
 
     "Attenzione!!!",
     "Il diario di volo salva permanentemente tutti gli aerei visibili sulla scheda SD. Per evitare che si riempia senza che te ne accorga e che i menu diventino lenti, si disattiva automaticamente dopo 24 ore.",
+    "Nome (opzionale):",
+    "Senza nome",
+    "Posizioni piene - rimuovine una prima",
+    "Quando aggiungi una posizione puoi darle un nome (es. \"Casa\"), mostrato poi nell'elenco. Tocca il testo scorrevole dell'aeroporto più vicino per aggiungerlo direttamente come nuova posizione con il suo nome.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

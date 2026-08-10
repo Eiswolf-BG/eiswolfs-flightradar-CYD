@@ -114,6 +114,121 @@ namespace {
         return confirmed ? String(buf) : String();
     }
 
+    // Vier Tastaturreihen wie bei der Rufzeichen-Eingabe (siehe
+    // aircraft_watchlist_screen.cpp::runCallsignKeypad), aber mit Leertaste
+    // (Ortsnamen enthalten oft Leerzeichen, z.B. "Bei Oma") und OHNE
+    // Eingabepflicht - der Name ist optional, "Ohne Namen" bestaetigt mit
+    // leerem Puffer statt die Eingabe abzubrechen.
+    String runPresetNameKeypad(TFT_eSPI& tft) {
+        MenuStars::reset();
+        constexpr const char* DIGITS = "1234567890";
+        constexpr const char* ROW1 = "QWERTYUIOP";
+        constexpr const char* ROW2 = "ASDFGHJKL";
+        constexpr const char* ROW3 = "ZXCVBNM";
+
+        char buf[17] = {0};
+        uint8_t len = 0;
+
+        constexpr int16_t KEY_H = 30;
+        constexpr int16_t KEY_GAP = 3;
+        constexpr int16_t ROW0_Y = 78;
+
+        auto layoutRow = [&](const char* row, int16_t y, Rect* outRects, uint8_t n) {
+            int16_t usableW = Config::SCREEN_WIDTH - 8;
+            int16_t keyW = (usableW - (n - 1) * KEY_GAP) / n;
+            int16_t x = 4;
+            for (uint8_t i = 0; i < n; i++) {
+                outRects[i] = {x, y, keyW, KEY_H};
+                x += keyW + KEY_GAP;
+            }
+        };
+
+        Rect digitRects[10], row1Rects[10], row2Rects[9], row3Rects[7];
+        layoutRow(DIGITS, ROW0_Y, digitRects, 10);
+        layoutRow(ROW1, ROW0_Y + (KEY_H + KEY_GAP), row1Rects, 10);
+        layoutRow(ROW2, ROW0_Y + 2 * (KEY_H + KEY_GAP), row2Rects, 9);
+        layoutRow(ROW3, ROW0_Y + 3 * (KEY_H + KEY_GAP), row3Rects, 7);
+
+        Rect spaceBtn     = {4, (int16_t)(ROW0_Y + 4 * (KEY_H + KEY_GAP)), 150, KEY_H};
+        Rect backspaceBtn = {158, (int16_t)(ROW0_Y + 4 * (KEY_H + KEY_GAP)), (int16_t)(Config::SCREEN_WIDTH - 8 - 154), KEY_H};
+        Rect skipBtn      = {4, (int16_t)(ROW0_Y + 5 * (KEY_H + KEY_GAP)), 110, KEY_H};
+        Rect confirmBtn   = {118, (int16_t)(ROW0_Y + 5 * (KEY_H + KEY_GAP)), (int16_t)(Config::SCREEN_WIDTH - 8 - 114), KEY_H};
+
+        bool done = false;
+        bool confirmed = false;
+
+        auto redraw = [&]() {
+            tft.fillScreen(TFT_BLACK);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setCursor(10, 14);
+            tft.println(I18n::t(StringId::LOCATION_NAME_PROMPT));
+
+            tft.fillRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_BLACK);
+            tft.drawRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_GREEN);
+            tft.setTextSize(2);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setCursor(14, 66);
+            tft.print(buf);
+            tft.setTextSize(1);
+
+            for (uint8_t i = 0; i < 10; i++) drawButton(tft, digitRects[i], String(DIGITS[i]));
+            for (uint8_t i = 0; i < 10; i++) drawButton(tft, row1Rects[i], String(ROW1[i]));
+            for (uint8_t i = 0; i < 9; i++) drawButton(tft, row2Rects[i], String(ROW2[i]));
+            for (uint8_t i = 0; i < 7; i++) drawButton(tft, row3Rects[i], String(ROW3[i]));
+
+            drawButton(tft, spaceBtn, I18n::t(StringId::WIFI_SPACE));
+            drawButton(tft, backspaceBtn, "<-");
+            drawButton(tft, skipBtn, I18n::t(StringId::LOCATION_NAME_SKIP));
+            drawButton(tft, confirmBtn, I18n::t(StringId::OK));
+        };
+
+        redraw();
+
+        while (!done) {
+            TouchInput::Point tap;
+            if (!TouchInput::wasTapped(tap)) { MenuStars::update(tft); delay(20); continue; }
+
+            bool handled = false;
+            for (uint8_t i = 0; i < 10 && !handled; i++) {
+                if (digitRects[i].contains(tap.x, tap.y) && len < sizeof(buf) - 1) { buf[len++] = DIGITS[i]; buf[len] = 0; handled = true; }
+            }
+            for (uint8_t i = 0; i < 10 && !handled; i++) {
+                if (row1Rects[i].contains(tap.x, tap.y) && len < sizeof(buf) - 1) { buf[len++] = ROW1[i]; buf[len] = 0; handled = true; }
+            }
+            for (uint8_t i = 0; i < 9 && !handled; i++) {
+                if (row2Rects[i].contains(tap.x, tap.y) && len < sizeof(buf) - 1) { buf[len++] = ROW2[i]; buf[len] = 0; handled = true; }
+            }
+            for (uint8_t i = 0; i < 7 && !handled; i++) {
+                if (row3Rects[i].contains(tap.x, tap.y) && len < sizeof(buf) - 1) { buf[len++] = ROW3[i]; buf[len] = 0; handled = true; }
+            }
+            if (!handled && spaceBtn.contains(tap.x, tap.y) && len < sizeof(buf) - 1) {
+                buf[len++] = ' ';
+                buf[len] = 0;
+                handled = true;
+            }
+            if (!handled && backspaceBtn.contains(tap.x, tap.y)) {
+                if (len > 0) { len--; buf[len] = 0; }
+                handled = true;
+            }
+            if (!handled && skipBtn.contains(tap.x, tap.y)) {
+                buf[0] = 0;
+                len = 0;
+                done = true;
+                confirmed = true;
+                handled = true;
+            }
+            if (!handled && confirmBtn.contains(tap.x, tap.y)) {
+                done = true;
+                confirmed = true;
+                handled = true;
+            }
+
+            if (handled) redraw();
+        }
+
+        return confirmed ? String(buf) : String();
+    }
+
     bool addPresetFlow(TFT_eSPI& tft) {
         String latStr = runNumericKeypad(tft, I18n::t(StringId::LOCATION_LAT_PROMPT));
         if (latStr.length() == 0) return false;
@@ -125,7 +240,19 @@ namespace {
         double lon = lonStr.toDouble();
         if (lat == 0.0 && lon == 0.0) return false;
 
-        return LocationPresets::addPreset(lat, lon);
+        String name = runPresetNameKeypad(tft);
+        return LocationPresets::addPreset(lat, lon, name);
+    }
+
+    // Kurze Meldung unten am Bildschirmrand, z.B. wenn beim Antippen des
+    // Naechster-Flughafen-Textes bereits alle 3 Preset-Slots belegt sind.
+    void showBriefMessage(TFT_eSPI& tft, const String& msg, uint16_t color) {
+        tft.fillRect(0, Config::SCREEN_HEIGHT - 18, Config::SCREEN_WIDTH, 18, TFT_BLACK);
+        tft.setTextColor(color, TFT_BLACK);
+        tft.setTextDatum(MC_DATUM);
+        tft.drawString(msg, Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT - 9);
+        tft.setTextDatum(TL_DATUM);
+        delay(1200);
     }
 
     int16_t layoutWrapped(TFT_eSPI& tft, int16_t x, int16_t startY, int16_t maxWidth,
@@ -277,6 +404,8 @@ namespace {
         totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA3), 0, 0, 0, false);
         totalH += 8;
         totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA4), 0, 0, 0, false);
+        totalH += 8;
+        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA5), 0, 0, 0, false);
 
         int16_t maxScroll = totalH - VIEW_BOTTOM;
         if (maxScroll < 0) maxScroll = 0;
@@ -304,7 +433,9 @@ namespace {
             y += 8;
             y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA3), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
             y += 8;
-            layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA4), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
+            y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA4), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
+            y += 8;
+            layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA5), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
 
             drawButton(tft, backBtn, I18n::t(StringId::BACK));
             if (scrollable) {
@@ -373,9 +504,18 @@ void run(TFT_eSPI& tft) {
             if (i < count) {
                 double lat = 0, lon = 0;
                 LocationPresets::getLatLon(i, lat, lon);
-                char coords[24];
-                snprintf(coords, sizeof(coords), "%d: %.2f, %.2f", i + 1, lat, lon);
-                String label = (active == (int8_t)i ? "> " : "") + presetWord + " " + coords;
+                String presetName = LocationPresets::getName(i);
+                String label;
+                if (presetName.length() > 0) {
+                    // Benannte Presets (manuell vergeben oder vom
+                    // Flughafen-Antippen uebernommen) zeigen den Namen statt
+                    // der Koordinaten - besser lesbar in der Uebersicht.
+                    label = (active == (int8_t)i ? "> " : "") + presetName;
+                } else {
+                    char coords[24];
+                    snprintf(coords, sizeof(coords), "%d: %.2f, %.2f", i + 1, lat, lon);
+                    label = (active == (int8_t)i ? "> " : "") + presetWord + " " + coords;
+                }
                 label = truncateForWidth(tft, label, (int16_t)(rowRect.w - 10));
                 drawButton(tft, rowRect, label, active == (int8_t)i);
                 drawButton(tft, removeRect, "X", false, true);
@@ -400,6 +540,13 @@ void run(TFT_eSPI& tft) {
         constexpr int16_t AIRPORT_LINE_X = 10;
         constexpr int16_t AIRPORT_LINE_W = Config::SCREEN_WIDTH - 20;
         int16_t airportLineY = (int16_t)(Config::SCREEN_HEIGHT - 60);
+        // Deckt denselben Bereich ab, den drawMarquee() bei jedem Frame
+        // loescht (siehe MARQUEE_CLEAR_TOP/-H) - dient sowohl als Tap-Zone
+        // als auch als sichtbarer Rahmen, der anzeigt, dass man hier
+        // antippen kann, um den Flughafen als neuen Preset zu uebernehmen.
+        Rect airportRect = {(int16_t)(AIRPORT_LINE_X - 4), (int16_t)(airportLineY - 20),
+                             (int16_t)(AIRPORT_LINE_W + 8), 26};
+        AirportLookup::Nearest nearest;
         {
             double activeLat = 0, activeLon = 0;
             if (active < 0) {
@@ -407,13 +554,14 @@ void run(TFT_eSPI& tft) {
             } else {
                 LocationPresets::getLatLon((uint8_t)active, activeLat, activeLon);
             }
-            AirportLookup::Nearest nearest = AirportLookup::findNearest(activeLat, activeLon);
+            nearest = AirportLookup::findNearest(activeLat, activeLon);
             if (nearest.found) {
                 char buf[48];
                 snprintf(buf, sizeof(buf), "%s %s (%.0f km)", nearest.icao, nearest.name, nearest.distanceKm);
                 String line = String(I18n::t(StringId::LOCATION_NEAREST_AIRPORT_PREFIX)) + buf;
                 setupMarquee(tft, line, AIRPORT_LINE_W);
                 drawMarquee(tft, AIRPORT_LINE_X, airportLineY, AIRPORT_LINE_W, 20);
+                tft.drawRoundRect(airportRect.x, airportRect.y, airportRect.w, airportRect.h, 4, TFT_DARKGREEN);
             } else {
                 airportMarquee.text = "";
             }
@@ -449,6 +597,14 @@ void run(TFT_eSPI& tft) {
         }
         if (!handled && canAdd && addBtn.contains(tap.x, tap.y)) {
             addPresetFlow(tft);
+            handled = true;
+        }
+        if (!handled && nearest.found && airportRect.contains(tap.x, tap.y)) {
+            if (canAdd) {
+                LocationPresets::addPreset(nearest.lat, nearest.lon, nearest.name);
+            } else {
+                showBriefMessage(tft, I18n::t(StringId::LOCATION_PRESETS_FULL), TFT_RED);
+            }
             handled = true;
         }
         if (!handled && backBtn.contains(tap.x, tap.y)) {

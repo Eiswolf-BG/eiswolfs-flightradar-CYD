@@ -194,6 +194,10 @@ static const char* const I18N_TR[] = {
 
     "Dikkat!!!",
     "Kayıt defteri, görüntülenen tüm uçakları SD karta sürekli kaydeder. Kartın fark edilmeden dolmaması ve menülerin yavaşlamaması için 24 saat sonra otomatik olarak kapanır.",
+    "İsim (opsiyonel):",
+    "İsimsiz devam et",
+    "Ön ayarlar dolu - önce birini kaldırın",
+    "Bir ön ayar eklerken ona bir isim verebilirsiniz (örn. \"Ev\"), bu isim daha sonra listede gösterilir. En yakın havalimanı kayan yazısına dokunarak onu doğrudan ismiyle yeni bir ön ayar olarak ekleyebilirsiniz.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,
