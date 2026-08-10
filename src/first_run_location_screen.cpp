@@ -56,11 +56,23 @@ void run(TFT_eSPI& tft) {
     tft.println(I18n::t(StringId::FIRST_RUN_LOCATION_TITLE));
 
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    layoutWrapped(tft, 10, 40, (int16_t)(Config::SCREEN_WIDTH - 20), 18,
-                  I18n::t(StringId::FIRST_RUN_LOCATION_BODY));
+    int16_t textEndY = layoutWrapped(tft, 10, 40, (int16_t)(Config::SCREEN_WIDTH - 20), 18,
+                                      I18n::t(StringId::FIRST_RUN_LOCATION_BODY));
 
-    Rect setBtn  = {10, (int16_t)(Config::SCREEN_HEIGHT - 96), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
-    Rect skipBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+    // Buttons folgen direkt unter dem Text (mit etwas Abstand) statt an
+    // einer fest einprogrammierten Position - eine laengere Uebersetzung
+    // hat sonst den Text bis unter/hinter die Buttons laufen lassen
+    // (auf Deutsch beobachtet: Text unlesbar hinter "Adresse eingeben"/
+    // "Ueberspringen"). Nach unten hin trotzdem an den Bildschirmrand
+    // geklemmt, falls ein Text ausnahmsweise doch sehr lang waere.
+    constexpr int16_t BTN_H = 40;
+    constexpr int16_t BTN_GAP = 8;
+    int16_t setY = textEndY + 14;
+    int16_t maxSetY = (int16_t)(Config::SCREEN_HEIGHT - (2 * BTN_H + BTN_GAP + 10));
+    if (setY > maxSetY) setY = maxSetY;
+
+    Rect setBtn  = {10, setY, (int16_t)(Config::SCREEN_WIDTH - 20), BTN_H};
+    Rect skipBtn = {10, (int16_t)(setY + BTN_H + BTN_GAP), (int16_t)(Config::SCREEN_WIDTH - 20), BTN_H};
     drawButton(tft, setBtn, I18n::t(StringId::FIRST_RUN_LOCATION_SET_BTN));
     drawButton(tft, skipBtn, I18n::t(StringId::FIRST_RUN_LOCATION_SKIP_BTN));
 

@@ -217,9 +217,11 @@ static const char* const I18N_EN[] = {
     "Try again",
     "Cancel",
     "Set Your Exact Location",
-    "Automatic IP-based location can easily be 20-30 km off - you might hear a plane overhead while the radar stays empty. Enter your address now for exact coordinates and a much better experience. The proximity LED will then really blink in sync with the aircraft above you. You can also do this later anytime via Menu > Flight Options > Location Presets.",
+    "Automatic IP-based location can be 20-30 km off. Enter your address for exact coordinates - the proximity LED will then really blink in sync with the aircraft above you. You can do this later anytime via Location Presets.",
     "Enter Address",
     "Skip",
+
+    "Tip: use the \"Search by address\" button when adding a preset (\"+\") to get exact coordinates for your address instantly - much more accurate than automatic IP-based location, which can easily be 20-30 km off. With your exact location set, the proximity LED really does blink in sync with the aircraft you can hear overhead.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

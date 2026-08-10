@@ -434,6 +434,8 @@ namespace {
         totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA4), 0, 0, 0, false);
         totalH += 8;
         totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA5), 0, 0, 0, false);
+        totalH += 8;
+        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA6), 0, 0, 0, false);
 
         int16_t maxScroll = totalH - VIEW_BOTTOM;
         if (maxScroll < 0) maxScroll = 0;
@@ -463,7 +465,9 @@ namespace {
             y += 8;
             y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA4), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
             y += 8;
-            layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA5), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
+            y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA5), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
+            y += 8;
+            layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA6), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
 
             drawButton(tft, backBtn, I18n::t(StringId::BACK));
             if (scrollable) {

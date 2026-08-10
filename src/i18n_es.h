@@ -216,9 +216,11 @@ static const char* const I18N_ES[] = {
     "Intentar de nuevo",
     "Cancelar",
     "Configura tu ubicación exacta",
-    "La geolocalización automática por IP puede fallar fácilmente por 20-30 km - podrías oír un avión mientras el radar permanece vacío. Introduce tu dirección ahora para obtener coordenadas exactas y una experiencia mucho mejor. El LED de proximidad parpadeará entonces realmente al ritmo del avión que tienes encima. También puedes hacerlo más tarde en cualquier momento desde Menú > Opciones de vuelo > Ubicaciones guardadas.",
+    "La geolocalización por IP puede fallar por 20-30 km. Introduce tu dirección para coordenadas exactas - el LED de proximidad parpadeará al ritmo del avión que tienes encima. Puedes hacerlo después desde Ubicaciones guardadas.",
     "Introducir dirección",
     "Omitir",
+
+    "Consejo: usa el botón \"Buscar por dirección\" al añadir un preset (\"+\") para obtener al instante coordenadas exactas de tu dirección - mucho más preciso que la geolocalización automática por IP, que puede fallar fácilmente por 20-30 km. Con tu ubicación exacta configurada, el LED de proximidad realmente parpadea al ritmo del avión que oyes encima de ti.",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

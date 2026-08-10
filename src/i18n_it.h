@@ -216,9 +216,11 @@ static const char* const I18N_IT[] = {
     "Riprova",
     "Annulla",
     "Imposta la tua posizione esatta",
-    "La geolocalizzazione IP automatica può sbagliare facilmente di 20-30 km - potresti sentire un aereo mentre il radar resta vuoto. Inserisci ora il tuo indirizzo per coordinate esatte e un'esperienza molto migliore. Il LED di prossimità lampeggerà allora davvero al ritmo dell'aereo sopra di te. Puoi farlo anche più tardi in qualsiasi momento tramite Menu > Opzioni di volo > Posizioni salvate.",
+    "La geolocalizzazione IP può sbagliare di 20-30 km. Inserisci il tuo indirizzo per coordinate esatte - il LED di prossimità lampeggerà al ritmo dell'aereo sopra di te. Puoi farlo anche più tardi da Posizioni salvate.",
     "Inserisci indirizzo",
     "Salta",
+
+    "Suggerimento: usa il pulsante \"Cerca per indirizzo\" quando aggiungi un preset (\"+\") per ottenere subito coordinate esatte per il tuo indirizzo - molto più preciso della geolocalizzazione IP automatica, che può sbagliare facilmente di 20-30 km. Con la tua posizione esatta impostata, il LED di prossimità lampeggia davvero al ritmo dell'aereo che senti sopra di te.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

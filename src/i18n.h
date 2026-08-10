@@ -246,6 +246,14 @@ enum class StringId : uint8_t {
     FIRST_RUN_LOCATION_SET_BTN,
     FIRST_RUN_LOCATION_SKIP_BTN,
 
+    // Zusaetzlicher Info-Absatz im Standort-Presets-Screen (Menue >
+    // Flugoptionen > Standort-Presets > "?") - weist auf den "Per Adresse
+    // suchen"-Weg beim "+"-Button hin (deutlich genauer als die
+    // automatische IP-Standortbestimmung). Ergaenzt die knappe Erwaehnung
+    // in LOCATION_INFO_PARA3 um denselben anschaulichen Vergleich wie im
+    // Ersteinrichtungs-Screen (FIRST_RUN_LOCATION_BODY) und im README.
+    LOCATION_INFO_PARA6,
+
     COUNT
 };
 

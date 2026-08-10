@@ -216,9 +216,11 @@ static const char* const I18N_TR[] = {
     "Tekrar dene",
     "İptal",
     "Tam Konumunuzu Ayarlayın",
-    "Otomatik IP tabanlı konum belirleme kolayca 20-30 km sapabilir - üstünüzden geçen bir uçağı duyarken radar boş kalabilir. Tam koordinatlar ve çok daha iyi bir deneyim için şimdi adresinizi girin. Yakınlık LED'i o zaman gerçekten üstünüzdeki uçakla aynı ritimde yanıp söner. Bunu daha sonra istediğiniz zaman Menü > Uçuş Seçenekleri > Konum ön ayarları üzerinden de yapabilirsiniz.",
+    "Otomatik IP konumu 20-30 km sapabilir. Tam koordinatlar için adresinizi girin - yakınlık LED'i o zaman gerçekten üstünüzdeki uçakla aynı ritimde yanıp söner. Daha sonra Konum ön ayarları üzerinden de yapılabilir.",
     "Adres Gir",
     "Atla",
+
+    "İpucu: bir ön ayar eklerken (\"+\") \"Adresle ara\" düğmesini kullanarak adresiniz için anında tam koordinatlar elde edin - otomatik IP tabanlı konum belirlemeden çok daha doğru, o kolayca 20-30 km sapabilir. Tam konumunuz ayarlandığında, yakınlık LED'i üstünüzden duyduğunuz uçakla gerçekten aynı ritimde yanıp söner.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,
