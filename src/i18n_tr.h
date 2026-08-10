@@ -133,7 +133,7 @@ static const char* const I18N_TR[] = {
     "Cihaz ayrıca tam kayıt defterini dışa aktarmak için küçük bir web sayfası da sunar. Aynı WiFi ağındayken tarayıcıda şu adresi açmanız yeterli:",
     "WiFi bağlantısı yok - dışa aktarma sayfasına yalnızca bir ağ bağlantısı varken ulaşılabilir.",
 
-    "Detaylar için dokunun",
+    "Daha fazla ayrıntı için bir uçağa dokunun",
     "Boş gökyüzü: ",
 
     "Model: ",

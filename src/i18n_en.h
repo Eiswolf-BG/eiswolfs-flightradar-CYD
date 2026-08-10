@@ -134,7 +134,7 @@ static const char* const I18N_EN[] = {
     "The device also runs a small web page for exporting the full logbook. While connected to the same WiFi network, open a browser and go to:",
     "No WiFi connection - the export page is only reachable while connected to a network.",
 
-    "Tap for details",
+    "Tap an aircraft for more details",
     "Empty sky for ",
 
     "Model: ",

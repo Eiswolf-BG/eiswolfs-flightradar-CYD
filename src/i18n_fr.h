@@ -133,7 +133,7 @@ static const char* const I18N_FR[] = {
     "L'appareil propose aussi une petite page web pour exporter le journal complet. Connecté au même réseau WiFi, ouvrez simplement un navigateur et allez sur :",
     "Pas de connexion WiFi - la page d'export n'est accessible que lorsqu'une connexion réseau est active.",
 
-    "Touchez pour les détails",
+    "Touchez un avion pour plus de détails",
     "Ciel vide depuis ",
 
     "Modèle : ",
