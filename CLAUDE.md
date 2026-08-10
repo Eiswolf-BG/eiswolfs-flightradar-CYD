@@ -139,6 +139,25 @@ mit Foto vom echten Display), bevor der Code als fertig gilt.
 - Immer least-invasive Änderungen bevorzugen — bestehende Funktionen/Namen
   nicht ohne Grund umbenennen.
 
+## Sprache: Projekt-Außendarstellung immer Englisch
+
+Alle nach außen sichtbaren Texte sind IMMER auf Englisch zu verfassen —
+unabhängig davon, in welcher Sprache die Unterhaltung mit Alex geführt
+wird. Das betrifft insbesondere:
+- `README.md`
+- `index.html` (Webseite/Flasher-Seite)
+- GitHub-Release-Notes / -Beschreibungen
+- Commit-Messages
+- Jeglicher sonstiger Beschreibungs- oder Bugfix-Text, der öffentlich
+  sichtbar ist (z.B. auf GitHub)
+
+Ausnahme: Die Firmware-UI selbst bleibt mehrsprachig wie gehabt
+(`i18n_de/en/fr/tr/es/it.h`) — diese Regel betrifft NUR die
+Projekt-Außendarstellung (Repo, Release Notes, Webseite), nicht die
+App-Oberfläche auf dem Gerät. Interne Code-Kommentare bleiben ebenfalls
+wie gehabt auf Deutsch (siehe „Code-Stil" oben) — diese Regel gilt nur
+für nach außen sichtbare Texte.
+
 ## Bekannte offene Punkte / mögliche nächste Schritte
 
 Keine akuten offenen Bugs bekannt (Stand v2.3.2). Mögliche Ideen für später,
