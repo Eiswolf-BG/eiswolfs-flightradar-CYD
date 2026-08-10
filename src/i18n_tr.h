@@ -221,6 +221,12 @@ static const char* const I18N_TR[] = {
     "Atla",
 
     "İpucu: bir ön ayar eklerken (\"+\") \"Adresle ara\" düğmesini kullanarak adresiniz için anında tam koordinatlar elde edin - otomatik IP tabanlı konum belirlemeden çok daha doğru, o kolayca 20-30 km sapabilir. Tam konumunuz ayarlandığında, yakınlık LED'i üstünüzden duyduğunuz uçakla gerçekten aynı ritimde yanıp söner.",
+
+    "örn. Örnek Cad. 12, 34000 İstanbul",
+
+    "Kurulum Tamamlandı",
+    "Kurulum işlemi artık tamamlandı. Tüm veriler SD karttaki şu klasöre kaydedildi: ",
+    ". Bir sonraki başlatmadan itibaren WiFi otomatik olarak bağlanacak.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

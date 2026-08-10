@@ -31,6 +31,7 @@
 #include "i18n.h"
 #include "first_run_language_screen.h"
 #include "first_run_location_screen.h"
+#include "first_run_complete_screen.h"
 #include "menu_stars.h"
 #include "ui_font.h"
 #include <math.h>
@@ -496,6 +497,10 @@ void setup() {
         // oben (die Adresssuche braucht eine Internetverbindung) -
         // ueberspringbar, siehe first_run_location_screen.cpp.
         FirstRunLocationScreen::run(tft);
+        // Abschluss-Screen: bestaetigt das Ende der Ersteinrichtung, nennt
+        // den SD-Ordner mit allen gespeicherten Daten und weist auf den
+        // automatischen WLAN-Verbindungsaufbau ab dem naechsten Start hin.
+        FirstRunCompleteScreen::run(tft);
         SplashScreen::begin(tft);
         MenuStars::update(tft);
         SplashScreen::setStatusLine(tft, 0, I18n::t(StringId::SPLASH_SD_OK), TFT_WHITE);
