@@ -296,7 +296,19 @@ namespace {
 
         constexpr int16_t KEY_H = 30;
         constexpr int16_t KEY_GAP = 3;
-        constexpr int16_t ROW0_Y = 78;
+        constexpr int16_t FIELD_H = 34;
+
+        // Kopfbereich (Titel + Namens-Hinweis) einmal zeichnen, um seine
+        // tatsaechliche Hoehe per getCursorY() zu messen - selbes Muster wie
+        // in runAddressKeyboard() oben.
+        tft.fillScreen(TFT_BLACK);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setCursor(10, 14);
+        tft.println(I18n::t(StringId::LOCATION_NAME_PROMPT));
+        tft.setTextColor(TFT_CYAN, TFT_BLACK);
+        tft.println(I18n::t(StringId::LOCATION_NAME_HINT));
+        int16_t fieldY = (int16_t)(tft.getCursorY() + 4);
+        int16_t ROW0_Y = (int16_t)(fieldY + FIELD_H + 8);
 
         auto layoutRow = [&](const char* row, int16_t y, Rect* outRects, uint8_t n) {
             int16_t usableW = Config::SCREEN_WIDTH - 8;
@@ -326,12 +338,14 @@ namespace {
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::LOCATION_NAME_PROMPT));
+            tft.setTextColor(TFT_CYAN, TFT_BLACK);
+            tft.println(I18n::t(StringId::LOCATION_NAME_HINT));
 
-            tft.fillRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_BLACK);
-            tft.drawRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_GREEN);
+            tft.fillRect(8, fieldY, Config::SCREEN_WIDTH - 16, FIELD_H, TFT_BLACK);
+            tft.drawRect(8, fieldY, Config::SCREEN_WIDTH - 16, FIELD_H, TFT_GREEN);
             tft.setTextSize(2);
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.setCursor(14, 66);
+            tft.setCursor(14, (int16_t)(fieldY + 26));
             tft.print(buf);
             tft.setTextSize(1);
 

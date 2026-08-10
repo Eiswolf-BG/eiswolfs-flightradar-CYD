@@ -227,6 +227,8 @@ static const char* const I18N_FR[] = {
     "Configuration terminée",
     "Le processus de configuration est maintenant terminé. Toutes les données ont été enregistrées sur la carte SD dans le dossier ",
     ". À partir du prochain démarrage, le WiFi se connectera automatiquement.",
+
+    "ex. Maison, Travail, Maison de vacances",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

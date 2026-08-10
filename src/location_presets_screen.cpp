@@ -132,7 +132,19 @@ namespace {
 
         constexpr int16_t KEY_H = 30;
         constexpr int16_t KEY_GAP = 3;
-        constexpr int16_t ROW0_Y = 78;
+        constexpr int16_t FIELD_H = 34;
+
+        // Kopfbereich (Titel + Namens-Hinweis) einmal zeichnen, um seine
+        // tatsaechliche Hoehe per getCursorY() zu messen - selbes Muster wie
+        // in address_search_screen.cpp::runAddressKeyboard().
+        tft.fillScreen(TFT_BLACK);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setCursor(10, 14);
+        tft.println(I18n::t(StringId::LOCATION_NAME_PROMPT));
+        tft.setTextColor(TFT_CYAN, TFT_BLACK);
+        tft.println(I18n::t(StringId::LOCATION_NAME_HINT));
+        int16_t fieldY = (int16_t)(tft.getCursorY() + 4);
+        int16_t ROW0_Y = (int16_t)(fieldY + FIELD_H + 8);
 
         auto layoutRow = [&](const char* row, int16_t y, Rect* outRects, uint8_t n) {
             int16_t usableW = Config::SCREEN_WIDTH - 8;
@@ -146,9 +158,9 @@ namespace {
 
         Rect digitRects[10], row1Rects[10], row2Rects[9], row3Rects[7];
         layoutRow(DIGITS, ROW0_Y, digitRects, 10);
-        layoutRow(ROW1, ROW0_Y + (KEY_H + KEY_GAP), row1Rects, 10);
-        layoutRow(ROW2, ROW0_Y + 2 * (KEY_H + KEY_GAP), row2Rects, 9);
-        layoutRow(ROW3, ROW0_Y + 3 * (KEY_H + KEY_GAP), row3Rects, 7);
+        layoutRow(ROW1, (int16_t)(ROW0_Y + (KEY_H + KEY_GAP)), row1Rects, 10);
+        layoutRow(ROW2, (int16_t)(ROW0_Y + 2 * (KEY_H + KEY_GAP)), row2Rects, 9);
+        layoutRow(ROW3, (int16_t)(ROW0_Y + 3 * (KEY_H + KEY_GAP)), row3Rects, 7);
 
         Rect spaceBtn     = {4, (int16_t)(ROW0_Y + 4 * (KEY_H + KEY_GAP)), 150, KEY_H};
         Rect backspaceBtn = {158, (int16_t)(ROW0_Y + 4 * (KEY_H + KEY_GAP)), (int16_t)(Config::SCREEN_WIDTH - 8 - 154), KEY_H};
@@ -163,12 +175,14 @@ namespace {
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::LOCATION_NAME_PROMPT));
+            tft.setTextColor(TFT_CYAN, TFT_BLACK);
+            tft.println(I18n::t(StringId::LOCATION_NAME_HINT));
 
-            tft.fillRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_BLACK);
-            tft.drawRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_GREEN);
+            tft.fillRect(8, fieldY, Config::SCREEN_WIDTH - 16, FIELD_H, TFT_BLACK);
+            tft.drawRect(8, fieldY, Config::SCREEN_WIDTH - 16, FIELD_H, TFT_GREEN);
             tft.setTextSize(2);
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.setCursor(14, 66);
+            tft.setCursor(14, (int16_t)(fieldY + 26));
             tft.print(buf);
             tft.setTextSize(1);
 
