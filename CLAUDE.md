@@ -194,26 +194,23 @@ in dieser Reihenfolge:
 6. Alle diese Änderungen (Code + README + Web-Flasher-Dateien) zusammen
    committen und pushen (`git push`, plus `git push origin vX.Y.Z` falls ein
    Tag erstellt wurde).
-7. Kurze Zusammenfassung am Ende: was committet/getaggt/gepusht wurde, und
-   ob die README aktualisiert wurde (und falls ja, welche Abschnitte).
-8. ERST DANACH (nach Schritt 5, wenn bootloader/firmware/partitions bereits
+7. ERST DANACH (nach Schritt 5, wenn bootloader/firmware/partitions bereits
    ins Hauptverzeichnis kopiert sind): die `firmware.bin` im
    `.pio/build/esp32dev/`-Ordner zusätzlich zu `CYD-flightradar.bin`
    umbenennen (bzw. kopieren) - das ist die Datei für den GitHub-Release-
-   Upload, erspart das manuelle Umbenennen nach jedem Release. WICHTIG:
-   diese Umbenennung darf NICHT vor dem Auto-Flash (siehe unten) passieren,
-   sonst schlägt `pio run --target upload` fehl, weil es die Datei unter
-   dem Namen `firmware.bin` erwartet.
+   Upload. WICHTIG: diese Umbenennung darf NICHT vor dem Auto-Flash (siehe
+   unten) passieren, sonst schlägt `pio run --target upload` fehl, weil es
+   die Datei unter dem Namen `firmware.bin` erwartet.
 
    SICHERHEITSPROBLEM bei dieser Umbenennung: Falls im
    `.pio/build/esp32dev/`-Ordner bereits eine `CYD-flightradar.bin` von
-   einem vorherigen Release liegt (weil Alex vergessen hat, sie nach dem
-   Release manuell zu löschen), darf das Umbenennen NICHT einfach
-   übersprungen werden (z.B. weil ein `mv`/Kopiervorgang auf eine bereits
-   existierende Zieldatei fehlschlägt oder stillschweigend nichts tut) -
-   sonst verwendet Alex beim nächsten GitHub-Release versehentlich die
-   ALTE, veraltete `CYD-flightradar.bin`, obwohl der frisch gebaute Code
-   neuer ist. Das ist ein ernsthaftes Risiko (veraltete Firmware wird
+   einem vorherigen Release liegt (weil sie nach dem letzten Release aus
+   irgendeinem Grund nicht geloescht wurde), darf das Umbenennen NICHT
+   einfach übersprungen werden (z.B. weil ein `mv`/Kopiervorgang auf eine
+   bereits existierende Zieldatei fehlschlägt oder stillschweigend nichts
+   tut) - sonst würde beim GitHub-Release versehentlich die ALTE,
+   veraltete `CYD-flightradar.bin` hochgeladen, obwohl der frisch gebaute
+   Code neuer ist. Das ist ein ernsthaftes Risiko (veraltete Firmware wird
    veröffentlicht, ohne dass es auffällt). Deshalb bei JEDEM Release als
    expliziter, nicht überspringbarer Schritt:
    a) Prüfen, ob im `.pio/build/esp32dev/`-Ordner bereits eine Datei
@@ -224,9 +221,30 @@ in dieser Reihenfolge:
    c) Danach die aktuelle `firmware.bin` zu `CYD-flightradar.bin`
       umbenennen (wie oben beschrieben).
    d) Am Ende der Release-Zusammenfassung IMMER explizit erwähnen, ob eine
-      alte `CYD-flightradar.bin` gefunden und gelöscht wurde, damit Alex
-      das mitbekommt (z.B. "Hinweis: eine alte CYD-flightradar.bin lag
-      noch im Ordner und wurde vor dem Umbenennen gelöscht").
+      alte `CYD-flightradar.bin` gefunden und gelöscht wurde.
+8. GitHub Release erstellen UND die `.bin`-Datei in einem Schritt hochladen
+   (per `gh` CLI, seit v2.7.5 eingerichtet und authentifiziert - siehe
+   `gh auth status`):
+
+       gh release create vX.Y.Z .pio/build/esp32dev/CYD-flightradar.bin \
+           --repo Eiswolf-BG/eiswolfs-flightradar-CYD \
+           --title "vX.Y.Z" \
+           --notes "<Release-Notes-Text>"
+
+   Der Release-Notes-Text kommt aus dem jeweiligen Push-Wunsch (derselbe
+   Text, der auch für die Tag-Message verwendet wird) - falls im
+   Push-Wunsch kein Text mitgegeben wurde, aus dem `git log` seit dem
+   letzten Tag ableiten, wie bisher auch für die Tag-Message.
+9. Nach erfolgreichem Upload: die lokale Kopie
+   `.pio/build/esp32dev/CYD-flightradar.bin` wieder löschen - reines
+   Build-Artefakt fürs Hochladen, gehört nicht ins Repo und wird nicht
+   committet.
+10. Kurze Zusammenfassung am Ende: was committet/getaggt/gepusht wurde, ob
+    die README aktualisiert wurde (und falls ja, welche Abschnitte), sowie
+    die URL des erstellten GitHub Release. Der GitHub-Release-Schritt ist
+    damit vollautomatisch - kein manuelles Nacharbeiten von Alex mehr
+    nötig, außer `gh` sollte einmal die Authentifizierung verlieren (dann
+    erneut `gh auth login`, siehe oben).
 
 ## Nach jedem erfolgreichen Build automatisch flashen
 
