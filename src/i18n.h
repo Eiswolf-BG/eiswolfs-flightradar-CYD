@@ -152,9 +152,6 @@ enum class StringId : uint8_t {
     DETAIL_LEVEL,
     DETAIL_SQUAWK,
 
-    SCREENSHOT_SAVED_PREFIX,
-    SCREENSHOT_FAILED,
-
     UNITS_TITLE,
     UNITS_AUTO,
     UNITS_METRIC,
@@ -203,6 +200,19 @@ enum class StringId : uint8_t {
     LOCATION_NAME_SKIP,
     LOCATION_PRESETS_FULL,
     LOCATION_INFO_PARA5,
+
+    // Neuer, direkt im System-Menue erreichbarer Punkt "Logbuch/WebUI"
+    // (statt nur ueber das versteckte "?" im Logbuch-Dateien-Screen) -
+    // zeigt IP + Erklaerung der Weboberflaeche (Flugbuch
+    // ansehen/herunterladen/loeschen). Die urspruenglich hier mit
+    // enthaltene Screenshot-Verwaltung wurde wieder entfernt, siehe
+    // Entfernung von SCREENSHOT_SAVED_PREFIX/SCREENSHOT_FAILED oben - das
+    // Bildschirm-Auslesen (SPI-Readback) funktioniert auf diesem
+    // CYD-Board hardwareseitig nicht (TFT_MISO nicht angebunden).
+    MENU_LOGBOOK_WEBUI,
+    WEBUI_TITLE,
+    WEBUI_INFO_PARA1,
+    WEBUI_INFO_PARA2,
 
     COUNT
 };

@@ -39,7 +39,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Aircraft watchlist** – track up to 5 specific flights by callsign, with a cyan radar ring and blue LED alert when one appears (see [Watchlist](#-watchlist) below)
 - **Night dimming** – automatically dims the backlight, plus the radar's aircraft markers and sweep line, to a softer (but still readable) look between 22:00 and 06:00 local time (see [Night Dimming](#-night-dimming) below)
 - **History chart** – a simple 7-day bar chart of logged aircraft counts, right next to the plain logbook file list (see [History Chart](#-history-chart) below)
-- **Web export** – a small built-in web page (reachable via the device's IP while on the same WiFi) to download the complete flight logbook as one merged CSV file (see [Web Export](#-web-export) below)
+- **Web export** – a small built-in web page (reachable via the device's IP while on the same WiFi, with its own "Logbook / WebUI" entry in Menu → System) to view, download and individually delete the flight logbook, in addition to a merged CSV of all days (see [Web Export](#-web-export) below)
 - **IP-based geolocation** (no GPS module needed) to center the radar on your location
 - **Proximity LED alert** – the onboard RGB LED blinks green when an aircraft is within 3 km (no speaker on this board, so this replaces an audible alert)
 - **Dual-core design** – all networking (WiFi, ADS-B polling, aircraft detail lookups) runs on Core 0, while the display and touch input run on Core 1, so the UI never freezes during a network request
@@ -132,11 +132,11 @@ A "?" info button on the History chart screen explains how it works directly on 
 Lists the last several days from the logbook individually, with date and the number of aircraft logged that day. Handy for tracing the history over multiple days instead of only seeing the grand total. Each file has its own red "X" to delete it individually.
 
 ### 🌐 Web Export
-In addition to viewing the logbook on the device itself, a small built-in web page lets you export the **complete flight logbook** as a single merged CSV file – handy for opening in Excel, Numbers, or Google Sheets. It starts automatically in the background as soon as the device connects to WiFi. Deliberately **export-only, no live radar tracking over the web** – that would just burn resources for little benefit.
+In addition to viewing the logbook on the device itself, a small built-in web page lets you export the flight logbook – handy for opening in Excel, Numbers, or Google Sheets. It starts automatically in the background as soon as the device connects to WiFi. Deliberately **export-only, no live radar tracking over the web** – that would just burn resources for little benefit.
 
-**How to use it:** while your computer or phone is on the same WiFi network as the device, open a browser and go to the device's IP address (e.g. `http://192.168.1.42/`). The page lists every logged day with its aircraft count and a download link for the merged CSV.
+**How to use it:** while your computer or phone is on the same WiFi network as the device, open a browser and go to the device's IP address (e.g. `http://192.168.1.42/`). The page lists every logged day with its aircraft count, a download link for the **merged CSV** (all days combined), and per-day **download/delete** links for each individual day's file.
 
-Don't know the device's current IP? The "?" info button on the **Logbook files** screen shows it live on the device.
+Don't know the device's current IP? **Menu > System > "Logbook / WebUI"** shows it live on the device, along with a short explanation of the page (the "?" info button on the **Logbook files** screen also still shows it).
 
 ### 📖 Flight logbook (ON/OFF)
 When enabled, the device logs **every newly sighted aircraft** (timestamp, hex code, callsign, registration, type, distance, altitude) into a CSV file on the SD card. An aircraft is only logged once per activation, even if it crosses the radar multiple times.

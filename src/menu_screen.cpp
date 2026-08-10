@@ -5,6 +5,7 @@
 #include "stats_screen.h"
 #include "stats_history_screen.h"
 #include "logbook_files_screen.h"
+#include "webui_screen.h"
 #include "location_presets_screen.h"
 #include "airline_filter_screen.h"
 #include "aircraft_watchlist_screen.h"
@@ -312,7 +313,8 @@ void run(TFT_eSPI& tft) {
             Rect backupBtn    = rowRect(5);
             Rect restoreBtn   = rowRect(6);
             Rect aboutBtn     = rowRect(7);
-            Rect backBtn      = rowRect(8);
+            Rect webuiBtn     = rowRect(8);
+            Rect backBtn      = rowRect(9);
 
             drawButton(tft, calibBtn, I18n::t(StringId::MENU_CALIBRATE));
 
@@ -327,6 +329,7 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, backupBtn, I18n::t(StringId::MENU_BACKUP));
             drawButton(tft, restoreBtn, I18n::t(StringId::MENU_RESTORE));
             drawButton(tft, aboutBtn, I18n::t(StringId::MENU_ABOUT));
+            drawButton(tft, webuiBtn, I18n::t(StringId::MENU_LOGBOOK_WEBUI));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -362,6 +365,8 @@ void run(TFT_eSPI& tft) {
                 }
             } else if (aboutBtn.contains(tap.x, tap.y)) {
                 AboutScreen::run(tft);
+            } else if (webuiBtn.contains(tap.x, tap.y)) {
+                WebUiScreen::run(tft);
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::Main;
             }

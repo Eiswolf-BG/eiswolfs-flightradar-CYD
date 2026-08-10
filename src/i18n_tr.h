@@ -152,9 +152,6 @@ static const char* const I18N_TR[] = {
     "Düz uçuş",
     "Squawk: ",
 
-    "Kaydedildi: ",
-    "Ekran görüntüsü başarısız",
-
     "Birimler",
     "Otomatik (konuma göre)",
     "Metrik (km, m, km/sa)",
@@ -198,6 +195,11 @@ static const char* const I18N_TR[] = {
     "İsimsiz devam et",
     "Ön ayarlar dolu - önce birini kaldırın",
     "Bir ön ayar eklerken ona bir isim verebilirsiniz (örn. \"Ev\"), bu isim daha sonra listede gösterilir. En yakın havalimanı kayan yazısına dokunarak onu doğrudan ismiyle yeni bir ön ayar olarak ekleyebilirsiniz.",
+
+    "Kayıt Defteri / WebUI",
+    "Kayıt Defteri / WebUI",
+    "Bu web sayfası, uçuş kayıt defterini doğrudan tarayıcıdan görüntülemenizi, indirmenizi ve tek tek silmenizi sağlar. Aynı WiFi ağındayken tarayıcıyı açıp şu adrese gidin:",
+    "WiFi bağlantısı yok - sayfaya yalnızca bir ağ bağlantısı varken erişilebilir.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

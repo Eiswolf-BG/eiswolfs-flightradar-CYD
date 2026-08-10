@@ -152,9 +152,6 @@ static const char* const I18N_DE[] = {
     "Horizontalflug",
     "Squawk: ",
 
-    "Gespeichert: ",
-    "Screenshot fehlgeschlagen",
-
     "Einheiten",
     "Automatisch (nach Standort)",
     "Metrisch (km, m, km/h)",
@@ -198,6 +195,11 @@ static const char* const I18N_DE[] = {
     "Ohne Namen",
     "Presets voll - zuerst einen entfernen",
     "Beim Anlegen eines Presets kannst du ihm einen Namen geben (z.B. \"Zuhause\"), der dann in der Übersicht angezeigt wird. Tippe auf die Laufschrift mit dem nächsten Flughafen, um ihn direkt als neuen Preset mit seinem Namen zu übernehmen.",
+
+    "Logbuch / WebUI",
+    "Logbuch / WebUI",
+    "Über diese Webseite kannst du das Flugbuch direkt im Browser ansehen, herunterladen und einzeln löschen. Im selben WLAN einfach im Browser aufrufen:",
+    "Keine WLAN-Verbindung - die Seite ist nur erreichbar, solange eine Netzwerkverbindung besteht.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

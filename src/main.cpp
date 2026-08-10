@@ -27,7 +27,6 @@
 #include "splash_screen.h"
 #include "led_alert.h"
 #include "flight_logbook.h"
-#include "screenshot.h"
 #include "i18n.h"
 #include "first_run_language_screen.h"
 #include "menu_stars.h"
@@ -80,7 +79,6 @@ struct Rect {
 };
 
 Rect menuBtn = {Config::SCREEN_WIDTH - 90, 3, 54, 22};
-Rect camBtn = {(int16_t)(menuBtn.x - 46), 3, 42, 22};
 
 void drawMenuButton() {
     tft.fillRoundRect(menuBtn.x, menuBtn.y, menuBtn.w, menuBtn.h, 4, TFT_BLACK);
@@ -88,15 +86,6 @@ void drawMenuButton() {
     tft.setTextDatum(MC_DATUM);
     tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.drawString("Menu", menuBtn.x + menuBtn.w / 2, menuBtn.y + menuBtn.h / 2);
-    tft.setTextDatum(TL_DATUM);
-}
-
-void drawCamButton() {
-    tft.fillRoundRect(camBtn.x, camBtn.y, camBtn.w, camBtn.h, 4, TFT_BLACK);
-    tft.drawRoundRect(camBtn.x, camBtn.y, camBtn.w, camBtn.h, 4, TFT_GREEN);
-    tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
-    tft.drawString("Cam", camBtn.x + camBtn.w / 2, camBtn.y + camBtn.h / 2);
     tft.setTextDatum(TL_DATUM);
 }
 
@@ -140,7 +129,6 @@ void drawHeader() {
     tft.setTextSize(1);
     tft.setCursor(6, 10);
     tft.println("Eiswolfs FR");
-    drawCamButton();
     drawMenuButton();
     updateWifiIcon();
 }
@@ -158,8 +146,8 @@ void updateStatusLine() {
     // ueberlagerten sich mit den neuen (am sichtbarsten bei der letzten
     // Minutenziffer, die sich am haeufigsten aendert). Deshalb hier gezielt
     // NUR unter der Uhrzeit einen hoeheren Bereich loeschen - nicht die
-    // ganze Zeile, sonst wuerde das jede Sekunde in die Cam/Menu-Buttons
-    // hineinschneiden, die bis y=25 reichen.
+    // ganze Zeile, sonst wuerde das jede Sekunde in den Menu-Button
+    // hineinschneiden, der bis y=25 reicht.
     constexpr int16_t CLOCK_CLEAR_W = 50;
     constexpr int16_t CLOCK_CLEAR_TOP = HEADER_TITLE_H - 10;
     tft.fillRect(0, CLOCK_CLEAR_TOP, CLOCK_CLEAR_W, CONTENT_TOP - CLOCK_CLEAR_TOP, TFT_BLACK);
@@ -204,25 +192,6 @@ void updateNightDimming() {
         ledcWrite(BACKLIGHT_PWM_CHANNEL, shouldDim ? nightDimBacklightPwm() : normalBacklightPwm());
         nightDimActive = shouldDim;
     }
-}
-
-void takeScreenshotWithFeedback() {
-    LedAlert::flashWhite();
-
-    String filename = Screenshot::save(tft);
-
-    tft.fillRect(0, 0, Config::SCREEN_WIDTH, CONTENT_TOP, TFT_NAVY);
-    tft.setTextColor(TFT_WHITE, TFT_NAVY);
-    tft.setCursor(6, 10);
-    if (filename.length() > 0) {
-        tft.print(String(I18n::t(StringId::SCREENSHOT_SAVED_PREFIX)) + filename);
-    } else {
-        tft.setTextColor(TFT_RED, TFT_NAVY);
-        tft.print(I18n::t(StringId::SCREENSHOT_FAILED));
-    }
-    delay(1200);
-    drawHeader();
-    updateStatusLine();
 }
 
 void haltWithSdRequiredScreen() {
@@ -412,8 +381,6 @@ void loop() {
             drawHeader();
             updateStatusLine();
             forceRedraw = true;
-        } else if (camBtn.contains(tap.x, tap.y)) {
-            takeScreenshotWithFeedback();
         } else if (tap.y >= CONTENT_TOP) {
             if (RadarScreen::handleTap(tap.x, tap.y, CONTENT_TOP)) {
                 forceRedraw = true;

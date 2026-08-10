@@ -152,9 +152,6 @@ static const char* const I18N_IT[] = {
     "Volo livellato",
     "Squawk: ",
 
-    "Salvato: ",
-    "Screenshot fallito",
-
     "Unità",
     "Auto (in base alla posizione)",
     "Metrico (km, m, km/h)",
@@ -198,6 +195,11 @@ static const char* const I18N_IT[] = {
     "Senza nome",
     "Posizioni piene - rimuovine una prima",
     "Quando aggiungi una posizione puoi darle un nome (es. \"Casa\"), mostrato poi nell'elenco. Tocca il testo scorrevole dell'aeroporto più vicino per aggiungerlo direttamente come nuova posizione con il suo nome.",
+
+    "Registro / WebUI",
+    "Registro / WebUI",
+    "Questa pagina web permette di visualizzare, scaricare ed eliminare singolarmente il registro di volo direttamente dal browser. Connesso alla stessa rete WiFi, apri un browser e vai a:",
+    "Nessuna connessione WiFi - la pagina è raggiungibile solo mentre è attiva una connessione di rete.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,
