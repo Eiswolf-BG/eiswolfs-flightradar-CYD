@@ -189,6 +189,8 @@ Completely hides aircraft from specific airlines from the radar (they're also ex
 ### 🚗 Hide ground vehicles (ON/OFF)
 ADS-B data doesn't only contain aircraft – it can also include **airport ground vehicles** (follow-me cars, pushback tugs, etc., flagged by the API under a separate "C" category). This option hides them so the radar stays focused purely on air traffic.
 
+When shown, ground vehicles render as distinct **blue square markers** on the radar screen instead of the normal aircraft marker, with a matching entry in the legend - so they're never mistaken for a low-flying aircraft.
+
 ### 📶 WiFi Manager
 See the dedicated section above: [WiFi Manager](#-wifi-manager-up-to-3-saved-networks) – save up to 3 WiFi networks at once.
 
