@@ -221,6 +221,12 @@ enum class StringId : uint8_t {
     WEATHER_INFO_TITLE,
     WEATHER_INFO_BODY,
 
+    // Zusaetzlicher Info-Absatz im Standort-Presets-Screen (Menue >
+    // Flugoptionen > Standort-Presets > "?") mit Tipp zu itilog.com fuer
+    // exakte Koordinaten - deutlich genauer als die automatische
+    // IP-Standortbestimmung (die leicht 20-30km danebenliegen kann).
+    LOCATION_INFO_PARA6,
+
     COUNT
 };
 

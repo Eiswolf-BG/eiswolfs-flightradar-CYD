@@ -203,6 +203,8 @@ static const char* const I18N_IT[] = {
 
     "Meteo",
     "L'icona meteo mostra le condizioni meteo attuali per la tua posizione attiva. Se è selezionata una posizione salvata, viene mostrato invece il meteo di quella posizione.",
+
+    "Suggerimento: su itilog.com (https://www.itilog.com/) inserisci gratuitamente il tuo indirizzo per ottenere subito le coordinate esatte. Ne vale la pena - la geolocalizzazione IP automatica può sbagliare facilmente di 20-30 km, quindi potresti sentire un aereo mentre il radar resta vuoto. Con le coordinate esatte inserite come preset, il LED di prossimità lampeggia davvero al ritmo dell'aereo sopra di te.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,
