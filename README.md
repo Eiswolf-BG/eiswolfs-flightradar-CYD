@@ -40,6 +40,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Night dimming** – automatically dims the backlight, plus the radar's aircraft markers and sweep line, to a softer (but still readable) look between 22:00 and 06:00 local time (see [Night Dimming](#-night-dimming) below)
 - **History chart** – a simple 7-day bar chart of logged aircraft counts, right next to the plain logbook file list (see [History Chart](#-history-chart) below)
 - **Web export** – a small built-in web page (reachable via the device's IP while on the same WiFi, with its own "Logbook / WebUI" entry in Menu → System) to view, download and individually delete the flight logbook, in addition to a merged CSV of all days (see [Web Export](#-web-export) below)
+- **Weather icon** – a small icon in the header shows the current conditions (sun, cloud, sun-behind-cloud, rain, snow, thunderstorm) for whichever location is currently active, including active location presets (see [Weather Icon](#-weather-icon) below)
 - **IP-based geolocation** (no GPS module needed) to center the radar on your location
 - **Proximity LED alert** – the onboard RGB LED blinks green when an aircraft is within 3 km (no speaker on this board, so this replaces an audible alert)
 - **Dual-core design** – all networking (WiFi, ADS-B polling, aircraft detail lookups) runs on Core 0, while the display and touch input run on Core 1, so the UI never freezes during a network request
@@ -137,6 +138,13 @@ In addition to viewing the logbook on the device itself, a small built-in web pa
 **How to use it:** while your computer or phone is on the same WiFi network as the device, open a browser and go to the device's IP address (e.g. `http://192.168.1.42/`). The page lists every logged day with its aircraft count, a download link for the **merged CSV** (all days combined), and per-day **download/delete** links for each individual day's file.
 
 Don't know the device's current IP? **Menu > System > "Logbook / WebUI"** shows it live on the device, along with a short explanation of the page (the "?" info button on the **Logbook files** screen also still shows it).
+
+### ☀️ Weather Icon
+A small icon in the header (where the camera button used to be) shows the current weather conditions – sun, cloud, sun-behind-cloud, rain, snow, or thunderstorm – drawn entirely with simple shapes, no image files or extra fonts needed.
+
+It always follows whichever location is currently active, including active [location presets](#-location-presets) – switch the active preset to e.g. Milan or Tokyo and the icon updates to show that location's weather.
+
+Powered by the free [Open-Meteo](https://open-meteo.com) API (no API key needed). Refreshed automatically in the background every 10 minutes, or immediately after switching to a different location.
 
 ### 📖 Flight logbook (ON/OFF)
 When enabled, the device logs **every newly sighted aircraft** (timestamp, hex code, callsign, registration, type, distance, altitude) into a CSV file on the SD card. An aircraft is only logged once per activation, even if it crosses the radar multiple times.

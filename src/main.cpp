@@ -27,10 +27,12 @@
 #include "splash_screen.h"
 #include "led_alert.h"
 #include "flight_logbook.h"
+#include "weather.h"
 #include "i18n.h"
 #include "first_run_language_screen.h"
 #include "menu_stars.h"
 #include "ui_font.h"
+#include <math.h>
 
 TFT_eSPI tft = TFT_eSPI();
 
@@ -44,6 +46,7 @@ uint32_t lastPollMs = 0;
 uint32_t lastSweepMs = 0;
 uint32_t lastStatusLineMs = 0;
 uint32_t lastRenderedVersion = 0xFFFFFFFF;
+Weather::Condition lastRenderedWeather = Weather::Condition::Unknown;
 bool forceRedraw = false;
 bool wasEmergency = false;
 bool bannerBlinkOn = false;
@@ -80,6 +83,11 @@ struct Rect {
 
 Rect menuBtn = {Config::SCREEN_WIDTH - 90, 3, 54, 22};
 
+// Platz, an dem frueher der Cam-Button war (siehe entfernte Screenshot-
+// Funktion) - zeigt jetzt stattdessen ein kleines Wetter-Icon fuer den
+// aktuell aktiven Standort (siehe weather.cpp/Weather::update()).
+Rect weatherIconRect = {(int16_t)(menuBtn.x - 46), 3, 42, 22};
+
 void drawMenuButton() {
     tft.fillRoundRect(menuBtn.x, menuBtn.y, menuBtn.w, menuBtn.h, 4, TFT_BLACK);
     tft.drawRoundRect(menuBtn.x, menuBtn.y, menuBtn.w, menuBtn.h, 4, TFT_GREEN);
@@ -87,6 +95,73 @@ void drawMenuButton() {
     tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.drawString("Menu", menuBtn.x + menuBtn.w / 2, menuBtn.y + menuBtn.h / 2);
     tft.setTextDatum(TL_DATUM);
+}
+
+// Kleine, mit einfachen TFT_eSPI-Grundformen gezeichnete Wolke (kein
+// Bild/Font noetig) - Basis fuer die Regen/Schnee/Gewitter-Varianten.
+void drawCloudShape(int16_t cx, int16_t cy, uint16_t color) {
+    tft.fillCircle(cx - 5, cy + 1, 3, color);
+    tft.fillCircle(cx - 1, cy - 2, 4, color);
+    tft.fillCircle(cx + 4, cy, 4, color);
+    tft.fillRect(cx - 8, cy, 13, 3, color);
+}
+
+// Sonne mit ein paar Strahlen ringsum, ebenfalls nur aus Grundformen.
+void drawSunShape(int16_t cx, int16_t cy, int16_t r, uint16_t color) {
+    tft.fillCircle(cx, cy, r, color);
+    for (uint8_t i = 0; i < 8; i++) {
+        float angle = i * (PI / 4.0f);
+        int16_t x1 = cx + (int16_t)((r + 2) * cosf(angle));
+        int16_t y1 = cy + (int16_t)((r + 2) * sinf(angle));
+        int16_t x2 = cx + (int16_t)((r + 4) * cosf(angle));
+        int16_t y2 = cy + (int16_t)((r + 4) * sinf(angle));
+        tft.drawLine(x1, y1, x2, y2, color);
+    }
+}
+
+// Zeichnet das Wetter-Icon passend zur zuletzt abgefragten Wetterlage
+// (Weather::current()) - bei Weather::Condition::Unknown (noch keine
+// erfolgreiche Abfrage, z.B. kurz nach dem Booten) bleibt die Flaeche
+// einfach leer, statt einen Platzhalter anzuzeigen.
+void drawWeatherIcon() {
+    int16_t cx = weatherIconRect.x + weatherIconRect.w / 2;
+    int16_t cy = weatherIconRect.y + weatherIconRect.h / 2;
+
+    tft.fillRect(weatherIconRect.x, weatherIconRect.y, weatherIconRect.w, weatherIconRect.h, TFT_BLACK);
+
+    switch (Weather::current()) {
+        case Weather::Condition::Clear:
+            drawSunShape(cx, cy, 6, TFT_YELLOW);
+            break;
+        case Weather::Condition::PartlyCloudy:
+            drawSunShape((int16_t)(cx - 4), (int16_t)(cy - 3), 4, TFT_YELLOW);
+            drawCloudShape((int16_t)(cx + 3), (int16_t)(cy + 2), TFT_LIGHTGREY);
+            break;
+        case Weather::Condition::Cloudy:
+            drawCloudShape(cx, cy, TFT_LIGHTGREY);
+            break;
+        case Weather::Condition::Rain:
+            drawCloudShape(cx, (int16_t)(cy - 3), TFT_LIGHTGREY);
+            tft.drawLine(cx - 4, cy + 4, cx - 6, cy + 8, TFT_SKYBLUE);
+            tft.drawLine(cx,     cy + 4, cx - 2, cy + 8, TFT_SKYBLUE);
+            tft.drawLine(cx + 4, cy + 4, cx + 2, cy + 8, TFT_SKYBLUE);
+            break;
+        case Weather::Condition::Snow:
+            drawCloudShape(cx, (int16_t)(cy - 3), TFT_LIGHTGREY);
+            tft.drawPixel(cx - 4, cy + 6, TFT_WHITE);
+            tft.drawPixel(cx,     cy + 7, TFT_WHITE);
+            tft.drawPixel(cx + 4, cy + 6, TFT_WHITE);
+            break;
+        case Weather::Condition::Thunderstorm:
+            drawCloudShape(cx, (int16_t)(cy - 3), TFT_LIGHTGREY);
+            tft.drawLine(cx,     cy + 3, cx - 3, cy + 7, TFT_YELLOW);
+            tft.drawLine(cx - 3, cy + 7, cx + 1, cy + 7, TFT_YELLOW);
+            tft.drawLine(cx + 1, cy + 7, cx - 2, cy + 11, TFT_YELLOW);
+            break;
+        case Weather::Condition::Unknown:
+        default:
+            break;
+    }
 }
 
 void drawWifiIcon(int16_t rightX, int16_t rowTop, int16_t rowH, int8_t rssi) {
@@ -131,6 +206,8 @@ void drawHeader() {
     tft.println("Eiswolfs FR");
     drawMenuButton();
     updateWifiIcon();
+    drawWeatherIcon();
+    lastRenderedWeather = Weather::current();
 }
 
 void updateStatusLine() {
@@ -165,6 +242,15 @@ void updateStatusLine() {
     }
 
     updateWifiIcon();
+
+    // Icon nur bei tatsaechlicher Aenderung neu zeichnen (Weather::update()
+    // laeuft im Hintergrund auf Core 0 und aktualisiert typischerweise nur
+    // alle paar Minuten) - vermeidet unnoetiges Neuzeichnen jede Sekunde.
+    Weather::Condition weatherNow = Weather::current();
+    if (weatherNow != lastRenderedWeather) {
+        lastRenderedWeather = weatherNow;
+        drawWeatherIcon();
+    }
 }
 
 // Prueft, ob die aktuelle Lokalzeit im Nachtdimm-Fenster (22:00-06:00) liegt.

@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "2.7.5";
+    constexpr const char* APP_VERSION = "2.8.0";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -39,6 +39,12 @@ namespace Config {
     constexpr uint16_t ADSB_API_PORT = 443;
     constexpr uint32_t FETCH_INTERVAL_MS = 8000;
     constexpr uint32_t HTTP_TIMEOUT_MS = 6000;
+
+    // Wetter-Icon im Header (siehe weather.cpp) - deutlich seltener
+    // abgefragt als die ADS-B-Daten, das Wetter aendert sich nicht
+    // minuetlich und die kostenlose Open-Meteo-API soll nicht unnoetig oft
+    // belastet werden.
+    constexpr uint32_t WEATHER_FETCH_INTERVAL_MS = 600000; // 10 Minuten
 
     constexpr float DEFAULT_PROXIMITY_ALERT_KM = 8.0f;
 
