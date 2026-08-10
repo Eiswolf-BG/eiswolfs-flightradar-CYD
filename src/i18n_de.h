@@ -216,9 +216,11 @@ static const char* const I18N_DE[] = {
     "Erneut versuchen",
     "Abbrechen",
     "Exakten Standort einrichten",
-    "Die automatische IP-Standortbestimmung kann leicht 20-30 km danebenliegen - du hörst vielleicht ein Flugzeug, während der Radar leer bleibt. Trage jetzt deine Adresse für exakte Koordinaten ein, für ein deutlich besseres Erlebnis. Die Näherungs-LED blinkt dann wirklich im Takt mit dem Flugzeug über dir. Du kannst das auch später jederzeit über Menü > Flugoptionen > Standort-Presets nachholen.",
+    "Automatische IP-Ortung kann 20-30 km danebenliegen. Adresse eintragen für exakte Koordinaten - die Näherungs-LED blinkt dann wirklich im Takt mit dem Flugzeug über dir. Später jederzeit über Standort-Presets nachholbar.",
     "Adresse eingeben",
     "Überspringen",
+
+    "Tipp: Über den Button \"Per Adresse suchen\" beim Anlegen eines Presets (\"+\") bekommst du sofort exakte Koordinaten für deine Adresse - viel genauer als die automatische IP-Standortbestimmung, die leicht 20-30 km danebenliegen kann. Mit dem exakten Standort als Preset blinkt die Näherungs-LED wirklich im Takt mit dem Flugzeug, das du gerade über dir hörst.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

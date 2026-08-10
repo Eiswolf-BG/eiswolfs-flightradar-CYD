@@ -216,9 +216,11 @@ static const char* const I18N_FR[] = {
     "Réessayer",
     "Annuler",
     "Définissez votre position exacte",
-    "La localisation automatique par IP peut facilement se tromper de 20 à 30 km - vous pourriez entendre un avion alors que le radar reste vide. Entrez votre adresse maintenant pour des coordonnées exactes et une bien meilleure expérience. La LED de proximité clignotera alors vraiment en rythme avec l'avion au-dessus de vous. Vous pouvez aussi le faire plus tard via Menu > Options de vol > Positions enregistrées.",
+    "La localisation automatique par IP peut se tromper de 20 à 30 km. Entrez votre adresse pour des coordonnées exactes - la LED de proximité clignotera alors vraiment en rythme avec l'avion au-dessus de vous. Possible plus tard via Positions enregistrées.",
     "Entrer l'adresse",
     "Passer",
+
+    "Astuce : utilisez le bouton \"Rechercher par adresse\" lors de l'ajout d'un preset (\"+\") pour obtenir instantanément des coordonnées exactes pour votre adresse - bien plus précis que la localisation automatique par IP, qui peut facilement se tromper de 20 à 30 km. Avec votre position exacte enregistrée, la LED de proximité clignote vraiment en rythme avec l'avion que vous entendez au-dessus de vous.",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,
