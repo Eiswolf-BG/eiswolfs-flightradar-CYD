@@ -18,6 +18,11 @@ You can flash the firmware directly from your browser to your CYD display withou
 2. Click the **Web Flasher link above**.
 3. Click the **Install** button on the web page, select your USB/COM port, and follow the instructions.
 
+**Driver note:** If your computer doesn't detect the CYD (no USB/COM port shows up), you likely need to install a driver for the board's CH340 USB-to-serial chip first:
+- **Windows:** [CH341SER.EXE](https://www.wch-ic.com/downloads/CH341SER_EXE.html)
+- **macOS:** [CH341SER_MAC.ZIP](https://www.wch-ic.com/downloads/CH341SER_MAC_ZIP.html)
+- **Linux:** built into the kernel since version 5.x - no separate installation needed
+
 ### Option 2: Manual Compilation (For Developers)
 1. Open and compile the project using PlatformIO (`platform = espressif32`, `board = esp32dev`, `framework = arduino`).
 2. Insert a FAT32-formatted microSD card into your display.
