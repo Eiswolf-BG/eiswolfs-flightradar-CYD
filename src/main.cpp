@@ -320,7 +320,12 @@ void updateStatusLine() {
     // NUR unter der Uhrzeit einen hoeheren Bereich loeschen - nicht die
     // ganze Zeile, sonst wuerde das jede Sekunde in den Menu-Button
     // hineinschneiden, der bis y=25 reicht.
-    constexpr int16_t CLOCK_CLEAR_W = 50;
+    // Auf 80px verbreitert (vorher 50) - das 12h-Format mit AM/PM (siehe
+    // unten) ist mit bis zu 7 Zeichen ("12:59PM") laenger als das feste
+    // 5-Zeichen-24h-Format ("23:12") und wurde sonst nicht vollstaendig
+    // geloescht (Ziffernreste blieben stehen). Der Bereich rechts daneben
+    // war hier ohnehin leer, daher unkritisch.
+    constexpr int16_t CLOCK_CLEAR_W = 80;
     constexpr int16_t CLOCK_CLEAR_TOP = HEADER_TITLE_H - 10;
     tft.fillRect(0, CLOCK_CLEAR_TOP, CLOCK_CLEAR_W, CONTENT_TOP - CLOCK_CLEAR_TOP, TFT_BLACK);
     tft.fillRect(CLOCK_CLEAR_W, HEADER_TITLE_H, Config::SCREEN_WIDTH - CLOCK_CLEAR_W, STATUS_LINE_H, TFT_BLACK);
@@ -330,8 +335,18 @@ void updateStatusLine() {
     if (now > 8 * 3600 * 2) {
         struct tm tmNow;
         localtime_r(&now, &tmNow);
-        char timeBuf[6];
-        snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", tmNow.tm_hour, tmNow.tm_min);
+        char timeBuf[9];
+        // 12h mit AM/PM bei Imperial (in den USA ueblich), 24h bei
+        // Metrisch - dieselbe Einheiten-Einstellung (Menue > Einheiten),
+        // die sonst Distanz/Hoehe steuert. Vorher immer fest 24h.
+        if (LocationManager::useMetricUnits()) {
+            snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", tmNow.tm_hour, tmNow.tm_min);
+        } else {
+            int hour12 = tmNow.tm_hour % 12;
+            if (hour12 == 0) hour12 = 12;
+            snprintf(timeBuf, sizeof(timeBuf), "%d:%02d%s", hour12, tmNow.tm_min,
+                     tmNow.tm_hour < 12 ? "AM" : "PM");
+        }
         tft.setCursor(6, HEADER_TITLE_H + 2);
         tft.print(timeBuf);
     }
