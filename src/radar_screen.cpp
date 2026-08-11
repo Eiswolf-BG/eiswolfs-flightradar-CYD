@@ -541,8 +541,14 @@ namespace {
         updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.climbText, climbLine, forceFull);
         y += LINE_H;
 
-        snprintf(buf, sizeof(buf), "%s%.0fkm / %.0fnm   %s%.0f", I18n::t(StringId::DETAIL_DIST),
-                 a.distanceKm, Units::kmToNm(a.distanceKm), I18n::t(StringId::DETAIL_HDG), a.headingDeg);
+        // Zusaetzlich zu km/nm auch Meilen (mi) - nm allein war fuer
+        // Laien-Nutzer aus Ländern mit imperialen Einheiten (v.a. USA)
+        // nicht selbsterklaerend, "Meilen" sind dort die gebraeuchlichere
+        // Alltags-Distanzeinheit (nm bleibt trotzdem stehen, da es zur
+        // Geschwindigkeit in kt passt: 1 kt = 1 nm/h).
+        snprintf(buf, sizeof(buf), "%s%.0fkm / %.0fnm / %.0fmi  %s%.0f", I18n::t(StringId::DETAIL_DIST),
+                 a.distanceKm, Units::kmToNm(a.distanceKm), Units::kmToMi(a.distanceKm),
+                 I18n::t(StringId::DETAIL_HDG), a.headingDeg);
         updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.distHeadingText, String(buf), forceFull);
         y += LINE_H;
 
@@ -750,7 +756,14 @@ void render(TFT_eSPI& tft, int16_t top) {
         drawInfoMarquee(tft, INFO_TEXT_X, infoTextY, infoTextW);
 
         char rangeLabel[8];
-        snprintf(rangeLabel, sizeof(rangeLabel), "%.0fkm", rangeKm);
+        // Zeigt km bei Metrisch, mi bei Imperial (Menue > Einheiten) -
+        // gleiches Muster wie drawLegend() weiter oben, statt fest immer
+        // km anzuzeigen.
+        if (LocationManager::useMetricUnits()) {
+            snprintf(rangeLabel, sizeof(rangeLabel), "%.0fkm", rangeKm);
+        } else {
+            snprintf(rangeLabel, sizeof(rangeLabel), "%.0fmi", Units::kmToMi(rangeKm));
+        }
         drawButton(tft, L.rangeBtn, rangeLabel);
 
         drawLegend(tft, infoTop + 44);
