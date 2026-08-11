@@ -634,6 +634,67 @@ namespace {
             gfx.drawPixel(stars[i].x, stars[i].y, color);
         }
     }
+
+    // Hintergrund-Sterne AUSSERHALB des Radarkreises (auf Wunsch: dasselbe
+    // dekorative Sternenfunkeln wie im Detail-Panel/Menue, aber ohne mit
+    // dem staendig neu gezeichneten Kreisinhalt zu kollidieren - genau DAS
+    // wuerde "ruckeln" verursachen, da Sweep-Linie/Blips/Ringe innerhalb
+    // des Kreises bei jedem tick() sowieso neu gezeichnet werden und dabei
+    // die Sterne dort staendig wieder verschlucken wuerden). Ausserhalb
+    // des Kreises bleibt der Hintergrund dauerhaft schwarz und wird von
+    // sonst niemandem angefasst - dort koennen die Sterne frei vor sich
+    // hin twinkeln, voellig unabhaengig von Sweep-Linie/Blip-Redraws.
+    constexpr uint8_t BG_STAR_COUNT = 20;
+    struct BgStar {
+        int16_t x, y;
+        uint8_t phase;
+        uint8_t speed;
+    };
+    BgStar bgStars[BG_STAR_COUNT];
+    bool bgStarsInitialized = false;
+
+    // Platziert jeden Stern per Rejection-Sampling irgendwo im Bereich
+    // [top..L.infoTop) x [0..SCREEN_WIDTH), aber nur wenn der Punkt
+    // ausserhalb von Radius+MARGIN um den Kreismittelpunkt liegt (MARGIN
+    // haelt zusaetzlich Abstand zum Ring und zum "N"-Kompasslabel knapp
+    // ausserhalb des Kreises). Findet ein Versuch nach 25 Anlaeufen keinen
+    // passenden Punkt (praktisch nie, da links/rechts vom Kreis immer
+    // reichlich Platz ist), wird einfach der letzte Versuchspunkt
+    // uebernommen - rein kosmetisches Feature, kein Grund fuer eine
+    // Endlosschleife.
+    void initBgStarsIfNeeded(const Layout& L, int16_t top) {
+        if (bgStarsInitialized) return;
+        randomSeed((uint32_t)esp_random());
+        constexpr int16_t MARGIN = 6;
+        int32_t minDist = L.radius + MARGIN;
+        int32_t minDistSq = minDist * minDist;
+        for (uint8_t i = 0; i < BG_STAR_COUNT; i++) {
+            int16_t x = 0, y = 0;
+            for (uint8_t attempt = 0; attempt < 25; attempt++) {
+                x = (int16_t)random(2, Config::SCREEN_WIDTH - 2);
+                y = (int16_t)random(top + 2, L.infoTop - 2);
+                int32_t dx = x - L.cx, dy = y - L.cy;
+                if (dx * dx + dy * dy > minDistSq) break;
+            }
+            bgStars[i].x = x;
+            bgStars[i].y = y;
+            bgStars[i].phase = (uint8_t)random(0, 256);
+            bgStars[i].speed = (uint8_t)(1 + random(0, 3));
+        }
+        bgStarsInitialized = true;
+    }
+
+    void updateBgStars(TFT_eSPI& gfx, const Layout& L, int16_t top) {
+        initBgStarsIfNeeded(L, top);
+        for (uint8_t i = 0; i < BG_STAR_COUNT; i++) {
+            bgStars[i].phase += bgStars[i].speed;
+            uint8_t bright = (bgStars[i].phase < 128)
+                ? (uint8_t)(bgStars[i].phase * 2)
+                : (uint8_t)((255 - bgStars[i].phase) * 2);
+            uint16_t color = gfx.color565(0, bright, 0);
+            gfx.drawPixel(bgStars[i].x, bgStars[i].y, color);
+        }
+    }
 }
 
 void render(TFT_eSPI& tft, int16_t top) {
@@ -814,6 +875,15 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
     tft.startWrite();
+
+    // Twinkeln ausserhalb des Radarkreises - laeuft im selben 80ms-Takt wie
+    // die Sweep-Linie, damit es fluessig wirkt. render() (bei jedem Aircraft-
+    // Update, alle ~300ms) loescht den kompletten Inhaltsbereich per fillRect
+    // und zeichnet ihn neu, OHNE die Sterne erneut zu setzen - das ist
+    // bewusst so (wie beim Detail-Panel-Sternenfeld auch): die naechste
+    // tick()-Runde (spaetestens 80ms spaeter) laesst sie einfach wieder
+    // aufblitzen, das ist zu kurz, um als Ruckeln wahrgenommen zu werden.
+    updateBgStars(tft, L, top);
 
     if (prevSweepAngleDeg >= 0.0f) {
         drawSweepLine(tft, L, prevSweepAngleDeg, TFT_BLACK);
