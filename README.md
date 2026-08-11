@@ -8,6 +8,7 @@ altitude/speed/model/route details and a proximity LED alert.
 ![framework](https://img.shields.io/badge/framework-Arduino%20%2F%20PlatformIO-blue)
 
 ![Eiswolfs Flightradar screenshot](images/radar.jpg)
+![Eiswolfs Flightradar Screenshot](images/screenshot.jpg)
 
 ## Getting Started
 
