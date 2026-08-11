@@ -383,12 +383,36 @@ namespace {
         };
         int16_t segW = Config::SCREEN_WIDTH / 3;
         gfx.setTextColor(TFT_WHITE, TFT_BLACK);
-        for (uint8_t i = 0; i < 3; i++) {
-            int16_t x0 = i * segW + 6;
-            gfx.fillCircle(x0, y - 5, 3, items[i].color);
-            gfx.setCursor(x0 + 7, y);
-            gfx.print(items[i].label);
-        }
+
+        // Aussenspalten (gruen/rot) bleiben auf ihrer festen 1/3-Raster-
+        // Position (x0 = i*segW+6). Die mittlere (gelbe) Spalte wurde
+        // bisher genauso starr positioniert, sass dadurch aber optisch zu
+        // weit rechts: ihr Label ("3000-9100") ist deutlich laenger als
+        // die Aussenlabels, wodurch rechts kaum noch Luft zum roten
+        // Eintrag blieb, waehrend links viel Freiraum zum kurzen gruenen
+        // Label uebrig war. Jetzt wird die gelbe Spalte stattdessen mittig
+        // in die Luecke zwischen Ende des gruenen Textes und Anfang des
+        // roten Punkts gesetzt.
+        int16_t x0Low = 0 * segW + 6;
+        int16_t x0High = 2 * segW + 6;
+
+        gfx.fillCircle(x0Low, y - 5, 3, items[0].color);
+        gfx.setCursor(x0Low + 7, y);
+        gfx.print(items[0].label);
+
+        gfx.fillCircle(x0High, y - 5, 3, items[2].color);
+        gfx.setCursor(x0High + 7, y);
+        gfx.print(items[2].label);
+
+        int16_t lowTextEndX = x0Low + 7 + gfx.textWidth(items[0].label);
+        int16_t highDotStartX = x0High - 3;
+        int16_t midBlockW = 10 + gfx.textWidth(items[1].label); // Punktdurchmesser (6) + 4px Abstand + Textbreite
+        int16_t gap = highDotStartX - lowTextEndX;
+        int16_t x0Mid = lowTextEndX + 3 + (gap > midBlockW ? (gap - midBlockW) / 2 : 0);
+
+        gfx.fillCircle(x0Mid, y - 5, 3, items[1].color);
+        gfx.setCursor(x0Mid + 7, y);
+        gfx.print(items[1].label);
 
         // Zweite Legenden-Zeile fuer die blauen Bodenfahrzeug-Quadrate - nur
         // wenn sie ueberhaupt sichtbar sind (Flugoptionen >
