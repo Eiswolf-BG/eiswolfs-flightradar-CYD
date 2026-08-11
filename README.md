@@ -30,7 +30,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 ---
 
 ## Features
-- **Live radar screen** – circular radar view, sized to the full screen width, with a rotating green sweep line; each aircraft marker's heading line ends in a small arrowhead, so its direction of travel is unambiguous at a glance
+- **Live radar screen** – circular radar view, sized to the full screen width, with a rotating green sweep line; each aircraft marker's heading line ends in a small arrowhead, so its direction of travel is unambiguous at a glance. Twinkling background stars fill the space outside the radar circle.
 - **Real ADS-B data** via the free [adsb.fi](https://adsb.fi) API, refreshed every 8 seconds
 - **Color-coded aircraft** by altitude (green `<10k ft`, yellow `10-30k ft`, red `>30k ft`) with an on-screen legend
 - **Tap an aircraft** to open a detail panel: callsign, airline, aircraft model (via [hexdb.io](https://hexdb.io)), altitude/speed/distance/heading in both metric and aviation units, estimated seat count
@@ -51,6 +51,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - Data (airline names, aircraft-type seat estimates) loaded from CSV files on the SD card, auto-seeded on first boot
 - **6 languages** (English, German, French, Turkish, Spanish, Italian), selectable on first boot or anytime from the menu
 - **Adjustable brightness** (10-100% in 10% steps, Menu → System → "Brightness") with a live preview as you tap
+- **Metric/Imperial units** (Menu → Region → "Units") consistently applied across the radar range button, range ring labels, aircraft list, nearest-airport distance, and stats
 - **About screen** (Menu → System → "About") shows the project name, a short description, and the current firmware version
 
 ## Feature Deep-Dive
