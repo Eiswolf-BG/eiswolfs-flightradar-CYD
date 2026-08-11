@@ -35,6 +35,23 @@
             max-width: 450px;
             width: 100%;
             position: relative;
+            z-index: 1;
+        }
+
+        /* Twinkling star background (same triangle-wave dim/brighten
+           formula as menu_stars.cpp/radar_screen.cpp on the device) -
+           placed as the first element in <body> and given z-index:0
+           (NOT a negative z-index) so it stacks reliably behind
+           .container without depending on how the browser paints the
+           body's own background layer. pointer-events:none keeps the
+           ESP Web Tools install button and all links fully clickable. */
+        #star-bg {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
         }
         h1 {
             font-size: 22px;
@@ -91,6 +108,7 @@
     <script data-goatcounter="https://eiswolf-bg.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
+<canvas id="star-bg"></canvas>
 <div class="container">
     <h1>EISWOLFS FLIGHTRADAR CYD</h1>
     <div class="subtitle">Firmware Flash Utility</div>
@@ -109,5 +127,61 @@
 
     <div class="browser-note">Requires Chrome, Edge, or Opera (Web Serial API)</div>
 </div>
+<script>
+(function () {
+  // Same triangle-wave dim/brighten twinkle formula (phase 0-255-0) used
+  // by MenuStars on the device - ties the web flasher's look to the
+  // device UI. STAR_COUNT scales with viewport area instead of a fixed
+  // number, so it stays sparse-but-present on both small phones and
+  // large desktop windows without needing a manual breakpoint.
+  const canvas = document.getElementById('star-bg');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+
+  function starCountFor(w, h) {
+    const density = (w * h) / 9000;
+    return Math.max(40, Math.min(160, Math.round(density)));
+  }
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+
+  function initStars() {
+    const count = starCountFor(canvas.width, canvas.height);
+    stars = [];
+    for (let i = 0; i < count; i++) {
+      stars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        phase: Math.random() * 256,
+        speed: 1 + Math.random() * 2
+      });
+    }
+  }
+
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { resize(); initStars(); }, 150);
+  });
+  resize();
+  initStars();
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const s of stars) {
+      s.phase = (s.phase + s.speed) % 256;
+      const bright = s.phase < 128 ? s.phase * 2 : (255 - s.phase) * 2;
+      ctx.fillStyle = `rgb(0, ${bright}, 0)`;
+      ctx.fillRect(s.x, s.y, 2, 2);
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+</script>
 </body>
 </html>
