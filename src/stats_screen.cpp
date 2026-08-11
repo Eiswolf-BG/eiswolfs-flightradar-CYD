@@ -4,6 +4,8 @@
 #include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
+#include "units.h"
+#include "location_manager.h"
 
 namespace StatsScreen {
 
@@ -98,8 +100,14 @@ void run(TFT_eSPI& tft) {
 
         if (topAlt.found) {
             String csign = topAlt.callsign[0] ? String(topAlt.callsign) : "?";
+            // Respektiert jetzt die Einheiten-Einstellung (Menue > Einheiten)
+            // - vorher immer "(XXXX ft)", auch bei Metrisch eingestellt.
             char altBuf[24];
-            snprintf(altBuf, sizeof(altBuf), "%s (%ld ft)", csign.c_str(), (long)topAlt.altitudeFt);
+            if (LocationManager::useMetricUnits()) {
+                snprintf(altBuf, sizeof(altBuf), "%s (%ldm)", csign.c_str(), (long)Units::feetToMeters((float)topAlt.altitudeFt));
+            } else {
+                snprintf(altBuf, sizeof(altBuf), "%s (%ld ft)", csign.c_str(), (long)topAlt.altitudeFt);
+            }
             drawStatRow(tft, TOP_ALT_Y, I18n::t(StringId::STATS_TOP_ALTITUDE_PREFIX), String(altBuf));
         }
 

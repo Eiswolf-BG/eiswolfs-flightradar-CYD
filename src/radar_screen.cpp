@@ -471,10 +471,16 @@ namespace {
         gfx.drawString("S", L.cx, L.cy + L.radius - 10);
         gfx.drawString("E", L.cx + L.radius - 10, L.cy);
         gfx.drawString("W", L.cx - L.radius + 10, L.cy);
+        // Ring-Beschriftungen (Zwischenabstaende) respektieren jetzt die
+        // Einheiten-Einstellung (Menue > Einheiten) - vorher immer in km,
+        // auch wenn Imperial (nm) eingestellt war. Gleiches Umrechnungs-
+        // Muster wie beim Range-Button unten und der Legende oben.
+        bool metric = LocationManager::useMetricUnits();
+        float displayRange = metric ? rangeKm : Units::kmToNm(rangeKm);
         char ringLabel[8];
-        snprintf(ringLabel, sizeof(ringLabel), "%.0f", rangeKm / 3);
+        snprintf(ringLabel, sizeof(ringLabel), "%.0f", displayRange / 3);
         gfx.drawString(ringLabel, L.cx, L.cy - L.radius / 3);
-        snprintf(ringLabel, sizeof(ringLabel), "%.0f", rangeKm * 2 / 3);
+        snprintf(ringLabel, sizeof(ringLabel), "%.0f", displayRange * 2 / 3);
         gfx.drawString(ringLabel, L.cx, L.cy - L.radius * 2 / 3);
         gfx.setTextDatum(TL_DATUM);
     }
@@ -779,14 +785,14 @@ void render(TFT_eSPI& tft, int16_t top) {
         int16_t infoTextW = L.rangeBtn.x - INFO_TEXT_X - INFO_TEXT_GAP;
         drawInfoMarquee(tft, INFO_TEXT_X, infoTextY, infoTextW);
 
+        // Respektiert jetzt die Einheiten-Einstellung (Menue > Einheiten) -
+        // vorher immer "XXkm", auch bei Imperial (dort jetzt "XXnm").
         char rangeLabel[8];
-        // Zeigt km bei Metrisch, mi bei Imperial (Menue > Einheiten) -
-        // gleiches Muster wie drawLegend() weiter oben, statt fest immer
-        // km anzuzeigen.
-        if (LocationManager::useMetricUnits()) {
+        bool rangeMetric = LocationManager::useMetricUnits();
+        if (rangeMetric) {
             snprintf(rangeLabel, sizeof(rangeLabel), "%.0fkm", rangeKm);
         } else {
-            snprintf(rangeLabel, sizeof(rangeLabel), "%.0fmi", Units::kmToMi(rangeKm));
+            snprintf(rangeLabel, sizeof(rangeLabel), "%.0fnm", Units::kmToNm(rangeKm));
         }
         drawButton(tft, L.rangeBtn, rangeLabel);
 
