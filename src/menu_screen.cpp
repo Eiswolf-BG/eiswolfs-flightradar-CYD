@@ -31,13 +31,27 @@ namespace {
         }
     };
 
-    constexpr int16_t ROW_H = 22;
+    // ROW_GAP/ROW_START_Y bleiben unveraendert (werden von flightRowRect()
+    // weiter unten mitbenutzt, siehe FLIGHT_ROW_H).
     constexpr int16_t ROW_GAP = 1;
     constexpr int16_t ROW_START_Y = 18;
 
+    // Region-Unterseite (Sprache/Einheiten/Zurueck, nur 3 Eintraege):
+    // Zeilenhoehe/-abstand werden aus der tatsaechlich verfuegbaren
+    // Bildschirmflaeche errechnet (gleiches Muster wie bei SYSTEM_ROW_H
+    // weiter unten), statt die kleine, fuer volle Seiten (z.B.
+    // Flugoptionen: 14 Eintraege) gedachte feste Hoehe (vorher 22px) zu
+    // benutzen - die liess bei nur 3 Eintraegen fast den ganzen Bildschirm
+    // leer und machte die Buttons winzig und schwer zu treffen.
+    constexpr uint8_t REGION_ROW_COUNT = 3;
+    constexpr int16_t REGION_ROW_GAP = 10;
+    constexpr int16_t REGION_END_Y = Config::SCREEN_HEIGHT - 10;
+    constexpr int16_t REGION_ROW_H =
+        (REGION_END_Y - ROW_START_Y - (REGION_ROW_COUNT - 1) * REGION_ROW_GAP) / REGION_ROW_COUNT;
+
     Rect rowRect(uint8_t index) {
-        return {10, (int16_t)(ROW_START_Y + index * (ROW_H + ROW_GAP)),
-                (int16_t)(Config::SCREEN_WIDTH - 20), ROW_H};
+        return {10, (int16_t)(ROW_START_Y + index * (REGION_ROW_H + REGION_ROW_GAP)),
+                (int16_t)(Config::SCREEN_WIDTH - 20), REGION_ROW_H};
     }
 
     constexpr int16_t CAT_ROW_H = 50;
