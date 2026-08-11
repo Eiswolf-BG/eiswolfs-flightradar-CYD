@@ -9,6 +9,8 @@
 #include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
+#include "units.h"
+#include "location_manager.h"
 #include <algorithm>
 #include <cstring>
 
@@ -124,6 +126,11 @@ bool run(TFT_eSPI& tft) {
         Rect rowRects[ROWS_VISIBLE];
         uint8_t visibleRowCount = 0;
 
+        // Einheiten-Einstellung (Menue > Einheiten) einmal vor der Schleife
+        // lesen statt pro Zeile - vorher zeigten Hoehe/Distanz hier immer
+        // fest ft/km, auch bei Imperial eingestellt.
+        bool listMetric = LocationManager::useMetricUnits();
+
         if (count == 0) {
             tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
             tft.setCursor(10, LIST_TOP + 14);
@@ -154,12 +161,20 @@ bool run(TFT_eSPI& tft) {
                 tft.drawString(label, r.x + 6, midY);
 
                 char buf[24];
-                snprintf(buf, sizeof(buf), "%.0fft", (float)a.altBaroFt);
+                if (listMetric) {
+                    snprintf(buf, sizeof(buf), "%.0fm", Units::feetToMeters((float)a.altBaroFt));
+                } else {
+                    snprintf(buf, sizeof(buf), "%.0fft", (float)a.altBaroFt);
+                }
                 tft.setTextColor(colorForAltitude(a.altBaroFt), TFT_BLACK);
                 tft.setTextDatum(MR_DATUM);
                 tft.drawString(buf, r.x + r.w - 62, midY);
 
-                snprintf(buf, sizeof(buf), "%.0fkm", a.distanceKm);
+                if (listMetric) {
+                    snprintf(buf, sizeof(buf), "%.0fkm", a.distanceKm);
+                } else {
+                    snprintf(buf, sizeof(buf), "%.0fnm", Units::kmToNm(a.distanceKm));
+                }
                 tft.setTextColor(TFT_GREEN, TFT_BLACK);
                 tft.setTextDatum(MR_DATUM);
                 tft.drawString(buf, r.x + r.w - 6, midY);

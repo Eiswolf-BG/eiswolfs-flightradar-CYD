@@ -7,6 +7,7 @@
 #include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
+#include "units.h"
 
 namespace LocationPresetsScreen {
 
@@ -602,8 +603,14 @@ void run(TFT_eSPI& tft) {
             }
             nearest = AirportLookup::findNearest(activeLat, activeLon);
             if (nearest.found) {
+                // Respektiert jetzt die Einheiten-Einstellung (Menue >
+                // Einheiten) - vorher immer "(XX km)", auch bei Imperial.
                 char buf[48];
-                snprintf(buf, sizeof(buf), "%s %s (%.0f km)", nearest.icao, nearest.name, nearest.distanceKm);
+                if (LocationManager::useMetricUnits()) {
+                    snprintf(buf, sizeof(buf), "%s %s (%.0f km)", nearest.icao, nearest.name, nearest.distanceKm);
+                } else {
+                    snprintf(buf, sizeof(buf), "%s %s (%.0f nm)", nearest.icao, nearest.name, Units::kmToNm(nearest.distanceKm));
+                }
                 String line = String(I18n::t(StringId::LOCATION_NEAREST_AIRPORT_PREFIX)) + buf;
                 setupMarquee(tft, line, AIRPORT_LINE_W);
                 drawMarquee(tft, AIRPORT_LINE_X, airportLineY, AIRPORT_LINE_W, 20);
