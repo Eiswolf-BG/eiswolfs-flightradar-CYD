@@ -38,7 +38,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Live radar screen** – circular radar view, sized to the full screen width, with a rotating green sweep line; each aircraft marker's heading line ends in a small arrowhead, so its direction of travel is unambiguous at a glance. Twinkling background stars fill the space outside the radar circle.
 - **Real ADS-B data** via the free [adsb.fi](https://adsb.fi) API, refreshed every 8 seconds
 - **Color-coded aircraft** by altitude (green `<10k ft`, yellow `10-30k ft`, red `>30k ft`) with an on-screen legend
-- **Tap an aircraft** to open a detail panel: callsign, airline, aircraft model (via [hexdb.io](https://hexdb.io)), altitude/speed/distance/heading in both metric and aviation units, estimated seat count
+- **Tap an aircraft** to open a detail panel: callsign, airline, aircraft model (via [hexdb.io](https://hexdb.io)), flight route (origin/destination airport, resolved via a chain of three free lookup services for better coverage), altitude/speed/distance/heading in both metric and aviation units, estimated seat count
 - **Bearing indicator** – with an aircraft selected, a dotted line plus a heading-in-degrees label points from the radar center to the compass edge, showing exactly which direction to look to spot it in the sky (not to be confused with the aircraft's own heading arrow)
 - **Empty-sky timer** – when no aircraft are currently in range, the info bar counts up how long the sky's been empty instead of showing the usual "tap for details" hint
 - **Adjustable range** (10/25/50/100 km) via on-screen button
@@ -150,7 +150,7 @@ In addition to viewing the logbook on the device itself, a small built-in web pa
 
 **How to use it:** while your computer or phone is on the same WiFi network as the device, open a browser and go to the device's IP address (e.g. `http://192.168.1.42/`). The page lists every logged day with its aircraft count, a download link for the **merged CSV** (all days combined), and per-day **download/delete** links for each individual day's file.
 
-Don't know the device's current IP? **Menu > System > "Logbook / WebUI"** shows it live on the device, along with a short explanation of the page (the "?" info button on the **Logbook files** screen also still shows it).
+Don't know the device's current IP? **Menu > System > "Logbook / WebUI"** shows it live on the device, along with a short explanation of the page (the "?" info button on the **Logbook files** screen also still shows it). While connected to WiFi, this screen also shows a **QR code** for the page's URL, so you can open it on your phone without typing the IP address by hand.
 
 ### ☀️ Weather Icon
 A small icon in the header (where the camera button used to be) shows the current weather conditions – sun, cloud, sun-behind-cloud, rain, snow, or thunderstorm – drawn entirely with simple shapes, no image files or extra fonts needed.
@@ -197,6 +197,8 @@ Completely hides aircraft from specific airlines from the radar (they're also ex
 ADS-B data doesn't only contain aircraft – it can also include **airport ground vehicles** (follow-me cars, pushback tugs, etc., flagged by the API under a separate "C" category). This option hides them so the radar stays focused purely on air traffic.
 
 When shown, ground vehicles render as distinct **blue square markers** on the radar screen instead of the normal aircraft marker, with a matching entry in the legend - so they're never mistaken for a low-flying aircraft.
+
+Helicopters (ADS-B emitter category "A7") get their own marker too - a filled circle with a rotor cross instead of the usual arrowhead, since a hovering helicopter doesn't have a meaningful "forward heading" to point in.
 
 ### 📶 WiFi Manager
 See the dedicated section above: [WiFi Manager](#-wifi-manager-up-to-3-saved-networks) – save up to 3 WiFi networks at once.
