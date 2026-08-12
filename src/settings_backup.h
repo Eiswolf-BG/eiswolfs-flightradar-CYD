@@ -2,8 +2,14 @@
 #include <Arduino.h>
 
 namespace SettingsBackup {
-    bool backup();
-    bool restore();
+    // onStep (falls angegeben) wird bei jedem der beiden Kopiervorgaenge
+    // (erst Einstellungen, dann WLAN-Zugangsdaten) direkt VOR dem
+    // jeweiligen Kopieren aufgerufen - der aufrufende Screen
+    // (menu_screen.cpp) nutzt das, um waehrend des SD-bedingt spuerbar
+    // langsamen Sicherns/Wiederherstellens Fortschrittspunkte auf dem
+    // Button anzuzeigen, statt dass der Button eingefroren wirkt.
+    bool backup(void (*onStep)() = nullptr);
+    bool restore(void (*onStep)() = nullptr);
     bool hasBackup();
 
     // Loescht den kompletten Flightradar-Ordner von der SD-Karte und
