@@ -328,15 +328,6 @@ namespace {
         return y;
     }
 
-    String truncateForWidth(TFT_eSPI& tft, const String& text, int16_t maxWidth) {
-        String s = text;
-        if (tft.textWidth(s) <= maxWidth) return s;
-        while (s.length() > 1 && tft.textWidth(s + "...") > maxWidth) {
-            s.remove(s.length() - 1);
-        }
-        return s + "...";
-    }
-
     // Laufschrift fuer den "Naechster Flughafen"-Text: statt ihn mit "..."
     // abzuschneiden, scrollt er horizontal durch, falls er nicht in die
     // verfuegbare Breite passt. BEWUSST OHNE tft.setViewport() (das hatte
@@ -429,6 +420,66 @@ namespace {
 
         tft.print(marqueeWindow(tft, airportMarquee.ring, airportMarquee.charOffset, w));
         tft.setTextSize(1);
+    }
+
+    // Laufschrift-Zustand pro Preset-Zeile, analog zu airportMarquee oben,
+    // aber als Array (eine Instanz je Zeile) und LINKSBUENDIG gezeichnet
+    // statt zentriert - zentriertes Scrollen wuerde bei jedem Schritt
+    // sichtbar hin- und herspringen, da sich die Textbreite laufend
+    // aendert. Ersetzt die bisherige truncateForWidth()-Kuerzung mit "...".
+    struct RowMarquee {
+        String text;
+        String ring;
+        bool needsScroll = false;
+        int32_t charOffset = 0;
+        uint32_t lastStepMs = 0;
+    };
+    RowMarquee rowMarquees[LocationPresets::MAX_PRESETS];
+
+    // Wie setupMarquee() oben, aber ohne Textgroessen-Umschaltung (die
+    // Preset-Zeilen nutzen durchgehend Size 1).
+    void setupRowMarquee(TFT_eSPI& tft, RowMarquee& m, const String& text, int16_t maxWidth) {
+        m.text = text;
+        m.needsScroll = tft.textWidth(text) > maxWidth;
+        String withGap = text + "   ";
+        m.ring = withGap + withGap;
+        m.charOffset = 0;
+        m.lastStepMs = millis();
+    }
+
+    // Zeichnet eine Preset-Zeile im selben Rahmen-/Fuellstil wie
+    // drawButton(), aber mit linksbuendiger Laufschrift statt zentriertem,
+    // ggf. abgeschnittenem Text. Wird sowohl beim ersten Bildschirmaufbau
+    // als auch (nur fuer Zeilen mit needsScroll) bei jedem Tick in der
+    // Warteschleife erneut aufgerufen, um den naechsten Scroll-Schritt zu
+    // zeichnen.
+    void drawRowMarquee(TFT_eSPI& tft, const Rect& r, RowMarquee& m, bool active) {
+        uint16_t bg = active ? TFT_GREEN : TFT_BLACK;
+        uint16_t fg = active ? TFT_BLACK : TFT_GREEN;
+        tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, bg);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+
+        constexpr int16_t PAD = 8;
+        int16_t maxWidth = (int16_t)(r.w - 2 * PAD);
+        tft.setTextColor(fg, bg);
+        tft.setTextDatum(ML_DATUM);
+        int16_t textY = (int16_t)(r.y + r.h / 2);
+
+        if (!m.needsScroll) {
+            tft.drawString(m.text, (int16_t)(r.x + PAD), textY);
+            tft.setTextDatum(TL_DATUM);
+            return;
+        }
+
+        uint32_t now = millis();
+        if (now - m.lastStepMs >= MARQUEE_STEP_MS) {
+            m.lastStepMs = now;
+            m.charOffset++;
+            int32_t singleLen = (int32_t)m.text.length() + 3;
+            if (m.charOffset >= singleLen) m.charOffset = 0;
+        }
+        tft.drawString(marqueeWindow(tft, m.ring, m.charOffset, maxWidth), (int16_t)(r.x + PAD), textY);
+        tft.setTextDatum(TL_DATUM);
     }
 
     void runInfoScreen(TFT_eSPI& tft) {
@@ -563,8 +614,17 @@ void run(TFT_eSPI& tft) {
                     snprintf(coords, sizeof(coords), "%d: %.2f, %.2f", i + 1, lat, lon);
                     label = (active == (int8_t)i ? "> " : "") + presetWord + " " + coords;
                 }
-                label = truncateForWidth(tft, label, (int16_t)(rowRect.w - 10));
-                drawButton(tft, rowRect, label, active == (int8_t)i);
+                // Laufschrift statt "..."-Kuerzung fuer lange Preset-Namen
+                // bzw. Koordinaten, die nicht in die Zeilenbreite passen
+                // (siehe RowMarquee oben) - kurze Labels bleiben unveraendert
+                // zentriert wie zuvor.
+                if (tft.textWidth(label) <= rowRect.w - 10) {
+                    rowMarquees[i].needsScroll = false;
+                    drawButton(tft, rowRect, label, active == (int8_t)i);
+                } else {
+                    setupRowMarquee(tft, rowMarquees[i], label, (int16_t)(rowRect.w - 10));
+                    drawRowMarquee(tft, rowRect, rowMarquees[i], active == (int8_t)i);
+                }
                 drawButton(tft, removeRect, "X", false, true);
             } else {
                 tft.fillRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_BLACK);
@@ -628,6 +688,11 @@ void run(TFT_eSPI& tft) {
             if (TouchInput::wasTapped(tap)) break;
             MenuStars::update(tft);
             drawMarquee(tft, AIRPORT_LINE_X, airportLineY, AIRPORT_LINE_W, 20);
+            for (uint8_t i = 0; i < count; i++) {
+                if (rowMarquees[i].needsScroll) {
+                    drawRowMarquee(tft, rowRects[i], rowMarquees[i], active == (int8_t)i);
+                }
+            }
             delay(20);
         }
 

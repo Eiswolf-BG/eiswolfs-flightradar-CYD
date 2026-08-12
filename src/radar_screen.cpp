@@ -485,21 +485,107 @@ namespace {
         gfx.setTextDatum(TL_DATUM);
     }
 
+    // Laufschrift-Zustand fuer EINE Detail-Panel-Zeile - gleiches
+    // Grundprinzip wie InfoMarquee oben, aber das Detail-Panel hat bis zu
+    // neun solcher Zeilen gleichzeitig (Airline, Modell, Typ, Hoehe,
+    // Geschw., Steig-/Sinkrate, Distanz/Peilung, Squawk, Sitzplaetze),
+    // deshalb ein eigener Zustand pro Zeile statt einer einzigen globalen
+    // Instanz. y/h/maxWidth/fg merken sich die Zeilen-Geometrie, damit
+    // tickDetailPanelMarquees() (siehe unten) ohne Zusatzparameter weiss,
+    // wo/wie jede Zeile neu zu zeichnen ist.
+    struct LineMarquee {
+        String text;
+        String ring;
+        bool needsScroll = false;
+        int32_t charOffset = 0;
+        uint32_t lastStepMs = 0;
+        int16_t y = 0, h = 0, maxWidth = 0;
+        uint16_t fg = TFT_GREEN;
+    };
+
     struct PanelState {
         bool valid = false;
         char hex[7] = {0};
-        String callsignText, airlineText, modelText, typeText,
-               altText, speedText, climbText, distHeadingText, squawkText, seatsText;
+        String callsignText;
+        LineMarquee airline, model, type, alt, speed, climb, distHeading, squawk, seats;
     };
     PanelState lastPanel;
 
-    void updateLine(TFT_eSPI& gfx, int16_t y, int16_t h, int16_t maxWidth,
-                     uint16_t fg, String& cached, const String& newText, bool forceFull) {
-        if (!forceFull && cached == newText) return;
+    // Zeichnet eine Detail-Panel-Zeile NEU, wenn sich ihr Text geaendert
+    // hat (oder das Panel komplett neu aufgebaut wird) - merkt sich dabei
+    // auch, ob der Text zu breit fuer die verfuegbare Breite ist
+    // (needsScroll) und baut bei Bedarf den Ring-Puffer fuer die
+    // Laufschrift auf (gleiches Muster wie infoMarqueeWindow() oben).
+    // Passt zu breite Zeilen ("Modell: ...", "Distanz: ...") NICHT mehr
+    // mit "..." ab, sondern laesst sie horizontal durchscrollen - siehe
+    // tickDetailPanelMarquees() weiter unten fuer den Teil, der das
+    // tatsaechliche Weiterscrollen zwischen zwei Datenaktualisierungen
+    // uebernimmt (render() liefert i.d.R. nur alle ~300ms neue Werte,
+    // das waere fuer eine fluessige Laufschrift viel zu selten).
+    void updateMarqueeLine(TFT_eSPI& gfx, int16_t y, int16_t h, int16_t maxWidth,
+                            uint16_t fg, LineMarquee& m, const String& newText, bool forceFull) {
+        // Geometrie/Farbe IMMER aktualisieren (auch ohne Textaenderung) -
+        // tickDetailPanelMarquees() braucht diese Werte, um beim naechsten
+        // Scroll-Schritt an der richtigen Stelle neu zu zeichnen.
+        m.y = y;
+        m.h = h;
+        m.maxWidth = maxWidth;
+        m.fg = fg;
+
+        if (!forceFull && m.text == newText) return;
+
+        m.text = newText;
+        m.needsScroll = gfx.textWidth(newText) > maxWidth;
+        String withGap = newText + "   "; // 3 Leerzeichen Luecke vor der Wiederholung
+        m.ring = withGap + withGap;
+        m.charOffset = 0;
+        m.lastStepMs = millis();
+
         gfx.fillRect(0, y - 14, Config::SCREEN_WIDTH, h, TFT_BLACK);
         gfx.setTextColor(fg, TFT_BLACK);
-        printLineTruncated(gfx, 8, y, maxWidth, newText);
-        cached = newText;
+        gfx.setCursor(8, y);
+        gfx.print(m.needsScroll ? infoMarqueeWindow(gfx, m.ring, 0, maxWidth) : newText);
+    }
+
+    // Laesst eine einzelne Detail-Panel-Zeile weiterscrollen, falls sie zu
+    // breit ist (needsScroll) und genug Zeit seit dem letzten Schritt
+    // vergangen ist - sonst passiert nichts (kein unnoetiges Neuzeichnen
+    // fuer Zeilen, die ohnehin komplett passen). Wird von
+    // tickDetailPanelMarquees() fuer alle neun Zeilen aufgerufen.
+    void advanceAndDrawMarqueeLine(TFT_eSPI& gfx, LineMarquee& m) {
+        if (!m.needsScroll) return;
+
+        uint32_t now = millis();
+        if (now - m.lastStepMs < INFO_MARQUEE_STEP_MS) return;
+        m.lastStepMs = now;
+
+        m.charOffset++;
+        int32_t singleLen = (int32_t)m.text.length() + 3;
+        if (m.charOffset >= singleLen) m.charOffset = 0;
+
+        gfx.fillRect(0, m.y - 14, Config::SCREEN_WIDTH, m.h, TFT_BLACK);
+        gfx.setTextColor(m.fg, TFT_BLACK);
+        gfx.setCursor(8, m.y);
+        gfx.print(infoMarqueeWindow(gfx, m.ring, m.charOffset, m.maxWidth));
+    }
+
+    // Laesst alle Detail-Panel-Zeilen weiterscrollen - waehrend das Panel
+    // offen ist, ruft tick() (alle ~80ms) das hier auf, DAZWISCHEN also
+    // viel oefter als render() (das nur bei neuen Flugzeug-Daten,
+    // ~alle 300ms, feuert) neue Werte liefert. Ohne diesen zusaetzlichen
+    // Aufruf wuerde eine lange Zeile bei jedem render()-Aufruf zwar einen
+    // Schritt weiterspringen, aber nicht fluessig durchlaufen.
+    void tickDetailPanelMarquees(TFT_eSPI& gfx) {
+        if (!lastPanel.valid) return;
+        advanceAndDrawMarqueeLine(gfx, lastPanel.airline);
+        advanceAndDrawMarqueeLine(gfx, lastPanel.model);
+        advanceAndDrawMarqueeLine(gfx, lastPanel.type);
+        advanceAndDrawMarqueeLine(gfx, lastPanel.alt);
+        advanceAndDrawMarqueeLine(gfx, lastPanel.speed);
+        advanceAndDrawMarqueeLine(gfx, lastPanel.climb);
+        advanceAndDrawMarqueeLine(gfx, lastPanel.distHeading);
+        advanceAndDrawMarqueeLine(gfx, lastPanel.squawk);
+        advanceAndDrawMarqueeLine(gfx, lastPanel.seats);
     }
 
     void drawDetailPanel(TFT_eSPI& gfx, Aircraft& a) {
@@ -533,29 +619,29 @@ namespace {
         }
         y += 30;
 
-        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.airlineText,
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.airline,
                    String(a.airlineName), forceFull);
         y += LINE_H;
 
         String modelLine = details.loading
             ? String(I18n::t(StringId::DETAIL_MODEL)) + I18n::t(StringId::DETAIL_LOADING_DOTS)
             : String(I18n::t(StringId::DETAIL_MODEL)) + (details.model[0] ? details.model : I18n::t(StringId::DETAIL_UNKNOWN));
-        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.modelText, modelLine, forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.model, modelLine, forceFull);
         y += LINE_H;
 
         String typeLine = String(I18n::t(StringId::DETAIL_TYPE)) + (a.typeCode[0] ? a.typeCode : I18n::t(StringId::DETAIL_UNKNOWN));
-        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.typeText, typeLine, forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.type, typeLine, forceFull);
         y += LINE_H;
 
         char buf[48];
         snprintf(buf, sizeof(buf), "%s%.0fm / %.0fft", I18n::t(StringId::DETAIL_ALT),
                  Units::feetToMeters((float)a.altBaroFt), (float)a.altBaroFt);
-        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.altText, String(buf), forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.alt, String(buf), forceFull);
         y += LINE_H;
 
         snprintf(buf, sizeof(buf), "%s%.0fkm/h / %.0fkt", I18n::t(StringId::DETAIL_SPEED),
                  Units::ktToKmh(a.groundSpeedKt), a.groundSpeedKt);
-        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.speedText, String(buf), forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.speed, String(buf), forceFull);
         y += LINE_H;
 
         String climbLine;
@@ -568,7 +654,7 @@ namespace {
         } else {
             climbLine = I18n::t(StringId::DETAIL_LEVEL);
         }
-        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.climbText, climbLine, forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.climb, climbLine, forceFull);
         y += LINE_H;
 
         // Zusaetzlich zu km/nm auch Meilen (mi) - nm allein war fuer
@@ -579,17 +665,17 @@ namespace {
         snprintf(buf, sizeof(buf), "%s%.0fkm / %.0fnm / %.0fmi  %s%.0f", I18n::t(StringId::DETAIL_DIST),
                  a.distanceKm, Units::kmToNm(a.distanceKm), Units::kmToMi(a.distanceKm),
                  I18n::t(StringId::DETAIL_HDG), a.headingDeg);
-        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.distHeadingText, String(buf), forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.distHeading, String(buf), forceFull);
         y += LINE_H;
 
         String squawkLine = String(I18n::t(StringId::DETAIL_SQUAWK)) + (a.squawk[0] ? a.squawk : I18n::t(StringId::DETAIL_UNKNOWN));
-        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.squawkText, squawkLine, forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.squawk, squawkLine, forceFull);
         y += LINE_H;
 
         String seatsLine = a.estSeats > 0
             ? String(I18n::t(StringId::DETAIL_SEATS_EST)) + a.estSeats
             : String(I18n::t(StringId::DETAIL_SEATS_UNKNOWN));
-        updateLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.seatsText, seatsLine, forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.seats, seatsLine, forceFull);
         y += 22;
 
         if (forceFull) {
@@ -867,6 +953,12 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     if (selectedHex[0]) {
         tft.startWrite();
         updateDetailPanelStars(tft);
+        // Laesst zu breite Detail-Panel-Zeilen (z.B. "Modell: ..." oder
+        // "Distanz: ...") weiterscrollen, statt wie zuvor mit "..." starr
+        // abgeschnitten zu bleiben - render() liefert neue Werte nur alle
+        // ~300ms, das reicht fuer eine fluessige Laufschrift nicht aus,
+        // deshalb hier zusaetzlich im 80ms-Tick weiterschieben.
+        tickDetailPanelMarquees(tft);
         tft.endWrite();
         return;
     }

@@ -237,6 +237,7 @@ static const char* const I18N_DE[] = {
     "Löscht ALLE Daten von der SD-Karte (Einstellungen, Flugbuch, Standort-Presets, WLAN, Kalibrierung) und startet das Gerät neu. Danach läuft die komplette Ersteinrichtung erneut - wie beim allerersten Start. Das kann NICHT rückgängig gemacht werden!",
     "Lösche alle Daten...",
     "Zurücksetzen fehlgeschlagen.",
+    "Tippen zum Überspringen",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

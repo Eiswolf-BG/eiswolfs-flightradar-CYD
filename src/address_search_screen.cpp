@@ -38,8 +38,16 @@ namespace {
     // Screen haelt seine eigenen kleinen Helfer statt eines gemeinsamen
     // Moduls). Ohne Scroll-Unterstuetzung - hier immer nur kurze,
     // vorab abgeschnittene Texte (siehe runConfirmScreen/showErrorRetry).
+    // Lokale Kopie (siehe Konvention in location_presets_screen.cpp - jeder
+    // Screen haelt seine eigenen kleinen Helfer statt eines gemeinsamen
+    // Moduls). Optionale Scroll-Unterstuetzung (scrollY/viewTop/viewBottom/
+    // draw) fuer runConfirmScreen() unten - bei den bestehenden Aufrufstellen
+    // (showErrorRetry, Kopfzeilen) bleiben die Defaults aktiv, es wird also
+    // wie bisher immer alles auf einmal gezeichnet.
     int16_t layoutWrapped(TFT_eSPI& tft, int16_t x, int16_t startY, int16_t maxWidth,
-                           int16_t lineHeight, const String& text) {
+                           int16_t lineHeight, const String& text,
+                           int16_t scrollY = 0, int16_t viewTop = -32000, int16_t viewBottom = 32000,
+                           bool draw = true) {
         int16_t y = startY;
         int32_t start = 0;
         int32_t len = text.length();
@@ -52,8 +60,13 @@ namespace {
                 if (lastSpace <= 0) break;
                 line = line.substring(0, lastSpace);
             }
-            tft.setCursor(x, y);
-            tft.print(line);
+            if (draw) {
+                int16_t screenY = (int16_t)(y - scrollY);
+                if (screenY >= viewTop && screenY <= viewBottom) {
+                    tft.setCursor(x, screenY);
+                    tft.print(line);
+                }
+            }
             y += lineHeight;
             start += line.length();
         }
@@ -499,26 +512,72 @@ namespace {
     // Adress-Tastatur).
     int runConfirmScreen(TFT_eSPI& tft, const String& displayName) {
         MenuStars::reset();
-        tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
-        tft.setCursor(10, 14);
-        tft.println(I18n::t(StringId::ADDRESS_SEARCH_CONFIRM_TITLE));
 
-        String shown = displayName;
-        if (shown.length() > 150) shown = shown.substring(0, 150) + "...";
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        layoutWrapped(tft, 10, 40, (int16_t)(Config::SCREEN_WIDTH - 20), 18, shown);
+        constexpr int16_t textMaxWidth = Config::SCREEN_WIDTH - 20;
+        constexpr int16_t LINE_H = 18;
+        constexpr int16_t VIEW_TOP = 40;
+        constexpr int16_t TRY_AGAIN_Y = (int16_t)(Config::SCREEN_HEIGHT - 96);
+        constexpr int16_t USE_Y = (int16_t)(Config::SCREEN_HEIGHT - 50);
+        constexpr int16_t VIEW_BOTTOM = (int16_t)(TRY_AGAIN_Y - 10);
 
-        Rect tryAgainBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 96), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
-        Rect useBtn      = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
-        drawButton(tft, tryAgainBtn, I18n::t(StringId::ADDRESS_SEARCH_TRY_AGAIN));
-        drawButton(tft, useBtn, I18n::t(StringId::ADDRESS_SEARCH_USE_THIS));
+        // Volle Adresse OHNE Kuerzung anzeigen (frueher wurde bei > 150
+        // Zeichen mit "..." abgeschnitten) - stattdessen wird der Absatz bei
+        // Bedarf vertikal scrollbar, exakt dasselbe Muster wie beim "Wie
+        // funktionieren Presets"-Infoscreen (location_presets_screen.cpp
+        // ::runInfoScreen). Bewusst KEIN Marquee hier: das ist ein
+        // mehrzeiliger, wortumgebrochener Absatz, keine einzelne Zeile, die
+        // in der Breite nicht passt - horizontales Scrollen waere hier die
+        // falsche Loesung.
+        int16_t totalH = layoutWrapped(tft, 10, VIEW_TOP, textMaxWidth, LINE_H, displayName, 0, 0, 0, false);
+        int16_t maxScroll = (int16_t)(totalH - VIEW_BOTTOM);
+        if (maxScroll < 0) maxScroll = 0;
+        bool scrollable = maxScroll > 0;
+        int16_t scrollY = 0;
+
+        Rect tryAgainBtn = {10, TRY_AGAIN_Y, (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+        Rect useBtn = scrollable
+            ? Rect{10, USE_Y, 130, 40}
+            : Rect{10, USE_Y, (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+        Rect upBtn   = {146, USE_Y, 38, 40};
+        Rect downBtn = {190, USE_Y, 38, 40};
+        constexpr int16_t SCROLL_STEP = 48;
+
+        auto redraw = [&]() {
+            tft.fillScreen(TFT_BLACK);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setCursor(10, 14);
+            tft.println(I18n::t(StringId::ADDRESS_SEARCH_CONFIRM_TITLE));
+
+            tft.setTextColor(TFT_WHITE, TFT_BLACK);
+            layoutWrapped(tft, 10, VIEW_TOP, textMaxWidth, LINE_H, displayName, scrollY, VIEW_TOP, VIEW_BOTTOM, true);
+
+            drawButton(tft, tryAgainBtn, I18n::t(StringId::ADDRESS_SEARCH_TRY_AGAIN));
+            drawButton(tft, useBtn, I18n::t(StringId::ADDRESS_SEARCH_USE_THIS));
+            if (scrollable) {
+                drawButton(tft, upBtn, "^");
+                drawButton(tft, downBtn, "v");
+            }
+        };
+
+        redraw();
 
         while (true) {
             TouchInput::Point tap;
-            if (!TouchInput::wasTapped(tap)) { MenuStars::update(tft); delay(20); continue; }
-            if (tryAgainBtn.contains(tap.x, tap.y)) return 0;
-            if (useBtn.contains(tap.x, tap.y)) return 1;
+            if (TouchInput::wasTapped(tap)) {
+                if (tryAgainBtn.contains(tap.x, tap.y)) return 0;
+                if (useBtn.contains(tap.x, tap.y)) return 1;
+                if (scrollable && upBtn.contains(tap.x, tap.y) && scrollY > 0) {
+                    scrollY -= SCROLL_STEP;
+                    if (scrollY < 0) scrollY = 0;
+                    redraw();
+                } else if (scrollable && downBtn.contains(tap.x, tap.y) && scrollY < maxScroll) {
+                    scrollY += SCROLL_STEP;
+                    if (scrollY > maxScroll) scrollY = maxScroll;
+                    redraw();
+                }
+            }
+            MenuStars::update(tft);
+            delay(20);
         }
     }
 }

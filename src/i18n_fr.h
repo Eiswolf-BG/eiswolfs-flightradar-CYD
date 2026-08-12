@@ -237,6 +237,7 @@ static const char* const I18N_FR[] = {
     "Supprime TOUTES les données de la carte SD (réglages, journal, préréglages de position, WiFi, calibrage) et redémarre l'appareil. La configuration initiale complète s'exécutera alors à nouveau, comme au tout premier démarrage. Cette action est IRRÉVERSIBLE !",
     "Suppression de toutes les données...",
     "Échec de la réinitialisation.",
+    "Toucher pour passer",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

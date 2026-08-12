@@ -84,6 +84,17 @@ void run(TFT_eSPI& tft) {
     Rect startBtn = {10, btnY, (int16_t)(Config::SCREEN_WIDTH - 20), BTN_H};
     drawButtonFrame(tft, startBtn);
 
+    // Small, centered hint below the button that tapping it skips the
+    // countdown - stays unchanged for the whole countdown
+    // (drawCountdownText() only redraws inside the button, so it never
+    // overwrites this text).
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextSize(1);
+    tft.drawString(I18n::t(StringId::FIRST_RUN_COMPLETE_TAP_TO_SKIP),
+                    (int16_t)(Config::SCREEN_WIDTH / 2), (int16_t)(startBtn.y + startBtn.h + 12));
+    tft.setTextDatum(TL_DATUM);
+
     // Automatic countdown in the button instead of a tappable
     // "Flightradar" text - continues automatically into the splash
     // screen/app afterward. Tapping the button during the countdown

@@ -238,6 +238,7 @@ static const char* const I18N_EN[] = {
     "Deletes ALL data from the SD card (settings, logbook, location presets, WiFi, calibration) and restarts the device. The full first-time setup will then run again, just like on the very first boot. This CANNOT be undone!",
     "Deleting all data...",
     "Reset failed.",
+    "Tap to skip",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,
