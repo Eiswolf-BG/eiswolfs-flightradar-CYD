@@ -80,7 +80,12 @@ namespace {
     // Bildschirmflaeche errechnet, sodass die Buttons den Platz bis knapp
     // ueber den Bildschirmrand ausfuellen - andere Seiten bleiben bei ihren
     // eigenen, unveraenderten Zeilenhoehen.
-    constexpr uint8_t SYSTEM_ROW_COUNT = 10;
+    // War 10, bevor "Sicherung"/"Wiederherstellen" in die neue
+    // "Sicherung & Reset"-Unterseite ausgelagert wurden (siehe
+    // BACKUP_RESET_ROW_COUNT unten) und dort durch einen einzelnen
+    // Ordner-Button ersetzt wurden: -2 (Backup/Restore raus) +1 (neuer
+    // Ordner-Button) = 9.
+    constexpr uint8_t SYSTEM_ROW_COUNT = 9;
     constexpr int16_t SYSTEM_ROW_GAP = 4;
     constexpr int16_t SYSTEM_START_Y = 18;
     constexpr int16_t SYSTEM_END_Y = Config::SCREEN_HEIGHT - 10;
@@ -89,6 +94,21 @@ namespace {
     Rect systemRowRect(uint8_t index) {
         return {10, (int16_t)(SYSTEM_START_Y + index * (SYSTEM_ROW_H + SYSTEM_ROW_GAP)),
                 (int16_t)(Config::SCREEN_WIDTH - 20), SYSTEM_ROW_H};
+    }
+
+    // Eigene Zeilenhoehe fuer die neue "Sicherung & Reset"-Unterseite (4
+    // Eintraege: Sichern/Wiederherstellen/Zuruecksetzen/Zurueck) - gleiches
+    // "aus verfuegbarem Platz errechnen"-Muster wie bei SYSTEM_ROW_H.
+    // ROW_START_Y wird mitbenutzt (siehe oben, gemeinsam mit rowRect()/
+    // flightRowRect()), nur GAP/COUNT/H sind eigene Werte.
+    constexpr uint8_t BACKUP_RESET_ROW_COUNT = 4;
+    constexpr int16_t BACKUP_RESET_ROW_GAP = 10;
+    constexpr int16_t BACKUP_RESET_END_Y = Config::SCREEN_HEIGHT - 10;
+    constexpr int16_t BACKUP_RESET_ROW_H =
+        (BACKUP_RESET_END_Y - ROW_START_Y - (BACKUP_RESET_ROW_COUNT - 1) * BACKUP_RESET_ROW_GAP) / BACKUP_RESET_ROW_COUNT;
+    Rect backupResetRowRect(uint8_t index) {
+        return {10, (int16_t)(ROW_START_Y + index * (BACKUP_RESET_ROW_H + BACKUP_RESET_ROW_GAP)),
+                (int16_t)(Config::SCREEN_WIDTH - 20), BACKUP_RESET_ROW_H};
     }
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label,
@@ -161,16 +181,21 @@ namespace {
     }
 
     // Warn-Ueberlage, die praktisch den kompletten Bildschirm einnimmt (nur
-    // ein paar Pixel Rand) und vor dem Einschalten des Flugbuchs erklaert,
-    // warum es sich nach 24h automatisch wieder abschaltet. "Achtung!!!"
-    // steht ganz oben, mit einer Leerzeile Abstand zum Fliesstext darunter;
-    // der Text scrollt bei Bedarf (laengere Uebersetzungen) ueber eigene
-    // Pfeil-Buttons, OK/Zurueck bleiben dabei immer unten fix und
+    // ein paar Pixel Rand) - urspruenglich nur fuers Einschalten des
+    // Flugbuchs gebaut (erklaert, warum es sich nach 24h automatisch
+    // wieder abschaltet), jetzt generisch mit uebergebenen Titel-/Text-
+    // StringIds, damit sie auch fuer die "Einstellungen zuruecksetzen"-
+    // Bestaetigung (Werksreset) wiederverwendet werden kann - beides sind
+    // seltene, potenziell folgenreiche Aktionen, die dieselbe deutliche
+    // Warnung verdienen. "Achtung!!!" (titleId) steht ganz oben, mit einer
+    // Leerzeile Abstand zum Fliesstext (bodyId) darunter; der Text
+    // scrollt bei Bedarf (laengere Uebersetzungen) ueber eigene Pfeil-
+    // Buttons, OK/Zurueck bleiben dabei immer unten fix und
     // kollisionsfrei sichtbar. Sternchen laufen im Hintergrund mit, wie auf
     // allen anderen Menue-Screens (nur der Radar-Screen selbst spart sich
     // das wegen der CPU-Last durch Abfragen/Zeichnen). Gibt true zurueck,
     // wenn "OK" angetippt wurde, false bei "Zurueck".
-    bool confirmLogbookEnable(TFT_eSPI& tft) {
+    bool confirmWarningScreen(TFT_eSPI& tft, StringId titleId, StringId bodyId) {
         constexpr int16_t BOX_X = 4;
         constexpr int16_t BOX_Y = 4;
         constexpr int16_t BOX_W = Config::SCREEN_WIDTH - 2 * BOX_X;
@@ -195,7 +220,7 @@ namespace {
         constexpr int16_t VIEW_BOTTOM_NO_SCROLL = OK_Y - 8;
         constexpr int16_t VIEW_BOTTOM_SCROLL = VIEW_BOTTOM_NO_SCROLL - SCROLL_ROW_H - SCROLL_ROW_GAP;
 
-        String body = I18n::t(StringId::MENU_LOGBOOK_WARNING_BODY);
+        String body = I18n::t(bodyId);
         int16_t totalH = layoutWrapped(tft, BOX_X + 10, VIEW_TOP, TEXT_MAX_WIDTH, LINE_H, body, 0, 0, 0, false);
 
         bool scrollable = (totalH - VIEW_BOTTOM_NO_SCROLL) > 0;
@@ -220,7 +245,7 @@ namespace {
             tft.setTextDatum(MC_DATUM);
             tft.setTextColor(TFT_RED, TFT_BLACK);
             tft.setTextSize(2);
-            tft.drawString(I18n::t(StringId::MENU_LOGBOOK_WARNING_TITLE), BOX_X + BOX_W / 2, TITLE_Y);
+            tft.drawString(I18n::t(titleId), BOX_X + BOX_W / 2, TITLE_Y);
             tft.setTextSize(1);
             tft.setTextDatum(TL_DATUM);
 
@@ -257,7 +282,7 @@ namespace {
         }
     }
 
-    enum class Page { Main, Region, System, Flight };
+    enum class Page { Main, Region, System, Flight, BackupReset };
 }
 
 void run(TFT_eSPI& tft) {
@@ -342,14 +367,15 @@ void run(TFT_eSPI& tft) {
             Rect brightnessBtn = systemRowRect(2);
             Rect timeoutBtn   = systemRowRect(3);
             Rect nightDimBtn  = systemRowRect(4);
-            Rect backupBtn    = systemRowRect(5);
-            Rect restoreBtn   = systemRowRect(6);
-            Rect webuiBtn     = systemRowRect(7);
-            // "Info" (About) steht bewusst als letzter Punkt direkt ueber dem
-            // Zurueck-Button - so bleibt seine Position stabil, egal wie
+            Rect webuiBtn     = systemRowRect(5);
+            // "Sicherung & Reset" (Backup/Restore/Werksreset, siehe
+            // Page::BackupReset unten) steht bewusst direkt ueber "Info",
+            // das seinerseits als letzter Punkt direkt ueber dem Zurueck-
+            // Button steht - so bleiben beide Positionen stabil, egal wie
             // viele weitere Punkte davor noch dazukommen.
-            Rect aboutBtn     = systemRowRect(8);
-            Rect backBtn      = systemRowRect(9);
+            Rect backupResetBtn = systemRowRect(6);
+            Rect aboutBtn     = systemRowRect(7);
+            Rect backBtn      = systemRowRect(8);
 
             drawButton(tft, calibBtn, I18n::t(StringId::MENU_CALIBRATE));
 
@@ -361,9 +387,8 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, brightnessBtn, brightnessLabel(SettingsStore::brightnessPercent()));
             drawButton(tft, timeoutBtn, screenTimeoutLabel(SettingsStore::screenTimeoutMinutes()));
             drawButton(tft, nightDimBtn, I18n::t(StringId::MENU_NIGHT_DIMMING) + onOff(SettingsStore::nightDimmingEnabled()));
-            drawButton(tft, backupBtn, I18n::t(StringId::MENU_BACKUP));
-            drawButton(tft, restoreBtn, I18n::t(StringId::MENU_RESTORE));
             drawButton(tft, webuiBtn, I18n::t(StringId::MENU_LOGBOOK_WEBUI));
+            drawButton(tft, backupResetBtn, I18n::t(StringId::MENU_BACKUP_RESET));
             drawButton(tft, aboutBtn, I18n::t(StringId::MENU_ABOUT));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
@@ -388,7 +413,42 @@ void run(TFT_eSPI& tft) {
                 SettingsStore::setScreenTimeoutMinutes(next);
             } else if (nightDimBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setNightDimmingEnabled(!SettingsStore::nightDimmingEnabled());
-            } else if (backupBtn.contains(tap.x, tap.y)) {
+            } else if (backupResetBtn.contains(tap.x, tap.y)) {
+                page = Page::BackupReset;
+            } else if (aboutBtn.contains(tap.x, tap.y)) {
+                AboutScreen::run(tft);
+            } else if (webuiBtn.contains(tap.x, tap.y)) {
+                WebUiScreen::run(tft);
+            } else if (backBtn.contains(tap.x, tap.y)) {
+                page = Page::Main;
+            }
+
+        } else if (page == Page::BackupReset) {
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setCursor(10, 14);
+            tft.println(I18n::t(StringId::MENU_BACKUP_RESET));
+
+            Rect backupBtn  = backupResetRowRect(0);
+            Rect restoreBtn = backupResetRowRect(1);
+            Rect resetBtn   = backupResetRowRect(2);
+            Rect backBtn    = backupResetRowRect(3);
+
+            drawButton(tft, backupBtn, I18n::t(StringId::MENU_BACKUP));
+            drawButton(tft, restoreBtn, I18n::t(StringId::MENU_RESTORE));
+            // Danger-Akzent (rot) - deutlich von Sichern/Wiederherstellen
+            // abgesetzt, da diese Aktion (nach Bestaetigung) ALLE Daten
+            // unwiderruflich loescht, siehe confirmWarningScreen() unten.
+            drawButton(tft, resetBtn, I18n::t(StringId::MENU_FACTORY_RESET), false, true);
+            drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
+
+            TouchInput::Point tap;
+            while (true) {
+                if (TouchInput::wasTapped(tap)) break;
+                MenuStars::update(tft);
+                delay(20);
+            }
+
+            if (backupBtn.contains(tap.x, tap.y)) {
                 bool ok = SettingsBackup::backup();
                 showBriefMessage(tft, I18n::t(ok ? StringId::MENU_BACKUP_SAVED : StringId::MENU_BACKUP_FAILED),
                                  ok ? TFT_GREEN : TFT_RED);
@@ -398,12 +458,26 @@ void run(TFT_eSPI& tft) {
                     showBriefMessage(tft, I18n::t(ok ? StringId::MENU_RESTORED : StringId::MENU_RESTORE_FAILED),
                                      ok ? TFT_GREEN : TFT_RED);
                 }
-            } else if (aboutBtn.contains(tap.x, tap.y)) {
-                AboutScreen::run(tft);
-            } else if (webuiBtn.contains(tap.x, tap.y)) {
-                WebUiScreen::run(tft);
+            } else if (resetBtn.contains(tap.x, tap.y)) {
+                if (confirmWarningScreen(tft, StringId::MENU_LOGBOOK_WARNING_TITLE,
+                                          StringId::MENU_FACTORY_RESET_WARNING_BODY)) {
+                    tft.fillScreen(TFT_BLACK);
+                    tft.setTextDatum(MC_DATUM);
+                    tft.setTextColor(TFT_RED, TFT_BLACK);
+                    tft.drawString(I18n::t(StringId::MENU_FACTORY_RESET_DELETING),
+                                    Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
+                    tft.setTextDatum(TL_DATUM);
+                    // Erfolgsfall: factoryReset() startet das Geraet neu und
+                    // kehrt nie zurueck - dieser Code danach laeuft nur im
+                    // (seltenen) Fehlerfall (SD nicht eingehaengt) ueberhaupt
+                    // weiter.
+                    bool ok = SettingsBackup::factoryReset();
+                    if (!ok) {
+                        showBriefMessage(tft, I18n::t(StringId::MENU_FACTORY_RESET_FAILED), TFT_RED);
+                    }
+                }
             } else if (backBtn.contains(tap.x, tap.y)) {
-                page = Page::Main;
+                page = Page::System;
             }
 
         } else { // Page::Flight
@@ -486,7 +560,8 @@ void run(TFT_eSPI& tft) {
                     SettingsStore::setFlightLogbookEnabled(false);
                     SettingsStore::setFlightLogbookEnabledAtEpoch(0);
                     SettingsStore::setFlightLogbookSessionFile("");
-                } else if (confirmLogbookEnable(tft)) {
+                } else if (confirmWarningScreen(tft, StringId::MENU_LOGBOOK_WARNING_TITLE,
+                                                 StringId::MENU_LOGBOOK_WARNING_BODY)) {
                     SettingsStore::setFlightLogbookEnabled(true);
                     SettingsStore::setFlightLogbookEnabledAtEpoch((uint32_t)time(nullptr));
                     // Leerer Eintrag erzwingt eine frische Sitzungsdatei beim

@@ -282,6 +282,21 @@ enum class StringId : uint8_t {
     // Hoehen-Farbstufen erscheinen.
     LEGEND_GROUND_VEHICLE,
 
+    // Neue "Sicherung & Reset"-Unterseite im System-Menue (fasst die
+    // bisher einzeln im System-Menue stehenden Backup/Restore-Buttons
+    // zusammen und ergaenzt einen dritten Punkt "Einstellungen
+    // zuruecksetzen" - ein kompletter Werksreset fuer Entwickler/Tester,
+    // der den gesamten Flightradar-Ordner von der SD-Karte loescht und
+    // neu startet, siehe settings_backup.cpp::factoryReset()). Titel und
+    // Button-Label teilen sich MENU_BACKUP_RESET, genau wie
+    // MENU_CATEGORY_SYSTEM sowohl fuer den Menue-Button als auch den
+    // Bildschirmtitel der System-Seite verwendet wird.
+    MENU_BACKUP_RESET,
+    MENU_FACTORY_RESET,
+    MENU_FACTORY_RESET_WARNING_BODY,
+    MENU_FACTORY_RESET_DELETING,
+    MENU_FACTORY_RESET_FAILED,
+
     COUNT
 };
 
