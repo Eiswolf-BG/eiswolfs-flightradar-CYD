@@ -57,4 +57,24 @@ bool hasBackup() {
     return SD.exists(SETTINGS_BACKUP_FILE) || SD.exists(WIFI_BACKUP_FILE);
 }
 
+bool factoryReset() {
+    if (!SdStorage::isMounted()) return false;
+
+    bool ok;
+    {
+        // Guard-Block bewusst vor dem Neustart wieder verlassen (statt
+        // ueber die Funktion hinweg zu halten) - reine Vorsicht, auch wenn
+        // ESP.restart() den Chip ohnehin sofort zuruecksetzt.
+        SdMutex::Guard guard;
+        ok = SdStorage::deleteDirectoryRecursive(Config::SD_ROOT_DIR);
+    }
+
+    if (ok) {
+        delay(200);
+        ESP.restart();
+        // Wird nie erreicht - ESP.restart() kehrt nicht zurueck.
+    }
+    return ok;
+}
+
 }

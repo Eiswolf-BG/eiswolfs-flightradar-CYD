@@ -143,4 +143,35 @@ void logEvent(const char* csvLine) {
     f.close();
 }
 
+bool deleteDirectoryRecursive(const char* path) {
+    File dir = SD.open(path);
+    if (!dir || !dir.isDirectory()) {
+        if (dir) dir.close();
+        return false;
+    }
+
+    // Gleiches vorsichtiges "entry.name() koennte relativ ODER absolut
+    // sein"-Muster wie in flight_logbook.cpp::resetAllData() - anders als
+    // dort aber mit echter Rekursion in Unterordner (statt sie zu
+    // ueberspringen), da der Flightradar-Ordner welche enthaelt (logs/,
+    // screenshots/).
+    File entry = dir.openNextFile();
+    while (entry) {
+        bool isDir = entry.isDirectory();
+        String name = String(entry.name());
+        entry.close();
+
+        String fullPath = name.startsWith("/") ? name : String(path) + "/" + name;
+        if (isDir) {
+            deleteDirectoryRecursive(fullPath.c_str());
+        } else {
+            SD.remove(fullPath);
+        }
+        entry = dir.openNextFile();
+    }
+    dir.close();
+
+    return SD.rmdir(path);
+}
+
 }

@@ -231,6 +231,12 @@ static const char* const I18N_TR[] = {
     "örn. Ev, İş, Tatil evi",
 
     "Kara aracı",
+
+    "Yedekleme ve Sıfırlama",
+    "Ayarları sıfırla",
+    "SD karttaki TÜM verileri (ayarlar, uçuş kayıt defteri, konum ön ayarları, WiFi, kalibrasyon) siler ve cihazı yeniden başlatır. Ardından ilk çalıştırmadaki gibi kurulum işlemi tekrar başlar. Bu işlem GERİ ALINAMAZ!",
+    "Tüm veriler siliniyor...",
+    "Sıfırlama başarısız.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,
