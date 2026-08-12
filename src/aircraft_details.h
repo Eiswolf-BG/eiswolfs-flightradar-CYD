@@ -12,9 +12,11 @@ namespace AircraftDetails {
         char model[40] = {0}; // e.g. "Airbus A320 216", empty if unknown
 
         // Departure/destination airport (ICAO code, e.g. "KIAH"/"EDDF") of
-        // the current flight route, looked up by callsign via the same
-        // adsbdb.com service used for the model fallback above - empty if
-        // no callsign is known or no route was found for it.
+        // the current flight route, looked up by callsign via a chain of
+        // three free sources (VRS standing-data mirror, hexdb.io, then
+        // adsbdb.com as a last fallback - see aircraft_details.cpp) for
+        // better coverage than any single source alone. Empty if no
+        // callsign is known or no route was found in any of the three.
         char routeOrigin[8] = {0};
         char routeDest[8] = {0};
     };
