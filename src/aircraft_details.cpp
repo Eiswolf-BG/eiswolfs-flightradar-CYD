@@ -120,24 +120,78 @@ void update() {
         }
     }
 
-    // Flugroute (Start-/Zielflughafen) - derselbe adsbdb.com-Dienst wie oben,
-    // aber ueber den Callsign-Endpunkt statt Hex-Code abgefragt (liefert
-    // dafuer origin/destination-Flughafendaten zurueck). Nur versuchen, wenn
-    // ueberhaupt ein Rufzeichen bekannt ist - Sichtflug-Maschinen ohne
-    // Callsign haben ohnehin keine darueber auswertbare Route.
+    // Flugroute (Start-/Zielflughafen) - jetzt ueber eine Kette aus DREI
+    // unabhaengigen kostenlosen Quellen statt nur einer, absteigend nach in
+    // Tests beobachteter Trefferquote sortiert. Vorher lieferte adsbdb.com
+    // allein in ca. 80% der Faelle "unknown" (siehe Alex' Feedback) - die
+    // drei Quellen speisen sich aus unterschiedlichen, ueberlappenden aber
+    // nicht identischen Community-Datenbanken, daher deutlich bessere
+    // Gesamtabdeckung durch Verketten:
+    //   1. VRS-Standing-Data-Mirror (adsb.lol) - stuendlich aktualisierter
+    //      Spiegel des Virtual-Radar-Server-Projekts, in Tests die mit
+    //      Abstand zuverlaessigste Quelle. Pfad = erste 2 Zeichen des
+    //      (GROSSGESCHRIEBENEN - der Dienst ist case-sensitiv) Rufzeichens
+    //      als Ordner, liefert "airport_codes":"ORIG-DEST" (ICAO).
+    //   2. hexdb.io - eigener Route-Endpunkt (andere URL als der
+    //      Aircraft-Endpunkt weiter oben), liefert "route":"ORIG-DEST".
+    //   3. adsbdb.com Callsign-Endpunkt - bisherige einzige Quelle, bleibt
+    //      als letzter Fallback, da sie gelegentlich Daten hat, die die
+    //      anderen beiden nicht haben.
+    // Nur versuchen, wenn ueberhaupt ein Rufzeichen bekannt ist -
+    // Sichtflug-Maschinen ohne Callsign haben ohnehin keine darueber
+    // auswertbare Route.
     String trimmedCallsign = String(callsign);
     trimmedCallsign.trim();
-    if (trimmedCallsign.length() > 0) {
+    trimmedCallsign.toUpperCase();
+
+    auto applyRouteCodes = [&](const String& codes) {
+        int dash = codes.indexOf('-');
+        if (dash > 0 && dash < (int)codes.length() - 1) {
+            strncpy(result.routeOrigin, codes.substring(0, dash).c_str(), sizeof(result.routeOrigin) - 1);
+            strncpy(result.routeDest, codes.substring(dash + 1).c_str(), sizeof(result.routeDest) - 1);
+        }
+    };
+
+    if (trimmedCallsign.length() >= 2) {
+        // 1. VRS-Standing-Data-Mirror.
         client.setTimeout(4000);
+        String folder = trimmedCallsign.substring(0, 2);
         String body3;
-        if (httpGetString(client, String("https://api.adsbdb.com/v0/callsign/") + trimmedCallsign, body3)) {
+        if (httpGetString(client, String("https://vrs-standing-data.adsb.lol/routes/") + folder + "/" + trimmedCallsign + ".json", body3)) {
             JsonDocument doc3;
-            DeserializationError err3 = deserializeJson(doc3, body3);
-            if (!err3) {
-                const char* originIcao = doc3["response"]["flightroute"]["origin"]["icao_code"] | "";
-                const char* destIcao = doc3["response"]["flightroute"]["destination"]["icao_code"] | "";
-                strncpy(result.routeOrigin, originIcao, sizeof(result.routeOrigin) - 1);
-                strncpy(result.routeDest, destIcao, sizeof(result.routeDest) - 1);
+            if (!deserializeJson(doc3, body3)) {
+                const char* codes = doc3["airport_codes"] | "";
+                applyRouteCodes(String(codes));
+            }
+        }
+
+        // 2. hexdb.io Route-Endpunkt, falls Quelle 1 nichts geliefert hat.
+        if (!result.routeOrigin[0] || !result.routeDest[0]) {
+            client.setTimeout(3000);
+            String body4;
+            if (httpGetString(client, String("https://hexdb.io/api/v1/route/icao/") + trimmedCallsign, body4)) {
+                JsonDocument doc4;
+                if (!deserializeJson(doc4, body4)) {
+                    const char* route = doc4["route"] | "";
+                    applyRouteCodes(String(route));
+                }
+            }
+        }
+    }
+
+    // 3. adsbdb.com Callsign-Endpunkt als letzter Fallback.
+    if (trimmedCallsign.length() > 0 && (!result.routeOrigin[0] || !result.routeDest[0])) {
+        client.setTimeout(4000);
+        String body5;
+        if (httpGetString(client, String("https://api.adsbdb.com/v0/callsign/") + trimmedCallsign, body5)) {
+            JsonDocument doc5;
+            if (!deserializeJson(doc5, body5)) {
+                const char* originIcao = doc5["response"]["flightroute"]["origin"]["icao_code"] | "";
+                const char* destIcao = doc5["response"]["flightroute"]["destination"]["icao_code"] | "";
+                if (originIcao[0] && destIcao[0]) {
+                    strncpy(result.routeOrigin, originIcao, sizeof(result.routeOrigin) - 1);
+                    strncpy(result.routeDest, destIcao, sizeof(result.routeDest) - 1);
+                }
             }
         }
     }
