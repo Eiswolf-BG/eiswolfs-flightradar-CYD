@@ -36,16 +36,28 @@ namespace {
         return y;
     }
 
-    void drawStartButton(TFT_eSPI& tft, const Rect& r) {
-        tft.fillRoundRect(r.x, r.y, r.w, r.h, 6, TFT_GREEN);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 6, TFT_GREEN);
+    // Button frame in the same style as the Start button on the Welcome
+    // screen (first_run_welcome_screen.cpp::drawButtonFrame) - black fill,
+    // thin green border, rounded corners. Deliberately no longer fully
+    // green-filled like the old version of this button, so both first-run
+    // screens look consistent.
+    void drawButtonFrame(TFT_eSPI& tft, const Rect& r) {
+        tft.fillRoundRect(r.x, r.y, r.w, r.h, 8, TFT_BLACK);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 8, TFT_GREEN);
+    }
+
+    // Big, bold (1px-offset technique, same as the "Start" text on the
+    // Welcome screen) countdown digit in the middle of the button -
+    // replaces the previous "Flightradar" text.
+    void drawCountdownText(TFT_eSPI& tft, const Rect& r, const String& text) {
+        tft.fillRect((int16_t)(r.x + 2), (int16_t)(r.y + 2), (int16_t)(r.w - 4), (int16_t)(r.h - 4), TFT_BLACK);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_BLACK, TFT_GREEN);
-        tft.setTextSize(2);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextSize(3);
         int16_t cx = r.x + r.w / 2;
         int16_t cy = r.y + r.h / 2;
-        tft.drawString("Flightradar", cx, cy);
-        tft.drawString("Flightradar", (int16_t)(cx + 1), cy);
+        tft.drawString(text, cx, cy);
+        tft.drawString(text, (int16_t)(cx + 1), cy);
         tft.setTextSize(1);
         tft.setTextDatum(TL_DATUM);
     }
@@ -70,12 +82,32 @@ void run(TFT_eSPI& tft) {
     if (btnY > maxBtnY) btnY = maxBtnY;
 
     Rect startBtn = {10, btnY, (int16_t)(Config::SCREEN_WIDTH - 20), BTN_H};
-    drawStartButton(tft, startBtn);
+    drawButtonFrame(tft, startBtn);
 
-    while (true) {
-        TouchInput::Point tap;
-        if (!TouchInput::wasTapped(tap)) { MenuStars::update(tft); delay(20); continue; }
-        if (startBtn.contains(tap.x, tap.y)) return;
+    // Automatic countdown in the button instead of a tappable
+    // "Flightradar" text - continues automatically into the splash
+    // screen/app afterward. Tapping the button during the countdown
+    // skips the wait immediately (same expectation as other buttons in
+    // the app). 7 seconds total (7-6-5-4-3-2-1, 1 second each) instead of
+    // the original 3 seconds - a bit more time to read the message above
+    // before it automatically continues.
+    constexpr uint32_t COUNTDOWN_STEP_MS = 1000;
+    constexpr int8_t COUNTDOWN_START = 7;
+    for (int8_t count = COUNTDOWN_START; count >= 1; count--) {
+        drawCountdownText(tft, startBtn, String(count));
+
+        uint32_t stepStart = millis();
+        bool skipped = false;
+        while (millis() - stepStart < COUNTDOWN_STEP_MS) {
+            TouchInput::Point tap;
+            if (TouchInput::wasTapped(tap) && startBtn.contains(tap.x, tap.y)) {
+                skipped = true;
+                break;
+            }
+            MenuStars::update(tft);
+            delay(20);
+        }
+        if (skipped) break;
     }
 }
 

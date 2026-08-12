@@ -28,7 +28,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 2. Insert a FAT32-formatted microSD card into your display.
 3. On first boot: Calibrate the touchscreen and configure your Wi-Fi via the built-in on-screen keyboard.
 
-**Guided first-time setup:** after language selection, a one-time (skippable) screen explains why setting your exact location gives a much better experience than automatic IP-based location, and offers to set it up right there via the address search. A final setup-complete screen then confirms everything is saved and ready before you enter the app.
+**Guided first-time setup:** a Welcome screen with the animated radar graphic greets you first, followed by language selection, then a one-time (skippable) screen that explains why setting your exact location gives a much better experience than automatic IP-based location and offers to set it up right there via the address search. A final setup-complete screen then confirms everything is saved and ready, counting down automatically before entering the app (or tap to skip ahead).
 
 **Tip:** for the best experience, set your exact location as a Location Preset (Menu → Flight Options → Location Presets → "+" → Search by address). Just type your address and the device looks up the exact coordinates for you automatically - no need to look anything up yourself. This is much more accurate than automatic IP-based location, which can easily be off by 20-30 km - you might hear a plane outside your window while the radar screen stays empty because the device thinks you're somewhere else entirely. With your precise location set, the proximity LED blinks in sync with aircraft you can actually hear overhead. You'll also be prompted to set this up right during first-time setup.
 
@@ -58,6 +58,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Adjustable brightness** (10-100% in 10% steps, Menu → System → "Brightness") with a live preview as you tap
 - **Metric/Imperial units** (Menu → Region → "Units") consistently applied across the radar range button, range ring labels, aircraft list, nearest-airport distance, and stats
 - **About screen** (Menu → System → "About") shows the project name, a short description, and the current firmware version
+- **Backup & Reset** (Menu → System → "Backup & Reset") – back up or restore your settings, or fully reset the device (wipes all on-device data and re-runs first-time setup) - handy for testing or handing the device to someone else
 
 ## Feature Deep-Dive
 

@@ -456,9 +456,20 @@ void setup() {
         haltWithSdRequiredScreen();
         return;
     }
-    SdStorage::seedDefaultDataFiles();
 
     bool isFirstRun = !SD.exists(Config::SD_SETTINGS_FILE);
+
+    // The Flightradar folder structure and default data files are
+    // deliberately NOT created yet on a first boot - that happens further
+    // down, after the Start button on the Welcome screen has been tapped
+    // (the button is "the gate to the app": nothing should exist on the
+    // card before that). On every later boot the structure already
+    // exists anyway - creating it immediately here is harmless,
+    // ensureDir()/writeIfAbsent() are idempotent.
+    if (!isFirstRun) {
+        SdStorage::createStructure();
+        SdStorage::seedDefaultDataFiles();
+    }
 
     SettingsStore::load();
     tft.invertDisplay(SettingsStore::displayInverted());
@@ -488,6 +499,12 @@ void setup() {
     // da die Sprachauswahl (FirstRunLanguageScreen) erst danach kommt,
     // siehe first_run_welcome_screen.cpp.
     if (isFirstRun) {
+        // Creating the folder structure, seeding default data files, AND
+        // showing the loading indicator during those (noticeably slow) SD
+        // accesses now all happen directly inside
+        // FirstRunWelcomeScreen::run() (triggered by the Start tap) - see
+        // there for why (button otherwise looked frozen, repeated tapping
+        // let a tap leak into calibration).
         FirstRunWelcomeScreen::run(tft);
     }
 
