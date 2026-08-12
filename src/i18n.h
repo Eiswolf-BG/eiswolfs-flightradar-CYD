@@ -297,6 +297,12 @@ enum class StringId : uint8_t {
     MENU_FACTORY_RESET_DELETING,
     MENU_FACTORY_RESET_FAILED,
 
+    // Small, centered hint below the countdown button on the "Setup
+    // complete" screen (first_run_complete_screen.cpp) - makes it visible
+    // that tapping the button skips the 7-second countdown immediately
+    // instead of waiting it out.
+    FIRST_RUN_COMPLETE_TAP_TO_SKIP,
+
     COUNT
 };
 

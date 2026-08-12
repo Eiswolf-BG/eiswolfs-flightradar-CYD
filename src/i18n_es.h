@@ -237,6 +237,7 @@ static const char* const I18N_ES[] = {
     "Elimina TODOS los datos de la tarjeta SD (ajustes, registro de vuelos, ubicaciones guardadas, WiFi, calibración) y reinicia el dispositivo. Después se ejecutará de nuevo la configuración inicial completa, como en el primer arranque. ¡Esto NO se puede deshacer!",
     "Eliminando todos los datos...",
     "Error al reiniciar.",
+    "Toca para saltar",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,
