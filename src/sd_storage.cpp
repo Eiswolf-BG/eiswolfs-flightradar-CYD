@@ -108,15 +108,18 @@ bool init() {
     sdSpi.begin(Config::SD_SPI_CLK_PIN, Config::SD_SPI_MISO_PIN,
                 Config::SD_SPI_MOSI_PIN, Config::SD_SPI_CS_PIN);
     mounted = SD.begin(Config::SD_SPI_CS_PIN, sdSpi, 4000000);
-    if (!mounted) return false;
-
-    ensureDir(Config::SD_ROOT_DIR);
-    ensureDir(Config::SD_LOG_DIR);
-    ensureDir(Config::SD_SCREENSHOT_DIR);
-    return true;
+    return mounted;
 }
 
 bool isMounted() { return mounted; }
+
+void createStructure() {
+    if (!mounted) return;
+    SdMutex::Guard guard;
+    ensureDir(Config::SD_ROOT_DIR);
+    ensureDir(Config::SD_LOG_DIR);
+    ensureDir(Config::SD_SCREENSHOT_DIR);
+}
 
 void seedDefaultDataFiles() {
     if (!mounted) return;

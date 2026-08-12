@@ -15,11 +15,19 @@ namespace {
         int16_t avgY() const { return n ? (int16_t)(sumY / n) : 0; }
     };
 
+    // Mini radar target: same look as the radar graphic on the splash/
+    // welcome screen (concentric rings + crosshair in green), but without
+    // aircraft - instead a green filled center point as the point to aim
+    // at, replacing the previous red filled circle with white center dot.
+    // Radii deliberately kept small so the targets in the screen corners
+    // (edge margin M=24, see run()) don't extend past the screen edge.
     void drawTarget(TFT_eSPI& tft, int16_t x, int16_t y) {
-        tft.fillCircle(x, y, 10, TFT_RED);
-        tft.drawFastHLine(x - 16, y, 32, TFT_RED);
-        tft.drawFastVLine(x, y - 16, 32, TFT_RED);
-        tft.fillCircle(x, y, 3, TFT_WHITE);
+        uint16_t dim = 0x0320;
+        tft.drawCircle(x, y, 16, dim);
+        tft.drawCircle(x, y, 10, dim);
+        tft.drawFastHLine((int16_t)(x - 18), y, 36, TFT_GREEN);
+        tft.drawFastVLine(x, (int16_t)(y - 18), 36, TFT_GREEN);
+        tft.fillCircle(x, y, 3, TFT_GREEN);
     }
 
     RawAvg waitForTap(TFT_eSPI& tft) {

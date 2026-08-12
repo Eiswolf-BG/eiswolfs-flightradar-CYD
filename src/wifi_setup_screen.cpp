@@ -185,6 +185,26 @@ namespace {
     void drawCancelButton(TFT_eSPI& tft) {
         drawButton(tft, cancelBtn, "X");
     }
+
+    // Small loading indicator ("."/".."/"...") during the WiFi scan (which
+    // can take several seconds) - without visible feedback the screen
+    // looked "frozen" during that time and people tapped impatiently,
+    // which (see comment at the end of the Scanning->PickSsid transition
+    // below) could cause mistaps in the freshly shown network list.
+    uint8_t scanDotPhase = 0;
+    uint32_t lastScanDotMs = 0;
+    constexpr uint32_t SCAN_DOT_INTERVAL_MS = 350;
+
+    void updateScanningDots(TFT_eSPI& tft) {
+        uint32_t now = millis();
+        if (now - lastScanDotMs < SCAN_DOT_INTERVAL_MS) return;
+        lastScanDotMs = now;
+        scanDotPhase = (uint8_t)((scanDotPhase + 1) % 4);
+        tft.fillRect(10, 26, 40, 12, TFT_BLACK);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setCursor(10, 26);
+        for (uint8_t i = 0; i < scanDotPhase; i++) tft.print(".");
+    }
 }
 
 bool run(TFT_eSPI& tft) {
@@ -197,6 +217,8 @@ bool run(TFT_eSPI& tft) {
     scrollOffset = 0;
     resetKeyboardState();
     needsRedraw = true;
+    scanDotPhase = 0;
+    lastScanDotMs = 0;
 
     WifiMgr::beginScan();
 
@@ -227,6 +249,16 @@ bool run(TFT_eSPI& tft) {
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.println(ssidCount == 0 ? I18n::t(StringId::WIFI_NO_NETWORKS) : I18n::t(StringId::WIFI_SELECT));
             drawCancelButton(tft);
+
+            // "tapped"/"tap" were captured for the previous state
+            // (Stage::Scanning) - without discarding it, a tap that
+            // happened to land exactly in the frame the scan finished
+            // would immediately be evaluated below against the
+            // BRAND-NEW (and, to the user, not yet visible) network list
+            // - at a position the user never intentionally tapped. That
+            // is what let impatient repeated tapping during the scan
+            // eventually pick a "random" wrong network.
+            tapped = false;
         }
 
         if (stage == Stage::Connecting) {
@@ -268,6 +300,15 @@ bool run(TFT_eSPI& tft) {
                         resetKeyboardState();
                         stage = Stage::EnterPassword;
                         needsRedraw = true;
+                        // Prevents this same tap (on a network name) from
+                        // also being evaluated against the password
+                        // keyboard further down in the same pass - "stage"
+                        // is already EnterPassword at this point, and the
+                        // network list rows and keyboard key rows
+                        // partially overlap in Y, so without this a
+                        // network selection could immediately also type a
+                        // stray character.
+                        tapped = false;
                     }
                 }
                 if (ssidCount > VISIBLE_ITEMS) {
@@ -334,6 +375,7 @@ bool run(TFT_eSPI& tft) {
         }
 
         if (!needsRedraw) {
+            if (stage == Stage::Scanning) updateScanningDots(tft);
             MenuStars::update(tft);
             delay(20);
             continue;

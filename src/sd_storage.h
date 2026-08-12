@@ -5,6 +5,14 @@ namespace SdStorage {
 
     bool init();
     bool isMounted();
+
+    // Creates the Flightradar folder structure (root/log/screenshot dirs)
+    // on the SD card - deliberately split out from init() (which now only
+    // mounts the card), so that on the very first boot nothing gets
+    // created on the card until the user has tapped Start on the Welcome
+    // screen (see main.cpp: the button is "the gate to the app"). Safe to
+    // call immediately on every later boot - ensureDir() is idempotent.
+    void createStructure();
     void seedDefaultDataFiles();
     void logEvent(const char* csvLine);
 
