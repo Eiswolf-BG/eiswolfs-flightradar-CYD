@@ -257,7 +257,13 @@ namespace {
         if (lat == 0.0 && lon == 0.0) return false;
 
         String name = runPresetNameKeypad(tft);
-        return LocationPresets::addPreset(lat, lon, name);
+        if (!LocationPresets::addPreset(lat, lon, name)) return false;
+        // Neu angelegtes Preset sofort aktivieren, gleiches Verhalten wie
+        // beim Anlegen per Adresssuche (siehe address_search_screen.cpp) -
+        // sonst blieb z.B. der automatische IP-Standort aktiv, obwohl gerade
+        // extra ein neuer Standort eingegeben wurde.
+        LocationPresets::setActiveIndex((int8_t)(LocationPresets::count() - 1));
+        return true;
     }
 
     // Erster Schritt beim Antippen von "+": manuelle Koordinaten oder
@@ -719,7 +725,11 @@ void run(TFT_eSPI& tft) {
         }
         if (!handled && nearest.found && airportRect.contains(tap.x, tap.y)) {
             if (canAdd) {
-                LocationPresets::addPreset(nearest.lat, nearest.lon, nearest.name);
+                if (LocationPresets::addPreset(nearest.lat, nearest.lon, nearest.name)) {
+                    // Gleiches Verhalten wie bei den anderen beiden Wegen,
+                    // ein Preset anzulegen - sofort aktivieren.
+                    LocationPresets::setActiveIndex((int8_t)(LocationPresets::count() - 1));
+                }
             } else {
                 showBriefMessage(tft, I18n::t(StringId::LOCATION_PRESETS_FULL), TFT_RED);
             }

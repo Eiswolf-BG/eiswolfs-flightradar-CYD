@@ -610,7 +610,12 @@ bool run(TFT_eSPI& tft) {
         if (choice == 0) continue;
 
         String name = runNameKeypad(tft);
-        return LocationPresets::addPreset(lat, lon, name);
+        if (!LocationPresets::addPreset(lat, lon, name)) return false;
+        // Neu angelegtes Preset sofort aktivieren - sonst blieb z.B. der
+        // automatische IP-Standort aktiv, obwohl gerade extra eine genauere
+        // Adresse eingegeben wurde (siehe Alex' Feedback).
+        LocationPresets::setActiveIndex((int8_t)(LocationPresets::count() - 1));
+        return true;
     }
 }
 

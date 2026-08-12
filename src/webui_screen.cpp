@@ -54,63 +54,6 @@ namespace {
         }
         return y;
     }
-
-    // QR-Code-Unterscreen: zeigt die WebUI-URL als QR-Code, damit man sie
-    // nicht mehr von Hand ins Handy tippen muss. Nutzt die ricmoo/QRCode-
-    // Bibliothek (kein dynamisches Allozieren, Version fest auf 4/33x33
-    // Module mit niedrigster Fehlerkorrektur, reicht locker fuer eine kurze
-    // "http://192.168.x.x/"-URL).
-    void runQrScreen(TFT_eSPI& tft, const String& url) {
-        QRCode qrcode;
-        uint8_t qrData[qrcode_getBufferSize(4)];
-        qrcode_initText(&qrcode, qrData, 4, ECC_LOW, url.c_str());
-
-        constexpr int16_t MODULE_PX = 6;
-        constexpr int16_t QUIET_ZONE = 4;
-        int16_t qrPx = qrcode.size * MODULE_PX;
-        int16_t boxPx = qrPx + 2 * QUIET_ZONE * MODULE_PX;
-        int16_t boxX = (Config::SCREEN_WIDTH - boxPx) / 2;
-        int16_t boxY = 30;
-
-        tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
-        tft.setCursor(10, 14);
-        tft.println(I18n::t(StringId::WEBUI_TITLE));
-
-        tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
-        tft.drawString(I18n::t(StringId::WEBUI_QR_HINT), Config::SCREEN_WIDTH / 2, boxY - 6);
-        tft.setTextDatum(TL_DATUM);
-
-        tft.fillRect(boxX, boxY + 10, boxPx, boxPx, TFT_WHITE);
-        for (uint8_t y = 0; y < qrcode.size; y++) {
-            for (uint8_t x = 0; x < qrcode.size; x++) {
-                if (qrcode_getModule(&qrcode, x, y)) {
-                    int16_t px = boxX + QUIET_ZONE * MODULE_PX + x * MODULE_PX;
-                    int16_t py = boxY + 10 + QUIET_ZONE * MODULE_PX + y * MODULE_PX;
-                    tft.fillRect(px, py, MODULE_PX, MODULE_PX, TFT_BLACK);
-                }
-            }
-        }
-
-        int16_t urlY = boxY + 10 + boxPx + 16;
-        tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.drawString(url, Config::SCREEN_WIDTH / 2, urlY);
-        tft.setTextDatum(TL_DATUM);
-
-        Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
-        drawButton(tft, backBtn, I18n::t(StringId::BACK));
-
-        while (true) {
-            TouchInput::Point tap;
-            if (TouchInput::wasTapped(tap)) {
-                if (backBtn.contains(tap.x, tap.y)) return;
-            }
-            MenuStars::update(tft);
-            delay(20);
-        }
-    }
 }
 
 void run(TFT_eSPI& tft) {
@@ -119,24 +62,54 @@ void run(TFT_eSPI& tft) {
     constexpr int16_t textMaxWidth = Config::SCREEN_WIDTH - 20;
     constexpr int16_t LINE_H = 16;
     constexpr int16_t VIEW_TOP = 36;
-    constexpr int16_t VIEW_BOTTOM = Config::SCREEN_HEIGHT - 60;
+
+    // Wenn WLAN verbunden ist, bekommt der Absatztext nur noch ein kleines
+    // (bei Bedarf scrollbares) Fenster, weil darunter fest der QR-Code samt
+    // IP-Adresse Platz braucht (siehe Alex' Feedback: der vorherige separate
+    // "QR"-Button oben rechts sah seltsam aus - jetzt wird der Code direkt
+    // hier gezeigt, mittig, mit der IP-Adresse mittig darunter). Ohne WLAN
+    // gibt es keinen QR-Code, der Text bekommt dann wie vorher die volle
+    // Bildschirmhoehe.
+    constexpr int16_t TEXT_VIEW_BOTTOM_CONNECTED = 84;
+    constexpr int16_t TEXT_VIEW_BOTTOM_DISCONNECTED = Config::SCREEN_HEIGHT - 60;
 
     bool wifiConnected = WiFi.status() == WL_CONNECTED;
     String urlLine = wifiConnected ? ("http://" + WiFi.localIP().toString() + "/") : String();
+    int16_t viewBottom = wifiConnected ? TEXT_VIEW_BOTTOM_CONNECTED : TEXT_VIEW_BOTTOM_DISCONNECTED;
 
-    // Gesamthoehe vorab berechnen (draw=false), um zu wissen, ob Scroll-
-    // Pfeile gebraucht werden - muss exakt zur Zeichenreihenfolge in
-    // redraw() unten passen.
+    // QR-Code einmalig erzeugen (die URL aendert sich waehrend dieser
+    // Bildschirm offen ist nicht). Version 4 (33x33 Module) reicht mit
+    // deutlicher Reserve fuer eine "http://<lokale-IP>/"-URL (max. rund 24
+    // Zeichen) - ECC_LOW statt eines hoeheren Fehlerkorrektur-Levels, um die
+    // Module moeglichst gross (und damit leicht scannbar) darstellen zu
+    // koennen.
+    constexpr uint8_t QR_VERSION = 4;
+    constexpr int16_t QR_SIZE_MODULES = 33; // Version 4: 4*4+17 = 33
+    constexpr int16_t QR_BLOCK = 4;
+    constexpr int16_t QR_QUIET = 2; // Ruhezone in Modulen rundherum, Scanner brauchen etwas Rand
+    constexpr int16_t QR_PIXEL_SIZE = (QR_SIZE_MODULES + 2 * QR_QUIET) * QR_BLOCK;
+    constexpr int16_t QR_X = (Config::SCREEN_WIDTH - QR_PIXEL_SIZE) / 2;
+    constexpr int16_t QR_GAP = 6;
+    constexpr int16_t QR_Y = TEXT_VIEW_BOTTOM_CONNECTED + QR_GAP;
+    constexpr int16_t IP_TEXT_Y = QR_Y + QR_PIXEL_SIZE + QR_GAP + 8;
+
+    uint8_t qrData[qrcode_getBufferSize(QR_VERSION)];
+    QRCode qrcode;
+    if (wifiConnected) {
+        qrcode_initText(&qrcode, qrData, QR_VERSION, ECC_LOW, urlLine.c_str());
+    }
+
+    // Gesamthoehe des Absatztextes vorab berechnen (draw=false), um zu
+    // wissen, ob Scroll-Pfeile gebraucht werden - muss exakt zur
+    // Zeichenreihenfolge in redraw() unten passen.
     int16_t totalH = VIEW_TOP;
     totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::WEBUI_INFO_PARA1), 0, 0, 0, false);
-    totalH += 8;
-    if (wifiConnected) {
-        totalH += LINE_H;
-    } else {
+    if (!wifiConnected) {
+        totalH += 8;
         totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::WEBUI_INFO_PARA2), 0, 0, 0, false);
     }
 
-    int16_t maxScroll = totalH - VIEW_BOTTOM;
+    int16_t maxScroll = totalH - viewBottom;
     if (maxScroll < 0) maxScroll = 0;
     bool scrollable = maxScroll > 0;
     int16_t scrollY = 0;
@@ -148,8 +121,6 @@ void run(TFT_eSPI& tft) {
     Rect downBtn = {190, (int16_t)(Config::SCREEN_HEIGHT - 50), 38, 40};
     constexpr int16_t SCROLL_STEP = 48;
 
-    Rect qrBtn = {(int16_t)(Config::SCREEN_WIDTH - 40), 2, 30, 24};
-
     auto redraw = [&]() {
         tft.fillScreen(TFT_BLACK);
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
@@ -158,27 +129,37 @@ void run(TFT_eSPI& tft) {
 
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
         int16_t y = VIEW_TOP;
-        y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::WEBUI_INFO_PARA1), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
-        y += 8;
+        y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::WEBUI_INFO_PARA1), scrollY, VIEW_TOP, viewBottom, true);
+        if (!wifiConnected) {
+            y += 8;
+            layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::WEBUI_INFO_PARA2), scrollY, VIEW_TOP, viewBottom, true);
+        }
+
         if (wifiConnected) {
-            int16_t screenY = y - scrollY;
-            if (screenY >= VIEW_TOP && screenY <= VIEW_BOTTOM) {
-                tft.setTextColor(TFT_WHITE, TFT_BLACK);
-                tft.setCursor(10, screenY);
-                tft.print(urlLine);
+            // QR-Code + IP-Adresse stehen fest unterhalb des (ggf.
+            // scrollbaren) Textes, unabhaengig von scrollY - beides mittig
+            // zentriert, direkt ueber dem Zurueck-Button.
+            tft.fillRect(QR_X, QR_Y, QR_PIXEL_SIZE, QR_PIXEL_SIZE, TFT_WHITE);
+            for (uint8_t my = 0; my < qrcode.size; my++) {
+                for (uint8_t mx = 0; mx < qrcode.size; mx++) {
+                    if (qrcode_getModule(&qrcode, mx, my)) {
+                        int16_t px = (int16_t)(QR_X + (QR_QUIET + mx) * QR_BLOCK);
+                        int16_t py = (int16_t)(QR_Y + (QR_QUIET + my) * QR_BLOCK);
+                        tft.fillRect(px, py, QR_BLOCK, QR_BLOCK, TFT_BLACK);
+                    }
+                }
             }
-        } else {
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::WEBUI_INFO_PARA2), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
+
+            tft.setTextDatum(MC_DATUM);
+            tft.setTextColor(TFT_WHITE, TFT_BLACK);
+            tft.drawString(urlLine, Config::SCREEN_WIDTH / 2, IP_TEXT_Y);
+            tft.setTextDatum(TL_DATUM);
         }
 
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
         if (scrollable) {
             drawButton(tft, upBtn, "^");
             drawButton(tft, downBtn, "v");
-        }
-        if (wifiConnected) {
-            drawButton(tft, qrBtn, "QR");
         }
     };
 
@@ -187,10 +168,8 @@ void run(TFT_eSPI& tft) {
     while (true) {
         TouchInput::Point tap;
         if (TouchInput::wasTapped(tap)) {
-            if (backBtn.contains(tap.x, tap.y)) return;
-            if (wifiConnected && qrBtn.contains(tap.x, tap.y)) {
-                runQrScreen(tft, urlLine);
-                redraw();
+            if (backBtn.contains(tap.x, tap.y)) {
+                return;
             } else if (scrollable && upBtn.contains(tap.x, tap.y) && scrollY > 0) {
                 scrollY -= SCROLL_STEP;
                 if (scrollY < 0) scrollY = 0;
