@@ -126,6 +126,27 @@ namespace {
 
     String onOff(bool on) { return I18n::t(on ? StringId::ON : StringId::OFF); }
 
+    // Fortschrittspunkte-Anzeige waehrend SettingsBackup::backup()/restore()
+    // laufen (siehe Aufrufe unten in Page::BackupReset) - diese sind
+    // synchrone, SD-lastige Vorgaenge, die spuerbar dauern koennen und den
+    // Button vorher wie eingefroren wirken liessen. SettingsBackup ruft den
+    // hier uebergebenen Funktionszeiger vor jedem der beiden Kopiervorgaenge
+    // (erst Einstellungen, dann WLAN) auf. Namespace-globale Zeiger/Variablen
+    // statt Lambda-Capture, da ein einfacher C-Funktionszeiger uebergeben
+    // werden muss (kein std::function im Projekt).
+    TFT_eSPI* progressTft = nullptr;
+    Rect progressBtnRect;
+    String progressLabel;
+    uint8_t progressDots = 0;
+
+    void drawProgressStep() {
+        if (!progressTft) return;
+        progressDots++;
+        String label = progressLabel;
+        for (uint8_t i = 0; i < progressDots; i++) label += ".";
+        drawButton(*progressTft, progressBtnRect, label);
+    }
+
     String screenTimeoutLabel(uint8_t minutes) {
         String prefix = I18n::t(StringId::MENU_SCREEN_TIMEOUT_PREFIX);
         if (minutes == 0) return prefix + I18n::t(StringId::NEVER);
@@ -449,12 +470,22 @@ void run(TFT_eSPI& tft) {
             }
 
             if (backupBtn.contains(tap.x, tap.y)) {
-                bool ok = SettingsBackup::backup();
+                progressTft = &tft;
+                progressBtnRect = backupBtn;
+                progressLabel = I18n::t(StringId::MENU_BACKUP);
+                progressDots = 0;
+                bool ok = SettingsBackup::backup(drawProgressStep);
+                progressTft = nullptr;
                 showBriefMessage(tft, I18n::t(ok ? StringId::MENU_BACKUP_SAVED : StringId::MENU_BACKUP_FAILED),
                                  ok ? TFT_GREEN : TFT_RED);
             } else if (restoreBtn.contains(tap.x, tap.y)) {
                 if (SettingsBackup::hasBackup()) {
-                    bool ok = SettingsBackup::restore();
+                    progressTft = &tft;
+                    progressBtnRect = restoreBtn;
+                    progressLabel = I18n::t(StringId::MENU_RESTORE);
+                    progressDots = 0;
+                    bool ok = SettingsBackup::restore(drawProgressStep);
+                    progressTft = nullptr;
                     showBriefMessage(tft, I18n::t(ok ? StringId::MENU_RESTORED : StringId::MENU_RESTORE_FAILED),
                                      ok ? TFT_GREEN : TFT_RED);
                 }

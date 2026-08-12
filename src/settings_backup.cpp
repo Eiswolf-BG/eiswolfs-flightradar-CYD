@@ -33,20 +33,24 @@ namespace {
     }
 }
 
-bool backup() {
+bool backup(void (*onStep)()) {
     if (!SdStorage::isMounted()) return false;
     SdMutex::Guard guard;
 
+    if (onStep) onStep();
     bool okSettings = copyFile(Config::SD_SETTINGS_FILE, SETTINGS_BACKUP_FILE);
+    if (onStep) onStep();
     bool okWifi = copyFile(Config::SD_WIFI_CREDENTIALS_FILE, WIFI_BACKUP_FILE);
     return okSettings || okWifi;
 }
 
-bool restore() {
+bool restore(void (*onStep)()) {
     if (!SdStorage::isMounted()) return false;
     SdMutex::Guard guard;
 
+    if (onStep) onStep();
     bool okSettings = copyFile(SETTINGS_BACKUP_FILE, Config::SD_SETTINGS_FILE);
+    if (onStep) onStep();
     bool okWifi = copyFile(WIFI_BACKUP_FILE, Config::SD_WIFI_CREDENTIALS_FILE);
     return okSettings || okWifi;
 }
