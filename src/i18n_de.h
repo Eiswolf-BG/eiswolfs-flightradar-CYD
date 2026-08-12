@@ -238,6 +238,8 @@ static const char* const I18N_DE[] = {
     "Lösche alle Daten...",
     "Zurücksetzen fehlgeschlagen.",
     "Tippen zum Überspringen",
+    "Route: ",
+    "Mit dem Handy scannen:",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

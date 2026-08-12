@@ -4,6 +4,7 @@
 #include "config.h"
 #include "i18n.h"
 #include <WiFi.h>
+#include <qrcode.h>
 
 namespace WebUiScreen {
 
@@ -53,6 +54,63 @@ namespace {
         }
         return y;
     }
+
+    // QR-Code-Unterscreen: zeigt die WebUI-URL als QR-Code, damit man sie
+    // nicht mehr von Hand ins Handy tippen muss. Nutzt die ricmoo/QRCode-
+    // Bibliothek (kein dynamisches Allozieren, Version fest auf 4/33x33
+    // Module mit niedrigster Fehlerkorrektur, reicht locker fuer eine kurze
+    // "http://192.168.x.x/"-URL).
+    void runQrScreen(TFT_eSPI& tft, const String& url) {
+        QRCode qrcode;
+        uint8_t qrData[qrcode_getBufferSize(4)];
+        qrcode_initText(&qrcode, qrData, 4, ECC_LOW, url.c_str());
+
+        constexpr int16_t MODULE_PX = 6;
+        constexpr int16_t QUIET_ZONE = 4;
+        int16_t qrPx = qrcode.size * MODULE_PX;
+        int16_t boxPx = qrPx + 2 * QUIET_ZONE * MODULE_PX;
+        int16_t boxX = (Config::SCREEN_WIDTH - boxPx) / 2;
+        int16_t boxY = 30;
+
+        tft.fillScreen(TFT_BLACK);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setCursor(10, 14);
+        tft.println(I18n::t(StringId::WEBUI_TITLE));
+
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.drawString(I18n::t(StringId::WEBUI_QR_HINT), Config::SCREEN_WIDTH / 2, boxY - 6);
+        tft.setTextDatum(TL_DATUM);
+
+        tft.fillRect(boxX, boxY + 10, boxPx, boxPx, TFT_WHITE);
+        for (uint8_t y = 0; y < qrcode.size; y++) {
+            for (uint8_t x = 0; x < qrcode.size; x++) {
+                if (qrcode_getModule(&qrcode, x, y)) {
+                    int16_t px = boxX + QUIET_ZONE * MODULE_PX + x * MODULE_PX;
+                    int16_t py = boxY + 10 + QUIET_ZONE * MODULE_PX + y * MODULE_PX;
+                    tft.fillRect(px, py, MODULE_PX, MODULE_PX, TFT_BLACK);
+                }
+            }
+        }
+
+        int16_t urlY = boxY + 10 + boxPx + 16;
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.drawString(url, Config::SCREEN_WIDTH / 2, urlY);
+        tft.setTextDatum(TL_DATUM);
+
+        Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+        drawButton(tft, backBtn, I18n::t(StringId::BACK));
+
+        while (true) {
+            TouchInput::Point tap;
+            if (TouchInput::wasTapped(tap)) {
+                if (backBtn.contains(tap.x, tap.y)) return;
+            }
+            MenuStars::update(tft);
+            delay(20);
+        }
+    }
 }
 
 void run(TFT_eSPI& tft) {
@@ -90,6 +148,8 @@ void run(TFT_eSPI& tft) {
     Rect downBtn = {190, (int16_t)(Config::SCREEN_HEIGHT - 50), 38, 40};
     constexpr int16_t SCROLL_STEP = 48;
 
+    Rect qrBtn = {(int16_t)(Config::SCREEN_WIDTH - 40), 2, 30, 24};
+
     auto redraw = [&]() {
         tft.fillScreen(TFT_BLACK);
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
@@ -117,6 +177,9 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, upBtn, "^");
             drawButton(tft, downBtn, "v");
         }
+        if (wifiConnected) {
+            drawButton(tft, qrBtn, "QR");
+        }
     };
 
     redraw();
@@ -125,7 +188,10 @@ void run(TFT_eSPI& tft) {
         TouchInput::Point tap;
         if (TouchInput::wasTapped(tap)) {
             if (backBtn.contains(tap.x, tap.y)) return;
-            if (scrollable && upBtn.contains(tap.x, tap.y) && scrollY > 0) {
+            if (wifiConnected && qrBtn.contains(tap.x, tap.y)) {
+                runQrScreen(tft, urlLine);
+                redraw();
+            } else if (scrollable && upBtn.contains(tap.x, tap.y) && scrollY > 0) {
                 scrollY -= SCROLL_STEP;
                 if (scrollY < 0) scrollY = 0;
                 redraw();

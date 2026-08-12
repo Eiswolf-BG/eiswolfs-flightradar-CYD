@@ -214,7 +214,7 @@ bool run(TFT_eSPI& tft) {
         } else {
             for (uint8_t i = 0; i < visibleRowCount; i++) {
                 if (rowRects[i].contains(tap.x, tap.y)) {
-                    RadarScreen::selectAircraft(snapshot[scrollTop + i].hex);
+                    RadarScreen::selectAircraft(snapshot[scrollTop + i].hex, snapshot[scrollTop + i].callsign);
                     selected = true;
                     break;
                 }

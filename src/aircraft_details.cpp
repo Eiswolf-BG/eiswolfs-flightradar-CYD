@@ -12,6 +12,7 @@ namespace {
     SemaphoreHandle_t mutex = nullptr;
 
     char pendingHex[7] = {0};
+    char pendingCallsign[9] = {0};
     bool hasPending = false;
 
     char cachedHex[7] = {0};
@@ -33,11 +34,12 @@ namespace {
     }
 }
 
-void request(const char* hex) {
+void request(const char* hex, const char* callsign) {
     ensureMutex();
     xSemaphoreTake(mutex, portMAX_DELAY);
     if (strcmp(cachedHex, hex) != 0 && strcmp(pendingHex, hex) != 0) {
         strncpy(pendingHex, hex, sizeof(pendingHex) - 1);
+        strncpy(pendingCallsign, callsign ? callsign : "", sizeof(pendingCallsign) - 1);
         hasPending = true;
     }
     xSemaphoreGive(mutex);
@@ -60,11 +62,13 @@ void update() {
     ensureMutex();
 
     char hex[7] = {0};
+    char callsign[9] = {0};
     bool doWork = false;
 
     xSemaphoreTake(mutex, portMAX_DELAY);
     if (hasPending) {
         strncpy(hex, pendingHex, sizeof(hex) - 1);
+        strncpy(callsign, pendingCallsign, sizeof(callsign) - 1);
         doWork = true;
     }
     xSemaphoreGive(mutex);
@@ -112,6 +116,28 @@ void update() {
                 } else if (type[0]) {
                     strncpy(result.model, type, sizeof(result.model) - 1);
                 }
+            }
+        }
+    }
+
+    // Flugroute (Start-/Zielflughafen) - derselbe adsbdb.com-Dienst wie oben,
+    // aber ueber den Callsign-Endpunkt statt Hex-Code abgefragt (liefert
+    // dafuer origin/destination-Flughafendaten zurueck). Nur versuchen, wenn
+    // ueberhaupt ein Rufzeichen bekannt ist - Sichtflug-Maschinen ohne
+    // Callsign haben ohnehin keine darueber auswertbare Route.
+    String trimmedCallsign = String(callsign);
+    trimmedCallsign.trim();
+    if (trimmedCallsign.length() > 0) {
+        client.setTimeout(4000);
+        String body3;
+        if (httpGetString(client, String("https://api.adsbdb.com/v0/callsign/") + trimmedCallsign, body3)) {
+            JsonDocument doc3;
+            DeserializationError err3 = deserializeJson(doc3, body3);
+            if (!err3) {
+                const char* originIcao = doc3["response"]["flightroute"]["origin"]["icao_code"] | "";
+                const char* destIcao = doc3["response"]["flightroute"]["destination"]["icao_code"] | "";
+                strncpy(result.routeOrigin, originIcao, sizeof(result.routeOrigin) - 1);
+                strncpy(result.routeDest, destIcao, sizeof(result.routeDest) - 1);
             }
         }
     }

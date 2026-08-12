@@ -303,6 +303,19 @@ enum class StringId : uint8_t {
     // instead of waiting it out.
     FIRST_RUN_COMPLETE_TAP_TO_SKIP,
 
+    // Zeilenpraefix im Radar-Detailpanel (radar_screen.cpp::drawDetailPanel)
+    // fuer die Flugroute (Start- -> Zielflughafen, ICAO-Code), abgefragt
+    // ueber AircraftDetails per Rufzeichen. Faellt wie MODEL/TYPE/SQUAWK auf
+    // DETAIL_UNKNOWN zurueck, wenn kein Rufzeichen bekannt ist oder keine
+    // Route gefunden wurde.
+    DETAIL_ROUTE,
+
+    // Hinweiszeile ueber dem QR-Code auf dem neuen QR-Unterscreen der
+    // Logbuch/WebUI-Seite (webui_screen.cpp::runQrScreen) - der WEBUI_TITLE-
+    // String wird fuer die Kopfzeile wiederverwendet, kein eigener Titel
+    // noetig.
+    WEBUI_QR_HINT,
+
     COUNT
 };
 

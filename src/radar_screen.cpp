@@ -57,7 +57,12 @@ namespace {
         return L;
     }
 
-    constexpr int16_t DETAIL_PANEL_H = 264;
+    // +22px gegenueber frueher (264) fuer die neue Route-Zeile (siehe
+    // drawDetailPanel()) - beeinflusst NUR die Groesse des Detail-Panel-
+    // Overlays, nicht das normale Radar-Layout (computeLayout() oben
+    // richtet sich ausschliesslich nach infoBarHeight(), nicht nach
+    // DETAIL_PANEL_H).
+    constexpr int16_t DETAIL_PANEL_H = 286;
 
     struct HitPoint {
         int16_t x, y;
@@ -70,6 +75,7 @@ namespace {
         bool isEmergency;
         bool isWatched;
         bool isGroundVehicle;
+        bool isRotorcraft;
     };
     constexpr uint8_t MAX_HIT_POINTS = Config::MAX_TRACKED_AIRCRAFT;
     HitPoint hitPoints[MAX_HIT_POINTS];
@@ -333,6 +339,19 @@ namespace {
         gfx.fillRect((int16_t)(x - HALF), (int16_t)(y - HALF), (int16_t)(2 * HALF), (int16_t)(2 * HALF), color);
     }
 
+    // Eigener Marker fuer Hubschrauber (ADS-B-Emitter-Kategorie "A7" =
+    // Rotorcraft) - ein gefuellter Kreis mit durchgehendem Rotorkreuz statt
+    // Pfeilkopf, da Hubschrauber im Schwebeflug keinen aussagekraeftigen
+    // "nach vorne"-Kurs wie ein Flugzeug haben (gleiche Ueberlegung wie beim
+    // Bodenfahrzeug-Marker, der aus demselben Grund ebenfalls ohne
+    // Kurslinie auskommt).
+    void drawHelicopterMarker(TFT_eSPI& gfx, int16_t x, int16_t y, uint16_t color) {
+        constexpr int16_t ROTOR_LEN = 8;
+        gfx.fillCircle(x, y, 4, color);
+        gfx.drawLine((int16_t)(x - ROTOR_LEN), y, (int16_t)(x + ROTOR_LEN), y, color);
+        gfx.drawLine(x, (int16_t)(y - ROTOR_LEN), x, (int16_t)(y + ROTOR_LEN), color);
+    }
+
     void printLineTruncated(TFT_eSPI& gfx, int16_t x, int16_t y, int16_t maxWidth, const String& text) {
         String s = text;
         if (gfx.textWidth(s) > maxWidth) {
@@ -507,7 +526,7 @@ namespace {
         bool valid = false;
         char hex[7] = {0};
         String callsignText;
-        LineMarquee airline, model, type, alt, speed, climb, distHeading, squawk, seats;
+        LineMarquee airline, model, type, route, alt, speed, climb, distHeading, squawk, seats;
     };
     PanelState lastPanel;
 
@@ -580,6 +599,7 @@ namespace {
         advanceAndDrawMarqueeLine(gfx, lastPanel.airline);
         advanceAndDrawMarqueeLine(gfx, lastPanel.model);
         advanceAndDrawMarqueeLine(gfx, lastPanel.type);
+        advanceAndDrawMarqueeLine(gfx, lastPanel.route);
         advanceAndDrawMarqueeLine(gfx, lastPanel.alt);
         advanceAndDrawMarqueeLine(gfx, lastPanel.speed);
         advanceAndDrawMarqueeLine(gfx, lastPanel.climb);
@@ -631,6 +651,24 @@ namespace {
 
         String typeLine = String(I18n::t(StringId::DETAIL_TYPE)) + (a.typeCode[0] ? a.typeCode : I18n::t(StringId::DETAIL_UNKNOWN));
         updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.type, typeLine, forceFull);
+        y += LINE_H;
+
+        // Start-/Zielflughafen (ICAO-Code) ueber AircraftDetails::get() -
+        // wird zusammen mit dem Modell abgefragt (siehe aircraft_details.cpp),
+        // aber ueber das Rufzeichen statt den Hex-Code aufgeloest. Ohne
+        // Rufzeichen (z.B. manche Sichtflug-Maschinen) bleibt die Route
+        // grundsaetzlich unbekannt, kein Abruf noetig.
+        String routeLine;
+        if (!a.callsign[0]) {
+            routeLine = String(I18n::t(StringId::DETAIL_ROUTE)) + I18n::t(StringId::DETAIL_UNKNOWN);
+        } else if (details.loading) {
+            routeLine = String(I18n::t(StringId::DETAIL_ROUTE)) + I18n::t(StringId::DETAIL_LOADING_DOTS);
+        } else if (details.routeOrigin[0] && details.routeDest[0]) {
+            routeLine = String(I18n::t(StringId::DETAIL_ROUTE)) + details.routeOrigin + " -> " + details.routeDest;
+        } else {
+            routeLine = String(I18n::t(StringId::DETAIL_ROUTE)) + I18n::t(StringId::DETAIL_UNKNOWN);
+        }
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.route, routeLine, forceFull);
         y += LINE_H;
 
         char buf[48];
@@ -860,6 +898,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         // oben) - eigene Farbe/Marker statt der hoehenbasierten Flugzeug-
         // Darstellung, siehe drawGroundVehicleMarker()/colorForGroundVehicle().
         bool isGroundVehicle = a.category[0] == 'C';
+        bool isRotorcraft = a.category[0] == 'A' && a.category[1] == '7';
         uint16_t color = isGroundVehicle ? colorForGroundVehicle(tft) : colorForAltitude(tft, a.altBaroFt);
         bool isSelected = selectedHex[0] && strcmp(a.hex, selectedHex) == 0;
         bool isEmergency = SettingsStore::emergencyAlertEnabled() && isEmergencySquawk(a.squawk);
@@ -873,6 +912,8 @@ void render(TFT_eSPI& tft, int16_t top) {
         }
         if (isGroundVehicle) {
             drawGroundVehicleMarker(tft, pt.x, pt.y, color);
+        } else if (isRotorcraft) {
+            drawHelicopterMarker(tft, pt.x, pt.y, color);
         } else {
             drawAircraftMarker(tft, pt.x, pt.y, a.headingDeg, color);
         }
@@ -898,6 +939,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         hitPoints[i].isEmergency = isEmergency;
         hitPoints[i].isWatched = isWatched;
         hitPoints[i].isGroundVehicle = isGroundVehicle;
+        hitPoints[i].isRotorcraft = isRotorcraft;
         strncpy(hitPoints[i].hex, a.hex, sizeof(hitPoints[i].hex) - 1);
         strncpy(hitPoints[i].callsign, a.callsign, sizeof(hitPoints[i].callsign) - 1);
     }
@@ -1007,6 +1049,8 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             // beruehren.
             if (hp.isGroundVehicle) {
                 drawGroundVehicleMarker(tft, hp.x, hp.y, TFT_BLACK);
+            } else if (hp.isRotorcraft) {
+                drawHelicopterMarker(tft, hp.x, hp.y, TFT_BLACK);
             } else {
                 drawAircraftMarker(tft, hp.x, hp.y, hp.headingDeg, TFT_BLACK);
             }
@@ -1023,6 +1067,8 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
 
         if (hp.isGroundVehicle) {
             drawGroundVehicleMarker(tft, hp.x, hp.y, hp.color);
+        } else if (hp.isRotorcraft) {
+            drawHelicopterMarker(tft, hp.x, hp.y, hp.color);
         } else {
             drawAircraftMarker(tft, hp.x, hp.y, hp.headingDeg, hp.color);
         }
@@ -1108,7 +1154,7 @@ bool handleTap(int16_t x, int16_t y, int16_t top) {
             int16_t dy = y - hitPoints[i].y;
             if (dx * dx + dy * dy <= 12 * 12) {
                 strncpy(selectedHex, hitPoints[i].hex, sizeof(selectedHex) - 1);
-                AircraftDetails::request(hitPoints[i].hex);
+                AircraftDetails::request(hitPoints[i].hex, hitPoints[i].callsign);
                 return true;
             }
         }
@@ -1129,7 +1175,7 @@ bool handleTap(int16_t x, int16_t y, int16_t top) {
         int16_t dy = y - hitPoints[i].y;
         if (dx * dx + dy * dy <= 12 * 12) {
             strncpy(selectedHex, hitPoints[i].hex, sizeof(selectedHex) - 1);
-            AircraftDetails::request(hitPoints[i].hex);
+            AircraftDetails::request(hitPoints[i].hex, hitPoints[i].callsign);
             return true;
         }
     }
@@ -1152,9 +1198,9 @@ bool handleTap(int16_t x, int16_t y, int16_t top) {
     return true;
 }
 
-void selectAircraft(const char* hex) {
+void selectAircraft(const char* hex, const char* callsign) {
     strncpy(selectedHex, hex, sizeof(selectedHex) - 1);
-    AircraftDetails::request(hex);
+    AircraftDetails::request(hex, callsign);
     // Erzwingt einen kompletten Neuaufbau des Detail-Panels beim naechsten
     // render() - wichtig, falls der Bildschirm zwischenzeitlich von einem
     // anderen Screen (z.B. der Flugzeugliste) ueberschrieben wurde, sonst
