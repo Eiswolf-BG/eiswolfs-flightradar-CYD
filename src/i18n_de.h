@@ -240,6 +240,15 @@ static const char* const I18N_DE[] = {
     "Tippen zum Überspringen",
     "Route: ",
     "Mit dem Handy scannen:",
+    "Nach Update suchen",
+    "Suche nach Updates...",
+    "Prüfung fehlgeschlagen. WLAN prüfen.",
+    "Bereits aktuell: v",
+    "Update verfügbar: v",
+    "Ein neues Firmware-Update wird heruntergeladen und installiert. Das Gerät startet danach automatisch neu. Bitte WLAN-Verbindung und Stromversorgung während des Vorgangs nicht unterbrechen.",
+    "Installiere Update ",
+    "Update fehlgeschlagen.",
+    "Installiert! Neustart...",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

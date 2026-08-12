@@ -240,6 +240,15 @@ static const char* const I18N_TR[] = {
     "Atlamak için dokun",
     "Rota: ",
     "Telefonla tarayın:",
+    "Güncelleme ara",
+    "Güncellemeler aranıyor...",
+    "Kontrol başarısız. WiFi bağlantınızı kontrol edin.",
+    "Zaten güncel: v",
+    "Güncelleme mevcut: v",
+    "Yeni bir donanım yazılımı güncellemesi indirilip yüklenecek. Cihaz bundan sonra otomatik olarak yeniden başlayacak. Lütfen bu işlem sırasında WiFi bağlantısını veya güç kaynağını kesmeyin.",
+    "Güncelleme yükleniyor ",
+    "Güncelleme başarısız.",
+    "Yüklendi! Yeniden başlatılıyor...",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,
