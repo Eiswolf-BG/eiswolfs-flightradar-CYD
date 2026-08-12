@@ -29,6 +29,7 @@
 #include "flight_logbook.h"
 #include "weather.h"
 #include "i18n.h"
+#include "first_run_welcome_screen.h"
 #include "first_run_language_screen.h"
 #include "first_run_location_screen.h"
 #include "first_run_complete_screen.h"
@@ -480,6 +481,15 @@ void setup() {
     // vor dem Radarscreen auf.
     MenuStars::update(tft);
     SplashScreen::setStatusLine(tft, 0, I18n::t(StringId::SPLASH_SD_OK), TFT_WHITE);
+
+    // Willkommens-Screen laeuft nur beim allerersten Start (isFirstRun) und
+    // bewusst VOR der Touch-Kalibrierung - der erste Eindruck, bevor man
+    // ueberhaupt zum Kalibrieren aufgefordert wird. Englisch hart kodiert,
+    // da die Sprachauswahl (FirstRunLanguageScreen) erst danach kommt,
+    // siehe first_run_welcome_screen.cpp.
+    if (isFirstRun) {
+        FirstRunWelcomeScreen::run(tft);
+    }
 
     if (!TouchInput::loadCalibration()) {
         CalibrationScreen::run(tft);
