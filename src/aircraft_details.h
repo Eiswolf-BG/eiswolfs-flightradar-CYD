@@ -10,11 +10,19 @@ namespace AircraftDetails {
     struct Info {
         bool loading = false;
         char model[40] = {0}; // e.g. "Airbus A320 216", empty if unknown
+
+        // Departure/destination airport (ICAO code, e.g. "KIAH"/"EDDF") of
+        // the current flight route, looked up by callsign via the same
+        // adsbdb.com service used for the model fallback above - empty if
+        // no callsign is known or no route was found for it.
+        char routeOrigin[8] = {0};
+        char routeDest[8] = {0};
     };
 
     // Called from Core 1 (touch selection): marks that details should be
-    // fetched for this aircraft (if not already done).
-    void request(const char* hex);
+    // fetched for this aircraft (if not already done). callsign may be
+    // empty (no route lookup is attempted in that case).
+    void request(const char* hex, const char* callsign);
 
     // Called from Core 1 to get the current (possibly still incomplete)
     // state for 'hex'.

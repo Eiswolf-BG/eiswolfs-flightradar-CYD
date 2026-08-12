@@ -12,7 +12,7 @@ namespace RadarScreen {
     // aus, nicht per Antippen auf dem Radar) - damit beim naechsten render()
     // sofort das Detail-Panel fuer dieses Flugzeug erscheint, so als haette
     // man es direkt im Radar angetippt.
-    void selectAircraft(const char* hex);
+    void selectAircraft(const char* hex, const char* callsign);
 
     struct EmergencyInfo {
         bool active = false;
