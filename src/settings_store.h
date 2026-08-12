@@ -50,6 +50,12 @@ namespace SettingsStore {
     bool nightDimmingEnabled();
     void setNightDimmingEnabled(bool on);
 
+    // Ruhebildschirm bei Inaktivitaets-Timeout (siehe main.cpp) - AUS per
+    // Default, damit sich am bisherigen Verhalten (Backlight komplett aus)
+    // nichts aendert, wer es nicht explizit einschaltet.
+    bool screensaverEnabled();
+    void setScreensaverEnabled(bool on);
+
     bool hideGroundVehicles();
     void setHideGroundVehicles(bool on);
 

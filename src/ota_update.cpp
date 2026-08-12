@@ -68,17 +68,21 @@ CheckInfo checkForUpdate() {
     strncpy(info.latestVersion, (tag[0] == 'v' || tag[0] == 'V') ? tag + 1 : tag,
             sizeof(info.latestVersion) - 1);
 
+    // Der Release-Workflow (siehe CLAUDE.md im Repo) laedt die gebaute
+    // Firmware unter dem Namen "CYD-flightradar.bin" als Release-Asset
+    // hoch (umbenannt aus dem rohen "firmware.bin"-Build-Artefakt) - das
+    // ist auch der Dateiname, unter dem der Web-Flasher sie erwartet.
     JsonArray assets = doc["assets"];
     for (JsonObject asset : assets) {
         const char* name = asset["name"] | "";
-        if (strcmp(name, "firmware.bin") == 0) {
+        if (strcmp(name, "CYD-flightradar.bin") == 0) {
             const char* url = asset["browser_download_url"] | "";
             strncpy(info.downloadUrl, url, sizeof(info.downloadUrl) - 1);
             break;
         }
     }
 
-    if (!info.downloadUrl[0]) return info; // Release ohne firmware.bin-Anhang
+    if (!info.downloadUrl[0]) return info; // Release ohne CYD-flightradar.bin-Anhang
 
     int cmp = compareVersions(info.latestVersion, Config::APP_VERSION);
     info.result = (cmp > 0) ? CheckResult::UpdateAvailable : CheckResult::UpToDate;

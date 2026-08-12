@@ -316,6 +316,11 @@ enum class StringId : uint8_t {
     // noetig.
     WEBUI_QR_HINT,
 
+    // Ruhebildschirm bei Inaktivitaets-Timeout (Menue > System >
+    // "Ruhebildschirm", siehe SettingsStore::screensaverEnabled() und
+    // main.cpp).
+    MENU_SCREENSAVER,
+
     // OTA-Firmware-Update ueber WLAN (Menue > System > "Nach Update
     // suchen", siehe menu_screen.cpp::runOtaUpdateScreen() und
     // ota_update.h/.cpp).

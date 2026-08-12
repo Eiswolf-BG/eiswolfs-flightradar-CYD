@@ -241,6 +241,7 @@ static const char* const I18N_EN[] = {
     "Tap to skip",
     "Route: ",
     "Scan with your phone:",
+    "Screensaver: ",
     "Check for update",
     "Checking for updates...",
     "Check failed. Check your WiFi connection.",

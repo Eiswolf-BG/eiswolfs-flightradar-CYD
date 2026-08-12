@@ -240,6 +240,7 @@ static const char* const I18N_TR[] = {
     "Atlamak için dokun",
     "Rota: ",
     "Telefonla tarayın:",
+    "Ekran koruyucu: ",
     "Güncelleme ara",
     "Güncellemeler aranıyor...",
     "Kontrol başarısız. WiFi bağlantınızı kontrol edin.",
