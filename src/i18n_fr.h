@@ -240,6 +240,7 @@ static const char* const I18N_FR[] = {
     "Toucher pour passer",
     "Trajet : ",
     "Scanner avec le téléphone :",
+    "Écran de veille : ",
     "Rechercher une mise à jour",
     "Recherche de mises à jour...",
     "Échec de la vérification. Vérifiez votre connexion WiFi.",

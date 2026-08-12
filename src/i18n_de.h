@@ -240,6 +240,7 @@ static const char* const I18N_DE[] = {
     "Tippen zum Überspringen",
     "Route: ",
     "Mit dem Handy scannen:",
+    "Ruhebildschirm: ",
     "Nach Update suchen",
     "Suche nach Updates...",
     "Prüfung fehlgeschlagen. WLAN prüfen.",

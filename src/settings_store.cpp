@@ -22,6 +22,7 @@ namespace {
     bool ledHeartbeatOn = true;
     uint8_t screenTimeoutMin = 0;
     bool nightDimmingOn = true;
+    bool screensaverOn = false;
     bool hideGroundVehiclesOn = true;
     uint8_t languageIdx = 0;
     uint8_t unitsModeVal = 0;
@@ -59,6 +60,8 @@ namespace {
             if (v >= 0 && v <= 10) screenTimeoutMin = (uint8_t)v;
         } else if (key == "night_dimming") {
             nightDimmingOn = (value.toInt() != 0);
+        } else if (key == "screensaver") {
+            screensaverOn = (value.toInt() != 0);
         } else if (key == "hide_ground_vehicles") {
             hideGroundVehiclesOn = (value.toInt() != 0);
         } else if (key == "language") {
@@ -122,6 +125,7 @@ void save() {
     f.printf("led_heartbeat=%d\n", ledHeartbeatOn ? 1 : 0);
     f.printf("screen_timeout_min=%d\n", screenTimeoutMin);
     f.printf("night_dimming=%d\n", nightDimmingOn ? 1 : 0);
+    f.printf("screensaver=%d\n", screensaverOn ? 1 : 0);
     f.printf("hide_ground_vehicles=%d\n", hideGroundVehiclesOn ? 1 : 0);
     f.printf("language=%d\n", languageIdx);
     f.printf("units_mode=%d\n", unitsModeVal);
@@ -216,6 +220,13 @@ bool nightDimmingEnabled() { return nightDimmingOn; }
 
 void setNightDimmingEnabled(bool on) {
     nightDimmingOn = on;
+    save();
+}
+
+bool screensaverEnabled() { return screensaverOn; }
+
+void setScreensaverEnabled(bool on) {
+    screensaverOn = on;
     save();
 }
 

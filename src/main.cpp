@@ -60,6 +60,15 @@ uint32_t lastInteractionMs = 0;
 bool screenDimmed = false;
 bool nightDimActive = false;
 
+// Ruhebildschirm (Menue > System > Ruhebildschirm, siehe SettingsStore::
+// screensaverEnabled()) - true, waehrend statt des komplett dunklen
+// Backlights ein gedimmter Sternenhimmel mit Uhrzeit angezeigt wird.
+// Getrennt von screenDimmed, da NICHT jeder Timeout automatisch ein
+// Ruhebildschirm ist (Default bleibt: Backlight komplett aus) - siehe
+// loop() weiter unten.
+bool screensaverShowing = false;
+uint32_t lastScreensaverClockMs = 0;
+
 // Wandelt die Nutzer-Helligkeit (Menue > System > Helligkeit, 10-100%) in
 // einen PWM-Wert 0-255 um - ersetzt das bisher fest verdrahtete
 // BACKLIGHT_FULL als "normale" Helligkeit ueberall unten.
@@ -280,6 +289,41 @@ void drawWifiIcon(int16_t rightX, int16_t rowTop, int16_t rowH, int8_t rssi) {
         tft.fillRect(x, baseline - barH, BAR_W, barH, color);
         x += BAR_W + BAR_GAP;
     }
+}
+
+// Grosse, zentrierte Uhrzeit fuer den Ruhebildschirm (siehe
+// screensaverShowing oben) - eigene, groessere Variante der kleinen
+// Kopfzeilen-Uhr aus updateStatusLine(), da diese bewusst kompakt gehalten
+// ist. Loescht bei jedem Aufruf nur den eigenen schmalen Streifen in der
+// Bildschirmmitte (nicht den ganzen Bildschirm), damit die Sternenanimation
+// darum herum ungestoert weiterlaeuft. Zeichnet nichts, solange die Uhrzeit
+// noch nicht per NTP synchronisiert ist (gleiche Pruefung wie
+// updateStatusLine()/isNightDimHours()).
+void drawScreensaverClock() {
+    time_t now = time(nullptr);
+    if (now <= 8 * 3600 * 2) return;
+
+    struct tm tmNow;
+    localtime_r(&now, &tmNow);
+    char timeBuf[9];
+    if (LocationManager::useMetricUnits()) {
+        snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", tmNow.tm_hour, tmNow.tm_min);
+    } else {
+        int hour12 = tmNow.tm_hour % 12;
+        if (hour12 == 0) hour12 = 12;
+        snprintf(timeBuf, sizeof(timeBuf), "%d:%02d%s", hour12, tmNow.tm_min,
+                 tmNow.tm_hour < 12 ? "AM" : "PM");
+    }
+
+    constexpr int16_t CLOCK_BAND_H = 40;
+    int16_t cy = Config::SCREEN_HEIGHT / 2;
+    tft.fillRect(0, (int16_t)(cy - CLOCK_BAND_H / 2), Config::SCREEN_WIDTH, CLOCK_BAND_H, TFT_BLACK);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+    tft.setTextSize(3);
+    tft.drawString(timeBuf, Config::SCREEN_WIDTH / 2, cy);
+    tft.setTextSize(1);
+    tft.setTextDatum(TL_DATUM);
 }
 
 constexpr int16_t WIFI_ICON_W = 22;
@@ -604,6 +648,18 @@ void loop() {
             nightDimActive = shouldNightDim;
             screenDimmed = false;
             tapped = false;
+
+            if (screensaverShowing) {
+                // Der Ruhebildschirm hat den kompletten Bildschirminhalt
+                // ueberschrieben (Sternenhimmel + Uhrzeit) - anders als beim
+                // normalen Timeout (nur Backlight aus, Inhalt blieb im
+                // TFT-Speicher unveraendert stehen) muss hier explizit neu
+                // gezeichnet werden.
+                screensaverShowing = false;
+                drawHeader();
+                updateStatusLine();
+                forceRedraw = true;
+            }
         }
     }
 
@@ -657,17 +713,38 @@ void loop() {
     if (!screenDimmed && timeoutMin > 0) {
         uint32_t timeoutMs = (uint32_t)timeoutMin * 60000UL;
         if (nowMs - lastInteractionMs >= timeoutMs) {
-            // Bewusst ganz aus (0) statt nur gedimmt - fuer den
-            // Bildschirm-Timeout (Menue > System > Timeout). Dimmen
-            // uebernimmt bereits der separate Nachtmodus
-            // (updateNightDimming()); der Inaktivitaets-Timeout soll das
-            // Display wirklich abschalten, z.B. fuer Plane-Spotter, die nur
-            // das Flugbuch mitlaufen lassen wollen, ohne den Screen zu
-            // brauchen. Ein Antippen weckt ihn ueber den screenDimmed-Zweig
-            // oben wieder auf die eingestellte Helligkeit (bzw. Nachtmodus-
-            // Helligkeit, falls gerade Nachtstunden sind).
-            ledcWrite(BACKLIGHT_PWM_CHANNEL, 0);
+            if (SettingsStore::screensaverEnabled()) {
+                // Ruhebildschirm statt komplett dunkel (Menue > System >
+                // Ruhebildschirm, AUS per Default) - gedimmter
+                // Sternenhimmel mit grosser Uhrzeit statt des Backlights
+                // ganz aus, fuer alle, die trotz Inaktivitaets-Timeout noch
+                // etwas auf dem Display sehen wollen.
+                screensaverShowing = true;
+                ledcWrite(BACKLIGHT_PWM_CHANNEL, nightDimBacklightPwm());
+                tft.fillScreen(TFT_BLACK);
+                MenuStars::reset();
+                lastScreensaverClockMs = 0; // sofortiges erstes Zeichnen erzwingen
+            } else {
+                // Bewusst ganz aus (0) statt nur gedimmt - fuer den
+                // Bildschirm-Timeout (Menue > System > Timeout). Dimmen
+                // uebernimmt bereits der separate Nachtmodus
+                // (updateNightDimming()); der Inaktivitaets-Timeout soll das
+                // Display wirklich abschalten, z.B. fuer Plane-Spotter, die nur
+                // das Flugbuch mitlaufen lassen wollen, ohne den Screen zu
+                // brauchen. Ein Antippen weckt ihn ueber den screenDimmed-Zweig
+                // oben wieder auf die eingestellte Helligkeit (bzw. Nachtmodus-
+                // Helligkeit, falls gerade Nachtstunden sind).
+                ledcWrite(BACKLIGHT_PWM_CHANNEL, 0);
+            }
             screenDimmed = true;
+        }
+    }
+
+    if (screenDimmed && screensaverShowing) {
+        MenuStars::update(tft);
+        if (nowMs - lastScreensaverClockMs >= 1000) {
+            lastScreensaverClockMs = nowMs;
+            drawScreensaverClock();
         }
     }
 }
