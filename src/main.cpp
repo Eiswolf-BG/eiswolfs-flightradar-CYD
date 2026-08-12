@@ -681,14 +681,24 @@ void loop() {
         }
     }
 
-    if (forceRedraw || millis() - lastPollMs >= POLL_INTERVAL_MS) {
-        lastPollMs = millis();
-        uint32_t currentVersion = AircraftTable::version();
-        if (forceRedraw || currentVersion != lastRenderedVersion) {
-            lastRenderedVersion = currentVersion;
-            forceRedraw = false;
-            RadarScreen::render(tft, CONTENT_TOP);
-            lastSweepMs = millis();
+    // Waehrend der Ruhebildschirm aktiv ist (screensaverShowing), duerfen
+    // Radar-Rendering/Sweep/Statuszeile den Bildschirm NICHT mehr
+    // ueberschreiben - sonst wuerde der naechste Aircraft-Update-Zyklus
+    // (oder der Sweep-Tick) den gedimmten Sternenhimmel jederzeit wieder mit
+    // dem vollen Radarbild uebermalen, waehrend gleichzeitig
+    // drawScreensaverClock() im Sekundentakt seinen Streifen drueberzeichnet
+    // - das Ergebnis war sichtbares Geflacker zwischen Radarbild und Uhr
+    // statt eines ruhigen Sternenhimmels.
+    if (!screensaverShowing) {
+        if (forceRedraw || millis() - lastPollMs >= POLL_INTERVAL_MS) {
+            lastPollMs = millis();
+            uint32_t currentVersion = AircraftTable::version();
+            if (forceRedraw || currentVersion != lastRenderedVersion) {
+                lastRenderedVersion = currentVersion;
+                forceRedraw = false;
+                RadarScreen::render(tft, CONTENT_TOP);
+                lastSweepMs = millis();
+            }
         }
     }
 
@@ -696,17 +706,19 @@ void loop() {
 
     RadarScreen::updateProximityAlert(nowMs);
 
-    if (nowMs - lastSweepMs >= SWEEP_TICK_MS) {
-        uint32_t deltaMs = nowMs - lastSweepMs;
-        lastSweepMs = nowMs;
-        RadarScreen::tick(tft, CONTENT_TOP, deltaMs);
-        updateEmergencyBanner(nowMs);
-    }
+    if (!screensaverShowing) {
+        if (nowMs - lastSweepMs >= SWEEP_TICK_MS) {
+            uint32_t deltaMs = nowMs - lastSweepMs;
+            lastSweepMs = nowMs;
+            RadarScreen::tick(tft, CONTENT_TOP, deltaMs);
+            updateEmergencyBanner(nowMs);
+        }
 
-    if (nowMs - lastStatusLineMs >= STATUS_LINE_UPDATE_MS) {
-        lastStatusLineMs = nowMs;
-        updateStatusLine();
-        updateNightDimming();
+        if (nowMs - lastStatusLineMs >= STATUS_LINE_UPDATE_MS) {
+            lastStatusLineMs = nowMs;
+            updateStatusLine();
+            updateNightDimming();
+        }
     }
 
     uint8_t timeoutMin = SettingsStore::screenTimeoutMinutes();
