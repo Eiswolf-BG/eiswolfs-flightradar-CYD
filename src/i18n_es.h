@@ -240,6 +240,15 @@ static const char* const I18N_ES[] = {
     "Toca para saltar",
     "Ruta: ",
     "Escanea con el móvil:",
+    "Buscar actualización",
+    "Buscando actualizaciones...",
+    "Error al comprobar. Revisa tu conexión WiFi.",
+    "Ya actualizado: v",
+    "Actualización disponible: v",
+    "Se descargará e instalará una nueva actualización de firmware. El dispositivo se reiniciará automáticamente después. No interrumpas la conexión WiFi ni la alimentación durante este proceso.",
+    "Instalando actualización ",
+    "Error al actualizar.",
+    "¡Instalado! Reiniciando...",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

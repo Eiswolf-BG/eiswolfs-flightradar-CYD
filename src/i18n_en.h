@@ -241,6 +241,15 @@ static const char* const I18N_EN[] = {
     "Tap to skip",
     "Route: ",
     "Scan with your phone:",
+    "Check for update",
+    "Checking for updates...",
+    "Check failed. Check your WiFi connection.",
+    "Already up to date: v",
+    "Update available: v",
+    "A new firmware update will be downloaded and installed. The device will restart automatically afterwards. Please don't interrupt the WiFi connection or power supply during this process.",
+    "Installing update ",
+    "Update failed.",
+    "Installed! Restarting...",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

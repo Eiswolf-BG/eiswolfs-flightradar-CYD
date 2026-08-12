@@ -6,6 +6,7 @@
 #include "stats_history_screen.h"
 #include "logbook_files_screen.h"
 #include "webui_screen.h"
+#include "ota_update.h"
 #include "location_presets_screen.h"
 #include "airline_filter_screen.h"
 #include "aircraft_watchlist_screen.h"
@@ -84,8 +85,9 @@ namespace {
     // "Sicherung & Reset"-Unterseite ausgelagert wurden (siehe
     // BACKUP_RESET_ROW_COUNT unten) und dort durch einen einzelnen
     // Ordner-Button ersetzt wurden: -2 (Backup/Restore raus) +1 (neuer
-    // Ordner-Button) = 9.
-    constexpr uint8_t SYSTEM_ROW_COUNT = 9;
+    // Ordner-Button) = 9. Danach +1 fuer den neuen "Nach Update
+    // suchen"-Punkt (OTA-Update, siehe ota_update.h) = 10.
+    constexpr uint8_t SYSTEM_ROW_COUNT = 10;
     constexpr int16_t SYSTEM_ROW_GAP = 4;
     constexpr int16_t SYSTEM_START_Y = 18;
     constexpr int16_t SYSTEM_END_Y = Config::SCREEN_HEIGHT - 10;
@@ -216,7 +218,15 @@ namespace {
     // allen anderen Menue-Screens (nur der Radar-Screen selbst spart sich
     // das wegen der CPU-Last durch Abfragen/Zeichnen). Gibt true zurueck,
     // wenn "OK" angetippt wurde, false bei "Zurueck".
-    bool confirmWarningScreen(TFT_eSPI& tft, StringId titleId, StringId bodyId) {
+    //
+    // title/body stehen VOR dem Aufruf per I18n::t() fest (statt StringIds
+    // entgegenzunehmen), damit auch dynamisch zusammengesetzte Texte (z.B.
+    // mit eingefuegter Versionsnummer bei OTA) moeglich sind. accentColor
+    // (Default TFT_RED fuer die beiden bestehenden, wirklich destruktiven
+    // Aufrufer) faerbt Rahmen und Titel - der OTA-Aufrufer uebergibt
+    // TFT_GREEN, da ein Update zwar bestaetigt werden sollte, aber keine
+    // "gefaehrliche" Loesch-Aktion wie Werksreset/Flugbuch ist.
+    bool confirmWarningScreen(TFT_eSPI& tft, const String& title, const String& body, uint16_t accentColor = TFT_RED) {
         constexpr int16_t BOX_X = 4;
         constexpr int16_t BOX_Y = 4;
         constexpr int16_t BOX_W = Config::SCREEN_WIDTH - 2 * BOX_X;
@@ -241,7 +251,6 @@ namespace {
         constexpr int16_t VIEW_BOTTOM_NO_SCROLL = OK_Y - 8;
         constexpr int16_t VIEW_BOTTOM_SCROLL = VIEW_BOTTOM_NO_SCROLL - SCROLL_ROW_H - SCROLL_ROW_GAP;
 
-        String body = I18n::t(bodyId);
         int16_t totalH = layoutWrapped(tft, BOX_X + 10, VIEW_TOP, TEXT_MAX_WIDTH, LINE_H, body, 0, 0, 0, false);
 
         bool scrollable = (totalH - VIEW_BOTTOM_NO_SCROLL) > 0;
@@ -261,12 +270,12 @@ namespace {
 
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
-            tft.drawRoundRect(BOX_X, BOX_Y, BOX_W, BOX_H, 6, TFT_RED);
+            tft.drawRoundRect(BOX_X, BOX_Y, BOX_W, BOX_H, 6, accentColor);
 
             tft.setTextDatum(MC_DATUM);
-            tft.setTextColor(TFT_RED, TFT_BLACK);
+            tft.setTextColor(accentColor, TFT_BLACK);
             tft.setTextSize(2);
-            tft.drawString(I18n::t(titleId), BOX_X + BOX_W / 2, TITLE_Y);
+            tft.drawString(title, BOX_X + BOX_W / 2, TITLE_Y);
             tft.setTextSize(1);
             tft.setTextDatum(TL_DATUM);
 
@@ -300,6 +309,75 @@ namespace {
             }
             MenuStars::update(tft);
             delay(20);
+        }
+    }
+
+    // Fortschrittsanzeige waehrend OtaUpdate::performUpdate() laeuft -
+    // gleiches Namespace-globale-Zeiger-Prinzip wie progressTft oben (siehe
+    // Settings-Backup-Fortschrittspunkte), da OtaUpdate::performUpdate()
+    // ebenfalls einen einfachen C-Funktionszeiger erwartet, keine
+    // Lambda-Capture erlaubt.
+    TFT_eSPI* otaProgressTft = nullptr;
+
+    void drawOtaProgress(uint8_t percent) {
+        if (!otaProgressTft) return;
+        TFT_eSPI& t = *otaProgressTft;
+        String label = String(I18n::t(StringId::OTA_INSTALLING_PREFIX)) + String(percent) + "%";
+        t.fillRect(0, (int16_t)(Config::SCREEN_HEIGHT / 2 - 14), Config::SCREEN_WIDTH, 28, TFT_BLACK);
+        t.setTextDatum(MC_DATUM);
+        t.setTextColor(TFT_GREEN, TFT_BLACK);
+        t.setTextSize(2);
+        t.drawString(label, Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
+        t.setTextSize(1);
+        t.setTextDatum(TL_DATUM);
+    }
+
+    // Kompletter Ablauf fuer "Nach Update suchen" (System-Menue) - Pruefung
+    // gegen GitHub-Releases, bei verfuegbarem Update explizite Bestaetigung
+    // (confirmWarningScreen() mit gruenem statt rotem Akzent - ein Update
+    // ist keine destruktive Aktion wie Werksreset, verdient aber trotzdem
+    // eine bewusste Bestaetigung, da WLAN/Strom waehrend des Vorgangs nicht
+    // unterbrochen werden sollten), danach Fortschrittsanzeige waehrend
+    // Download+Flash. Startet das Geraet bei Erfolg selbst neu.
+    void runOtaUpdateScreen(TFT_eSPI& tft) {
+        MenuStars::reset();
+        tft.fillScreen(TFT_BLACK);
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.drawString(I18n::t(StringId::OTA_CHECKING), Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
+        tft.setTextDatum(TL_DATUM);
+
+        OtaUpdate::CheckInfo info = OtaUpdate::checkForUpdate();
+
+        if (info.result == OtaUpdate::CheckResult::Error) {
+            showBriefMessage(tft, I18n::t(StringId::OTA_CHECK_FAILED), TFT_RED);
+            return;
+        }
+        if (info.result == OtaUpdate::CheckResult::UpToDate) {
+            showBriefMessage(tft, String(I18n::t(StringId::OTA_UP_TO_DATE_PREFIX)) + info.latestVersion, TFT_GREEN);
+            return;
+        }
+
+        String title = String(I18n::t(StringId::OTA_UPDATE_AVAILABLE_PREFIX)) + info.latestVersion;
+        bool confirmed = confirmWarningScreen(tft, title, I18n::t(StringId::OTA_CONFIRM_BODY), TFT_GREEN);
+        if (!confirmed) return;
+
+        otaProgressTft = &tft;
+        tft.fillScreen(TFT_BLACK);
+        drawOtaProgress(0);
+        bool ok = OtaUpdate::performUpdate(info.downloadUrl, drawOtaProgress);
+        otaProgressTft = nullptr;
+
+        if (ok) {
+            tft.fillScreen(TFT_BLACK);
+            tft.setTextDatum(MC_DATUM);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.drawString(I18n::t(StringId::OTA_UPDATE_SUCCESS), Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
+            tft.setTextDatum(TL_DATUM);
+            delay(1500);
+            ESP.restart();
+        } else {
+            showBriefMessage(tft, I18n::t(StringId::OTA_UPDATE_FAILED), TFT_RED);
         }
     }
 
@@ -390,13 +468,15 @@ void run(TFT_eSPI& tft) {
             Rect nightDimBtn  = systemRowRect(4);
             Rect webuiBtn     = systemRowRect(5);
             // "Sicherung & Reset" (Backup/Restore/Werksreset, siehe
-            // Page::BackupReset unten) steht bewusst direkt ueber "Info",
-            // das seinerseits als letzter Punkt direkt ueber dem Zurueck-
-            // Button steht - so bleiben beide Positionen stabil, egal wie
-            // viele weitere Punkte davor noch dazukommen.
+            // Page::BackupReset unten) und "Nach Update suchen" stehen
+            // bewusst direkt ueber "Info", das seinerseits als letzter
+            // Punkt direkt ueber dem Zurueck-Button steht - so bleiben
+            // beide Positionen stabil, egal wie viele weitere Punkte davor
+            // noch dazukommen.
             Rect backupResetBtn = systemRowRect(6);
-            Rect aboutBtn     = systemRowRect(7);
-            Rect backBtn      = systemRowRect(8);
+            Rect checkUpdateBtn = systemRowRect(7);
+            Rect aboutBtn     = systemRowRect(8);
+            Rect backBtn      = systemRowRect(9);
 
             drawButton(tft, calibBtn, I18n::t(StringId::MENU_CALIBRATE));
 
@@ -410,6 +490,7 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, nightDimBtn, I18n::t(StringId::MENU_NIGHT_DIMMING) + onOff(SettingsStore::nightDimmingEnabled()));
             drawButton(tft, webuiBtn, I18n::t(StringId::MENU_LOGBOOK_WEBUI));
             drawButton(tft, backupResetBtn, I18n::t(StringId::MENU_BACKUP_RESET));
+            drawButton(tft, checkUpdateBtn, I18n::t(StringId::MENU_CHECK_UPDATE));
             drawButton(tft, aboutBtn, I18n::t(StringId::MENU_ABOUT));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
@@ -436,6 +517,8 @@ void run(TFT_eSPI& tft) {
                 SettingsStore::setNightDimmingEnabled(!SettingsStore::nightDimmingEnabled());
             } else if (backupResetBtn.contains(tap.x, tap.y)) {
                 page = Page::BackupReset;
+            } else if (checkUpdateBtn.contains(tap.x, tap.y)) {
+                runOtaUpdateScreen(tft);
             } else if (aboutBtn.contains(tap.x, tap.y)) {
                 AboutScreen::run(tft);
             } else if (webuiBtn.contains(tap.x, tap.y)) {
@@ -490,8 +573,8 @@ void run(TFT_eSPI& tft) {
                                      ok ? TFT_GREEN : TFT_RED);
                 }
             } else if (resetBtn.contains(tap.x, tap.y)) {
-                if (confirmWarningScreen(tft, StringId::MENU_LOGBOOK_WARNING_TITLE,
-                                          StringId::MENU_FACTORY_RESET_WARNING_BODY)) {
+                if (confirmWarningScreen(tft, I18n::t(StringId::MENU_LOGBOOK_WARNING_TITLE),
+                                          I18n::t(StringId::MENU_FACTORY_RESET_WARNING_BODY))) {
                     tft.fillScreen(TFT_BLACK);
                     tft.setTextDatum(MC_DATUM);
                     tft.setTextColor(TFT_RED, TFT_BLACK);
@@ -591,8 +674,8 @@ void run(TFT_eSPI& tft) {
                     SettingsStore::setFlightLogbookEnabled(false);
                     SettingsStore::setFlightLogbookEnabledAtEpoch(0);
                     SettingsStore::setFlightLogbookSessionFile("");
-                } else if (confirmWarningScreen(tft, StringId::MENU_LOGBOOK_WARNING_TITLE,
-                                                 StringId::MENU_LOGBOOK_WARNING_BODY)) {
+                } else if (confirmWarningScreen(tft, I18n::t(StringId::MENU_LOGBOOK_WARNING_TITLE),
+                                                 I18n::t(StringId::MENU_LOGBOOK_WARNING_BODY))) {
                     SettingsStore::setFlightLogbookEnabled(true);
                     SettingsStore::setFlightLogbookEnabledAtEpoch((uint32_t)time(nullptr));
                     // Leerer Eintrag erzwingt eine frische Sitzungsdatei beim

@@ -240,6 +240,15 @@ static const char* const I18N_FR[] = {
     "Toucher pour passer",
     "Trajet : ",
     "Scanner avec le téléphone :",
+    "Rechercher une mise à jour",
+    "Recherche de mises à jour...",
+    "Échec de la vérification. Vérifiez votre connexion WiFi.",
+    "Déjà à jour : v",
+    "Mise à jour disponible : v",
+    "Une nouvelle mise à jour du micrologiciel va être téléchargée et installée. L'appareil redémarrera automatiquement ensuite. Merci de ne pas interrompre la connexion WiFi ni l'alimentation pendant ce processus.",
+    "Installation de la mise à jour ",
+    "Échec de la mise à jour.",
+    "Installé ! Redémarrage...",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

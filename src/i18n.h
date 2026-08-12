@@ -316,6 +316,19 @@ enum class StringId : uint8_t {
     // noetig.
     WEBUI_QR_HINT,
 
+    // OTA-Firmware-Update ueber WLAN (Menue > System > "Nach Update
+    // suchen", siehe menu_screen.cpp::runOtaUpdateScreen() und
+    // ota_update.h/.cpp).
+    MENU_CHECK_UPDATE,
+    OTA_CHECKING,
+    OTA_CHECK_FAILED,
+    OTA_UP_TO_DATE_PREFIX,
+    OTA_UPDATE_AVAILABLE_PREFIX,
+    OTA_CONFIRM_BODY,
+    OTA_INSTALLING_PREFIX,
+    OTA_UPDATE_FAILED,
+    OTA_UPDATE_SUCCESS,
+
     COUNT
 };
 
