@@ -56,7 +56,7 @@ static const char* const I18N_ES[] = {
     "Gestionar redes WiFi",
     "Ubicaciones guardadas",
     "Apagado de pantalla: ",
-    "Atenuación nocturna (22-6h): ",
+    "Atenuación nocturna (solar): ",
     "Estadísticas",
     "Historial",
     "Archivos del registro",

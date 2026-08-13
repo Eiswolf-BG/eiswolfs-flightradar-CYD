@@ -117,6 +117,8 @@ namespace {
         html += "ctx.fillStyle=color;ctx.strokeStyle=color;";
         html += "if(a.ground_vehicle){ctx.fillRect(x-3,y-3,6,6);}";
         html += "else if(a.rotorcraft){ctx.beginPath();ctx.moveTo(x,y-5);ctx.lineTo(x+5,y);ctx.lineTo(x,y+5);ctx.lineTo(x-5,y);ctx.closePath();ctx.fill();}";
+        html += "else if(a.heavy){ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.stroke();";
+        html += "var hr2=a.track_deg*Math.PI/180;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+10*Math.sin(hr2),y-10*Math.cos(hr2));ctx.stroke();}";
         html += "else{ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();";
         html += "var hr=a.track_deg*Math.PI/180;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+10*Math.sin(hr),y-10*Math.cos(hr));ctx.stroke();}";
         html += "if(a.emergency){ctx.strokeStyle='#ff3b3b';ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.stroke();}";
@@ -366,9 +368,16 @@ namespace {
             if (AirlineFilter::isHidden(a.callsign)) continue;
 
             bool isRotorcraft = a.category[0] == 'A' && a.category[1] == '7';
+            bool isHeavy = isHeavyCategoryWeb(a.category);
             bool isEmergency = emergencyOn && isEmergencySquawkWeb(a.squawk);
             bool isWatched = watchOn && AircraftWatchlist::isWatched(a.callsign);
-            bool isNotable = isHeavyCategoryWeb(a.category);
+            // "notable" (oranger Ring) ist fuer auffaellige Rufzeichen
+            // (Militaer/Regierung) reserviert - Heavy-Flugzeuge bekommen
+            // stattdessen die eigene Markerform (siehe "heavy" unten). Es
+            // gibt aktuell aber keine Militaer-/Regierungs-Praefixliste im
+            // Projekt (auch nicht am Geraete-Display, siehe radar_screen.cpp)
+            // - "notable" bleibt daher bis auf Weiteres immer false.
+            bool isNotable = false;
 
             JsonObject o = arr.add<JsonObject>();
             o["hex"] = a.hex;
@@ -379,6 +388,7 @@ namespace {
             o["track_deg"] = a.headingDeg;
             o["ground_vehicle"] = isGroundVehicle;
             o["rotorcraft"] = isRotorcraft;
+            o["heavy"] = isHeavy;
             o["emergency"] = isEmergency;
             o["watched"] = isWatched;
             o["notable"] = isNotable;

@@ -9,6 +9,7 @@
 #include "settings_store.h"
 #include "led_alert.h"
 #include "location_manager.h"
+#include "sun_times.h"
 #include "world_map.h"
 #include "airline_filter.h"
 #include "aircraft_watchlist.h"
@@ -76,6 +77,7 @@ namespace {
         bool isWatched;
         bool isGroundVehicle;
         bool isRotorcraft;
+        bool isHeavy;
     };
     constexpr uint8_t MAX_HIT_POINTS = Config::MAX_TRACKED_AIRCRAFT;
     HitPoint hitPoints[MAX_HIT_POINTS];
@@ -203,15 +205,33 @@ namespace {
     float prevSweepAngleDeg = -1.0f;
     constexpr float SWEEP_DEGREES_PER_SEC = 45.0f;
 
-    // Gleiches Nachtdimm-Fenster wie main.cpp::isNightDimHours() (22:00-06:00,
-    // ueber Mitternacht hinweg gerechnet). Hier bewusst dupliziert statt
-    // geteilt, siehe CLAUDE.md-Konvention ("jeder Screen unabhaengig
-    // lauffaehig, kein gemeinsames Modul fuer solche Kleinigkeiten").
+    // Gleiche Logik wie main.cpp::isNightDimHours() - Nacht = zwischen
+    // Sonnenuntergang und Sonnenaufgang am aktiven Standort (siehe
+    // sun_times.h), mit Rueckfall auf ein festes 22:00-06:00-Fenster,
+    // solange Standort/Uhrzeit noch nicht bekannt sind. Hier bewusst
+    // dupliziert statt geteilt, siehe CLAUDE.md-Konvention ("jeder Screen
+    // unabhaengig lauffaehig, kein gemeinsames Modul fuer solche
+    // Kleinigkeiten").
     bool isNightHours() {
         time_t now = time(nullptr);
         if (now <= 8 * 3600 * 2) return false; // Uhrzeit noch nicht per NTP synchronisiert
+
         struct tm tmNow;
         localtime_r(&now, &tmNow);
+
+        double lat = 0, lon = 0;
+        LocationManager::getHomeLocation(lat, lon);
+        if (lat != 0.0 || lon != 0.0) {
+            SunTimes::Result sun = SunTimes::compute(lat, lon, tmNow.tm_year + 1900, tmNow.tm_mon + 1,
+                                                      tmNow.tm_mday, LocationManager::utcOffsetSeconds());
+            if (sun.valid) {
+                if (sun.alwaysDay) return false;
+                if (sun.alwaysNight) return true;
+                float hourNow = tmNow.tm_hour + tmNow.tm_min / 60.0f;
+                return (hourNow < sun.sunriseHour) || (hourNow >= sun.sunsetHour);
+            }
+        }
+
         int hour = tmNow.tm_hour;
         return (hour >= 22 || hour < 6);
     }
@@ -352,6 +372,37 @@ namespace {
         gfx.drawLine(x, (int16_t)(y - ROTOR_LEN), x, (int16_t)(y + ROTOR_LEN), color);
     }
 
+    // Eigener Marker fuer "Heavy"-Flugzeuge (ADS-B-Emitter-Kategorie "A5" -
+    // Flugzeuge ueber 136t Starthoechstgewicht, z.B. A380/B747/B777/A330).
+    // Gleicher Aufbau wie drawAircraftMarker() (Kreis + Kurslinie mit
+    // Pfeilkopf), aber mit groesserem Kreis und einem zusaetzlichen duennen
+    // Aussenring - auf den ersten Blick als "groesser/schwerer" erkennbar,
+    // ohne eine komplett neue Formsprache einzufuehren. Die Farbe bleibt wie
+    // gewohnt die Hoehenfarbe (colorForAltitude()) - die Form transportiert
+    // "Heavy", kein Alarm-/Auffaelligkeitszustand.
+    void drawHeavyMarker(TFT_eSPI& gfx, int16_t x, int16_t y, float headingDeg, uint16_t color) {
+        gfx.fillCircle(x, y, 6, color);
+        gfx.drawCircle(x, y, 8, color);
+
+        double rad = headingDeg * PI / 180.0;
+        int16_t dx = (int16_t)(sin(rad) * 10);
+        int16_t dy = (int16_t)(-cos(rad) * 10);
+        int16_t tipX = x + dx;
+        int16_t tipY = y + dy;
+        gfx.drawLine(x, y, tipX, tipY, color);
+
+        constexpr double WING_ANGLE_RAD = 150.0 * PI / 180.0;
+        constexpr int16_t WING_LEN = 4;
+        double wing1 = rad + WING_ANGLE_RAD;
+        double wing2 = rad - WING_ANGLE_RAD;
+        int16_t w1x = tipX + (int16_t)(sin(wing1) * WING_LEN);
+        int16_t w1y = tipY + (int16_t)(-cos(wing1) * WING_LEN);
+        int16_t w2x = tipX + (int16_t)(sin(wing2) * WING_LEN);
+        int16_t w2y = tipY + (int16_t)(-cos(wing2) * WING_LEN);
+        gfx.drawLine(tipX, tipY, w1x, w1y, color);
+        gfx.drawLine(tipX, tipY, w2x, w2y, color);
+    }
+
     void printLineTruncated(TFT_eSPI& gfx, int16_t x, int16_t y, int16_t maxWidth, const String& text) {
         String s = text;
         if (gfx.textWidth(s) > maxWidth) {
@@ -391,7 +442,7 @@ namespace {
 
         // Dieselbe colorForAltitude()-Funktion wie fuer die Flugzeug-Marker
         // selbst verwenden (mit einer typischen Hoehe je Band) - sonst zeigt
-        // die Legende bei aktiver Nachtdimmung (22-6 Uhr) die HELLEN Farben,
+        // die Legende bei aktiver Nachtdimmung (Sonnenunter- bis -aufgang) die HELLEN Farben,
         // waehrend die Marker/Beschriftungen auf dem Radar bereits gedaempft
         // sind. Das fuehrte dazu, dass z.B. ein rotes Flugzeug nachts eher
         // dunkelorange wirkte, obwohl die Legende noch reines Rot zeigte.
@@ -899,6 +950,9 @@ void render(TFT_eSPI& tft, int16_t top) {
         // Darstellung, siehe drawGroundVehicleMarker()/colorForGroundVehicle().
         bool isGroundVehicle = a.category[0] == 'C';
         bool isRotorcraft = a.category[0] == 'A' && a.category[1] == '7';
+        // ADS-B-Emitter-Kategorie "A5" = "Heavy" - eigene Markerform (siehe
+        // drawHeavyMarker()), unabhaengig von jeglicher Ring-Markierung.
+        bool isHeavy = a.category[0] == 'A' && a.category[1] == '5';
         uint16_t color = isGroundVehicle ? colorForGroundVehicle(tft) : colorForAltitude(tft, a.altBaroFt);
         bool isSelected = selectedHex[0] && strcmp(a.hex, selectedHex) == 0;
         bool isEmergency = SettingsStore::emergencyAlertEnabled() && isEmergencySquawk(a.squawk);
@@ -914,6 +968,8 @@ void render(TFT_eSPI& tft, int16_t top) {
             drawGroundVehicleMarker(tft, pt.x, pt.y, color);
         } else if (isRotorcraft) {
             drawHelicopterMarker(tft, pt.x, pt.y, color);
+        } else if (isHeavy) {
+            drawHeavyMarker(tft, pt.x, pt.y, a.headingDeg, color);
         } else {
             drawAircraftMarker(tft, pt.x, pt.y, a.headingDeg, color);
         }
@@ -940,6 +996,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         hitPoints[i].isWatched = isWatched;
         hitPoints[i].isGroundVehicle = isGroundVehicle;
         hitPoints[i].isRotorcraft = isRotorcraft;
+        hitPoints[i].isHeavy = isHeavy;
         strncpy(hitPoints[i].hex, a.hex, sizeof(hitPoints[i].hex) - 1);
         strncpy(hitPoints[i].callsign, a.callsign, sizeof(hitPoints[i].callsign) - 1);
     }
@@ -1051,6 +1108,8 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
                 drawGroundVehicleMarker(tft, hp.x, hp.y, TFT_BLACK);
             } else if (hp.isRotorcraft) {
                 drawHelicopterMarker(tft, hp.x, hp.y, TFT_BLACK);
+            } else if (hp.isHeavy) {
+                drawHeavyMarker(tft, hp.x, hp.y, hp.headingDeg, TFT_BLACK);
             } else {
                 drawAircraftMarker(tft, hp.x, hp.y, hp.headingDeg, TFT_BLACK);
             }
@@ -1069,6 +1128,8 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             drawGroundVehicleMarker(tft, hp.x, hp.y, hp.color);
         } else if (hp.isRotorcraft) {
             drawHelicopterMarker(tft, hp.x, hp.y, hp.color);
+        } else if (hp.isHeavy) {
+            drawHeavyMarker(tft, hp.x, hp.y, hp.headingDeg, hp.color);
         } else {
             drawAircraftMarker(tft, hp.x, hp.y, hp.headingDeg, hp.color);
         }
