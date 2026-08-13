@@ -253,6 +253,8 @@ static const char* const I18N_FR[] = {
     "Le nouveau micrologiciel a été installé avec succès. Veuillez redémarrer maintenant pour l'utiliser.",
     "Redémarrer maintenant",
     "La mise à jour n'a pas pu être téléchargée ou installée. L'appareil continue de fonctionner normalement avec le micrologiciel précédent. Merci de vérifier votre connexion WiFi et de réessayer plus tard.",
+    "Délai d'inactivité",
+    "Après ce délai sans contact, l'écran s'éteint pour économiser l'énergie. Avec l'écran de veille activé, il affiche à la place un ciel étoilé tamisé avec l'heure.",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

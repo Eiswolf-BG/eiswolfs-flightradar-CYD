@@ -13,6 +13,7 @@
 #include "aircraft_list_screen.h"
 #include "about_screen.h"
 #include "brightness_screen.h"
+#include "timeout_screen.h"
 #include "language_screen.h"
 #include "units_screen.h"
 #include "settings_backup.h"
@@ -86,8 +87,11 @@ namespace {
     // BACKUP_RESET_ROW_COUNT unten) und dort durch einen einzelnen
     // Ordner-Button ersetzt wurden: -2 (Backup/Restore raus) +1 (neuer
     // Ordner-Button) = 9. Danach +1 fuer den neuen "Nach Update
-    // suchen"-Punkt (OTA-Update, siehe ota_update.h) = 10.
-    constexpr uint8_t SYSTEM_ROW_COUNT = 11;
+    // suchen"-Punkt (OTA-Update, siehe ota_update.h) = 10. Der
+    // Ruhebildschirm-Umschalter, der zwischenzeitlich hier eine eigene
+    // Zeile hatte, ist in den neuen Bildschirm-Timeout-Screen umgezogen
+    // (siehe timeout_screen.cpp) - Zeilenzahl bleibt dadurch bei 10.
+    constexpr uint8_t SYSTEM_ROW_COUNT = 10;
     constexpr int16_t SYSTEM_ROW_GAP = 4;
     constexpr int16_t SYSTEM_START_Y = 18;
     constexpr int16_t SYSTEM_END_Y = Config::SCREEN_HEIGHT - 10;
@@ -590,18 +594,17 @@ void run(TFT_eSPI& tft) {
             Rect brightnessBtn = systemRowRect(2);
             Rect timeoutBtn   = systemRowRect(3);
             Rect nightDimBtn  = systemRowRect(4);
-            Rect screensaverBtn = systemRowRect(5);
-            Rect webuiBtn     = systemRowRect(6);
+            Rect webuiBtn     = systemRowRect(5);
             // "Sicherung & Reset" (Backup/Restore/Werksreset, siehe
             // Page::BackupReset unten) und "Nach Update suchen" stehen
             // bewusst direkt ueber "Info", das seinerseits als letzter
             // Punkt direkt ueber dem Zurueck-Button steht - so bleiben
             // beide Positionen stabil, egal wie viele weitere Punkte davor
             // noch dazukommen.
-            Rect backupResetBtn = systemRowRect(7);
-            Rect checkUpdateBtn = systemRowRect(8);
-            Rect aboutBtn     = systemRowRect(9);
-            Rect backBtn      = systemRowRect(10);
+            Rect backupResetBtn = systemRowRect(6);
+            Rect checkUpdateBtn = systemRowRect(7);
+            Rect aboutBtn     = systemRowRect(8);
+            Rect backBtn      = systemRowRect(9);
 
             drawButton(tft, calibBtn, I18n::t(StringId::MENU_CALIBRATE));
 
@@ -613,7 +616,6 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, brightnessBtn, brightnessLabel(SettingsStore::brightnessPercent()));
             drawButton(tft, timeoutBtn, screenTimeoutLabel(SettingsStore::screenTimeoutMinutes()));
             drawButton(tft, nightDimBtn, I18n::t(StringId::MENU_NIGHT_DIMMING) + onOff(SettingsStore::nightDimmingEnabled()));
-            drawButton(tft, screensaverBtn, I18n::t(StringId::MENU_SCREENSAVER) + onOff(SettingsStore::screensaverEnabled()));
             drawButton(tft, webuiBtn, I18n::t(StringId::MENU_LOGBOOK_WEBUI));
             drawButton(tft, backupResetBtn, I18n::t(StringId::MENU_BACKUP_RESET));
             drawButton(tft, checkUpdateBtn, I18n::t(StringId::MENU_CHECK_UPDATE));
@@ -636,13 +638,15 @@ void run(TFT_eSPI& tft) {
             } else if (brightnessBtn.contains(tap.x, tap.y)) {
                 BrightnessScreen::run(tft);
             } else if (timeoutBtn.contains(tap.x, tap.y)) {
-                uint8_t current = SettingsStore::screenTimeoutMinutes();
-                uint8_t next = (current >= 10) ? 0 : (current + 1);
-                SettingsStore::setScreenTimeoutMinutes(next);
+                // Vorher: Durchklicken per wiederholtem Antippen (0-10, ein
+                // Tipp pro Minute - bei z.B. 10 Minuten also zehn Tipps).
+                // Jetzt: eigener Screen mit Schieberegler, siehe
+                // timeout_screen.cpp - dort lebt jetzt auch der
+                // Ruhebildschirm-Umschalter (inhaltlich eng verwandt, und
+                // dort ist Platz fuer eine kurze Erklaerung).
+                TimeoutScreen::run(tft);
             } else if (nightDimBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setNightDimmingEnabled(!SettingsStore::nightDimmingEnabled());
-            } else if (screensaverBtn.contains(tap.x, tap.y)) {
-                SettingsStore::setScreensaverEnabled(!SettingsStore::screensaverEnabled());
             } else if (backupResetBtn.contains(tap.x, tap.y)) {
                 page = Page::BackupReset;
             } else if (checkUpdateBtn.contains(tap.x, tap.y)) {

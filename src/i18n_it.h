@@ -253,6 +253,8 @@ static const char* const I18N_IT[] = {
     "Il nuovo firmware è stato installato correttamente. Riavvia ora per iniziare a usarlo.",
     "Riavvia ora",
     "Non è stato possibile scaricare o installare l'aggiornamento. Il dispositivo continua a funzionare senza modifiche con il firmware precedente. Controlla la connessione WiFi e riprova più tardi.",
+    "Timeout schermo",
+    "Dopo questo tempo senza tocchi, lo schermo si spegne per risparmiare energia. Con il salvaschermo attivo, mostra invece un cielo stellato attenuato con l'orario.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

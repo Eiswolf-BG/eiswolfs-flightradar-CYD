@@ -57,7 +57,7 @@ namespace {
             ledHeartbeatOn = (value.toInt() != 0);
         } else if (key == "screen_timeout_min") {
             int v = value.toInt();
-            if (v >= 0 && v <= 10) screenTimeoutMin = (uint8_t)v;
+            if (v >= 0 && v <= Config::SCREEN_TIMEOUT_MAX_MINUTES) screenTimeoutMin = (uint8_t)v;
         } else if (key == "night_dimming") {
             nightDimmingOn = (value.toInt() != 0);
         } else if (key == "screensaver") {
@@ -210,7 +210,7 @@ void setLedHeartbeatEnabled(bool on) {
 uint8_t screenTimeoutMinutes() { return screenTimeoutMin; }
 
 void setScreenTimeoutMinutes(uint8_t minutes) {
-    if (minutes <= 10) {
+    if (minutes <= Config::SCREEN_TIMEOUT_MAX_MINUTES) {
         screenTimeoutMin = minutes;
         save();
     }
