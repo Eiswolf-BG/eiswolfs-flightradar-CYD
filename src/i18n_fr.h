@@ -246,7 +246,7 @@ static const char* const I18N_FR[] = {
     "Échec de la vérification. Vérifiez votre connexion WiFi.",
     "Déjà à jour : v",
     "Mise à jour disponible : v",
-    "Une nouvelle mise à jour du micrologiciel va être téléchargée et installée. Merci de ne pas interrompre la connexion WiFi ni l'alimentation pendant ce processus. Un redémarrage vous sera demandé une fois l'installation terminée.",
+    "Une nouvelle mise à jour du micrologiciel va être téléchargée et installée. Merci de ne pas interrompre la connexion WiFi ni l'alimentation pendant ce processus. Un redémarrage vous sera demandé une fois l'installation terminée. Si la page WebUI (journal/radar) est ouverte dans un navigateur, merci de la fermer au préalable - elle interroge régulièrement l'appareil et pourrait sinon perturber le téléchargement.",
     "Installation de la mise à jour ",
     "Échec de la mise à jour",
     "Mise à jour installée",

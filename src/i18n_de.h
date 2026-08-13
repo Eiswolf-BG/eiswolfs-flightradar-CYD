@@ -246,7 +246,7 @@ static const char* const I18N_DE[] = {
     "Prüfung fehlgeschlagen. WLAN prüfen.",
     "Bereits aktuell: v",
     "Update verfügbar: v",
-    "Ein neues Firmware-Update wird heruntergeladen und installiert. Bitte WLAN-Verbindung und Stromversorgung während des Vorgangs nicht unterbrechen. Nach der Installation wirst du zum Neustart aufgefordert.",
+    "Ein neues Firmware-Update wird heruntergeladen und installiert. Bitte WLAN-Verbindung und Stromversorgung während des Vorgangs nicht unterbrechen. Nach der Installation wirst du zum Neustart aufgefordert. Falls die WebUI-Seite (Logbuch/Radar) in einem Browser geöffnet ist, bitte vorher schließen - sie fragt regelmäßig Daten vom Gerät ab und kann den Download sonst stören.",
     "Installiere Update ",
     "Update fehlgeschlagen",
     "Update installiert",

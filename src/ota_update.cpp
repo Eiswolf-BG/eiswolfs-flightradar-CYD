@@ -1,5 +1,6 @@
 #include "ota_update.h"
 #include "config.h"
+#include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
@@ -68,6 +69,9 @@ CheckInfo checkForUpdate() {
     strncpy(info.latestVersion, (tag[0] == 'v' || tag[0] == 'V') ? tag + 1 : tag,
             sizeof(info.latestVersion) - 1);
 
+    // Der Release-Workflow (siehe CLAUDE.md im Repo) laedt das rohe
+    // Build-Artefakt unveraendert als "firmware.bin" ins Release hoch -
+    // keine Umbenennung mehr noetig.
     JsonArray assets = doc["assets"];
     for (JsonObject asset : assets) {
         const char* name = asset["name"] | "";
@@ -86,6 +90,15 @@ CheckInfo checkForUpdate() {
 }
 
 bool performUpdate(const char* url, void (*onProgress)(uint8_t percent)) {
+    // Diagnose-Logging (nur ueber USB-Seriell sichtbar, kein Einfluss auf
+    // die UI) - vorher wurde bei einem Fehlschlag nur ein simples "true/
+    // false" nach aussen gegeben, ohne den eigentlichen Grund (Timeout,
+    // TLS-Fehler, HTTP-Statuscode...) festzuhalten. Damit laesst sich ein
+    // fehlgeschlagener OTA-Versuch am Seriell-Monitor nachvollziehen, statt
+    // erneut raten zu muessen.
+    Serial.printf("[OTA] Start: url=%s freeHeap=%u RSSI=%ddBm\n", url,
+                  (unsigned)ESP.getFreeHeap(), WiFi.RSSI());
+
     WiFiClientSecure client;
     client.setInsecure();
     client.setTimeout(15000);
@@ -108,9 +121,29 @@ bool performUpdate(const char* url, void (*onProgress)(uint8_t percent)) {
         if (onProgress && total > 0) {
             onProgress((uint8_t)((cur * 100) / total));
         }
+        // Nur gelegentlich loggen (alle ~10%), sonst quillt der Seriell-
+        // Monitor bei grossen Dateien mit hunderten Zeilen ueber.
+        static int8_t lastLoggedPercent = -1;
+        if (total > 0) {
+            int8_t pct = (int8_t)((cur * 100) / total);
+            if (pct != lastLoggedPercent && pct % 10 == 0) {
+                lastLoggedPercent = pct;
+                Serial.printf("[OTA] Fortschritt: %d%% (%d/%d Bytes) freeHeap=%u\n", pct, cur, total,
+                              (unsigned)ESP.getFreeHeap());
+            }
+        }
     });
 
     t_httpUpdate_return result = httpUpdate.update(client, url);
+
+    if (result != HTTP_UPDATE_OK) {
+        Serial.printf("[OTA] Fehlgeschlagen: result=%d error=%d (%s) freeHeap=%u\n", (int)result,
+                      httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str(),
+                      (unsigned)ESP.getFreeHeap());
+    } else {
+        Serial.println("[OTA] Erfolgreich heruntergeladen und geflasht.");
+    }
+
     return result == HTTP_UPDATE_OK;
 }
 

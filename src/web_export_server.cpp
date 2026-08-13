@@ -10,6 +10,7 @@
 #include <ArduinoJson.h>
 #include <SD.h>
 #include <cstring>
+#include <cmath>
 
 namespace WebExportServer {
 
@@ -44,13 +45,15 @@ namespace {
         return false;
     }
 
-    // "Auffaellig" beschraenkt sich aktuell auf die Heavy-Kategorie (ADS-B
-    // Emitter-Kategorie "A5") - der Teil ueber Militaer-/Regierungs-
-    // Rufzeichen-Praefixe (Config::NOTABLE_CALLSIGN_PREFIXES) ist NICHT
-    // umgesetzt, weil diese Konstante nirgends im Projekt existiert (auch
-    // nicht in radar_screen.cpp) - das zugehoerige Feature wurde bisher nie
-    // tatsaechlich spezifiziert/implementiert. Sobald es das gibt, hier den
-    // Praefix-Abgleich ergaenzen, analog zu isEmergencySquawkWeb() oben.
+    // "Auffaellig" (oranger Ring) beschraenkt sich aktuell auf gar nichts -
+    // der Teil ueber Militaer-/Regierungs-Rufzeichen-Praefixe
+    // (Config::NOTABLE_CALLSIGN_PREFIXES) ist NICHT umgesetzt, weil diese
+    // Konstante nirgends im Projekt existiert (auch nicht in
+    // radar_screen.cpp) - das zugehoerige Feature wurde bisher nie
+    // tatsaechlich spezifiziert/implementiert. "notable" wird deshalb unten
+    // in handleRadarJson() fest auf false gesetzt. Sobald es eine echte
+    // Praefixliste gibt, hier eine isNotableCallsignWeb()-Funktion analog zu
+    // isEmergencySquawkWeb() ergaenzen.
     bool isHeavyCategoryWeb(const char* category) {
         return category[0] == 'A' && category[1] == '5';
     }
@@ -78,8 +81,12 @@ namespace {
         html += ".addbtn:hover{background:#39ff14;color:#0a0f0d;}";
         html += "input[type=text]{background:#0a0f0d;color:#39ff14;border:1px solid #39ff14;border-radius:4px;padding:5px 8px;font-family:inherit;}";
         html += "nav{margin-bottom:10px;}nav a{color:#39ff14;margin-right:16px;}";
-        html += "#radarCanvas{width:100%;max-width:400px;height:auto;background:#05100a;border:1px solid #1f3a2b;border-radius:8px;display:block;}";
+        html += "#radarCanvas{width:100%;max-width:400px;height:auto;background:#05100a;border:1px solid #1f3a2b;border-radius:8px;display:block;cursor:pointer;}";
         html += "#radarStatus{font-size:12px;color:#7a9a86;margin-top:4px;}";
+        html += "#radarControls{font-size:12px;margin-bottom:8px;}";
+        html += "#radarControls select{background:#0a0f0d;color:#39ff14;border:1px solid #39ff14;border-radius:4px;padding:2px 6px;font-family:inherit;}";
+        html += "#acInfo{display:none;max-width:400px;margin-top:8px;padding:8px 10px;border:1px solid #39ff14;border-radius:6px;font-size:13px;line-height:1.7;}";
+        html += "#acInfo a{color:#ff3b3b;text-decoration:none;border:1px solid #ff3b3b;border-radius:4px;padding:2px 8px;display:inline-block;margin-top:4px;}";
         html += "</style></head><body>";
         html += "<h1>" + title + "</h1>";
         return html;
@@ -91,24 +98,73 @@ namespace {
     // fetch()-Polling statt WebSocket/SSE gehalten - deutlich weniger Code
     // und Speicherbedarf auf dem ESP32, und fuer eine gelegentlich vom Handy
     // aus aufgerufene Seite voellig ausreichend.
+    //
+    // Der Reichweiten-Waehler (<select>) ist rein clientseitig/pro Seiten-
+    // aufruf - er aendert NICHT die Geraete-Einstellung (SettingsStore::
+    // rangeIndex()), sondern wird als "range_km"-Query-Parameter an
+    // /radar.json mitgeschickt (siehe handleRadarJson()) und erlaubt so ein
+    // unabhaengiges Herein-/Herauszoomen auf dem Handy, ohne das Geraete-
+    // Display zu beeinflussen. Default ist die aktuelle Geraete-Reichweite.
     void appendRadarSection(String& html) {
+        float deviceRangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
+
         html += "<h2>Live Radar</h2>";
+        html += "<div id=\"radarControls\">Range: <select id=\"radarRange\">";
+        for (uint8_t i = 0; i < Config::RANGE_STEP_COUNT; i++) {
+            bool isDefault = fabsf(Config::RANGE_STEPS_KM[i] - deviceRangeKm) < 0.5f;
+            html += "<option value=\"" + String(Config::RANGE_STEPS_KM[i], 0) + "\"";
+            if (isDefault) html += " selected";
+            html += ">" + String(Config::RANGE_STEPS_KM[i], 0) + " km</option>";
+        }
+        html += "</select></div>";
         html += "<canvas id=\"radarCanvas\" width=\"360\" height=\"360\"></canvas>";
         html += "<p id=\"radarStatus\">Loading...</p>";
+        html += "<div id=\"acInfo\"></div>";
         html += "<script>(function(){";
         html += "var canvas=document.getElementById('radarCanvas');";
         html += "var ctx=canvas.getContext('2d');";
         html += "var status=document.getElementById('radarStatus');";
+        html += "var infoBox=document.getElementById('acInfo');";
+        html += "var rangeSel=document.getElementById('radarRange');";
         html += "var W=canvas.width,H=canvas.height,cx=W/2,cy=H/2,R=Math.min(W,H)/2-24;";
+        html += "var lastData={range_km:" + String(deviceRangeKm, 0) + ",aircraft:[]};";
+        html += "var markers=[];";
+        html += "var selectedHex=null;";
+
+        // Hintergrund-Sterne AUSSERHALB des Radarkreises - gleiches Prinzip
+        // wie updateBgStars()/initBgStarsIfNeeded() in radar_screen.cpp
+        // (Rejection-Sampling, damit kein Stern innerhalb des Kreises
+        // landet), hier per Canvas/JS statt TFT_eSPI nachgebaut.
+        html += "var stars=[];";
+        html += "(function(){var minDistSq=(R+6)*(R+6);for(var i=0;i<24;i++){var x,y,tries=0;";
+        html += "do{x=4+Math.random()*(W-8);y=4+Math.random()*(H-8);tries++;}";
+        html += "while(((x-cx)*(x-cx)+(y-cy)*(y-cy))<minDistSq&&tries<25);";
+        html += "stars.push({x:x,y:y,phase:Math.random()*255,speed:1+Math.random()*2});}})();";
+        html += "function drawStars(){for(var i=0;i<stars.length;i++){var s=stars[i];";
+        html += "s.phase=(s.phase+s.speed)%256;";
+        html += "var bright=Math.round(s.phase<128?s.phase*2:(255-s.phase)*2);";
+        html += "ctx.fillStyle='rgb(0,'+bright+',0)';ctx.fillRect(s.x,s.y,1,1);}}";
+
         html += "function altColor(ft){if(ft<3000)return '#ff4d4d';if(ft<10000)return '#ffb84d';if(ft<25000)return '#ffe14d';if(ft<35000)return '#39ff14';return '#4dd2ff';}";
+
         html += "function draw(data){";
+        html += "lastData=data;";
         html += "ctx.clearRect(0,0,W,H);";
+        html += "drawStars();";
         html += "ctx.strokeStyle='#1f3a2b';ctx.fillStyle='#39ff14';ctx.font='10px monospace';ctx.textAlign='left';";
         html += "for(var ring=1;ring<=3;ring++){var r=R*ring/3;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();";
         html += "ctx.fillText(Math.round(data.range_km*ring/3)+' km',cx+4,cy-r+10);}";
         html += "ctx.strokeStyle='#12261a';ctx.beginPath();ctx.moveTo(cx-R,cy);ctx.lineTo(cx+R,cy);ctx.moveTo(cx,cy-R);ctx.lineTo(cx,cy+R);ctx.stroke();";
+        // Alle vier Himmelsrichtungen (N/E/S/W), genau wie
+        // drawStaticBackground() in radar_screen.cpp - vorher stand hier nur
+        // "N", was auf Nachfrage ergaenzt wurde.
         html += "ctx.fillStyle='#39ff14';ctx.textAlign='center';ctx.fillText('N',cx,cy-R-8);";
+        html += "ctx.fillText('S',cx,cy+R+16);";
+        html += "ctx.textAlign='left';ctx.fillText('E',cx+R+4,cy+3);";
+        html += "ctx.textAlign='right';ctx.fillText('W',cx-R-4,cy+3);";
+        html += "ctx.textAlign='center';";
         html += "ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);ctx.fill();";
+        html += "markers=[];";
         html += "(data.aircraft||[]).forEach(function(a){";
         html += "var theta=a.bearing_deg*Math.PI/180;";
         html += "var r=Math.min(a.dist_km/data.range_km,1)*R;";
@@ -124,12 +180,65 @@ namespace {
         html += "if(a.emergency){ctx.strokeStyle='#ff3b3b';ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.stroke();}";
         html += "else if(a.watched){ctx.strokeStyle='#00e5ff';ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.stroke();}";
         html += "else if(a.notable){ctx.strokeStyle='#ff9f1a';ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.stroke();}";
+        // Ausgewaehltes Flugzeug (per Klick/Tap, siehe unten) bekommt einen
+        // weissen Auswahlring, gleiches Prinzip wie isSelected auf dem
+        // Geraete-Display (radar_screen.cpp render()).
+        html += "if(a.hex===selectedHex){ctx.strokeStyle='#ffffff';ctx.beginPath();ctx.arc(x,y,11,0,Math.PI*2);ctx.stroke();}";
         html += "ctx.fillStyle=color;ctx.textAlign='center';ctx.fillText(a.callsign,x,y-8);";
+        html += "markers.push({x:x,y:y,a:a});";
         html += "});";
         html += "status.textContent=(data.aircraft||[]).length+' aircraft \\u00b7 range '+data.range_km+' km';";
+        // Falls das ausgewaehlte Flugzeug in dieser Aktualisierung nicht
+        // mehr vorkommt (z.B. aus der Reichweite geflogen), Infobox wieder
+        // schliessen statt veraltete Daten stehen zu lassen.
+        html += "if(selectedHex){var found=markers.filter(function(m){return m.a.hex===selectedHex;})[0];";
+        html += "if(found){showInfo(found.a);}else{selectedHex=null;hideInfo();}}";
         html += "}";
-        html += "function poll(){fetch('/radar.json').then(function(r){return r.json();}).then(draw).catch(function(){status.textContent='Connection lost - retrying...';});}";
-        html += "poll();setInterval(poll,3000);";
+
+        // Info-Panel fuer ein angetipptes Flugzeug - bewusst eine eigene,
+        // stehenbleibende Box (kein Tooltip/Popup, das beim naechsten
+        // Neuzeichnen einfach verschwindet), mit explizitem Schliessen-Link,
+        // gleiches Grundprinzip wie infoScreen() am Geraet: der Nutzer soll
+        // aktiv entscheiden, wann die Info wieder verschwindet.
+        html += "function fmtNum(n,d){return (typeof n==='number')?n.toFixed(d):'?';}";
+        html += "function showInfo(a){";
+        html += "var lines=[];";
+        html += "lines.push('<b>'+(a.callsign||a.hex)+'</b> ('+a.hex+')');";
+        html += "lines.push('Altitude: '+Math.round(a.alt_ft)+' ft');";
+        html += "if(a.speed_kt){lines.push('Speed: '+Math.round(a.speed_kt)+' kt');}";
+        html += "lines.push('Distance: '+fmtNum(a.dist_km,1)+' km, bearing '+Math.round(a.bearing_deg)+'\\u00b0');";
+        html += "lines.push('Heading: '+Math.round(a.track_deg)+'\\u00b0');";
+        html += "if(a.squawk){lines.push('Squawk: '+a.squawk);}";
+        html += "infoBox.innerHTML=lines.join('<br>')+'<br><a href=\"#\" id=\"acInfoClose\">Close</a>';";
+        html += "infoBox.style.display='block';";
+        html += "document.getElementById('acInfoClose').onclick=function(e){e.preventDefault();selectedHex=null;hideInfo();draw(lastData);};";
+        html += "}";
+        html += "function hideInfo(){infoBox.style.display='none';}";
+
+        html += "canvas.addEventListener('click',function(ev){";
+        html += "var rect=canvas.getBoundingClientRect();";
+        html += "var scaleX=canvas.width/rect.width,scaleY=canvas.height/rect.height;";
+        html += "var px=(ev.clientX-rect.left)*scaleX,py=(ev.clientY-rect.top)*scaleY;";
+        html += "var best=null,bestD=14*14;";
+        html += "markers.forEach(function(m){var dx=m.x-px,dy=m.y-py,d=dx*dx+dy*dy;if(d<bestD){bestD=d;best=m;}});";
+        html += "if(best){selectedHex=best.a.hex;showInfo(best.a);}else{selectedHex=null;hideInfo();}";
+        html += "draw(lastData);";
+        html += "});";
+
+        html += "if(rangeSel){rangeSel.addEventListener('change',poll);}";
+        html += "function poll(){";
+        html += "var url='/radar.json';";
+        html += "if(rangeSel&&rangeSel.value){url+='?range_km='+rangeSel.value;}";
+        html += "fetch(url).then(function(r){return r.json();}).then(draw).catch(function(){status.textContent='Connection lost - retrying...';});";
+        html += "}";
+        html += "poll();";
+        html += "setInterval(poll,3000);";
+        // Schnellerer, rein lokaler Redraw-Takt (alle 150ms, ohne Netzwerk-
+        // Anfrage) nur fuer das Sternenfunkeln + die Auswahlmarkierung -
+        // gleiches Grundprinzip wie tick() vs. render() auf dem
+        // Geraete-Display: Flugzeugpositionen aktualisieren sich weiterhin
+        // nur alle 3s per poll(), die Sterne twinkeln aber fluessig dazwischen.
+        html += "setInterval(function(){draw(lastData);},150);";
         html += "})();</script>";
     }
 
@@ -348,6 +457,20 @@ namespace {
     // genau dieser Prioritaet.
     void handleRadarJson() {
         float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
+        // Erlaubt der Web-Ansicht ein eigenes, unabhaengiges Zoomen (siehe
+        // Reichweiten-Waehler in appendRadarSection()), OHNE die Geraete-
+        // Einstellung zu veraendern. Nur einen der bekannten
+        // Config::RANGE_STEPS_KM-Werte akzeptieren - ein fehlender oder
+        // nicht erkannter Parameter faellt auf die Geraete-Reichweite zurueck.
+        if (server.hasArg("range_km")) {
+            float requested = server.arg("range_km").toFloat();
+            for (uint8_t i = 0; i < Config::RANGE_STEP_COUNT; i++) {
+                if (fabsf(Config::RANGE_STEPS_KM[i] - requested) < 0.5f) {
+                    rangeKm = Config::RANGE_STEPS_KM[i];
+                    break;
+                }
+            }
+        }
         bool hideGround = SettingsStore::hideGroundVehicles();
         bool emergencyOn = SettingsStore::emergencyAlertEnabled();
         bool watchOn = SettingsStore::watchlistAlertEnabled();
@@ -373,10 +496,11 @@ namespace {
             bool isWatched = watchOn && AircraftWatchlist::isWatched(a.callsign);
             // "notable" (oranger Ring) ist fuer auffaellige Rufzeichen
             // (Militaer/Regierung) reserviert - Heavy-Flugzeuge bekommen
-            // stattdessen die eigene Markerform (siehe "heavy" unten). Es
+            // stattdessen die eigene Markerform (siehe "heavy" oben). Es
             // gibt aktuell aber keine Militaer-/Regierungs-Praefixliste im
-            // Projekt (auch nicht am Geraete-Display, siehe radar_screen.cpp)
-            // - "notable" bleibt daher bis auf Weiteres immer false.
+            // Projekt (auch nicht am Geraete-Display, siehe
+            // radar_screen.cpp) - "notable" bleibt daher bis auf Weiteres
+            // immer false.
             bool isNotable = false;
 
             JsonObject o = arr.add<JsonObject>();
@@ -392,6 +516,12 @@ namespace {
             o["emergency"] = isEmergency;
             o["watched"] = isWatched;
             o["notable"] = isNotable;
+            // Zusaetzliche Felder nur fuer das Info-Panel bei Klick/Tap auf
+            // ein Flugzeug (siehe showInfo() in appendRadarSection()) - beide
+            // stehen bereits verlustfrei im Aircraft-Snapshot, kein
+            // zusaetzlicher Netzwerk-/SD-Zugriff noetig.
+            o["speed_kt"] = a.groundSpeedKt;
+            o["squawk"] = a.squawk;
         }
         AircraftTable::unlock();
 

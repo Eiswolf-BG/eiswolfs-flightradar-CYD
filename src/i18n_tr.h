@@ -246,7 +246,7 @@ static const char* const I18N_TR[] = {
     "Kontrol başarısız. WiFi bağlantınızı kontrol edin.",
     "Zaten güncel: v",
     "Güncelleme mevcut: v",
-    "Yeni bir donanım yazılımı güncellemesi indirilip yüklenecek. Lütfen bu işlem sırasında WiFi bağlantısını veya güç kaynağını kesmeyin. Kurulum tamamlandığında yeniden başlatmanız istenecek.",
+    "Yeni bir donanım yazılımı güncellemesi indirilip yüklenecek. Lütfen bu işlem sırasında WiFi bağlantısını veya güç kaynağını kesmeyin. Kurulum tamamlandığında yeniden başlatmanız istenecek. WebUI sayfası (kayıt defteri/radar) bir tarayıcıda açıksa, lütfen önce kapatın - cihazdan düzenli olarak veri istediği için indirmeyi aksatabilir.",
     "Güncelleme yükleniyor ",
     "Güncelleme başarısız",
     "Güncelleme yüklendi",
