@@ -16,6 +16,7 @@
 #include "wifi_manager.h"
 #include "location_manager.h"
 #include "location_presets.h"
+#include "sun_times.h"
 #include "adsb_client.h"
 #include "touch_input.h"
 #include "calibration_screen.h"
@@ -408,23 +409,43 @@ void updateStatusLine() {
     }
 }
 
-// Prueft, ob die aktuelle Lokalzeit im Nachtdimm-Fenster (22:00-06:00) liegt.
-// Ueber Mitternacht hinweg gerechnet. Solange die Uhrzeit noch nicht per NTP
-// synchronisiert ist, wird false zurueckgegeben statt zu raten (gleiche
-// Pruefung wie in updateStatusLine()).
+// Prueft, ob gerade Nacht ist (fuer die Nachtdimmung). Nutzt den echten
+// Sonnenauf-/untergang am aktiven Standort (siehe sun_times.h), NICHT mehr
+// ein festes 22:00-06:00-Fenster - im Sommer war das vorher oft noch hell
+// draussen, wenn schon gedimmt wurde, und im Winter blieb es nach 6 Uhr noch
+// lange dunkel, ohne dass gedimmt wurde. Solange Standort oder Uhrzeit noch
+// nicht bekannt sind (z.B. kurz nach dem Start, bevor NTP/GPS/IP-Geolocation
+// fertig sind), faellt die Funktion auf das alte feste Fenster zurueck,
+// damit die Nachtdimmung nicht komplett ausfaellt.
 bool isNightDimHours() {
     time_t now = time(nullptr);
     if (now <= 8 * 3600 * 2) return false;
 
     struct tm tmNow;
     localtime_r(&now, &tmNow);
+
+    double lat = 0, lon = 0;
+    LocationManager::getHomeLocation(lat, lon);
+    if (lat != 0.0 || lon != 0.0) {
+        SunTimes::Result sun = SunTimes::compute(lat, lon, tmNow.tm_year + 1900, tmNow.tm_mon + 1,
+                                                  tmNow.tm_mday, LocationManager::utcOffsetSeconds());
+        if (sun.valid) {
+            if (sun.alwaysDay) return false;
+            if (sun.alwaysNight) return true;
+            float hourNow = tmNow.tm_hour + tmNow.tm_min / 60.0f;
+            return (hourNow < sun.sunriseHour) || (hourNow >= sun.sunsetHour);
+        }
+    }
+
+    // Fallback: Standort noch unbekannt.
     int hour = tmNow.tm_hour;
     return (hour >= 22 || hour < 6);
 }
 
-// Sanfte Nachtdimmung des Backlights zwischen 22:00 und 06:00 Uhr, sofern in
-// den Einstellungen aktiviert. Der Inaktivitaets-Timeout (screenDimmed) hat
-// Vorrang und wird hier nicht ueberschrieben.
+// Sanfte Nachtdimmung des Backlights zwischen Sonnenuntergang und
+// Sonnenaufgang (siehe isNightDimHours()), sofern in den Einstellungen
+// aktiviert. Der Inaktivitaets-Timeout (screenDimmed) hat Vorrang und wird
+// hier nicht ueberschrieben.
 void updateNightDimming() {
     if (screenDimmed) return;
 

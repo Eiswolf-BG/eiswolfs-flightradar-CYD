@@ -56,7 +56,7 @@ static const char* const I18N_EN[] = {
     "Manage WiFi networks",
     "Location presets",
     "Screen timeout: ",
-    "Night dimming (10pm-6am): ",
+    "Night dimming (sun-based): ",
     "Statistics",
     "History chart",
     "Logbook files",

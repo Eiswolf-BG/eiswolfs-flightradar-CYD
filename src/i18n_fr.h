@@ -56,7 +56,7 @@ static const char* const I18N_FR[] = {
     "Gérer les réseaux WiFi",
     "Positions enregistrées",
     "Extinction écran : ",
-    "Assombrissement nuit (22h-6h) : ",
+    "Assombrissement nuit (soleil) : ",
     "Statistiques",
     "Historique",
     "Fichiers du journal",

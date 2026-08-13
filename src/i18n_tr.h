@@ -56,7 +56,7 @@ static const char* const I18N_TR[] = {
     "WiFi ağlarını yönet",
     "Konum ön ayarları",
     "Ekran zaman aşımı: ",
-    "Gece kısma (22-06): ",
+    "Gece kısma (güneşe göre): ",
     "İstatistikler",
     "Geçmiş",
     "Kayıt defteri dosyaları",

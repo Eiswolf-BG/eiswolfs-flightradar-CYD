@@ -56,7 +56,7 @@ static const char* const I18N_DE[] = {
     "WLAN-Netzwerke verwalten",
     "Standort-Presets",
     "Bildschirm-Timeout: ",
-    "Nachtdimmung (22-6 Uhr): ",
+    "Nachtdimmung (Sonnenzeit): ",
     "Statistik",
     "Verlauf",
     "Logbuch-Dateien",
