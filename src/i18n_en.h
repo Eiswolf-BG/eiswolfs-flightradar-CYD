@@ -247,7 +247,7 @@ static const char* const I18N_EN[] = {
     "Check failed. Check your WiFi connection.",
     "Already up to date: v",
     "Update available: v",
-    "A new firmware update will be downloaded and installed. Please don't interrupt the WiFi connection or power supply during this process. You'll be asked to restart once installation is complete.",
+    "A new firmware update will be downloaded and installed. Please don't interrupt the WiFi connection or power supply during this process. You'll be asked to restart once installation is complete. If the WebUI page (logbook/radar) is open in a browser, please close it first - it regularly polls the device for data and can interfere with the download otherwise.",
     "Installing update ",
     "Update failed",
     "Update installed",

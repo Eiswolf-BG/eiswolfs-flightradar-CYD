@@ -246,7 +246,7 @@ static const char* const I18N_IT[] = {
     "Verifica fallita. Controlla la connessione WiFi.",
     "Già aggiornato: v",
     "Aggiornamento disponibile: v",
-    "Un nuovo aggiornamento del firmware verrà scaricato e installato. Non interrompere la connessione WiFi o l'alimentazione durante questo processo. Al termine dell'installazione ti verrà chiesto di riavviare.",
+    "Un nuovo aggiornamento del firmware verrà scaricato e installato. Non interrompere la connessione WiFi o l'alimentazione durante questo processo. Al termine dell'installazione ti verrà chiesto di riavviare. Se la pagina WebUI (registro/radar) è aperta in un browser, chiudila prima - interroga regolarmente il dispositivo e potrebbe interferire con il download.",
     "Installazione aggiornamento ",
     "Aggiornamento fallito",
     "Aggiornamento installato",

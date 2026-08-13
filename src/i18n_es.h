@@ -246,7 +246,7 @@ static const char* const I18N_ES[] = {
     "Error al comprobar. Revisa tu conexión WiFi.",
     "Ya actualizado: v",
     "Actualización disponible: v",
-    "Se descargará e instalará una nueva actualización de firmware. No interrumpas la conexión WiFi ni la alimentación durante este proceso. Se te pedirá reiniciar una vez completada la instalación.",
+    "Se descargará e instalará una nueva actualización de firmware. No interrumpas la conexión WiFi ni la alimentación durante este proceso. Se te pedirá reiniciar una vez completada la instalación. Si la página WebUI (registro/radar) está abierta en un navegador, ciérrala primero - consulta datos del dispositivo regularmente y podría interferir con la descarga.",
     "Instalando actualización ",
     "Error al actualizar",
     "Actualización instalada",
