@@ -199,7 +199,7 @@ static const char* const I18N_EN[] = {
 
     "Logbook / WebUI",
     "Logbook / WebUI",
-    "This web page lets you view, download and individually delete the flight logbook right from a browser. While connected to the same WiFi network, open a browser and go to:",
+    "This web page shows a live radar with all currently visible aircraft at the top, and below it lets you view, download and individually delete the flight logbook right from a browser. While connected to the same WiFi network, open a browser and go to:",
     "No WiFi connection - the page is only reachable while connected to a network.",
 
     "Weather",

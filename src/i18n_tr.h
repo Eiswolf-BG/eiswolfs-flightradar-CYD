@@ -198,7 +198,7 @@ static const char* const I18N_TR[] = {
 
     "Kayıt Defteri / WebUI",
     "Kayıt Defteri / WebUI",
-    "Bu web sayfası, uçuş kayıt defterini doğrudan tarayıcıdan görüntülemenizi, indirmenizi ve tek tek silmenizi sağlar. Aynı WiFi ağındayken tarayıcıyı açıp şu adrese gidin:",
+    "Bu web sayfasının üst kısmında o an görünen tüm uçakları gösteren canlı bir radar, altında ise uçuş kayıt defterini doğrudan tarayıcıdan görüntüleme, indirme ve tek tek silme imkanı bulunur. Aynı WiFi ağındayken tarayıcıyı açıp şu adrese gidin:",
     "WiFi bağlantısı yok - sayfaya yalnızca bir ağ bağlantısı varken erişilebilir.",
 
     "Hava Durumu",

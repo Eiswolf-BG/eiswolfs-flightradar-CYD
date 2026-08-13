@@ -198,7 +198,7 @@ static const char* const I18N_FR[] = {
 
     "Journal / WebUI",
     "Journal / WebUI",
-    "Cette page web permet de consulter, télécharger et supprimer individuellement le journal de vol directement depuis un navigateur. Connecté au même réseau WiFi, ouvrez simplement un navigateur et allez à :",
+    "Cette page web affiche en haut un radar en direct avec tous les avions actuellement visibles, et en dessous permet de consulter, télécharger et supprimer individuellement le journal de vol directement depuis un navigateur. Connecté au même réseau WiFi, ouvrez simplement un navigateur et allez à :",
     "Pas de connexion WiFi - la page n'est accessible que lorsqu'une connexion réseau est établie.",
 
     "Météo",

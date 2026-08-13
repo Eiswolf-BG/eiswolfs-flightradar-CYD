@@ -3,6 +3,8 @@
 #include "sd_mutex.h"
 #include "sd_storage.h"
 #include <SD.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 #include <cstring>
 #include <cctype>
 
@@ -13,6 +15,16 @@ namespace {
 
     char watched[MAX_WATCHED][9] = {{0}};
     uint8_t watchedCount = 0;
+
+    // Schuetzt watched[]/watchedCount - urspruenglich nur von Core 1 (Menue-
+    // Screens, Radar) verwendet, seit der WebUI-Listenverwaltung (siehe
+    // web_export_server.cpp) aber auch von Core 0 (NetTask) aus erreichbar.
+    // Gleiches Muster wie AircraftDetails::mutex.
+    SemaphoreHandle_t mutex = nullptr;
+
+    void ensureMutex() {
+        if (mutex == nullptr) mutex = xSemaphoreCreateMutex();
+    }
 
     // Ueberspringt fuehrende Leerzeichen, uebernimmt bis zu 8 Zeichen und
     // bricht bei einem Leerzeichen ab (ADS-B-Rufzeichen haben oft Padding),
@@ -61,55 +73,83 @@ namespace {
 }
 
 void init() {
+    ensureMutex();
     loadFromSd();
 }
 
-uint8_t count() { return watchedCount; }
+uint8_t count() {
+    ensureMutex();
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    uint8_t c = watchedCount;
+    xSemaphoreGive(mutex);
+    return c;
+}
 
 String callsignAt(uint8_t index) {
-    if (index >= watchedCount) return String();
-    return String(watched[index]);
+    ensureMutex();
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    String out = (index >= watchedCount) ? String() : String(watched[index]);
+    xSemaphoreGive(mutex);
+    return out;
 }
 
 bool addWatched(const char* callsign) {
-    if (watchedCount >= MAX_WATCHED) return false;
     if (!callsign || !callsign[0]) return false;
 
     char normalized[9] = {0};
     normalize(callsign, normalized);
     if (!normalized[0]) return false;
 
-    for (uint8_t j = 0; j < watchedCount; j++) {
-        if (strcmp(watched[j], normalized) == 0) return true;
+    ensureMutex();
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    bool ok = true;
+    bool alreadyPresent = false;
+    if (watchedCount >= MAX_WATCHED) {
+        ok = false;
+    } else {
+        for (uint8_t j = 0; j < watchedCount; j++) {
+            if (strcmp(watched[j], normalized) == 0) { alreadyPresent = true; break; }
+        }
+        if (!alreadyPresent) {
+            strncpy(watched[watchedCount], normalized, 8);
+            watched[watchedCount][8] = 0;
+            watchedCount++;
+        }
     }
+    xSemaphoreGive(mutex);
 
-    strncpy(watched[watchedCount], normalized, 8);
-    watched[watchedCount][8] = 0;
-    watchedCount++;
-    saveToSd();
-    return true;
+    if (ok && !alreadyPresent) saveToSd();
+    return ok;
 }
 
 void removeWatched(uint8_t index) {
-    if (index >= watchedCount) return;
-    for (uint8_t i = index; i < watchedCount - 1; i++) {
-        strncpy(watched[i], watched[i + 1], 9);
+    ensureMutex();
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    bool changed = index < watchedCount;
+    if (changed) {
+        for (uint8_t i = index; i < watchedCount - 1; i++) {
+            strncpy(watched[i], watched[i + 1], 9);
+        }
+        watchedCount--;
+        watched[watchedCount][0] = 0;
     }
-    watchedCount--;
-    watched[watchedCount][0] = 0;
-    saveToSd();
+    xSemaphoreGive(mutex);
+    if (changed) saveToSd();
 }
 
 bool isWatched(const char* callsign) {
-    if (watchedCount == 0) return false;
+    ensureMutex();
     char normalized[9];
     normalize(callsign, normalized);
     if (!normalized[0]) return false;
 
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    bool found = false;
     for (uint8_t i = 0; i < watchedCount; i++) {
-        if (strcmp(watched[i], normalized) == 0) return true;
+        if (strcmp(watched[i], normalized) == 0) { found = true; break; }
     }
-    return false;
+    xSemaphoreGive(mutex);
+    return found;
 }
 
 }

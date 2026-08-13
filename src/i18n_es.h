@@ -198,7 +198,7 @@ static const char* const I18N_ES[] = {
 
     "Registro / WebUI",
     "Registro / WebUI",
-    "Esta página web permite ver, descargar y eliminar individualmente el registro de vuelo directamente desde un navegador. Conectado a la misma red WiFi, simplemente abre un navegador y ve a:",
+    "Esta página web muestra arriba un radar en vivo con todos los aviones actualmente visibles y, debajo, permite ver, descargar y eliminar individualmente el registro de vuelo directamente desde un navegador. Conectado a la misma red WiFi, simplemente abre un navegador y ve a:",
     "Sin conexión WiFi - la página solo es accesible mientras haya una conexión de red.",
 
     "Clima",

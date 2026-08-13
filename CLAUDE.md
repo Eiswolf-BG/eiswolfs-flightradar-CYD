@@ -190,6 +190,11 @@ in dieser Reihenfolge:
    Alex nachfragen statt zu raten. Erst NACH dem Eintragen der korrekten
    Nummer: einmal sauber `pio run` bauen, DANACH erst der Rest des
    bekannten Workflows (README, Tag, index.html, Bin-Dateien, Commit/Push).
+   (Hier bewusst NUR bauen, NICHT flashen - Ausnahme von der sonst
+   geltenden Auto-Flash-Regel, siehe Abschnitt "Nach jedem erfolgreichen
+   Build automatisch flashen" weiter unten. Das Testgerät soll auf der
+   bisherigen Version bleiben, damit das neue Release per OTA getestet
+   werden kann.)
 1. Prüfen, ob seit dem letzten Commit neue/geänderte Features hinzugekommen
    sind, die für Endnutzer sichtbar sind (neue Menüpunkte, geändertes
    Verhalten, neue Screens) - falls ja, **README.md entsprechend ergänzen**
@@ -244,5 +249,14 @@ im Anschluss auch flashen (`pio run --target upload`), ohne extra danach zu
 fragen - außer der Nutzer sagt ausdrücklich "nur bauen, nicht flashen" o.ä.
 Kurz danach bestätigen, dass der Upload ebenfalls erfolgreich war (inkl.
 "[SUCCESS]"-Zeile am Ende).
+
+AUSNAHME: Innerhalb der Push & Release-Routine (siehe Abschnitt
+"Standard-Workflow: Push & Release") NICHT automatisch flashen, selbst
+nach erfolgreichem Build - dort wird bewusst nur gebaut. Grund: Alex
+möchte das Testgerät auf der bisherigen Version belassen, um das neue
+Release anschließend über die OTA-Update-Funktion zu testen, statt es
+direkt per Kabel zu flashen. Für alle anderen Anlässe (normales
+Entwickeln/Testen, einzelne Fixes) gilt die automatische Flash-Regel
+unverändert weiter.
 
 Bitte diese Regel jetzt in die CLAUDE.md-Datei einpflegen.
