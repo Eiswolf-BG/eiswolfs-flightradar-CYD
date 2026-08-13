@@ -154,7 +154,7 @@ Lists the last several days from the logbook individually, with date and the num
 ### 🌐 Web Export
 A small built-in web page lets you view a live radar and export the flight logbook from any browser on the same WiFi network – handy for checking traffic from your phone or opening the logbook in Excel, Numbers, or Google Sheets. It starts automatically in the background as soon as the device connects to WiFi.
 
-**Live radar:** the top of the page shows a canvas radar with all currently visible aircraft, refreshing automatically every few seconds (simple polling, no app or special software needed) – same distance rings, altitude colors, and marker shapes (ground vehicles, rotorcraft, Heavy aircraft) as the device display.
+**Live radar:** the top of the page shows a canvas radar with all currently visible aircraft, refreshing automatically every few seconds (simple polling, no app or special software needed) – same distance rings, altitude colors, marker shapes (ground vehicles, rotorcraft, Heavy aircraft), and full compass directions (N/E/S/W) as the device display, plus a twinkling starfield background. Tap or click an aircraft to open an info panel with callsign, altitude, speed, distance, bearing, heading, and squawk. A radius selector (10/25/50/100 km) above the radar lets you zoom the web view in or out independently of the device's own range setting.
 
 **Logbook:** below the radar, the page lists every logged day with its aircraft count, a download link for the **merged CSV** (all days combined), and per-day **download/delete** links for each individual day's file.
 
