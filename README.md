@@ -62,6 +62,9 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Screen timeout with slider** (Menu → System → "Screen Timeout") – set how long until the display turns off after a period of no touches, from 1 to 15 minutes or "Never", using a drag slider instead of tapping through values one minute at a time
 - **Idle screensaver** (same screen, off by default) – instead of turning the display off completely after the timeout, shows a dimmed starfield with a large clock; a tap wakes it back up
 - **OTA firmware updates over WiFi** (Menu → System → "Check for update") – checks the latest GitHub release and, if newer, downloads and installs it directly on the device, no cable or web flasher needed. Update results are shown as a clear on-screen message that requires confirmation, with an explicit restart button on success
+- **Live radar in the web UI** – scanning the QR code (or opening the device's IP) now shows a live radar with all currently visible aircraft at the top of the page, refreshing every few seconds, with the flight logbook below it as before (see [Web Export](#-web-export) below)
+- **Sun-based night dimming** – the night dimming window now follows the actual sunrise/sunset time at your location instead of a fixed 10pm-6am window, so it matches how dark it actually is outside depending on the season
+- **Heavy aircraft marker** – wide-body jets over 136 tonnes MTOW (e.g. A380, B747, B777) get their own marker (a larger circle with an outer ring) on both the device radar and the web UI radar, instead of the normal aircraft marker
 
 ## Feature Deep-Dive
 
@@ -114,9 +117,9 @@ Any saved network can be removed again at any time via the red "X", freeing up a
 slot for a new one.
 
 ### 🌙 Night Dimming
-Between 22:00 and 06:00 local time, the backlight automatically dims to a softer brightness level - still perfectly readable, but easier on the eyes if the device sits in a bedroom or living room around the clock. This is separate from the inactivity screen timeout (**Menu → System → "Timeout"**), which turns the display fully off after a period of no touch input, regardless of time of day - handy if you just want the flight logbook running in the background without needing the screen. Tapping the screen wakes it back up to your configured brightness (or the soft night level above, if it's still within the night window).
+Between sunset and sunrise at your active location, the backlight automatically dims to a softer brightness level - still perfectly readable, but easier on the eyes if the device sits in a bedroom or living room around the clock. The dimming window follows the real sunrise/sunset time (calculated from your location and the current date), not a fixed clock window, so it automatically shifts earlier in winter and later in summer. Until the location or time of day is known (e.g. briefly after boot), it falls back to a fixed 10pm-6am window. This is separate from the inactivity screen timeout (**Menu → System → "Screen Timeout"**), which turns the display fully off after a period of no touch input, regardless of time of day - handy if you just want the flight logbook running in the background without needing the screen. Tapping the screen wakes it back up to your configured brightness (or the soft night level above, if it's still night).
 
-Toggle it under **Menu → System → "Night dimming"**. When you tap the screen while it's night-dimmed, it wakes back up to the soft night level (not full brightness) if it's still within the night window - no sudden bright flash in a dark room.
+Toggle it under **Menu → System → "Night dimming"**. When you tap the screen while it's night-dimmed, it wakes back up to the soft night level (not full brightness) if it's still night - no sudden bright flash in a dark room.
 
 Since this update, the same night window also softens the **radar screen itself** — aircraft markers and the rotating sweep line switch to darker green/yellow/red tones, so the whole display is easier on the eyes at night, not just the backlight. No separate toggle needed - it uses the same **Night dimming** setting.
 
@@ -149,9 +152,13 @@ A "?" info button on the History chart screen explains how it works directly on 
 Lists the last several days from the logbook individually, with date and the number of aircraft logged that day. Handy for tracing the history over multiple days instead of only seeing the grand total. Each file has its own red "X" to delete it individually.
 
 ### 🌐 Web Export
-In addition to viewing the logbook on the device itself, a small built-in web page lets you export the flight logbook – handy for opening in Excel, Numbers, or Google Sheets. It starts automatically in the background as soon as the device connects to WiFi. Deliberately **export-only, no live radar tracking over the web** – that would just burn resources for little benefit.
+A small built-in web page lets you view a live radar and export the flight logbook from any browser on the same WiFi network – handy for checking traffic from your phone or opening the logbook in Excel, Numbers, or Google Sheets. It starts automatically in the background as soon as the device connects to WiFi.
 
-**How to use it:** while your computer or phone is on the same WiFi network as the device, open a browser and go to the device's IP address (e.g. `http://192.168.1.42/`). The page lists every logged day with its aircraft count, a download link for the **merged CSV** (all days combined), and per-day **download/delete** links for each individual day's file.
+**Live radar:** the top of the page shows a canvas radar with all currently visible aircraft, refreshing automatically every few seconds (simple polling, no app or special software needed) – same distance rings, altitude colors, and marker shapes (ground vehicles, rotorcraft, Heavy aircraft) as the device display.
+
+**Logbook:** below the radar, the page lists every logged day with its aircraft count, a download link for the **merged CSV** (all days combined), and per-day **download/delete** links for each individual day's file.
+
+**How to use it:** while your computer or phone is on the same WiFi network as the device, open a browser and go to the device's IP address (e.g. `http://192.168.1.42/`).
 
 Don't know the device's current IP? **Menu > System > "Logbook / WebUI"** shows it live on the device, along with a short explanation of the page (the "?" info button on the **Logbook files** screen also still shows it). While connected to WiFi, this screen also shows a **QR code** for the page's URL, so you can open it on your phone without typing the IP address by hand.
 
@@ -202,6 +209,8 @@ ADS-B data doesn't only contain aircraft – it can also include **airport groun
 When shown, ground vehicles render as distinct **blue square markers** on the radar screen instead of the normal aircraft marker, with a matching entry in the legend - so they're never mistaken for a low-flying aircraft.
 
 Helicopters (ADS-B emitter category "A7") get their own marker too - a filled circle with a rotor cross instead of the usual arrowhead, since a hovering helicopter doesn't have a meaningful "forward heading" to point in.
+
+"Heavy" aircraft (category "A5" - wide-body jets over 136 tonnes MTOW, e.g. A380, B747, B777) also get a distinct marker - a larger circle with an outer ring plus the usual heading line, so they stand out at a glance from smaller aircraft.
 
 ### 📶 WiFi Manager
 See the dedicated section above: [WiFi Manager](#-wifi-manager-up-to-3-saved-networks) – save up to 3 WiFi networks at once.
