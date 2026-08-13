@@ -95,4 +95,12 @@ void begin() {
     );
 }
 
+void pause() {
+    if (taskHandle) vTaskSuspend(taskHandle);
+}
+
+void resume() {
+    if (taskHandle) vTaskResume(taskHandle);
+}
+
 }

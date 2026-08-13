@@ -7,6 +7,7 @@
 #include "logbook_files_screen.h"
 #include "webui_screen.h"
 #include "ota_update.h"
+#include "net_task.h"
 #include "location_presets_screen.h"
 #include "airline_filter_screen.h"
 #include "aircraft_watchlist_screen.h"
@@ -541,7 +542,9 @@ namespace {
         tft.drawString(I18n::t(StringId::OTA_CHECKING), Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
         tft.setTextDatum(TL_DATUM);
 
+        NetTask::pause();
         OtaUpdate::CheckInfo info = OtaUpdate::checkForUpdate();
+        NetTask::resume();
 
         if (info.result == OtaUpdate::CheckResult::Error) {
             infoScreen(tft, I18n::t(StringId::OTA_CHECK_FAILED), "", TFT_RED, I18n::t(StringId::OK));
@@ -560,7 +563,9 @@ namespace {
         otaProgressTft = &tft;
         tft.fillScreen(TFT_BLACK);
         drawOtaProgress(0);
+        NetTask::pause();
         bool ok = OtaUpdate::performUpdate(info.downloadUrl, drawOtaProgress);
+        NetTask::resume();
         otaProgressTft = nullptr;
 
         if (ok) {
