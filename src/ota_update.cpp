@@ -43,17 +43,29 @@ namespace {
 CheckInfo checkForUpdate() {
     CheckInfo info;
 
+    Serial.printf("[OTA] Pruefe auf Update: url=%s freeHeap=%u RSSI=%ddBm\n", RELEASES_API_URL,
+                  (unsigned)ESP.getFreeHeap(), WiFi.RSSI());
+
     WiFiClientSecure client;
     client.setInsecure();
     client.setTimeout(8000);
 
     HTTPClient http;
     http.setTimeout(8000);
-    if (!http.begin(client, RELEASES_API_URL)) return info;
+    if (!http.begin(client, RELEASES_API_URL)) {
+        Serial.println("[OTA] Pruefung fehlgeschlagen: http.begin() lieferte false.");
+        return info;
+    }
     http.addHeader("User-Agent", USER_AGENT);
 
     int code = http.GET();
     if (code != HTTP_CODE_OK) {
+        if (code < 0) {
+            Serial.printf("[OTA] Pruefung fehlgeschlagen: HTTP-Fehler=%d (%s)\n", code,
+                          HTTPClient::errorToString(code).c_str());
+        } else {
+            Serial.printf("[OTA] Pruefung fehlgeschlagen: HTTP-Status=%d\n", code);
+        }
         http.end();
         return info;
     }
@@ -61,17 +73,21 @@ CheckInfo checkForUpdate() {
     http.end();
 
     JsonDocument doc;
-    if (deserializeJson(doc, body)) return info;
+    DeserializationError jsonErr = deserializeJson(doc, body);
+    if (jsonErr) {
+        Serial.printf("[OTA] Pruefung fehlgeschlagen: JSON-Fehler (%s)\n", jsonErr.c_str());
+        return info;
+    }
 
     const char* tag = doc["tag_name"] | "";
-    if (!tag[0]) return info;
+    if (!tag[0]) {
+        Serial.println("[OTA] Pruefung fehlgeschlagen: kein tag_name im Release-JSON.");
+        return info;
+    }
 
     strncpy(info.latestVersion, (tag[0] == 'v' || tag[0] == 'V') ? tag + 1 : tag,
             sizeof(info.latestVersion) - 1);
 
-    // Der Release-Workflow (siehe CLAUDE.md im Repo) laedt das rohe
-    // Build-Artefakt unveraendert als "firmware.bin" ins Release hoch -
-    // keine Umbenennung mehr noetig.
     JsonArray assets = doc["assets"];
     for (JsonObject asset : assets) {
         const char* name = asset["name"] | "";
@@ -82,10 +98,17 @@ CheckInfo checkForUpdate() {
         }
     }
 
-    if (!info.downloadUrl[0]) return info; // Release ohne firmware.bin-Anhang
+    if (!info.downloadUrl[0]) {
+        Serial.printf("[OTA] Pruefung fehlgeschlagen: Release v%s hat keinen firmware.bin-Anhang.\n",
+                      info.latestVersion);
+        return info; // Release ohne firmware.bin-Anhang
+    }
 
     int cmp = compareVersions(info.latestVersion, Config::APP_VERSION);
     info.result = (cmp > 0) ? CheckResult::UpdateAvailable : CheckResult::UpToDate;
+    Serial.printf("[OTA] Pruefung erfolgreich: installiert=v%s neuestes=v%s -> %s\n", Config::APP_VERSION,
+                  info.latestVersion,
+                  info.result == CheckResult::UpdateAvailable ? "Update verfuegbar" : "bereits aktuell");
     return info;
 }
 
