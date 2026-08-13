@@ -253,6 +253,8 @@ static const char* const I18N_TR[] = {
     "Yeni donanım yazılımı başarıyla yüklendi. Kullanmaya başlamak için lütfen şimdi yeniden başlatın.",
     "Şimdi yeniden başlat",
     "Güncelleme indirilemedi veya yüklenemedi. Cihaz değişmeden önceki donanım yazılımıyla çalışmaya devam ediyor. Lütfen WiFi bağlantınızı kontrol edip daha sonra tekrar deneyin.",
+    "Ekran Zaman Aşımı",
+    "Bu süre boyunca dokunulmazsa ekran güç tasarrufu için kapanır. Ekran koruyucu açıksa, bunun yerine saatli, sönük bir yıldızlı gökyüzü gösterir.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

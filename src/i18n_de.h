@@ -253,6 +253,8 @@ static const char* const I18N_DE[] = {
     "Die neue Firmware wurde erfolgreich installiert. Bitte jetzt neu starten, um sie zu verwenden.",
     "Jetzt neu starten",
     "Das Update konnte nicht heruntergeladen oder installiert werden. Das Gerät läuft unverändert mit der bisherigen Firmware weiter. Bitte WLAN-Verbindung prüfen und es später erneut versuchen.",
+    "Bildschirm-Timeout",
+    "Nach dieser Zeit ohne Berührung schaltet sich das Display ab, um Strom zu sparen. Ist der Ruhebildschirm aktiviert, zeigt es stattdessen einen gedimmten Sternenhimmel mit Uhrzeit.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

@@ -15,6 +15,14 @@ namespace Config {
     constexpr uint8_t BRIGHTNESS_MAX_PERCENT = 100;
     constexpr uint8_t BRIGHTNESS_STEP_PERCENT = 10;
 
+    // Bildschirm-Timeout (Menue > System > Bildschirm-Timeout), in Minuten,
+    // per Schieberegler einstellbar (siehe timeout_screen.cpp) - danach
+    // folgt "Nie" (kein Timeout) als eigene Endposition. Vorher nur per
+    // wiederholtem Antippen 0-10 durchklickbar (0 = Nie), was bei z.B. 10
+    // Minuten zehn einzelne Tipps brauchte.
+    constexpr uint8_t SCREEN_TIMEOUT_MIN_MINUTES = 1;
+    constexpr uint8_t SCREEN_TIMEOUT_MAX_MINUTES = 15;
+
     // Nachtmodus (22-6 Uhr) dimmt relativ zur jeweils eingestellten normalen
     // Helligkeit, nicht auf einen festen Absolutwert - sonst waere der
     // Dimm-Effekt bei niedrig eingestellter Normalhelligkeit wirkungslos

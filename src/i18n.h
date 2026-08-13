@@ -344,6 +344,16 @@ enum class StringId : uint8_t {
     OTA_RESTART_BUTTON,
     OTA_FAILED_BODY,
 
+    // Eigener Bildschirm-Timeout-Screen (Menue > System > Bildschirm-
+    // Timeout, siehe timeout_screen.cpp) mit Schieberegler statt des
+    // vorherigen Durchklickens per wiederholtem Antippen - der
+    // Ruhebildschirm-Umschalter (vorher eigene Zeile im System-Menue,
+    // MENU_SCREENSAVER) zieht mit auf diesen Screen um, da er inhaltlich
+    // eng mit dem Timeout zusammenhaengt und hier genug Platz fuer eine
+    // kurze Erklaerung ist.
+    TIMEOUT_SCREEN_TITLE,
+    TIMEOUT_SCREENSAVER_DESC,
+
     COUNT
 };
 
