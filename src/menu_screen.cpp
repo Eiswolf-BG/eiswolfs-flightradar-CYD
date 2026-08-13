@@ -207,6 +207,37 @@ namespace {
         return y;
     }
 
+    // Zerlegt einen Titel in bis zu maxLines Zeilen nach dem gleichen
+    // Wortumbruch-Prinzip wie layoutWrapped() - ein Titel wird aber nie
+    // gescrollt, sondern muss immer komplett sichtbar sein, daher eine
+    // eigene, einfachere Variante ohne Scroll-Unterstuetzung.
+    int wrapTitleLines(TFT_eSPI& tft, const String& text, int16_t maxWidth, String* outLines, int maxLines) {
+        int count = 0;
+        int32_t start = 0;
+        int32_t len = text.length();
+        while (start < len && count < maxLines) {
+            while (start < len && text[start] == ' ') start++;
+            if (start >= len) break;
+
+            String line = text.substring(start, len);
+            bool isLastAllowedLine = (count == maxLines - 1);
+            if (!isLastAllowedLine) {
+                while (tft.textWidth(line) > maxWidth) {
+                    int32_t lastSpace = line.lastIndexOf(' ');
+                    if (lastSpace <= 0) break;
+                    line = line.substring(0, lastSpace);
+                }
+            }
+            outLines[count++] = line;
+            start += line.length();
+        }
+        if (count == 0) {
+            outLines[0] = text;
+            count = 1;
+        }
+        return count;
+    }
+
     // Warn-Ueberlage, die praktisch den kompletten Bildschirm einnimmt (nur
     // ein paar Pixel Rand) - urspruenglich nur fuers Einschalten des
     // Flugbuchs gebaut (erklaert, warum es sich nach 24h automatisch
@@ -238,8 +269,29 @@ namespace {
         constexpr int16_t TEXT_MAX_WIDTH = BOX_W - 20;
         constexpr int16_t LINE_H = 16;
         constexpr int16_t TITLE_Y = BOX_Y + 16;
-        // Eine Leerzeile Abstand zwischen "Achtung!!!" und dem Fliesstext.
-        constexpr int16_t VIEW_TOP = TITLE_Y + 12 + LINE_H;
+
+        // Titel-Text vorab in so viele Zeilen umbrechen, wie bei Größe 2
+        // (oder bei zu langem Text Größe 1) nötig sind - siehe
+        // wrapTitleLines() oben. VIEW_TOP hängt dadurch von der
+        // tatsächlichen Zeilenzahl des Titels ab, ist also kein constexpr
+        // mehr wie vorher (wo immer nur eine Titelzeile angenommen wurde).
+        tft.setTextSize(2);
+        uint8_t titleTextSize = 2;
+        if (tft.textWidth(title) > TEXT_MAX_WIDTH) {
+            tft.setTextSize(1);
+            titleTextSize = 1;
+        }
+        constexpr int MAX_TITLE_LINES = 3;
+        String titleLines[MAX_TITLE_LINES];
+        int titleLineCount = wrapTitleLines(tft, title, TEXT_MAX_WIDTH, titleLines, MAX_TITLE_LINES);
+        // Fließtext wird immer bei Größe 1 vermessen/gezeichnet (siehe
+        // layoutWrapped()-Aufrufe unten) - Größe hier zurücksetzen, falls
+        // obiger Titel-Breitentest sie auf 2 stehen gelassen hat, sonst
+        // würde die gleich folgende totalH-Berechnung (vor dem ersten
+        // redraw()) mit falscher (zu breiter) Schriftgröße rechnen.
+        tft.setTextSize(1);
+        // Eine Leerzeile Abstand zwischen Titel und Fließtext.
+        int16_t VIEW_TOP = (int16_t)(TITLE_Y + titleLineCount * LINE_H + 12);
 
         constexpr int16_t BTN_H = 36;
         constexpr int16_t BTN_GAP = 8;
@@ -285,11 +337,10 @@ namespace {
             // links/rechts ueber den Bildschirmrand hinaus. Deshalb hier
             // die Breite bei Groesse 2 pruefen und bei Bedarf auf Groesse 1
             // zurueckfallen, statt eine feste Groesse anzunehmen.
-            tft.setTextSize(2);
-            if (tft.textWidth(title) > (BOX_W - 20)) {
-                tft.setTextSize(1);
+            tft.setTextSize(titleTextSize);
+            for (int i = 0; i < titleLineCount; i++) {
+                tft.drawString(titleLines[i], BOX_X + BOX_W / 2, (int16_t)(TITLE_Y + i * LINE_H));
             }
-            tft.drawString(title, BOX_X + BOX_W / 2, TITLE_Y);
             tft.setTextSize(1);
             tft.setTextDatum(TL_DATUM);
 
@@ -344,7 +395,29 @@ namespace {
         constexpr int16_t TEXT_MAX_WIDTH = BOX_W - 20;
         constexpr int16_t LINE_H = 16;
         constexpr int16_t TITLE_Y = BOX_Y + 16;
-        constexpr int16_t VIEW_TOP = TITLE_Y + 12 + LINE_H;
+
+        // Titel-Text vorab in so viele Zeilen umbrechen, wie bei Größe 2
+        // (oder bei zu langem Text Größe 1) nötig sind - siehe
+        // wrapTitleLines() oben. VIEW_TOP hängt dadurch von der
+        // tatsächlichen Zeilenzahl des Titels ab, ist also kein constexpr
+        // mehr wie vorher (wo immer nur eine Titelzeile angenommen wurde).
+        tft.setTextSize(2);
+        uint8_t titleTextSize = 2;
+        if (tft.textWidth(title) > TEXT_MAX_WIDTH) {
+            tft.setTextSize(1);
+            titleTextSize = 1;
+        }
+        constexpr int MAX_TITLE_LINES = 3;
+        String titleLines[MAX_TITLE_LINES];
+        int titleLineCount = wrapTitleLines(tft, title, TEXT_MAX_WIDTH, titleLines, MAX_TITLE_LINES);
+        // Fließtext wird immer bei Größe 1 vermessen/gezeichnet (siehe
+        // layoutWrapped()-Aufrufe unten) - Größe hier zurücksetzen, falls
+        // obiger Titel-Breitentest sie auf 2 stehen gelassen hat, sonst
+        // würde die gleich folgende totalH-Berechnung (vor dem ersten
+        // redraw()) mit falscher (zu breiter) Schriftgröße rechnen.
+        tft.setTextSize(1);
+        // Eine Leerzeile Abstand zwischen Titel und Fließtext.
+        int16_t VIEW_TOP = (int16_t)(TITLE_Y + titleLineCount * LINE_H + 12);
 
         constexpr int16_t BTN_H = 40;
         constexpr int16_t BOTTOM_MARGIN = 10;
@@ -377,11 +450,10 @@ namespace {
 
             tft.setTextDatum(MC_DATUM);
             tft.setTextColor(accentColor, TFT_BLACK);
-            tft.setTextSize(2);
-            if (tft.textWidth(title) > (BOX_W - 20)) {
-                tft.setTextSize(1);
+            tft.setTextSize(titleTextSize);
+            for (int i = 0; i < titleLineCount; i++) {
+                tft.drawString(titleLines[i], BOX_X + BOX_W / 2, (int16_t)(TITLE_Y + i * LINE_H));
             }
-            tft.drawString(title, BOX_X + BOX_W / 2, TITLE_Y);
             tft.setTextSize(1);
             tft.setTextDatum(TL_DATUM);
 
