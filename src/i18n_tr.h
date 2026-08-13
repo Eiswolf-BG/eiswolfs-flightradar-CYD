@@ -246,10 +246,13 @@ static const char* const I18N_TR[] = {
     "Kontrol başarısız. WiFi bağlantınızı kontrol edin.",
     "Zaten güncel: v",
     "Güncelleme mevcut: v",
-    "Yeni bir donanım yazılımı güncellemesi indirilip yüklenecek. Cihaz bundan sonra otomatik olarak yeniden başlayacak. Lütfen bu işlem sırasında WiFi bağlantısını veya güç kaynağını kesmeyin.",
+    "Yeni bir donanım yazılımı güncellemesi indirilip yüklenecek. Lütfen bu işlem sırasında WiFi bağlantısını veya güç kaynağını kesmeyin. Kurulum tamamlandığında yeniden başlatmanız istenecek.",
     "Güncelleme yükleniyor ",
-    "Güncelleme başarısız.",
-    "Yüklendi! Yeniden başlatılıyor...",
+    "Güncelleme başarısız",
+    "Güncelleme yüklendi",
+    "Yeni donanım yazılımı başarıyla yüklendi. Kullanmaya başlamak için lütfen şimdi yeniden başlatın.",
+    "Şimdi yeniden başlat",
+    "Güncelleme indirilemedi veya yüklenemedi. Cihaz değişmeden önceki donanım yazılımıyla çalışmaya devam ediyor. Lütfen WiFi bağlantınızı kontrol edip daha sonra tekrar deneyin.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

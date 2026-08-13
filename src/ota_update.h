@@ -18,20 +18,19 @@ namespace OtaUpdate {
         // sowohl bei UpToDate als auch bei UpdateAvailable gesetzt, damit
         // der aufrufende Screen sie in beiden Faellen anzeigen kann.
         char latestVersion[16] = {0};
-        // Direkter Download-Link zur CYD-flightradar.bin des Releases -
-        // nur gesetzt, wenn result == UpdateAvailable.
+        // Direkter Download-Link zur firmware.bin des Releases - nur
+        // gesetzt, wenn result == UpdateAvailable.
         char downloadUrl[192] = {0};
     };
 
     // Fragt die GitHub-Releases-API nach dem neuesten Release ab, vergleicht
     // dessen Versionsnummer (Tag-Name, "v"-Praefix wird ignoriert) gegen
-    // Config::APP_VERSION und sucht im Release den Anhang
-    // "CYD-flightradar.bin". CheckResult::Error bei jedem Fehler unterwegs
-    // (kein WLAN, Zeitueberschreitung, unerwartetes JSON, kein
-    // CYD-flightradar.bin im Release).
+    // Config::APP_VERSION und sucht im Release den Anhang "firmware.bin".
+    // CheckResult::Error bei jedem Fehler unterwegs (kein WLAN, Zeitueber-
+    // schreitung, unerwartetes JSON, kein firmware.bin im Release).
     CheckInfo checkForUpdate();
 
-    // Laedt die CYD-flightradar.bin von 'url' herunter und flasht sie (ueber die
+    // Laedt die firmware.bin von 'url' herunter und flasht sie (ueber die
     // Standard-Arduino-HTTPUpdate-Bibliothek). Ruft bei Erfolg BEWUSST
     // NICHT selbst ESP.restart() auf - der Aufrufer zeigt zuerst eine
     // kurze Erfolgsmeldung an und startet danach selbst neu. onProgress

@@ -334,6 +334,16 @@ enum class StringId : uint8_t {
     OTA_UPDATE_FAILED,
     OTA_UPDATE_SUCCESS,
 
+    // Erfolgs-/Fehler-Ergebnis nach Download+Flash wird jetzt als
+    // dauerhafter Info-Screen mit explizitem Button angezeigt (statt
+    // automatischem Neustart bzw. kurzer, automatisch verschwindender
+    // Meldung) - der Nutzer muss bei einer sicherheitsrelevanten Aktion wie
+    // einem Firmware-Update IMMER aktiv informiert werden und selbst
+    // bestaetigen, siehe menu_screen.cpp::infoScreen().
+    OTA_SUCCESS_BODY,
+    OTA_RESTART_BUTTON,
+    OTA_FAILED_BODY,
+
     COUNT
 };
 

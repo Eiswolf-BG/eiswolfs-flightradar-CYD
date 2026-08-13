@@ -246,10 +246,13 @@ static const char* const I18N_FR[] = {
     "Échec de la vérification. Vérifiez votre connexion WiFi.",
     "Déjà à jour : v",
     "Mise à jour disponible : v",
-    "Une nouvelle mise à jour du micrologiciel va être téléchargée et installée. L'appareil redémarrera automatiquement ensuite. Merci de ne pas interrompre la connexion WiFi ni l'alimentation pendant ce processus.",
+    "Une nouvelle mise à jour du micrologiciel va être téléchargée et installée. Merci de ne pas interrompre la connexion WiFi ni l'alimentation pendant ce processus. Un redémarrage vous sera demandé une fois l'installation terminée.",
     "Installation de la mise à jour ",
-    "Échec de la mise à jour.",
-    "Installé ! Redémarrage...",
+    "Échec de la mise à jour",
+    "Mise à jour installée",
+    "Le nouveau micrologiciel a été installé avec succès. Veuillez redémarrer maintenant pour l'utiliser.",
+    "Redémarrer maintenant",
+    "La mise à jour n'a pas pu être téléchargée ou installée. L'appareil continue de fonctionner normalement avec le micrologiciel précédent. Merci de vérifier votre connexion WiFi et de réessayer plus tard.",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,
