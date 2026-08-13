@@ -59,8 +59,9 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Metric/Imperial units** (Menu → Region → "Units") consistently applied across the radar range button, range ring labels, aircraft list, nearest-airport distance, and stats
 - **About screen** (Menu → System → "About") shows the project name, a short description, and the current firmware version
 - **Backup & Reset** (Menu → System → "Backup & Reset") – back up or restore your settings, or fully reset the device (wipes all on-device data and re-runs first-time setup) - handy for testing or handing the device to someone else
-- **Idle screensaver** (Menu → System → "Screensaver", off by default) – after the inactivity timeout, shows a dimmed starfield with a large clock instead of turning the display off completely; a tap wakes it back up
-- **OTA firmware updates over WiFi** (Menu → System → "Check for update") – checks the latest GitHub release and, if newer, downloads and installs it directly on the device, no cable or web flasher needed
+- **Screen timeout with slider** (Menu → System → "Screen Timeout") – set how long until the display turns off after a period of no touches, from 1 to 15 minutes or "Never", using a drag slider instead of tapping through values one minute at a time
+- **Idle screensaver** (same screen, off by default) – instead of turning the display off completely after the timeout, shows a dimmed starfield with a large clock; a tap wakes it back up
+- **OTA firmware updates over WiFi** (Menu → System → "Check for update") – checks the latest GitHub release and, if newer, downloads and installs it directly on the device, no cable or web flasher needed. Update results are shown as a clear on-screen message that requires confirmation, with an explicit restart button on success
 
 ## Feature Deep-Dive
 
