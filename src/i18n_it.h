@@ -246,10 +246,13 @@ static const char* const I18N_IT[] = {
     "Verifica fallita. Controlla la connessione WiFi.",
     "Già aggiornato: v",
     "Aggiornamento disponibile: v",
-    "Un nuovo aggiornamento del firmware verrà scaricato e installato. Il dispositivo si riavvierà automaticamente al termine. Non interrompere la connessione WiFi o l'alimentazione durante questo processo.",
+    "Un nuovo aggiornamento del firmware verrà scaricato e installato. Non interrompere la connessione WiFi o l'alimentazione durante questo processo. Al termine dell'installazione ti verrà chiesto di riavviare.",
     "Installazione aggiornamento ",
-    "Aggiornamento fallito.",
-    "Installato! Riavvio...",
+    "Aggiornamento fallito",
+    "Aggiornamento installato",
+    "Il nuovo firmware è stato installato correttamente. Riavvia ora per iniziare a usarlo.",
+    "Riavvia ora",
+    "Non è stato possibile scaricare o installare l'aggiornamento. Il dispositivo continua a funzionare senza modifiche con il firmware precedente. Controlla la connessione WiFi e riprova più tardi.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

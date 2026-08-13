@@ -246,10 +246,13 @@ static const char* const I18N_ES[] = {
     "Error al comprobar. Revisa tu conexión WiFi.",
     "Ya actualizado: v",
     "Actualización disponible: v",
-    "Se descargará e instalará una nueva actualización de firmware. El dispositivo se reiniciará automáticamente después. No interrumpas la conexión WiFi ni la alimentación durante este proceso.",
+    "Se descargará e instalará una nueva actualización de firmware. No interrumpas la conexión WiFi ni la alimentación durante este proceso. Se te pedirá reiniciar una vez completada la instalación.",
     "Instalando actualización ",
-    "Error al actualizar.",
-    "¡Instalado! Reiniciando...",
+    "Error al actualizar",
+    "Actualización instalada",
+    "El nuevo firmware se instaló correctamente. Reinicia ahora para empezar a usarlo.",
+    "Reiniciar ahora",
+    "No se pudo descargar o instalar la actualización. El dispositivo sigue funcionando sin cambios con el firmware anterior. Comprueba tu conexión WiFi e inténtalo de nuevo más tarde.",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

@@ -246,10 +246,13 @@ static const char* const I18N_DE[] = {
     "Prüfung fehlgeschlagen. WLAN prüfen.",
     "Bereits aktuell: v",
     "Update verfügbar: v",
-    "Ein neues Firmware-Update wird heruntergeladen und installiert. Das Gerät startet danach automatisch neu. Bitte WLAN-Verbindung und Stromversorgung während des Vorgangs nicht unterbrechen.",
+    "Ein neues Firmware-Update wird heruntergeladen und installiert. Bitte WLAN-Verbindung und Stromversorgung während des Vorgangs nicht unterbrechen. Nach der Installation wirst du zum Neustart aufgefordert.",
     "Installiere Update ",
-    "Update fehlgeschlagen.",
-    "Installiert! Neustart...",
+    "Update fehlgeschlagen",
+    "Update installiert",
+    "Die neue Firmware wurde erfolgreich installiert. Bitte jetzt neu starten, um sie zu verwenden.",
+    "Jetzt neu starten",
+    "Das Update konnte nicht heruntergeladen oder installiert werden. Das Gerät läuft unverändert mit der bisherigen Firmware weiter. Bitte WLAN-Verbindung prüfen und es später erneut versuchen.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

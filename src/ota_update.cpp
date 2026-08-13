@@ -68,21 +68,17 @@ CheckInfo checkForUpdate() {
     strncpy(info.latestVersion, (tag[0] == 'v' || tag[0] == 'V') ? tag + 1 : tag,
             sizeof(info.latestVersion) - 1);
 
-    // Der Release-Workflow (siehe CLAUDE.md im Repo) laedt die gebaute
-    // Firmware unter dem Namen "CYD-flightradar.bin" als Release-Asset
-    // hoch (umbenannt aus dem rohen "firmware.bin"-Build-Artefakt) - das
-    // ist auch der Dateiname, unter dem der Web-Flasher sie erwartet.
     JsonArray assets = doc["assets"];
     for (JsonObject asset : assets) {
         const char* name = asset["name"] | "";
-        if (strcmp(name, "CYD-flightradar.bin") == 0) {
+        if (strcmp(name, "firmware.bin") == 0) {
             const char* url = asset["browser_download_url"] | "";
             strncpy(info.downloadUrl, url, sizeof(info.downloadUrl) - 1);
             break;
         }
     }
 
-    if (!info.downloadUrl[0]) return info; // Release ohne CYD-flightradar.bin-Anhang
+    if (!info.downloadUrl[0]) return info; // Release ohne firmware.bin-Anhang
 
     int cmp = compareVersions(info.latestVersion, Config::APP_VERSION);
     info.result = (cmp > 0) ? CheckResult::UpdateAvailable : CheckResult::UpToDate;
@@ -93,6 +89,16 @@ bool performUpdate(const char* url, void (*onProgress)(uint8_t percent)) {
     WiFiClientSecure client;
     client.setInsecure();
     client.setTimeout(15000);
+
+    // WICHTIG: GitHubs "browser_download_url" fuer Release-Assets ist KEIN
+    // direkter Download-Link, sondern liefert erst ein HTTP 301/302-Redirect
+    // auf eine signierte objects.githubusercontent.com-URL. HTTPUpdate folgt
+    // Redirects standardmaessig NICHT (HTTPC_DISABLE_FOLLOW_REDIRECTS ist der
+    // Default) - ohne diese Zeile bricht der Download mit HTTP_UPDATE_FAILED
+    // ab, weil statt der .bin-Datei nur die Redirect-Antwort ankommt. Siehe
+    // z.B. espressif/arduino-esp32#3020. HTTPC_STRICT_FOLLOW_REDIRECTS
+    // reicht, da wir nur GET verwenden.
+    httpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
 
     // Wir zeigen nach erfolgreicher Installation selbst noch eine kurze
     // Erfolgsmeldung an, bevor das Geraet neu startet - siehe

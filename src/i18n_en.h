@@ -247,10 +247,13 @@ static const char* const I18N_EN[] = {
     "Check failed. Check your WiFi connection.",
     "Already up to date: v",
     "Update available: v",
-    "A new firmware update will be downloaded and installed. The device will restart automatically afterwards. Please don't interrupt the WiFi connection or power supply during this process.",
+    "A new firmware update will be downloaded and installed. Please don't interrupt the WiFi connection or power supply during this process. You'll be asked to restart once installation is complete.",
     "Installing update ",
-    "Update failed.",
-    "Installed! Restarting...",
+    "Update failed",
+    "Update installed",
+    "The new firmware was installed successfully. Please restart now to start using it.",
+    "Restart now",
+    "The update could not be downloaded or installed. The device is still running the previous firmware, unchanged. Please check your WiFi connection and try again later.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

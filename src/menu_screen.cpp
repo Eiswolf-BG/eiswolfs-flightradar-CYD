@@ -274,7 +274,17 @@ namespace {
 
             tft.setTextDatum(MC_DATUM);
             tft.setTextColor(accentColor, TFT_BLACK);
+            // Statische Titel ("Achtung!!!") sind kurz genug fuer Groesse 2,
+            // aber der OTA-Aufrufer baut den Titel dynamisch mit
+            // Versionsnummer zusammen (z.B. "Update verfuegbar: v3.5.0") -
+            // das passt bei Groesse 2 nicht mehr in die Box und lief vorher
+            // links/rechts ueber den Bildschirmrand hinaus. Deshalb hier
+            // die Breite bei Groesse 2 pruefen und bei Bedarf auf Groesse 1
+            // zurueckfallen, statt eine feste Groesse anzunehmen.
             tft.setTextSize(2);
+            if (tft.textWidth(title) > (BOX_W - 20)) {
+                tft.setTextSize(1);
+            }
             tft.drawString(title, BOX_X + BOX_W / 2, TITLE_Y);
             tft.setTextSize(1);
             tft.setTextDatum(TL_DATUM);
@@ -312,6 +322,96 @@ namespace {
         }
     }
 
+    // Einfacher Info-Screen mit nur EINEM Button (kein Abbrechen) - fuer
+    // Endzustaende, bei denen es nichts mehr zu entscheiden gibt, nur zu
+    // bestaetigen (z.B. Ergebnis eines OTA-Updates). Anders als
+    // showBriefMessage() (kurze Meldung unten am Bildschirmrand,
+    // verschwindet nach 1,2s automatisch von selbst) bleibt dieser Screen
+    // stehen, bis aktiv bestaetigt wird - wichtig bei sicherheitsrelevanten
+    // Meldungen wie einem fehlgeschlagenen oder erfolgreichen Firmware-
+    // Update, die der Nutzer auf keinen Fall verpassen darf. Gleicher
+    // Kasten-/Scroll-Aufbau wie confirmWarningScreen(), nur mit einem
+    // einzigen, ueber die volle Breite gehenden Button statt OK/Zurueck.
+    void infoScreen(TFT_eSPI& tft, const String& title, const String& body, uint16_t accentColor, const String& buttonLabel) {
+        constexpr int16_t BOX_X = 4;
+        constexpr int16_t BOX_Y = 4;
+        constexpr int16_t BOX_W = Config::SCREEN_WIDTH - 2 * BOX_X;
+        constexpr int16_t BOX_H = Config::SCREEN_HEIGHT - 2 * BOX_Y;
+        constexpr int16_t TEXT_MAX_WIDTH = BOX_W - 20;
+        constexpr int16_t LINE_H = 16;
+        constexpr int16_t TITLE_Y = BOX_Y + 16;
+        constexpr int16_t VIEW_TOP = TITLE_Y + 12 + LINE_H;
+
+        constexpr int16_t BTN_H = 40;
+        constexpr int16_t BOTTOM_MARGIN = 10;
+        constexpr int16_t BTN_Y = BOX_Y + BOX_H - BOTTOM_MARGIN - BTN_H;
+        constexpr int16_t SCROLL_ROW_H = 28;
+        constexpr int16_t SCROLL_ROW_GAP = 8;
+
+        constexpr int16_t VIEW_BOTTOM_NO_SCROLL = BTN_Y - 8;
+        constexpr int16_t VIEW_BOTTOM_SCROLL = VIEW_BOTTOM_NO_SCROLL - SCROLL_ROW_H - SCROLL_ROW_GAP;
+
+        int16_t totalH = layoutWrapped(tft, BOX_X + 10, VIEW_TOP, TEXT_MAX_WIDTH, LINE_H, body, 0, 0, 0, false);
+
+        bool scrollable = (totalH - VIEW_BOTTOM_NO_SCROLL) > 0;
+        int16_t viewBottom = scrollable ? VIEW_BOTTOM_SCROLL : VIEW_BOTTOM_NO_SCROLL;
+        int16_t maxScroll = totalH - viewBottom;
+        if (maxScroll < 0) maxScroll = 0;
+        int16_t scrollY = 0;
+        constexpr int16_t SCROLL_STEP = 48;
+
+        Rect okBtn = {(int16_t)(BOX_X + 10), BTN_Y, (int16_t)(BOX_W - 20), BTN_H};
+        int16_t scrollRowY = VIEW_BOTTOM_SCROLL + SCROLL_ROW_GAP;
+        Rect upBtn   = {(int16_t)(BOX_X + BOX_W / 2 - 64), scrollRowY, 60, SCROLL_ROW_H};
+        Rect downBtn = {(int16_t)(BOX_X + BOX_W / 2 + 4), scrollRowY, 60, SCROLL_ROW_H};
+
+        MenuStars::reset();
+
+        auto redraw = [&]() {
+            tft.fillScreen(TFT_BLACK);
+            tft.drawRoundRect(BOX_X, BOX_Y, BOX_W, BOX_H, 6, accentColor);
+
+            tft.setTextDatum(MC_DATUM);
+            tft.setTextColor(accentColor, TFT_BLACK);
+            tft.setTextSize(2);
+            if (tft.textWidth(title) > (BOX_W - 20)) {
+                tft.setTextSize(1);
+            }
+            tft.drawString(title, BOX_X + BOX_W / 2, TITLE_Y);
+            tft.setTextSize(1);
+            tft.setTextDatum(TL_DATUM);
+
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            layoutWrapped(tft, BOX_X + 10, VIEW_TOP, TEXT_MAX_WIDTH, LINE_H, body, scrollY, VIEW_TOP, viewBottom, true);
+
+            drawButton(tft, okBtn, buttonLabel);
+            if (scrollable) {
+                drawButton(tft, upBtn, "^");
+                drawButton(tft, downBtn, "v");
+            }
+        };
+
+        redraw();
+
+        while (true) {
+            TouchInput::Point tap;
+            if (TouchInput::wasTapped(tap)) {
+                if (okBtn.contains(tap.x, tap.y)) return;
+                if (scrollable && upBtn.contains(tap.x, tap.y) && scrollY > 0) {
+                    scrollY -= SCROLL_STEP;
+                    if (scrollY < 0) scrollY = 0;
+                    redraw();
+                } else if (scrollable && downBtn.contains(tap.x, tap.y) && scrollY < maxScroll) {
+                    scrollY += SCROLL_STEP;
+                    if (scrollY > maxScroll) scrollY = maxScroll;
+                    redraw();
+                }
+            }
+            MenuStars::update(tft);
+            delay(20);
+        }
+    }
+
     // Fortschrittsanzeige waehrend OtaUpdate::performUpdate() laeuft -
     // gleiches Namespace-globale-Zeiger-Prinzip wie progressTft oben (siehe
     // Settings-Backup-Fortschrittspunkte), da OtaUpdate::performUpdate()
@@ -322,12 +422,25 @@ namespace {
     void drawOtaProgress(uint8_t percent) {
         if (!otaProgressTft) return;
         TFT_eSPI& t = *otaProgressTft;
-        String label = String(I18n::t(StringId::OTA_INSTALLING_PREFIX)) + String(percent) + "%";
-        t.fillRect(0, (int16_t)(Config::SCREEN_HEIGHT / 2 - 14), Config::SCREEN_WIDTH, 28, TFT_BLACK);
+        // Zwei Zeilen statt einer langen: der Praefix-Text
+        // (OTA_INSTALLING_PREFIX) ist in manchen Sprachen zu lang, um
+        // zusammen mit der Prozentzahl auf einer Zeile bei lesbarer
+        // Schriftgroesse zu passen (lief vorher links/rechts ueber den
+        // Bildschirmrand hinaus). Jetzt: Beschriftung klein oben, Prozent
+        // gross darunter.
+        constexpr int16_t BAND_H = 60;
+        int16_t cy = Config::SCREEN_HEIGHT / 2;
+        t.fillRect(0, (int16_t)(cy - BAND_H / 2), Config::SCREEN_WIDTH, BAND_H, TFT_BLACK);
+
         t.setTextDatum(MC_DATUM);
         t.setTextColor(TFT_GREEN, TFT_BLACK);
-        t.setTextSize(2);
-        t.drawString(label, Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
+        t.setTextSize(1);
+        t.drawString(I18n::t(StringId::OTA_INSTALLING_PREFIX), Config::SCREEN_WIDTH / 2, (int16_t)(cy - 14));
+
+        String percentLabel = String(percent) + "%";
+        t.setTextSize(3);
+        t.drawString(percentLabel, Config::SCREEN_WIDTH / 2, (int16_t)(cy + 12));
+
         t.setTextSize(1);
         t.setTextDatum(TL_DATUM);
     }
@@ -338,7 +451,12 @@ namespace {
     // ist keine destruktive Aktion wie Werksreset, verdient aber trotzdem
     // eine bewusste Bestaetigung, da WLAN/Strom waehrend des Vorgangs nicht
     // unterbrochen werden sollten), danach Fortschrittsanzeige waehrend
-    // Download+Flash. Startet das Geraet bei Erfolg selbst neu.
+    // Download+Flash. WICHTIG: startet NICHT mehr automatisch neu und
+    // springt bei einem Fehler auch nicht einfach stillschweigend zurueck
+    // ins Menue - jedes Ergebnis (Erfolg wie Fehler) wird ueber infoScreen()
+    // als eigener, stehenbleibender Screen angezeigt, den der Nutzer aktiv
+    // bestaetigen muss. Bei Erfolg startet erst ein expliziter Tap auf
+    // "Jetzt neu starten" tatsaechlich neu.
     void runOtaUpdateScreen(TFT_eSPI& tft) {
         MenuStars::reset();
         tft.fillScreen(TFT_BLACK);
@@ -350,11 +468,12 @@ namespace {
         OtaUpdate::CheckInfo info = OtaUpdate::checkForUpdate();
 
         if (info.result == OtaUpdate::CheckResult::Error) {
-            showBriefMessage(tft, I18n::t(StringId::OTA_CHECK_FAILED), TFT_RED);
+            infoScreen(tft, I18n::t(StringId::OTA_CHECK_FAILED), "", TFT_RED, I18n::t(StringId::OK));
             return;
         }
         if (info.result == OtaUpdate::CheckResult::UpToDate) {
-            showBriefMessage(tft, String(I18n::t(StringId::OTA_UP_TO_DATE_PREFIX)) + info.latestVersion, TFT_GREEN);
+            String upToDateTitle = String(I18n::t(StringId::OTA_UP_TO_DATE_PREFIX)) + info.latestVersion;
+            infoScreen(tft, upToDateTitle, "", TFT_GREEN, I18n::t(StringId::OK));
             return;
         }
 
@@ -369,15 +488,20 @@ namespace {
         otaProgressTft = nullptr;
 
         if (ok) {
-            tft.fillScreen(TFT_BLACK);
-            tft.setTextDatum(MC_DATUM);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.drawString(I18n::t(StringId::OTA_UPDATE_SUCCESS), Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
-            tft.setTextDatum(TL_DATUM);
-            delay(1500);
+            // Bewusst KEIN automatischer Neustart mehr - der Nutzer
+            // bestaetigt aktiv per Button, damit er den Erfolg auch wirklich
+            // mitbekommt (vorher lief die Meldung nur 1,5s an, dann
+            // Neustart - leicht zu verpassen).
+            infoScreen(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), I18n::t(StringId::OTA_SUCCESS_BODY),
+                       TFT_GREEN, I18n::t(StringId::OTA_RESTART_BUTTON));
             ESP.restart();
         } else {
-            showBriefMessage(tft, I18n::t(StringId::OTA_UPDATE_FAILED), TFT_RED);
+            // Bewusst ein stehenbleibender Info-Screen statt der alten
+            // showBriefMessage() (1,2s, dann automatisch zurueck ins Menue)
+            // - ein fehlgeschlagenes Firmware-Update ist keine
+            // Nebensaechlichkeit, die man verpassen darf.
+            infoScreen(tft, I18n::t(StringId::OTA_UPDATE_FAILED), I18n::t(StringId::OTA_FAILED_BODY),
+                       TFT_RED, I18n::t(StringId::OK));
         }
     }
 
