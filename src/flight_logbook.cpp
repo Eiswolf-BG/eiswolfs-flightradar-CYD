@@ -92,7 +92,7 @@ namespace {
                 if (buf[i] == '\n') lines++;
             }
             blocksRead++;
-            if (blocksRead % 8 == 0) yield();
+            if (blocksRead % 8 == 0) delay(1);
         }
         return lines;
     }
@@ -141,7 +141,7 @@ namespace {
                 }
             }
             blocksRead++;
-            if (blocksRead % 8 == 0) yield();
+            if (blocksRead % 8 == 0) delay(1);
         }
         f.close();
     }
@@ -284,6 +284,7 @@ TopAltitude todayMaxAltitude() {
     if (!f) return result;
 
     bool firstLine = true;
+    uint32_t lineIdx = 0;
     while (f.available()) {
         String line = f.readStringUntil('\n');
         if (firstLine) { firstLine = false; continue; } // CSV-Header ueberspringen
@@ -315,7 +316,8 @@ TopAltitude todayMaxAltitude() {
             strncpy(result.callsign, callsign.c_str(), sizeof(result.callsign) - 1);
             result.callsign[sizeof(result.callsign) - 1] = 0;
         }
-        yield();
+        lineIdx++;
+        if (lineIdx % 16 == 0) delay(1);
     }
     f.close();
 
