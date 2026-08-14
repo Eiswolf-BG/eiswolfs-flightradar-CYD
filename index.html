@@ -76,6 +76,31 @@
             margin-bottom: 25px;
             text-shadow: 0 0 4px rgba(57, 255, 20, 0.4);
         }
+        .version-picker {
+            text-align: left;
+            font-size: 12px;
+            color: #aae0aa;
+            margin-bottom: 20px;
+        }
+        .version-picker label {
+            display: block;
+            margin-bottom: 4px;
+        }
+        .version-picker select {
+            width: 100%;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-family: inherit;
+            font-size: 13px;
+        }
+        .version-picker .hint {
+            font-size: 11px;
+            color: #6a8f6a;
+            margin-top: 6px;
+        }
         p {
             font-size: 14px;
             color: #ffffff;
@@ -112,9 +137,19 @@
 <div class="container">
     <h1>EISWOLFS FLIGHTRADAR CYD</h1>
     <div class="subtitle">Firmware Flash Utility</div>
-    <div class="version-badge">Version: v3.6.3</div>
+    <div class="version-badge">Version: <span id="versionLabel">v3.6.3</span></div>
 
-    <p>Install the latest Flightradar firmware directly from your browser to your Cheap Yellow Display.</p>
+    <p>Install the Flightradar firmware directly from your browser to your Cheap Yellow Display.</p>
+
+    <div class="version-picker">
+        <label for="versionSelect">Install version:</label>
+        <select id="versionSelect">
+            <option value="manifest.json" data-version="v3.6.3" selected>v3.6.3 (latest)</option>
+            <option value="versions/v3.6.2/manifest.json" data-version="v3.6.2">v3.6.2</option>
+            <option value="versions/v3.6.1/manifest.json" data-version="v3.6.1">v3.6.1</option>
+        </select>
+        <div class="hint">Older versions are only kept for testing or rolling back - the latest version is recommended for most users.</div>
+    </div>
 
     <div class="instructions">
         1. Connect your CYD via USB cable<br>
@@ -122,7 +157,8 @@
         3. Select the correct COM port<br>
         4. Sit back and wait for the process to finish
     </div>
-    <!-- References the manifest.json in the same folder -->
+    <!-- References the manifest.json in the same folder by default;
+         changed at runtime by the version picker above. -->
     <esp-web-install-button manifest="manifest.json" data-goatcounter-click="flash-button" data-goatcounter-title="Firmware geflasht"></esp-web-install-button>
 
     <div class="browser-note">Requires Chrome, Edge, or Opera (Web Serial API)</div>
@@ -181,6 +217,22 @@
     requestAnimationFrame(draw);
   }
   draw();
+})();
+</script>
+<script>
+(function () {
+  // Version picker: repoints the ESP Web Tools install button at a
+  // different manifest.json when the user picks an older version, and
+  // keeps the "Version: vX.Y.Z" badge in sync with the current selection.
+  const select = document.getElementById('versionSelect');
+  const button = document.querySelector('esp-web-install-button');
+  const label = document.getElementById('versionLabel');
+  if (!select || !button) return;
+  select.addEventListener('change', function () {
+    const opt = select.options[select.selectedIndex];
+    button.setAttribute('manifest', select.value);
+    if (label && opt) label.textContent = opt.dataset.version || opt.textContent;
+  });
 })();
 </script>
 </body>

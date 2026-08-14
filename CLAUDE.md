@@ -212,6 +212,20 @@ in dieser Reihenfolge:
    immer die README (oder auch nur die Versionsnummer) auf eine neue Version
    aktualisiert wird, IMMER im selben Zug auch `index.html` prüfen und
    synchron mitziehen.
+4b. Web-Flasher-Versionsauswahl aktuell halten: Bevor die Wurzel-.bin-Dateien
+    mit dem neuen Build überschrieben werden, die BISHERIGEN (noch alten)
+    bootloader.bin/partitions.bin/firmware.bin in einen neuen Ordner
+    `versions/vALT/` archivieren (vALT = die Versionsnummer, die index.html
+    vor diesem Update zeigte) - dort auch eine `manifest.json` ablegen
+    (identischer Inhalt wie die Wurzel-manifest.json, siehe
+    `versions/v3.6.2/manifest.json` als Vorlage). Danach im Ordner
+    `versions/` nur die 2 neuesten Versionsordner (nach Versionsnummer
+    sortiert, nicht nach Datei-Datum) behalten - ältere Ordner löschen.
+    Anschließend in `index.html` den Versions-Dropdown
+    (`<select id="versionSelect">`) aktualisieren: 3 Optionen - die neue
+    aktuelle Version (`value="manifest.json"`, `data-version="vNEU"`, Text
+    "vNEU (latest)") plus die beiden jetzt in `versions/` verbliebenen
+    Versionen (`value="versions/vX.Y.Z/manifest.json"`, neueste zuerst).
 5. Prüfen, ob `bootloader.bin`, `firmware.bin`, `partitions.bin` im
    Hauptverzeichnis dem aktuellen Build in `.pio/build/esp32dev/`
    entsprechen - falls nicht, von dort kopieren.
