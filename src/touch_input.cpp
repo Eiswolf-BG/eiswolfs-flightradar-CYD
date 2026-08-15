@@ -103,6 +103,11 @@ Point mappedPoint() {
 
     out.x = clampi((int16_t)mx, 0, Config::SCREEN_WIDTH - 1);
     out.y = clampi((int16_t)my, 0, Config::SCREEN_HEIGHT - 1);
+
+    if (Config::DISPLAY_ROTATION == 2) {
+        out.x = Config::SCREEN_WIDTH - 1 - out.x;
+        out.y = Config::SCREEN_HEIGHT - 1 - out.y;
+    }
     return out;
 }
 

@@ -89,6 +89,10 @@ namespace Config {
     constexpr uint8_t TOUCH_MISO_PIN = 39;
     constexpr uint8_t TOUCH_IRQ_PIN  = 36;
 
+    // Display-Rotation: 0 = normal (USB-Anschluss unten), 2 = 180 Grad
+    // gedreht (USB oben) - fuer Montage mit Ladebuchse oben.
+    constexpr uint8_t DISPLAY_ROTATION = 0;
+
     constexpr int16_t SCREEN_WIDTH  = 240;
     constexpr int16_t SCREEN_HEIGHT = 320;
 

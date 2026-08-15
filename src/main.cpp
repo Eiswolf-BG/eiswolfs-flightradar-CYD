@@ -504,7 +504,7 @@ void setup() {
     delay(300);
 
     tft.init();
-    tft.setRotation(0);
+    tft.setRotation(Config::DISPLAY_ROTATION);
     tft.setFreeFont(&UiFont11pt);
     tft.invertDisplay(true);
     tft.fillScreen(TFT_BLACK);
