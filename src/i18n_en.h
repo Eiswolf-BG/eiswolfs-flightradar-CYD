@@ -256,6 +256,21 @@ static const char* const I18N_EN[] = {
     "The update could not be downloaded or installed. The device is still running the previous firmware, unchanged. Please check your WiFi connection and try again later.",
     "Screen Timeout",
     "After this time without touch, the display turns off to save power. With the screensaver on, it dims to a starfield with a clock instead.",
+
+    "Radar Color Theme",
+    "Radar Color Theme",
+    "Green (default)",
+    "Amber",
+    "Blue",
+
+    "Most Seen",
+    "Most Seen Aircraft",
+    "No data yet. Flight logbook must be active.",
+    " sightings",
+
+    "Aviation weather report (METAR) for ",
+
+    "Scan for live tracking of this flight",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

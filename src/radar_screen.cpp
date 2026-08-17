@@ -14,6 +14,9 @@
 #include "airline_filter.h"
 #include "aircraft_watchlist.h"
 #include "i18n.h"
+#include "touch_input.h"
+#include "menu_stars.h"
+#include <qrcode.h>
 #include <math.h>
 #include <time.h>
 
@@ -201,6 +204,25 @@ namespace {
         return false;
     }
 
+    // "Auffaellige Flugzeuge" (oranger Ring) - fuer Militaer-/Regierungs-
+    // Rufzeichen-Praefixe gedacht. Bleibt aktuell IMMER false: es gibt
+    // nirgends im Projekt eine Config::NOTABLE_CALLSIGN_PREFIXES-Liste -
+    // dieses Feature wurde nie tatsaechlich spezifiziert/geliefert (mehrfach
+    // in verschiedenen Aenderungswuenschen referenziert, aber die
+    // eigentliche Praefixliste kam nie an). "Heavy"-Flugzeuge (ADS-B-
+    // Emitter-Kategorie "A5", siehe isHeavyCategory() unten) haben bereits
+    // ihre eigene Markerform (drawHeavyMarker()) und sind NICHT von diesem
+    // Ring betroffen. Sobald eine echte Praefixliste geliefert wird, hier
+    // den Vergleich analog zu isEmergencySquawk() ergaenzen.
+    bool isNotableCallsign(const char* callsign) {
+        (void)callsign;
+        return false;
+    }
+
+    bool isHeavyCategory(const char* category) {
+        return category[0] == 'A' && category[1] == '5';
+    }
+
     float sweepAngleDeg = 0.0f;
     float prevSweepAngleDeg = -1.0f;
     constexpr float SWEEP_DEGREES_PER_SEC = 45.0f;
@@ -245,7 +267,35 @@ namespace {
         return SettingsStore::nightDimmingEnabled() && isNightHours();
     }
 
-    // Farbe je nach Flughoehe - gedaempft (dunkleres Gruen/Oliv) waehrend der
+    // Radar-Farbschema (Menue > System > Radar-Farbschema, siehe
+    // radar_theme_screen.cpp / SettingsStore::radarThemeIndex()) - retro
+    // Phosphor-Radarschirm-Optik (Gruen/Amber/Blau). Betrifft NUR den
+    // "Grundton" dieses Screens: Sweep-Linie, Panel-Rahmen/Text, Buttons und
+    // die niedrigste Hoehenstufe (siehe colorForAltitude() unten). Die
+    // gelbe/rote Hoehenstufe (mittlere/hohe Flughoehe = Warnfarben) sowie
+    // ALLE anderen Bildschirme im Projekt bleiben bewusst immer gruen -
+    // Warnfarben sollen ueberall gleich bleiben, unabhaengig vom gewaehlten
+    // Radar-Farbschema.
+    uint16_t themeBaseColor(TFT_eSPI& gfx) {
+        switch (SettingsStore::radarThemeIndex()) {
+            case 1: return gfx.color565(255, 176, 0);  // Amber
+            case 2: return gfx.color565(0, 200, 255);  // Blau
+            default: return TFT_GREEN;                  // Gruen (Standard)
+        }
+    }
+
+    // Gedaempfte Variante von themeBaseColor() fuer die Nachtdimmung -
+    // gleiches Helligkeitsverhaeltnis wie das bisherige TFT_GREEN->
+    // color565(0,160,0) fuer die anderen beiden Farbschemata nachgebildet.
+    uint16_t themeDimColor(TFT_eSPI& gfx) {
+        switch (SettingsStore::radarThemeIndex()) {
+            case 1: return gfx.color565(160, 110, 0);  // Amber, gedaempft
+            case 2: return gfx.color565(0, 120, 160);  // Blau, gedaempft
+            default: return gfx.color565(0, 160, 0);    // Gruen, gedaempft
+        }
+    }
+
+    // Farbe je nach Flughoehe - gedaempft (dunklerer Grundton) waehrend der
     // Nachtdimmung.
     //
     // Die rote Hoehenstufe wird bewusst NICHT gedaempft: der bisherige
@@ -255,14 +305,14 @@ namespace {
     uint16_t colorForAltitude(TFT_eSPI& gfx, int32_t altFt) {
         bool dim = nightDimActiveNow();
         if (altFt < Config::COLOR_LOW_ALT_THRESHOLD_FT)
-            return dim ? gfx.color565(0, 160, 0) : TFT_GREEN;
+            return dim ? themeDimColor(gfx) : themeBaseColor(gfx);
         if (altFt < Config::COLOR_MID_ALT_THRESHOLD_FT)
             return dim ? gfx.color565(160, 160, 0) : TFT_YELLOW;
         return TFT_RED;
     }
 
     uint16_t sweepLineColor(TFT_eSPI& gfx) {
-        return nightDimActiveNow() ? gfx.color565(0, 110, 0) : TFT_GREEN;
+        return nightDimActiveNow() ? themeDimColor(gfx) : themeBaseColor(gfx);
     }
 
     // Feste Blau-Farbe fuer Bodenfahrzeug-Marker (ADS-B-Emitter-Kategorie
@@ -379,7 +429,7 @@ namespace {
     // Aussenring - auf den ersten Blick als "groesser/schwerer" erkennbar,
     // ohne eine komplett neue Formsprache einzufuehren. Die Farbe bleibt wie
     // gewohnt die Hoehenfarbe (colorForAltitude()) - die Form transportiert
-    // "Heavy", kein Alarm-/Auffaelligkeitszustand.
+    // "Heavy", nicht einen Alarm-/Auffaelligkeitszustand (siehe isNotable).
     void drawHeavyMarker(TFT_eSPI& gfx, int16_t x, int16_t y, float headingDeg, uint16_t color) {
         gfx.fillCircle(x, y, 6, color);
         gfx.drawCircle(x, y, 8, color);
@@ -417,9 +467,9 @@ namespace {
 
     void drawButton(TFT_eSPI& gfx, const Rect& r, const String& label) {
         gfx.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
-        gfx.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+        gfx.drawRoundRect(r.x, r.y, r.w, r.h, 4, themeBaseColor(gfx));
         gfx.setTextDatum(MC_DATUM);
-        gfx.setTextColor(TFT_GREEN, TFT_BLACK);
+        gfx.setTextColor(themeBaseColor(gfx), TFT_BLACK);
         gfx.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         gfx.setTextDatum(TL_DATUM);
     }
@@ -541,6 +591,7 @@ namespace {
         gfx.drawString("S", L.cx, L.cy + L.radius - 10);
         gfx.drawString("E", L.cx + L.radius - 10, L.cy);
         gfx.drawString("W", L.cx - L.radius + 10, L.cy);
+
         // Ring-Beschriftungen (Zwischenabstaende) respektieren jetzt die
         // Einheiten-Einstellung (Menue > Einheiten) - vorher immer in km,
         // auch wenn Imperial (nm) eingestellt war. Gleiches Umrechnungs-
@@ -577,9 +628,24 @@ namespace {
         bool valid = false;
         char hex[7] = {0};
         String callsignText;
+        // Rohes Rufzeichen (nicht der ggf. auf den Hex-Code zurueckfallende
+        // Anzeigetext callsignText oben) - vom QR-Button gebraucht (siehe
+        // qrButtonRect()/runFlightQrScreen() weiter unten), da handleTap()
+        // keinen direkten Zugriff auf das aktuell ausgewaehlte Aircraft-
+        // Objekt hat, sondern nur auf diesen zwischengespeicherten Zustand.
+        char callsign[9] = {0};
         LineMarquee airline, model, type, route, alt, speed, climb, distHeading, squawk, seats;
     };
     PanelState lastPanel;
+
+    // Kleiner "QR"-Button oben rechts im Detail-Panel (siehe
+    // drawDetailPanel()/handleTap() weiter unten) - oeffnet einen
+    // Vollbild-QR-Code mit einem Live-Tracking-Link fuer den aktuell
+    // angezeigten Flug. Eigene Funktion, da sowohl beim Zeichnen als auch
+    // beim Antippen exakt dieselbe Flaeche gebraucht wird.
+    Rect qrButtonRect(int16_t panelTop) {
+        return {(int16_t)(Config::SCREEN_WIDTH - 34), (int16_t)(panelTop + 4), 30, 20};
+    }
 
     // Zeichnet eine Detail-Panel-Zeile NEU, wenn sich ihr Text geaendert
     // hat (oder das Panel komplett neu aufgebaut wird) - merkt sich dabei
@@ -670,7 +736,7 @@ namespace {
         bool forceFull = !lastPanel.valid || strcmp(lastPanel.hex, a.hex) != 0;
         if (forceFull) {
             gfx.fillRect(0, panelTop, Config::SCREEN_WIDTH, DETAIL_PANEL_H, TFT_BLACK);
-            gfx.drawRect(0, panelTop, Config::SCREEN_WIDTH, DETAIL_PANEL_H, TFT_GREEN);
+            gfx.drawRect(0, panelTop, Config::SCREEN_WIDTH, DETAIL_PANEL_H, themeBaseColor(gfx));
             lastPanel = PanelState{};
             strncpy(lastPanel.hex, a.hex, sizeof(lastPanel.hex) - 1);
         }
@@ -678,30 +744,56 @@ namespace {
         int16_t y = panelTop + 26;
 
         {
+            // QR_BTN_RESERVED_W spart rechts Platz fuer den neuen QR-Button
+            // (siehe qrButtonRect()) frei, damit ein langes Rufzeichen nicht
+            // darunter/dahinter verschwindet.
+            constexpr int16_t QR_BTN_RESERVED_W = 34;
             String txt = a.callsign[0] ? a.callsign : a.hex;
-            if (forceFull || lastPanel.callsignText != txt) {
+            bool callsignChanged = forceFull || lastPanel.callsignText != txt;
+            if (callsignChanged) {
                 gfx.fillRect(0, y - 22, Config::SCREEN_WIDTH, 28, TFT_BLACK);
-                gfx.setTextColor(TFT_GREEN, TFT_BLACK);
+                gfx.setTextColor(themeBaseColor(gfx), TFT_BLACK);
                 gfx.setTextSize(2);
-                printLineTruncated(gfx, 8, y, textMaxWidth, txt);
+                int16_t callsignMaxW = a.callsign[0] ? (int16_t)(textMaxWidth - QR_BTN_RESERVED_W) : textMaxWidth;
+                printLineTruncated(gfx, 8, y, callsignMaxW, txt);
                 gfx.setTextSize(1);
                 lastPanel.callsignText = txt;
+                strncpy(lastPanel.callsign, a.callsign, sizeof(lastPanel.callsign) - 1);
+                lastPanel.callsign[sizeof(lastPanel.callsign) - 1] = 0;
+
+                // QR-Button neu zeichnen, wann immer diese Zeile neu
+                // gezeichnet wird (nicht nur bei forceFull) - sonst koennte
+                // ein spaeteres Aendern NUR des Rufzeichens (z.B. ADS-B
+                // liefert es live nach) den Button versehentlich
+                // ueberschreiben, ohne ihn wieder herzustellen. Nur
+                // sichtbar, wenn ueberhaupt ein Rufzeichen bekannt ist -
+                // ohne Rufzeichen liesse sich kein sinnvoller
+                // Live-Tracking-Link bilden (z.B. bei manchen
+                // Sichtflug-Maschinen).
+                if (a.callsign[0]) {
+                    Rect qrBtn = qrButtonRect(panelTop);
+                    gfx.drawRoundRect(qrBtn.x, qrBtn.y, qrBtn.w, qrBtn.h, 3, themeBaseColor(gfx));
+                    gfx.setTextDatum(MC_DATUM);
+                    gfx.setTextColor(themeBaseColor(gfx), TFT_BLACK);
+                    gfx.drawString("QR", qrBtn.x + qrBtn.w / 2, qrBtn.y + qrBtn.h / 2);
+                    gfx.setTextDatum(TL_DATUM);
+                }
             }
         }
         y += 30;
 
-        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.airline,
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.airline,
                    String(a.airlineName), forceFull);
         y += LINE_H;
 
         String modelLine = details.loading
             ? String(I18n::t(StringId::DETAIL_MODEL)) + I18n::t(StringId::DETAIL_LOADING_DOTS)
             : String(I18n::t(StringId::DETAIL_MODEL)) + (details.model[0] ? details.model : I18n::t(StringId::DETAIL_UNKNOWN));
-        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.model, modelLine, forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.model, modelLine, forceFull);
         y += LINE_H;
 
         String typeLine = String(I18n::t(StringId::DETAIL_TYPE)) + (a.typeCode[0] ? a.typeCode : I18n::t(StringId::DETAIL_UNKNOWN));
-        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.type, typeLine, forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.type, typeLine, forceFull);
         y += LINE_H;
 
         // Start-/Zielflughafen (ICAO-Code) ueber AircraftDetails::get() -
@@ -719,18 +811,18 @@ namespace {
         } else {
             routeLine = String(I18n::t(StringId::DETAIL_ROUTE)) + I18n::t(StringId::DETAIL_UNKNOWN);
         }
-        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.route, routeLine, forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.route, routeLine, forceFull);
         y += LINE_H;
 
         char buf[48];
         snprintf(buf, sizeof(buf), "%s%.0fm / %.0fft", I18n::t(StringId::DETAIL_ALT),
                  Units::feetToMeters((float)a.altBaroFt), (float)a.altBaroFt);
-        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.alt, String(buf), forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.alt, String(buf), forceFull);
         y += LINE_H;
 
         snprintf(buf, sizeof(buf), "%s%.0fkm/h / %.0fkt", I18n::t(StringId::DETAIL_SPEED),
                  Units::ktToKmh(a.groundSpeedKt), a.groundSpeedKt);
-        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.speed, String(buf), forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.speed, String(buf), forceFull);
         y += LINE_H;
 
         String climbLine;
@@ -743,7 +835,7 @@ namespace {
         } else {
             climbLine = I18n::t(StringId::DETAIL_LEVEL);
         }
-        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.climb, climbLine, forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.climb, climbLine, forceFull);
         y += LINE_H;
 
         // Zusaetzlich zu km/nm auch Meilen (mi) - nm allein war fuer
@@ -754,26 +846,122 @@ namespace {
         snprintf(buf, sizeof(buf), "%s%.0fkm / %.0fnm / %.0fmi  %s%.0f", I18n::t(StringId::DETAIL_DIST),
                  a.distanceKm, Units::kmToNm(a.distanceKm), Units::kmToMi(a.distanceKm),
                  I18n::t(StringId::DETAIL_HDG), a.headingDeg);
-        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.distHeading, String(buf), forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.distHeading, String(buf), forceFull);
         y += LINE_H;
 
         String squawkLine = String(I18n::t(StringId::DETAIL_SQUAWK)) + (a.squawk[0] ? a.squawk : I18n::t(StringId::DETAIL_UNKNOWN));
-        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.squawk, squawkLine, forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.squawk, squawkLine, forceFull);
         y += LINE_H;
 
         String seatsLine = a.estSeats > 0
             ? String(I18n::t(StringId::DETAIL_SEATS_EST)) + a.estSeats
             : String(I18n::t(StringId::DETAIL_SEATS_UNKNOWN));
-        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, TFT_GREEN, lastPanel.seats, seatsLine, forceFull);
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.seats, seatsLine, forceFull);
         y += 22;
 
         if (forceFull) {
-            gfx.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+            gfx.setTextColor(themeDimColor(gfx), TFT_BLACK);
             gfx.setCursor(8, y);
             gfx.print(I18n::t(StringId::DETAIL_TAP_CLOSE));
         }
 
         lastPanel.valid = true;
+    }
+
+    // Kurzer Zeilenumbruch (hoechstens 2 Zeilen) fuer die Hinweiszeile unter
+    // dem QR-Code - noetig, da manche Uebersetzungen (z.B. Italienisch/
+    // Spanisch) bei Textgroesse 1 breiter als der Bildschirm waeren (gleiche
+    // Grundidee wie menu_screen.cpp::wrapTitleLines(), hier aber bewusst
+    // einfacher gehalten, da nur EINE kurze Hinweiszeile betroffen ist).
+    void drawWrappedCenteredHint(TFT_eSPI& gfx, const String& text, int16_t centerX, int16_t startY,
+                                  int16_t maxWidth, int16_t lineH) {
+        String line1 = text;
+        String line2;
+        if (gfx.textWidth(line1) > maxWidth) {
+            int32_t breakAt = -1;
+            for (int32_t i = 0; i < (int32_t)line1.length(); i++) {
+                if (line1[i] == ' ' && gfx.textWidth(line1.substring(0, i)) <= maxWidth) {
+                    breakAt = i;
+                }
+            }
+            if (breakAt > 0) {
+                line2 = line1.substring(breakAt + 1);
+                line1 = line1.substring(0, breakAt);
+            }
+        }
+        gfx.setTextDatum(MC_DATUM);
+        gfx.setTextColor(TFT_WHITE, TFT_BLACK);
+        gfx.drawString(line1, centerX, startY);
+        if (line2.length() > 0) {
+            gfx.drawString(line2, centerX, (int16_t)(startY + lineH));
+        }
+        gfx.setTextDatum(TL_DATUM);
+    }
+
+    // Vollbild-QR-Code mit einem FlightAware-Live-Tracking-Link fuer das
+    // uebergebene Rufzeichen - erreichbar ueber den "QR"-Button oben rechts
+    // im Detail-Panel (siehe drawDetailPanel()/qrButtonRect()). Gleiches
+    // QRCode-Bibliotheks-Muster (Version 4, ECC_LOW, 4px-Module) wie der
+    // bestehende WebUI-QR-Code in webui_screen.cpp.
+    void runFlightQrScreen(TFT_eSPI& gfx, const char* callsign) {
+        MenuStars::reset();
+        // Explizit setzen statt vom Aufrufer geerbt anzunehmen - die
+        // Breitenberechnung in drawWrappedCenteredHint() unten haengt vom
+        // aktuellen textSize-Zustand ab, siehe dortiger Kommentar.
+        gfx.setTextSize(1);
+
+        // FlightAware statt z.B. Flightradar24 gewaehlt, da deren
+        // "/live/flight/<Rufzeichen>"-URL-Schema direkt mit dem rohen
+        // ADS-B-Rufzeichen funktioniert, ohne zusaetzliche Aufloesung ueber
+        // einen anderen Dienst.
+        String cs = String(callsign);
+        cs.trim();
+        cs.toUpperCase();
+        String url = "https://flightaware.com/live/flight/" + cs;
+
+        constexpr uint8_t QR_VERSION = 4;
+        constexpr int16_t QR_SIZE_MODULES = 33; // Version 4: 4*4+17 = 33
+        constexpr int16_t QR_BLOCK = 4;
+        constexpr int16_t QR_QUIET = 2;
+        constexpr int16_t QR_PIXEL_SIZE = (QR_SIZE_MODULES + 2 * QR_QUIET) * QR_BLOCK;
+        constexpr int16_t QR_X = (Config::SCREEN_WIDTH - QR_PIXEL_SIZE) / 2;
+        constexpr int16_t QR_Y = 40;
+
+        uint8_t qrData[qrcode_getBufferSize(QR_VERSION)];
+        QRCode qrcode;
+        qrcode_initText(&qrcode, qrData, QR_VERSION, ECC_LOW, url.c_str());
+
+        Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+
+        gfx.fillScreen(TFT_BLACK);
+        gfx.setTextColor(themeBaseColor(gfx), TFT_BLACK);
+        gfx.setCursor(10, 14);
+        gfx.println(cs);
+
+        gfx.fillRect(QR_X, QR_Y, QR_PIXEL_SIZE, QR_PIXEL_SIZE, TFT_WHITE);
+        for (uint8_t my = 0; my < qrcode.size; my++) {
+            for (uint8_t mx = 0; mx < qrcode.size; mx++) {
+                if (qrcode_getModule(&qrcode, mx, my)) {
+                    int16_t px = (int16_t)(QR_X + (QR_QUIET + mx) * QR_BLOCK);
+                    int16_t py = (int16_t)(QR_Y + (QR_QUIET + my) * QR_BLOCK);
+                    gfx.fillRect(px, py, QR_BLOCK, QR_BLOCK, TFT_BLACK);
+                }
+            }
+        }
+
+        drawWrappedCenteredHint(gfx, I18n::t(StringId::DETAIL_QR_HINT), Config::SCREEN_WIDTH / 2,
+                                (int16_t)(QR_Y + QR_PIXEL_SIZE + 14), (int16_t)(Config::SCREEN_WIDTH - 20), 16);
+
+        drawButton(gfx, backBtn, I18n::t(StringId::BACK));
+
+        while (true) {
+            TouchInput::Point tap;
+            if (TouchInput::wasTapped(tap)) {
+                if (backBtn.contains(tap.x, tap.y)) return;
+            }
+            MenuStars::update(gfx);
+            delay(20);
+        }
     }
 
     constexpr uint8_t STAR_COUNT = 28;
@@ -949,14 +1137,21 @@ void render(TFT_eSPI& tft, int16_t top) {
         // oben) - eigene Farbe/Marker statt der hoehenbasierten Flugzeug-
         // Darstellung, siehe drawGroundVehicleMarker()/colorForGroundVehicle().
         bool isGroundVehicle = a.category[0] == 'C';
+        // ADS-B-Emitter-Kategorie "A7" = Rotorcraft (Hubschrauber) - eigenes
+        // Symbol statt des Pfeilkopf-Markers, siehe drawHelicopterMarker().
         bool isRotorcraft = a.category[0] == 'A' && a.category[1] == '7';
         // ADS-B-Emitter-Kategorie "A5" = "Heavy" - eigene Markerform (siehe
-        // drawHeavyMarker()), unabhaengig von jeglicher Ring-Markierung.
-        bool isHeavy = a.category[0] == 'A' && a.category[1] == '5';
+        // drawHeavyMarker()), unabhaengig vom oranger-Ring-Status (isNotable
+        // unten), der jetzt ausschliesslich fuer Militaer-/Regierungs-
+        // Rufzeichen reserviert ist.
+        bool isHeavy = isHeavyCategory(a.category);
         uint16_t color = isGroundVehicle ? colorForGroundVehicle(tft) : colorForAltitude(tft, a.altBaroFt);
         bool isSelected = selectedHex[0] && strcmp(a.hex, selectedHex) == 0;
         bool isEmergency = SettingsStore::emergencyAlertEnabled() && isEmergencySquawk(a.squawk);
         bool isWatched = SettingsStore::watchlistAlertEnabled() && AircraftWatchlist::isWatched(a.callsign);
+        // Niedrigste Prioritaet der drei Ring-Markierungen (siehe unten) -
+        // rein informativ, kein Alarm wie Notfall/Beobachtungsliste.
+        bool isNotable = isNotableCallsign(a.callsign);
 
         if (isSelected) {
             tft.drawCircle(pt.x, pt.y, 9, TFT_WHITE);
@@ -978,6 +1173,8 @@ void render(TFT_eSPI& tft, int16_t top) {
             tft.drawCircle(pt.x, pt.y, 12, TFT_RED);
         } else if (isWatched) {
             tft.drawCircle(pt.x, pt.y, 12, TFT_CYAN);
+        } else if (isNotable) {
+            tft.drawCircle(pt.x, pt.y, 12, TFT_ORANGE);
         }
 
         tft.setTextColor(color);
@@ -1094,16 +1291,6 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
 
         bool inAlertRange = hp.distanceKm <= Config::LED_ALERT_RADIUS_KM;
         if (inAlertRange && !ledBlinkOn) {
-            // Blink-Aus-Phase: frueher wurde hier ein pauschales 40x30px
-            // schwarzes Rechteck gezeichnet, um den Marker zu "verstecken" -
-            // das hat dabei aber auch die Radar-Ringe/Kompasslinien darunter
-            // ueberdeckt (bei jeder Hoehenfarbe gleichermassen, da diese
-            // Blink-Logik rein distanzbasiert ist). Stattdessen werden hier
-            // jetzt exakt dieselben Formen, die beim normalen Zeichnen weiter
-            // unten entstehen (Marker, Notfall-/Beobachtungs-Ring, Label),
-            // einfach in Schwarz nachgezeichnet - das macht sie pixelgenau
-            // wieder unsichtbar, ohne irgendetwas ausserhalb dieser Formen zu
-            // beruehren.
             if (hp.isGroundVehicle) {
                 drawGroundVehicleMarker(tft, hp.x, hp.y, TFT_BLACK);
             } else if (hp.isRotorcraft) {
@@ -1147,13 +1334,6 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
         tft.setTextDatum(TL_DATUM);
     }
 
-    // Info-Zeile unten (Tap-Hinweis bzw. "Leerer Himmel"-Timer) als
-    // durchlaufende Laufschrift - siehe InfoMarquee weiter oben.
-    // visibleCount wird hier bewusst erneut aus hitPoints[] gezaehlt
-    // (statt aus render() uebernommen), da tick() unabhaengig von render()
-    // laeuft und so auch den "Leerer Himmel"-Sekundenzaehler fluessig
-    // hochzaehlen kann, ohne auf den naechsten render()-Aufruf warten zu
-    // muessen.
     uint8_t visibleCountNow = 0;
     for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) {
         if (hitPoints[i].valid) visibleCountNow++;
@@ -1169,9 +1349,6 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
         if (emptySec < 60) {
             snprintf(buf, sizeof(buf), "%lus", (unsigned long)emptySec);
         } else {
-            // Ab der ersten vollen Minute NUR noch Minuten anzeigen (ohne
-            // Sekunden) - abgerundet (60-119s = "1min", 120-179s = "2min",
-            // usw.) - intuitiv wie eine normale Stoppuhr-Minutenanzeige.
             unsigned long minutes = emptySec / 60;
             snprintf(buf, sizeof(buf), "%lumin", minutes);
         }
@@ -1187,17 +1364,9 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     int16_t infoTextW = L.rangeBtn.x - INFO_TEXT_X - INFO_TEXT_GAP;
 
     if (kind != infoMarqueeKind) {
-        // Die ART der Nachricht hat sich geaendert (z.B. letztes Flugzeug
-        // verschwunden) - Laufschrift komplett neu aufsetzen und von vorne
-        // beginnen.
         infoMarqueeKind = kind;
         setupInfoMarquee(tft, infoText, infoTextW);
     } else {
-        // Gleiche Art wie zuvor (z.B. weiterhin "Leerer Himmel", nur die
-        // Sekundenzahl hat sich geaendert) - Text aktualisieren, aber NICHT
-        // den Scroll-Fortschritt zuruecksetzen, sonst wuerde die
-        // Laufschrift bei jedem Sekundenwechsel neu von vorne beginnen statt
-        // fluessig durchzulaufen.
         updateInfoMarqueeText(tft, infoText, infoTextW);
     }
     drawInfoMarquee(tft, INFO_TEXT_X, infoTextY, infoTextW);
@@ -1205,10 +1374,18 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     tft.endWrite();
 }
 
-bool handleTap(int16_t x, int16_t y, int16_t top) {
+bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
     Layout L = computeLayout(top);
 
     if (selectedHex[0]) {
+        int16_t panelTop = Config::SCREEN_HEIGHT - DETAIL_PANEL_H;
+        Rect qrBtn = qrButtonRect(panelTop);
+        if (lastPanel.callsign[0] && qrBtn.contains(x, y)) {
+            runFlightQrScreen(tft, lastPanel.callsign);
+            lastPanel.valid = false;
+            return true;
+        }
+
         for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) {
             if (!hitPoints[i].valid) continue;
             int16_t dx = x - hitPoints[i].x;
@@ -1262,10 +1439,6 @@ bool handleTap(int16_t x, int16_t y, int16_t top) {
 void selectAircraft(const char* hex, const char* callsign) {
     strncpy(selectedHex, hex, sizeof(selectedHex) - 1);
     AircraftDetails::request(hex, callsign);
-    // Erzwingt einen kompletten Neuaufbau des Detail-Panels beim naechsten
-    // render() - wichtig, falls der Bildschirm zwischenzeitlich von einem
-    // anderen Screen (z.B. der Flugzeugliste) ueberschrieben wurde, sonst
-    // wuerden unveraenderte Zeilen faelschlich als "schon da" uebersprungen.
     lastPanel.valid = false;
 }
 

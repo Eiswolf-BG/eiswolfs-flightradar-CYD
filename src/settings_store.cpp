@@ -26,6 +26,7 @@ namespace {
     bool hideGroundVehiclesOn = true;
     uint8_t languageIdx = 0;
     uint8_t unitsModeVal = 0;
+    uint8_t radarThemeIdx = 0;
 
     void applyKeyValue(const String& key, const String& value) {
         if (key == "range_index") {
@@ -70,6 +71,9 @@ namespace {
         } else if (key == "units_mode") {
             int v = value.toInt();
             if (v >= 0 && v <= 2) unitsModeVal = (uint8_t)v;
+        } else if (key == "radar_theme") {
+            int v = value.toInt();
+            if (v >= 0 && v <= 2) radarThemeIdx = (uint8_t)v;
         }
     }
 }
@@ -129,6 +133,7 @@ void save() {
     f.printf("hide_ground_vehicles=%d\n", hideGroundVehiclesOn ? 1 : 0);
     f.printf("language=%d\n", languageIdx);
     f.printf("units_mode=%d\n", unitsModeVal);
+    f.printf("radar_theme=%d\n", radarThemeIdx);
     f.close();
 }
 
@@ -251,6 +256,15 @@ uint8_t unitsMode() { return unitsModeVal; }
 void setUnitsMode(uint8_t mode) {
     if (mode <= 2) {
         unitsModeVal = mode;
+        save();
+    }
+}
+
+uint8_t radarThemeIndex() { return radarThemeIdx; }
+
+void setRadarThemeIndex(uint8_t idx) {
+    if (idx <= 2) {
+        radarThemeIdx = idx;
         save();
     }
 }

@@ -696,7 +696,7 @@ void loop() {
             updateStatusLine();
             forceRedraw = true;
         } else if (tap.y >= CONTENT_TOP) {
-            if (RadarScreen::handleTap(tap.x, tap.y, CONTENT_TOP)) {
+            if (RadarScreen::handleTap(tft, tap.x, tap.y, CONTENT_TOP)) {
                 forceRedraw = true;
             }
         }

@@ -255,6 +255,21 @@ static const char* const I18N_TR[] = {
     "Güncelleme indirilemedi veya yüklenemedi. Cihaz değişmeden önceki donanım yazılımıyla çalışmaya devam ediyor. Lütfen WiFi bağlantınızı kontrol edip daha sonra tekrar deneyin.",
     "Ekran Zaman Aşımı",
     "Bu süre boyunca dokunulmazsa ekran güç tasarrufu için kapanır. Ekran koruyucu açıksa, bunun yerine saatli, sönük bir yıldızlı gökyüzü gösterir.",
+
+    "Radar Renk Teması",
+    "Radar Renk Teması",
+    "Yeşil (varsayılan)",
+    "Amber",
+    "Mavi",
+
+    "En Çok Görülen",
+    "En Çok Görülen Uçaklar",
+    "Henüz veri yok. Uçuş kayıt defteri etkin olmalı.",
+    " kez görüldü",
+
+    "Havacılık hava raporu (METAR) - ",
+
+    "Bu uçuşun canlı takibi için tarayın",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

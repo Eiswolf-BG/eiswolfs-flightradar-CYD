@@ -6,6 +6,7 @@
 #include "i18n.h"
 #include "units.h"
 #include "location_manager.h"
+#include "top_aircraft_screen.h"
 
 namespace StatsScreen {
 
@@ -63,6 +64,12 @@ void run(TFT_eSPI& tft) {
 
     Rect resetBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 100), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
     Rect backBtn  = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+    // Kleiner Button oben rechts (gleiches Platzierungsmuster wie das "?"-
+    // Info-Icon auf anderen Screens) - oeffnet die neue "Meistgesehene
+    // Flugzeuge"-Rangliste, ohne die bestehende Zeilen-/Button-Anordnung
+    // dieses Screens zu veraendern. Breit genug fuer den laengsten
+    // uebersetzten Button-Text (Tuerkisch "En Çok Görülen").
+    Rect topAircraftBtn = {(int16_t)(Config::SCREEN_WIDTH - 100), 2, 94, 22};
 
     bool confirmPending = false;
     uint32_t confirmArmedAtMs = 0;
@@ -100,8 +107,6 @@ void run(TFT_eSPI& tft) {
 
         if (topAlt.found) {
             String csign = topAlt.callsign[0] ? String(topAlt.callsign) : "?";
-            // Respektiert jetzt die Einheiten-Einstellung (Menue > Einheiten)
-            // - vorher immer "(XXXX ft)", auch bei Metrisch eingestellt.
             char altBuf[24];
             if (LocationManager::useMetricUnits()) {
                 snprintf(altBuf, sizeof(altBuf), "%s (%ldm)", csign.c_str(), (long)Units::feetToMeters((float)topAlt.altitudeFt));
@@ -117,6 +122,7 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, resetBtn, I18n::t(StringId::STATS_RESET_BTN));
         }
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
+        drawButton(tft, topAircraftBtn, I18n::t(StringId::STATS_TOP_AIRCRAFT_BTN));
     };
 
     redraw();
@@ -147,6 +153,9 @@ void run(TFT_eSPI& tft) {
                 }
             } else if (backBtn.contains(tap.x, tap.y)) {
                 done = true;
+            } else if (topAircraftBtn.contains(tap.x, tap.y)) {
+                TopAircraftScreen::run(tft);
+                redraw();
             }
         }
         MenuStars::update(tft);

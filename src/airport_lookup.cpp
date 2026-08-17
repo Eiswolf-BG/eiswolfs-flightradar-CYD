@@ -2,6 +2,7 @@
 #include "sd_storage.h"
 #include "config.h"
 #include "radar_math.h"
+#include "sd_mutex.h"
 #include <SD.h>
 
 namespace AirportLookup {
@@ -9,6 +10,13 @@ namespace AirportLookup {
 Nearest findNearest(double lat, double lon) {
     Nearest result;
     if (!SdStorage::isMounted()) return result;
+
+    // Lock hinzugefuegt, weil findNearest() jetzt nicht mehr nur vom
+    // Haupt-Loop (Core 1, z.B. Standort-Presets-Screen) aufgerufen wird,
+    // sondern auch periodisch aus Weather::update() auf NetTask (Core 0,
+    // siehe weather.cpp) - ohne dieses Lock waeren dann zeitgleiche
+    // SD-Zugriffe von beiden Cores moeglich (siehe sd_mutex.h).
+    SdMutex::Guard guard;
 
     File f = SD.open(Config::SD_AIRPORTS_CSV);
     if (!f) return result;
