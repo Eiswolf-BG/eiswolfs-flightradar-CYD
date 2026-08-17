@@ -243,6 +243,23 @@ void showWeatherInfo(TFT_eSPI& tftRef) {
 
     String body = I18n::t(StringId::WEATHER_INFO_BODY);
 
+    // METAR-Flugwetterbericht (siehe weather.cpp::currentMetar()) als
+    // zusaetzlicher, zweiter Absatz unterhalb des bisherigen Erklaertexts -
+    // ALS EIGENER weatherInfoLayoutWrapped()-Aufruf statt ueber einen
+    // eingebetteten Zeilenumbruch ("\n") im String: die Umbruch-Funktion
+    // erkennt nur Leerzeichen als Trennstellen, ein roher "\n"-Buchstabe
+    // wuerde einfach als Textzeichen mitgezaehlt (falsche Breitenberechnung,
+    // ueberlappende Zeilen) statt einen echten Zeilenumbruch auszuloesen -
+    // gleiches Muster wie die zweigeteilte PARA1/PARA2-Anzeige in
+    // webui_screen.cpp.
+    Weather::Metar metar = Weather::currentMetar();
+    String metarLabelLine;
+    String metarRawLine;
+    if (metar.available) {
+        metarLabelLine = String(I18n::t(StringId::WEATHER_METAR_PREFIX)) + metar.icao + ":";
+        metarRawLine = metar.raw;
+    }
+
     Rect backBtn = {(int16_t)(BOX_X + 10), BACK_Y, (int16_t)(BOX_W - 20), BTN_H};
 
     MenuStars::reset();
@@ -259,7 +276,13 @@ void showWeatherInfo(TFT_eSPI& tftRef) {
         tftRef.setTextDatum(TL_DATUM);
 
         tftRef.setTextColor(TFT_GREEN, TFT_BLACK);
-        weatherInfoLayoutWrapped(tftRef, BOX_X + 10, VIEW_TOP, TEXT_MAX_WIDTH, LINE_H, body);
+        int16_t y = weatherInfoLayoutWrapped(tftRef, BOX_X + 10, VIEW_TOP, TEXT_MAX_WIDTH, LINE_H, body);
+
+        if (metarLabelLine.length() > 0) {
+            y += 8;
+            y = weatherInfoLayoutWrapped(tftRef, BOX_X + 10, y, TEXT_MAX_WIDTH, LINE_H, metarLabelLine);
+            weatherInfoLayoutWrapped(tftRef, BOX_X + 10, y, TEXT_MAX_WIDTH, LINE_H, metarRawLine);
+        }
 
         weatherInfoDrawButton(tftRef, backBtn, I18n::t(StringId::BACK));
     };
