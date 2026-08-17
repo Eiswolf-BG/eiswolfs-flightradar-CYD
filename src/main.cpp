@@ -101,10 +101,16 @@ Rect menuBtn = {Config::SCREEN_WIDTH - 90, 3, 54, 22};
 Rect weatherIconRect = {(int16_t)(menuBtn.x - 46), 3, 42, 22};
 
 void drawMenuButton() {
+    // Folgt jetzt dem auf dem Radar-Screen gewaehlten Farbschema (Menue >
+    // System > Radar-Farbschema) statt fest Gruen zu bleiben - der Button
+    // gehoert visuell zum Radar-Screen (er ist nur dort dauerhaft sichtbar),
+    // alle anderen Screens/Buttons im Projekt bleiben bewusst weiterhin
+    // gruen, siehe Kommentar bei RadarScreen::themeColor().
+    uint16_t color = RadarScreen::themeColor(tft);
     tft.fillRoundRect(menuBtn.x, menuBtn.y, menuBtn.w, menuBtn.h, 4, TFT_BLACK);
-    tft.drawRoundRect(menuBtn.x, menuBtn.y, menuBtn.w, menuBtn.h, 4, TFT_GREEN);
+    tft.drawRoundRect(menuBtn.x, menuBtn.y, menuBtn.w, menuBtn.h, 4, color);
     tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(color, TFT_BLACK);
     tft.drawString("Menu", menuBtn.x + menuBtn.w / 2, menuBtn.y + menuBtn.h / 2);
     tft.setTextDatum(TL_DATUM);
 }
@@ -687,11 +693,22 @@ void loop() {
     if (tapped) {
         if (menuBtn.contains(tap.x, tap.y)) {
             MenuScreen::run(tft);
+            // Menue lief als Vollbild-Screen und kann dabei ein evtl. noch
+            // offenes Flugzeug-Detail-Panel komplett ueberschrieben haben -
+            // ohne diesen Aufruf wuerde RadarScreen::render() faelschlich
+            // annehmen, das Panel sei unveraendert noch da (gleicher Hex-
+            // Code) und nur die Zeilen mit geaendertem Text neu zeichnen,
+            // wodurch Reste des Menues (Buttons/Text) sichtbar stehen
+            // blieben - siehe RadarScreen::invalidatePanel().
+            RadarScreen::invalidatePanel();
             drawHeader();
             updateStatusLine();
             forceRedraw = true;
         } else if (weatherIconRect.contains(tap.x, tap.y)) {
             showWeatherInfo(tft);
+            // Gleicher Grund wie beim Menue oben - auch der Wetter-Info-
+            // Screen ist ein Vollbild-Overlay.
+            RadarScreen::invalidatePanel();
             drawHeader();
             updateStatusLine();
             forceRedraw = true;

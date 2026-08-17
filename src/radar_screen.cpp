@@ -644,7 +644,7 @@ namespace {
     // angezeigten Flug. Eigene Funktion, da sowohl beim Zeichnen als auch
     // beim Antippen exakt dieselbe Flaeche gebraucht wird.
     Rect qrButtonRect(int16_t panelTop) {
-        return {(int16_t)(Config::SCREEN_WIDTH - 34), (int16_t)(panelTop + 4), 30, 20};
+        return {(int16_t)(Config::SCREEN_WIDTH - 42), (int16_t)(panelTop + 4), 38, 24};
     }
 
     // Zeichnet eine Detail-Panel-Zeile NEU, wenn sich ihr Text geaendert
@@ -747,7 +747,7 @@ namespace {
             // QR_BTN_RESERVED_W spart rechts Platz fuer den neuen QR-Button
             // (siehe qrButtonRect()) frei, damit ein langes Rufzeichen nicht
             // darunter/dahinter verschwindet.
-            constexpr int16_t QR_BTN_RESERVED_W = 34;
+            constexpr int16_t QR_BTN_RESERVED_W = 42;
             String txt = a.callsign[0] ? a.callsign : a.hex;
             bool callsignChanged = forceFull || lastPanel.callsignText != txt;
             if (callsignChanged) {
@@ -771,10 +771,16 @@ namespace {
                 // Live-Tracking-Link bilden (z.B. bei manchen
                 // Sichtflug-Maschinen).
                 if (a.callsign[0]) {
+                    // Voll gefuellter Button (statt nur eines duennen
+                    // Rahmens wie vorher) - der reine Umriss ging im
+                    // sonstigen grafischen "Rauschen" des Panels (Sterne,
+                    // Rahmenlinien) fast unter und wurde kaum bemerkt.
+                    // Gefuellter Hintergrund in der Themenfarbe + schwarze
+                    // Schrift sorgt fuer deutlich mehr Kontrast/Auffaelligkeit.
                     Rect qrBtn = qrButtonRect(panelTop);
-                    gfx.drawRoundRect(qrBtn.x, qrBtn.y, qrBtn.w, qrBtn.h, 3, themeBaseColor(gfx));
+                    gfx.fillRoundRect(qrBtn.x, qrBtn.y, qrBtn.w, qrBtn.h, 4, themeBaseColor(gfx));
                     gfx.setTextDatum(MC_DATUM);
-                    gfx.setTextColor(themeBaseColor(gfx), TFT_BLACK);
+                    gfx.setTextColor(TFT_BLACK, themeBaseColor(gfx));
                     gfx.drawString("QR", qrBtn.x + qrBtn.w / 2, qrBtn.y + qrBtn.h / 2);
                     gfx.setTextDatum(TL_DATUM);
                 }
@@ -1058,6 +1064,14 @@ namespace {
             gfx.drawPixel(bgStars[i].x, bgStars[i].y, color);
         }
     }
+}
+
+uint16_t themeColor(TFT_eSPI& gfx) {
+    return themeBaseColor(gfx);
+}
+
+void invalidatePanel() {
+    lastPanel.valid = false;
 }
 
 void render(TFT_eSPI& tft, int16_t top) {
