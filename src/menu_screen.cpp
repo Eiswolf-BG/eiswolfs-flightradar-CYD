@@ -23,6 +23,7 @@
 #include "menu_stars.h"
 #include "i18n.h"
 #include "config.h"
+#include "changelog.h"
 #include <time.h>
 
 namespace MenuScreen {
@@ -191,7 +192,16 @@ namespace {
             while (start < len && text[start] == ' ') start++;
             if (start >= len) break;
 
-            String line = text.substring(start, len);
+            // Erzwungener Zeilenumbruch bei "\n" (z.B. fuer die
+            // Aufzaehlungspunkte im OTA-Changelog, siehe changelog.h) -
+            // Wortumbruch an Leerzeichen wird auf den Abschnitt VOR dem
+            // naechsten "\n" begrenzt, damit ein "\n" nie einfach
+            // ueberlesen wird. Vorher hatte ein eingebettetes "\n" gar
+            // keine Wirkung auf das Layout.
+            int32_t segEnd = text.indexOf('\n', start);
+            if (segEnd < 0) segEnd = len;
+
+            String line = text.substring(start, segEnd);
             while (tft.textWidth(line) > maxWidth) {
                 int32_t lastSpace = line.lastIndexOf(' ');
                 if (lastSpace <= 0) break;
@@ -207,6 +217,10 @@ namespace {
             }
             y += lineHeight;
             start += line.length();
+            // Falls die gezeichnete Zeile exakt bis zum "\n" reichte, jetzt
+            // ueberspringen (es ist kein Leerzeichen, wuerde von der
+            // Leerzeichen-Schleife oben sonst nicht entfernt).
+            if (start < len && text[start] == '\n') start++;
         }
         return y;
     }
@@ -576,7 +590,15 @@ namespace {
             // bestaetigt aktiv per Button, damit er den Erfolg auch wirklich
             // mitbekommt (vorher lief die Meldung nur 1,5s an, dann
             // Neustart - leicht zu verpassen).
-            infoScreen(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), I18n::t(StringId::OTA_SUCCESS_BODY),
+            // Changelog des installierten Releases (Config::CHANGELOG_LATEST,
+            // siehe changelog.h) wird unter den Standardtext gehaengt - der
+            // Screen ist ueber infoScreen()/layoutWrapped() bereits
+            // automatisch scrollbar, falls der Gesamttext nicht auf einmal
+            // passt (Pfeil-Buttons erscheinen dann von selbst).
+            String successBody = String(I18n::t(StringId::OTA_SUCCESS_BODY)) + "\n\n" +
+                                  I18n::t(StringId::OTA_CHANGELOG_LABEL) + "\n" +
+                                  Config::CHANGELOG_LATEST;
+            infoScreen(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), successBody,
                        TFT_GREEN, I18n::t(StringId::OTA_RESTART_BUTTON));
             ESP.restart();
         } else {

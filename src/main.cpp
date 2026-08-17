@@ -260,6 +260,44 @@ void showWeatherInfo(TFT_eSPI& tftRef) {
         metarRawLine = metar.raw;
     }
 
+    // Sonnenauf-/untergang fuer den aktuell aktiven Standort (gleiche
+    // Berechnung wie isNightDimHours(), siehe dort) - passt thematisch gut
+    // in den Wetter-Info-Screen und die Rechenlogik existierte bereits
+    // (bisher nur intern fuer die Nachtdimmung genutzt, nie angezeigt).
+    // Eigener dritter "Absatz" unterhalb von METAR, aus demselben Grund wie
+    // dort ueber einen eigenen weatherInfoLayoutWrapped()-Aufruf statt
+    // eingebettetem "\n" (siehe Kommentar oben).
+    String sunLine;
+    {
+        double lat = 0, lon = 0;
+        LocationManager::getHomeLocation(lat, lon);
+        if (lat != 0.0 || lon != 0.0) {
+            time_t now = time(nullptr);
+            if (now > 8 * 3600 * 2) { // NTP-Zeit schon synchronisiert (siehe isNightDimHours())
+                struct tm tmNow;
+                localtime_r(&now, &tmNow);
+                SunTimes::Result sun = SunTimes::compute(lat, lon, tmNow.tm_year + 1900, tmNow.tm_mon + 1,
+                                                          tmNow.tm_mday, LocationManager::utcOffsetSeconds());
+                if (sun.valid) {
+                    if (sun.alwaysDay) {
+                        sunLine = I18n::t(StringId::WEATHER_POLAR_DAY);
+                    } else if (sun.alwaysNight) {
+                        sunLine = I18n::t(StringId::WEATHER_POLAR_NIGHT);
+                    } else {
+                        char sunriseBuf[6];
+                        char sunsetBuf[6];
+                        int sunriseMin = (int)roundf(sun.sunriseHour * 60.0f) % (24 * 60);
+                        int sunsetMin = (int)roundf(sun.sunsetHour * 60.0f) % (24 * 60);
+                        snprintf(sunriseBuf, sizeof(sunriseBuf), "%02d:%02d", sunriseMin / 60, sunriseMin % 60);
+                        snprintf(sunsetBuf, sizeof(sunsetBuf), "%02d:%02d", sunsetMin / 60, sunsetMin % 60);
+                        sunLine = String(I18n::t(StringId::WEATHER_SUNRISE_PREFIX)) + sunriseBuf + "   " +
+                                  String(I18n::t(StringId::WEATHER_SUNSET_PREFIX)) + sunsetBuf;
+                    }
+                }
+            }
+        }
+    }
+
     Rect backBtn = {(int16_t)(BOX_X + 10), BACK_Y, (int16_t)(BOX_W - 20), BTN_H};
 
     MenuStars::reset();
@@ -281,7 +319,12 @@ void showWeatherInfo(TFT_eSPI& tftRef) {
         if (metarLabelLine.length() > 0) {
             y += 8;
             y = weatherInfoLayoutWrapped(tftRef, BOX_X + 10, y, TEXT_MAX_WIDTH, LINE_H, metarLabelLine);
-            weatherInfoLayoutWrapped(tftRef, BOX_X + 10, y, TEXT_MAX_WIDTH, LINE_H, metarRawLine);
+            y = weatherInfoLayoutWrapped(tftRef, BOX_X + 10, y, TEXT_MAX_WIDTH, LINE_H, metarRawLine);
+        }
+
+        if (sunLine.length() > 0) {
+            y += 8;
+            weatherInfoLayoutWrapped(tftRef, BOX_X + 10, y, TEXT_MAX_WIDTH, LINE_H, sunLine);
         }
 
         weatherInfoDrawButton(tftRef, backBtn, I18n::t(StringId::BACK));

@@ -252,6 +252,7 @@ static const char* const I18N_DE[] = {
     "Update installiert",
     "Die neue Firmware wurde erfolgreich installiert. Bitte jetzt neu starten, um sie zu verwenden.",
     "Jetzt neu starten",
+    "Neu in dieser Version:",
     "Das Update konnte nicht heruntergeladen oder installiert werden. Das Gerät läuft unverändert mit der bisherigen Firmware weiter. Bitte WLAN-Verbindung prüfen und es später erneut versuchen.",
     "Bildschirm-Timeout",
     "Nach dieser Zeit ohne Berührung schaltet sich das Display ab, um Strom zu sparen. Ist der Ruhebildschirm aktiviert, zeigt es stattdessen einen gedimmten Sternenhimmel mit Uhrzeit.",
@@ -270,6 +271,11 @@ static const char* const I18N_DE[] = {
     "Flugwetterbericht (METAR) für ",
 
     "Scannen für Live-Tracking dieses Fluges",
+
+    "Sonnenaufgang: ",
+    "Sonnenuntergang: ",
+    "Die Sonne geht heute an diesem Ort nicht unter (Polartag).",
+    "Die Sonne geht heute an diesem Ort nicht auf (Polarnacht).",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

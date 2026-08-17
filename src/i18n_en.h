@@ -253,6 +253,7 @@ static const char* const I18N_EN[] = {
     "Update installed",
     "The new firmware was installed successfully. Please restart now to start using it.",
     "Restart now",
+    "What's new in this version:",
     "The update could not be downloaded or installed. The device is still running the previous firmware, unchanged. Please check your WiFi connection and try again later.",
     "Screen Timeout",
     "After this time without touch, the display turns off to save power. With the screensaver on, it dims to a starfield with a clock instead.",
@@ -271,6 +272,11 @@ static const char* const I18N_EN[] = {
     "Aviation weather report (METAR) for ",
 
     "Scan for live tracking of this flight",
+
+    "Sunrise: ",
+    "Sunset: ",
+    "The sun does not set today at this location (polar day).",
+    "The sun does not rise today at this location (polar night).",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,
