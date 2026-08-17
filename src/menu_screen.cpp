@@ -611,14 +611,15 @@ namespace {
             // bestaetigt aktiv per Button, damit er den Erfolg auch wirklich
             // mitbekommt (vorher lief die Meldung nur 1,5s an, dann
             // Neustart - leicht zu verpassen).
-            // Changelog des installierten Releases (Config::CHANGELOG_LATEST,
-            // siehe changelog.h) wird unter den Standardtext gehaengt - der
-            // Screen ist ueber infoScreen()/layoutWrapped() bereits
-            // automatisch scrollbar, falls der Gesamttext nicht auf einmal
-            // passt (Pfeil-Buttons erscheinen dann von selbst).
+            // Changelog des installierten Releases (Config::changelogLatest(),
+            // siehe changelog.h/.cpp - liefert den Text bereits in der
+            // aktuell eingestellten Sprache) wird unter den Standardtext
+            // gehaengt - der Screen ist ueber infoScreen()/layoutWrapped()
+            // bereits automatisch scrollbar, falls der Gesamttext nicht auf
+            // einmal passt (Pfeil-Buttons erscheinen dann von selbst).
             String successBody = String(I18n::t(StringId::OTA_SUCCESS_BODY)) + "\n\n" +
                                   I18n::t(StringId::OTA_CHANGELOG_LABEL) + "\n" +
-                                  Config::CHANGELOG_LATEST;
+                                  Config::changelogLatest();
             infoScreen(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), successBody,
                        TFT_GREEN, I18n::t(StringId::OTA_RESTART_BUTTON));
             ESP.restart();
