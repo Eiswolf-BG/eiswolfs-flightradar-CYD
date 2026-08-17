@@ -57,7 +57,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **6 languages** (English, German, French, Turkish, Spanish, Italian), selectable on first boot or anytime from the menu
 - **Adjustable brightness** (10-100% in 10% steps, Menu → System → "Brightness") with a live preview as you tap
 - **Metric/Imperial units** (Menu → Region → "Units") consistently applied across the radar range button, range ring labels, aircraft list, nearest-airport distance, and stats
-- **About screen** (Menu → System → "About") shows the project name, a short description, and the current firmware version
+- **Firmware version** is shown directly on the "Check for updates" button (Menu → System)
 - **Backup & Reset** (Menu → System → "Backup & Reset") – back up or restore your settings, or fully reset the device (wipes all on-device data and re-runs first-time setup) - handy for testing or handing the device to someone else
 - **Screen timeout with slider** (Menu → System → "Screen Timeout") – set how long until the display turns off after a period of no touches, from 1 to 15 minutes or "Never", using a drag slider instead of tapping through values one minute at a time
 - **Idle screensaver** (same screen, off by default) – instead of turning the display off completely after the timeout, shows a dimmed starfield with a large clock; a tap wakes it back up

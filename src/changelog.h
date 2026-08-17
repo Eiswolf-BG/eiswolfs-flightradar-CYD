@@ -23,6 +23,6 @@ namespace Config {
     // Display (siehe layoutWrapped()-Fix in menu_screen.cpp). Kurz halten -
     // der Screen ist zwar scrollbar, aber ein Bildschirm mit 240x320px.
     constexpr const char* CHANGELOG_LATEST =
-        "- New: this changelog screen, shown after every update\n"
-        "- New: sunrise/sunset times for your location (Weather Info screen)";
+        "- Removed the separate Info screen - the version number now shows "
+        "directly on the bigger 'Check for updates' button in System settings";
 }

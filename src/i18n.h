@@ -180,10 +180,15 @@ enum class StringId : uint8_t {
     AIRCRAFT_LIST_SORT_ALTITUDE,
     AIRCRAFT_LIST_SORT_CALLSIGN,
 
-    MENU_ABOUT,
-    ABOUT_DESC1,
-    ABOUT_DESC2,
-    ABOUT_VERSION_PREFIX,
+    // Eigener "Info"-Screen (about_screen.cpp) entfernt - der einzige
+    // wirklich relevante Inhalt dort war die Versionsnummer. Die steht
+    // jetzt als erste von zwei Zeilen direkt auf dem vergroesserten "Nach
+    // Update suchen"-Button im System-Menue (siehe menu_screen.cpp,
+    // Page::System), der den freigewordenen Platz des alten "Info"-Buttons
+    // mit uebernommen hat - Zeile 2 ist der bereits vorhandene
+    // MENU_CHECK_UPDATE-Text, eine eigene neue "Antippen, um..."-Zeile war
+    // nicht noetig.
+    CHECK_UPDATE_VERSION_PREFIX,
 
     MENU_BRIGHTNESS_PREFIX,
     BRIGHTNESS_TITLE,

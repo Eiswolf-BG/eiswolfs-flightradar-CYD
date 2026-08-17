@@ -181,9 +181,6 @@ static const char* const I18N_IT[] = {
     "Altitudine",
     "Nominativo",
 
-    "Informazioni",
-    "Radar di volo ADS-B live",
-    "per il display ESP32 CYD.",
     "Versione: ",
 
     "Luminosità: ",

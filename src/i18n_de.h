@@ -181,9 +181,6 @@ static const char* const I18N_DE[] = {
     "Höhe",
     "Rufzeichen",
 
-    "Info",
-    "Live-ADS-B-Flugradar für",
-    "das ESP32 CYD-Display.",
     "Version: ",
 
     "Helligkeit: ",

@@ -186,6 +186,11 @@ in dieser Reihenfolge:
    nicht bei kleinen Patches). Das gilt auch für größere Sprünge (z.B.
    2.6 -> 3.0), die Alex bewusst und absichtlich machen kann - Karl
    übernimmt in jedem Fall die genannte Nummer 1:1, ohne eigene Annahmen.
+   `Config::APP_VERSION` ist die EINZIGE Stelle im Code, die pro Release
+   gepflegt werden muss - sie erscheint automatisch auf dem "Nach Update
+   suchen"-Button im System-Menü (seit der frühere separate Info-Screen,
+   `src/about_screen.cpp`/`.h`, entfernt wurde; diese Dateien existieren
+   nicht mehr und dürfen bei künftigen Releases nicht mehr gesucht werden).
    Falls im Push-Wunsch keine explizite Versionsnummer genannt wurde, bei
    Alex nachfragen statt zu raten. Zusammen mit `APP_VERSION` IMMER auch
    `Config::CHANGELOG_LATEST` in `src/changelog.h` auf die Änderungen
