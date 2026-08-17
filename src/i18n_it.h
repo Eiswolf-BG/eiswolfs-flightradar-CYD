@@ -255,6 +255,21 @@ static const char* const I18N_IT[] = {
     "Non è stato possibile scaricare o installare l'aggiornamento. Il dispositivo continua a funzionare senza modifiche con il firmware precedente. Controlla la connessione WiFi e riprova più tardi.",
     "Timeout schermo",
     "Dopo questo tempo senza tocchi, lo schermo si spegne per risparmiare energia. Con il salvaschermo attivo, mostra invece un cielo stellato attenuato con l'orario.",
+
+    "Tema colore radar",
+    "Tema colore radar",
+    "Verde (predefinito)",
+    "Ambra",
+    "Blu",
+
+    "Più visti",
+    "Aerei più visti",
+    "Ancora nessun dato. Il registro di volo deve essere attivo.",
+    " avvistamenti",
+
+    "Bollettino meteo aeronautico (METAR) per ",
+
+    "Scansiona per il tracciamento in diretta di questo volo",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

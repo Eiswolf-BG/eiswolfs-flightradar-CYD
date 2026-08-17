@@ -255,6 +255,21 @@ static const char* const I18N_ES[] = {
     "No se pudo descargar o instalar la actualización. El dispositivo sigue funcionando sin cambios con el firmware anterior. Comprueba tu conexión WiFi e inténtalo de nuevo más tarde.",
     "Tiempo de espera de pantalla",
     "Tras este tiempo sin toques, la pantalla se apaga para ahorrar energía. Con el salvapantallas activado, muestra en su lugar un cielo estrellado atenuado con la hora.",
+
+    "Tema de color del radar",
+    "Tema de color del radar",
+    "Verde (predeterminado)",
+    "Ámbar",
+    "Azul",
+
+    "Más vistos",
+    "Aviones más vistos",
+    "Aún no hay datos. El diario de vuelo debe estar activo.",
+    " avistamientos",
+
+    "Informe meteorológico aeronáutico (METAR) para ",
+
+    "Escanea para el seguimiento en vivo de este vuelo",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

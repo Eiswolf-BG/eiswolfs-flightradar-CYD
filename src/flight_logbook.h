@@ -54,4 +54,24 @@ namespace FlightLogbook {
     // setzt die "heute schon gesehen"-Liste zurueck. Fuer den Reset-Button
     // im Statistik-Bildschirm gedacht.
     void resetAllData();
+
+    struct TopAircraft {
+        // Kennzeichen (Registrierung), falls in mindestens einer Zeile
+        // bekannt - sonst leer, dann zeigt der Top-Aircraft-Screen den
+        // Hex-Code als Ersatz an.
+        char reg[10] = {0};
+        char hex[7] = {0};
+        // Anzahl Logbuch-Zeilen mit diesem Hex-Code ueber ALLE Dateien
+        // hinweg - da jedes Flugzeug pro Sitzung nur EINMAL geloggt wird
+        // (siehe alreadySeen()/markSeen()), entspricht das der Anzahl
+        // unterschiedlicher Sitzungen/Tage, an denen es gesehen wurde.
+        uint32_t sightings = 0;
+    };
+
+    // Ermittelt die am haeufigsten geloggten Flugzeuge (nach Hex-Code
+    // gezaehlt) ueber ALLE Logbuch-Dateien auf der SD-Karte hinweg - fuer
+    // die "Meistgesehene Flugzeuge"-Rangliste (Statistik-Screen). Absteigend
+    // sortiert, out[0] = am haeufigsten gesehen. Gibt die Anzahl gefuellter
+    // Eintraege zurueck (<= maxEntries).
+    uint8_t computeTopAircraft(TopAircraft* out, uint8_t maxEntries);
 }

@@ -30,4 +30,23 @@ namespace Weather {
     // UI-Thread gelesen wird - kein Lock noetig, ein kurzfristig veraltetes
     // Lesen ist unkritisch).
     Condition current();
+
+    // Roher METAR-Text (Flugwetterbericht) fuer den naechstgelegenen
+    // Flughafen (per AirportLookup::findNearest() zum aktuell aktiven
+    // Standort ermittelt) - ergaenzt die einfache Icon-Wetteranzeige um die
+    // "echten", von Piloten genutzten Rohdaten. Abgefragt ueber die
+    // kostenlose, anmeldefreie aviationweather.gov-Daten-API (US National
+    // Weather Service), im selben Aufruf/Intervall wie das Icon-Wetter.
+    struct Metar {
+        bool available = false;
+        char icao[5] = {0};
+        char raw[128] = {0};
+    };
+
+    // Wie current() nur vom NetTask geschrieben, vom UI-Thread gelesen -
+    // gleiche Begruendung, kein Lock noetig (ein kurzfristig veraltetes/
+    // theoretisch "zerrissenes" Lesen des raw[]-Texts waere rein kosmetisch
+    // und korrigiert sich spaetestens beim naechsten Abfrage-Intervall von
+    // selbst).
+    Metar currentMetar();
 }

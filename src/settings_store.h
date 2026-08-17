@@ -67,4 +67,11 @@ namespace SettingsStore {
     // erzwingen, 2=Imperial (Fuss/Knoten/Meilen) erzwingen.
     uint8_t unitsMode();
     void setUnitsMode(uint8_t mode);
+
+    // Radar-Farbschema (Menue > System > Radar-Farbschema): 0=Gruen
+    // (Standard), 1=Amber, 2=Blau - betrifft nur den Radar-Screen (Sweep-
+    // Linie, Panel-Rahmen/Text, niedrig fliegende Flugzeuge), siehe
+    // radar_screen.cpp::themeBaseColor().
+    uint8_t radarThemeIndex();
+    void setRadarThemeIndex(uint8_t idx);
 }

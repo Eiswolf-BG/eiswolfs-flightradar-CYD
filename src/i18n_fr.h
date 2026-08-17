@@ -255,6 +255,21 @@ static const char* const I18N_FR[] = {
     "La mise à jour n'a pas pu être téléchargée ou installée. L'appareil continue de fonctionner normalement avec le micrologiciel précédent. Merci de vérifier votre connexion WiFi et de réessayer plus tard.",
     "Délai d'inactivité",
     "Après ce délai sans contact, l'écran s'éteint pour économiser l'énergie. Avec l'écran de veille activé, il affiche à la place un ciel étoilé tamisé avec l'heure.",
+
+    "Thème de couleur radar",
+    "Thème de couleur radar",
+    "Vert (par défaut)",
+    "Ambre",
+    "Bleu",
+
+    "Les plus vus",
+    "Avions les plus vus",
+    "Pas encore de données. Le carnet de vol doit être actif.",
+    " observations",
+
+    "Bulletin météo aéronautique (METAR) pour ",
+
+    "Scanner pour le suivi en direct de ce vol",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

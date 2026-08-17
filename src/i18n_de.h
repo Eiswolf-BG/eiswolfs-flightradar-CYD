@@ -255,6 +255,21 @@ static const char* const I18N_DE[] = {
     "Das Update konnte nicht heruntergeladen oder installiert werden. Das Gerät läuft unverändert mit der bisherigen Firmware weiter. Bitte WLAN-Verbindung prüfen und es später erneut versuchen.",
     "Bildschirm-Timeout",
     "Nach dieser Zeit ohne Berührung schaltet sich das Display ab, um Strom zu sparen. Ist der Ruhebildschirm aktiviert, zeigt es stattdessen einen gedimmten Sternenhimmel mit Uhrzeit.",
+
+    "Radar-Farbschema",
+    "Radar-Farbschema",
+    "Grün (Standard)",
+    "Amber",
+    "Blau",
+
+    "Meistgesehen",
+    "Meistgesehene Flugzeuge",
+    "Noch keine Daten. Flugbuch muss aktiv sein.",
+    " Sichtungen",
+
+    "Flugwetterbericht (METAR) für ",
+
+    "Scannen für Live-Tracking dieses Fluges",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

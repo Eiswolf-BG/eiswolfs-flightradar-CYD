@@ -458,4 +458,136 @@ void resetAllData() {
     }
 }
 
+uint8_t computeTopAircraft(TopAircraft* out, uint8_t maxEntries) {
+    SdMutex::Guard guard;
+
+    // Begrenzte Merkliste unterschiedlicher Flugzeuge (nach Hex-Code) ueber
+    // ALLE Logbuch-Dateien hinweg - 160 reicht fuer den ueblichen Gebrauch an
+    // einem Heimstandort deutlich (zum Vergleich: MAX_SEEN=400 gilt nur fuer
+    // EINEN Tag). Wird die Grenze doch erreicht, werden weitere NEUE
+    // Flugzeuge einfach nicht mehr mitgezaehlt - bereits erfasste Flugzeuge
+    // zaehlen aber korrekt weiter. Kein Fehlerfall, nur eine sehr
+    // theoretische Einschraenkung bei extrem vielen unterschiedlichen
+    // Flugzeugen ueber die gesamte Aufzeichnungsdauer.
+    constexpr uint16_t MAX_TRACKED = 160;
+    static char trackHex[MAX_TRACKED][7];
+    static char trackReg[MAX_TRACKED][10];
+    static uint32_t trackCount[MAX_TRACKED];
+    uint16_t trackedN = 0;
+
+    File dir = SD.open(Config::SD_LOG_DIR);
+    if (!dir || !dir.isDirectory()) return 0;
+
+    File entry = dir.openNextFile();
+    while (entry) {
+        if (!entry.isDirectory()) {
+            String name = String(entry.name());
+            if (name.endsWith(".csv")) {
+                constexpr size_t BUF_SIZE = 512;
+                static uint8_t buf[BUF_SIZE];
+                char lineBuf[64];
+                size_t lineLen = 0;
+                bool firstLine = true;
+                uint32_t blocksRead = 0;
+
+                // Spalten: timestamp,hex,callsign,reg,type,distance_km,altitude_ft
+                auto processLine = [&]() {
+                    if (lineLen == 0) return;
+                    if (firstLine) { firstLine = false; return; }
+                    lineBuf[lineLen] = 0;
+
+                    char* p1 = strchr(lineBuf, ',');
+                    if (!p1) return;
+                    char* p2 = strchr(p1 + 1, ',');
+                    if (!p2) return;
+                    char* p3 = strchr(p2 + 1, ',');
+                    if (!p3) return;
+                    char* p4 = strchr(p3 + 1, ',');
+                    if (!p4) return;
+
+                    size_t hexLen = (size_t)(p2 - (p1 + 1));
+                    if (hexLen == 0 || hexLen >= sizeof(trackHex[0])) return;
+                    char hexBuf[7] = {0};
+                    memcpy(hexBuf, p1 + 1, hexLen);
+
+                    size_t regLen = (size_t)(p4 - (p3 + 1));
+                    char regBuf[10] = {0};
+                    if (regLen > 0 && regLen < sizeof(regBuf)) {
+                        memcpy(regBuf, p3 + 1, regLen);
+                    }
+
+                    int16_t idx = -1;
+                    for (uint16_t i = 0; i < trackedN; i++) {
+                        if (strcmp(trackHex[i], hexBuf) == 0) { idx = (int16_t)i; break; }
+                    }
+                    if (idx < 0) {
+                        if (trackedN >= MAX_TRACKED) return;
+                        idx = (int16_t)trackedN;
+                        strncpy(trackHex[idx], hexBuf, sizeof(trackHex[idx]) - 1);
+                        trackHex[idx][sizeof(trackHex[idx]) - 1] = 0;
+                        trackReg[idx][0] = 0;
+                        trackCount[idx] = 0;
+                        trackedN++;
+                    }
+                    trackCount[idx]++;
+                    if (regBuf[0]) {
+                        strncpy(trackReg[idx], regBuf, sizeof(trackReg[idx]) - 1);
+                        trackReg[idx][sizeof(trackReg[idx]) - 1] = 0;
+                    }
+                };
+
+                while (entry.available()) {
+                    size_t n = entry.read(buf, BUF_SIZE);
+                    for (size_t i = 0; i < n; i++) {
+                        char c = (char)buf[i];
+                        if (c == '\n' || c == '\r') {
+                            if (lineLen > 0) processLine();
+                            lineLen = 0;
+                        } else if (lineLen < sizeof(lineBuf) - 1) {
+                            lineBuf[lineLen++] = c;
+                        }
+                    }
+                    blocksRead++;
+                    // Gleicher Watchdog-Fix wie ueberall sonst in dieser
+                    // Datei - siehe ausfuehrlicher Kommentar in
+                    // countLinesFast() oben (delay(1) statt yield()).
+                    if (blocksRead % 8 == 0) delay(1);
+                }
+            }
+        }
+        entry.close();
+        entry = dir.openNextFile();
+    }
+    dir.close();
+
+    // Einfache Auswahl-Sortierung (Selection Sort) - trackedN ist klein
+    // genug (max. MAX_TRACKED=160), dass O(n^2) hier keine Rolle spielt.
+    uint8_t resultCount = (trackedN < maxEntries) ? (uint8_t)trackedN : maxEntries;
+    for (uint8_t r = 0; r < resultCount; r++) {
+        uint16_t bestIdx = r;
+        for (uint16_t i = (uint16_t)(r + 1); i < trackedN; i++) {
+            if (trackCount[i] > trackCount[bestIdx]) bestIdx = i;
+        }
+        if (bestIdx != r) {
+            uint32_t tmpCount = trackCount[r];
+            trackCount[r] = trackCount[bestIdx];
+            trackCount[bestIdx] = tmpCount;
+            char tmpHex[7];
+            strcpy(tmpHex, trackHex[r]);
+            strcpy(trackHex[r], trackHex[bestIdx]);
+            strcpy(trackHex[bestIdx], tmpHex);
+            char tmpReg[10];
+            strcpy(tmpReg, trackReg[r]);
+            strcpy(trackReg[r], trackReg[bestIdx]);
+            strcpy(trackReg[bestIdx], tmpReg);
+        }
+        strncpy(out[r].hex, trackHex[r], sizeof(out[r].hex) - 1);
+        out[r].hex[sizeof(out[r].hex) - 1] = 0;
+        strncpy(out[r].reg, trackReg[r], sizeof(out[r].reg) - 1);
+        out[r].reg[sizeof(out[r].reg) - 1] = 0;
+        out[r].sightings = trackCount[r];
+    }
+    return resultCount;
+}
+
 }

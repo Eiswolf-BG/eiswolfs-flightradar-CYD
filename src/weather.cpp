@@ -1,6 +1,7 @@
 #include "weather.h"
 #include "config.h"
 #include "location_manager.h"
+#include "airport_lookup.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -18,6 +19,47 @@ namespace {
     double lastLat = 0;
     double lastLon = 0;
     bool hasLastLocation = false;
+
+    Metar currentMetarData;
+
+    // aviationweather.gov liefert bei format=json ein JSON-ARRAY (auch fuer
+    // eine einzelne angefragte Station) - Feld "rawOb" enthaelt den
+    // kompletten rohen METAR-Text (inkl. dem Wort "METAR" am Anfang, so wie
+    // von der API geliefert). Kein API-Key noetig, dieselbe kostenlose
+    // Daten-API, die z.B. auch ForeFlight/SkyVector nutzen.
+    void fetchMetarFor(const char* icao) {
+        HTTPClient http;
+        char url[128];
+        snprintf(url, sizeof(url), "https://aviationweather.gov/api/data/metar?ids=%s&format=json", icao);
+
+        http.setTimeout(Config::HTTP_TIMEOUT_MS);
+        if (!http.begin(client, url)) return;
+
+        int code = http.GET();
+        if (code != HTTP_CODE_OK) {
+            http.end();
+            return;
+        }
+
+        // Body erst komplett als String einsammeln statt direkt aus
+        // http.getStream() zu parsen - gleicher Grund/Fix wie bei der
+        // Open-Meteo-Abfrage oben (siehe dortiger Kommentar).
+        String body = http.getString();
+        http.end();
+
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, body);
+        if (err || !doc.is<JsonArray>() || doc.size() == 0) return;
+
+        const char* raw = doc[0]["rawOb"] | "";
+        if (!raw[0]) return;
+
+        currentMetarData.available = true;
+        strncpy(currentMetarData.icao, icao, sizeof(currentMetarData.icao) - 1);
+        currentMetarData.icao[sizeof(currentMetarData.icao) - 1] = 0;
+        strncpy(currentMetarData.raw, raw, sizeof(currentMetarData.raw) - 1);
+        currentMetarData.raw[sizeof(currentMetarData.raw) - 1] = 0;
+    }
 
     // Ordnet den WMO-Wettercode von Open-Meteo (Feld "weathercode", siehe
     // https://open-meteo.com/en/docs) einer der wenigen Icon-Kategorien zu,
@@ -71,6 +113,21 @@ namespace {
         if (wmoCode < 0) return;
 
         currentCondition = conditionFromWmoCode(wmoCode);
+
+        // METAR-Flugwetterbericht fuer den naechstgelegenen Flughafen - im
+        // selben Aufruf/Intervall wie das Icon-Wetter oben, damit dafuer
+        // keine zusaetzliche Netzwerklast/kein eigener Timer noetig ist. Der
+        // naechste Flughafen wird bei JEDEM Aufruf neu bestimmt (billige,
+        // rein lokale SD-Abfrage ueber AirportLookup, kein Netzwerkzugriff)
+        // - so bleibt er auch nach einem Standortwechsel (anderes Preset)
+        // automatisch aktuell, ohne eigene Aenderungserkennung wie beim
+        // Icon-Wetter oben.
+        AirportLookup::Nearest nearest = AirportLookup::findNearest(lat, lon);
+        if (nearest.found) {
+            fetchMetarFor(nearest.icao);
+        } else {
+            currentMetarData = Metar{};
+        }
     }
 }
 
@@ -99,5 +156,7 @@ void update() {
 }
 
 Condition current() { return currentCondition; }
+
+Metar currentMetar() { return currentMetarData; }
 
 }
