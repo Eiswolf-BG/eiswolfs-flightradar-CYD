@@ -11,9 +11,6 @@
 namespace Weather {
 
 namespace {
-    WiFiClientSecure client;
-    bool clientConfigured = false;
-
     Condition currentCondition = Condition::Unknown;
     uint32_t lastFetchMs = 0;
     double lastLat = 0;
@@ -27,7 +24,7 @@ namespace {
     // kompletten rohen METAR-Text (inkl. dem Wort "METAR" am Anfang, so wie
     // von der API geliefert). Kein API-Key noetig, dieselbe kostenlose
     // Daten-API, die z.B. auch ForeFlight/SkyVector nutzen.
-    void fetchMetarFor(const char* icao) {
+    void fetchMetarFor(WiFiClientSecure& client, const char* icao) {
         HTTPClient http;
         char url[128];
         snprintf(url, sizeof(url), "https://aviationweather.gov/api/data/metar?ids=%s&format=json", icao);
@@ -97,11 +94,15 @@ namespace {
     void fetchNow(double lat, double lon) {
         if (WiFi.status() != WL_CONNECTED) return;
 
-        if (!clientConfigured) {
-            client.setInsecure();
-            client.setTimeout(Config::HTTP_TIMEOUT_MS);
-            clientConfigured = true;
-        }
+        // Bewusst ein rein lokales WiFiClientSecure pro Aufruf statt eines
+        // dauerhaft gehaltenen globalen Objekts (wie zuvor) - dieselbe
+        // wiederverwendete Verbindung ueber viele Zyklen UND zwei
+        // verschiedene Hosts (Open-Meteo + aviationweather.gov) hinweg hat
+        // zu einem Socket-Fehler ("Bad file number") und einem haengenden
+        // NetTask gefuehrt. Gleiches Muster wie in AircraftDetails::update().
+        WiFiClientSecure client;
+        client.setInsecure();
+        client.setTimeout(Config::HTTP_TIMEOUT_MS);
 
         HTTPClient http;
         char url[160];
@@ -144,7 +145,7 @@ namespace {
         // Icon-Wetter oben.
         AirportLookup::Nearest nearest = AirportLookup::findNearest(lat, lon);
         if (nearest.found) {
-            fetchMetarFor(nearest.icao);
+            fetchMetarFor(client, nearest.icao);
         } else {
             Serial.println("[Weather] METAR uebersprungen: kein Flughafen in airports.csv auf der SD-Karte gefunden.");
             currentMetarData = Metar{};
