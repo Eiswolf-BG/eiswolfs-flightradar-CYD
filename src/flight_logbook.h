@@ -6,6 +6,15 @@ namespace FlightLogbook {
     void init();
     void update();
 
+    // Prueft/erzwingt NUR die 24h-Sicherheitsabschaltung (siehe
+    // flight_logbook.cpp), OHNE neue Sichtungen zu loggen - dafuer wird
+    // keine frische ADS-B-Abfrage benoetigt. Von net_task.cpp bei JEDEM
+    // Schleifendurchlauf aufgerufen, unabhaengig vom Erfolg der letzten
+    // ADS-B-Abfrage (anders als update(), das nur nach einer erfolgreichen
+    // Abfrage laeuft und die 24h-Grenze deshalb allein nicht zuverlaessig
+    // durchsetzen konnte).
+    void enforceAutoOff();
+
     uint16_t todayCount();
 
     struct TopAltitude {

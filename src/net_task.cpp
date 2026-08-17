@@ -41,6 +41,11 @@ namespace {
 
             AircraftDetails::update();
             Weather::update();
+            // Unabhaengig vom Erfolg der ADS-B-Abfrage weiter unten pruefen,
+            // damit die 24h-Sicherheitsabschaltung des Flugbuchs auch waehrend
+            // laengerer WLAN-/ADS-B-Ausfaelle zuverlaessig greift (siehe
+            // flight_logbook.cpp::enforceAutoOff() fuer den Hintergrund).
+            FlightLogbook::enforceAutoOff();
 
             if (millis() - lastFetchMs >= Config::FETCH_INTERVAL_MS) {
                 lastFetchMs = millis();
