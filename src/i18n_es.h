@@ -252,6 +252,7 @@ static const char* const I18N_ES[] = {
     "Actualización instalada",
     "El nuevo firmware se instaló correctamente. Reinicia ahora para empezar a usarlo.",
     "Reiniciar ahora",
+    "Novedades de esta versión:",
     "No se pudo descargar o instalar la actualización. El dispositivo sigue funcionando sin cambios con el firmware anterior. Comprueba tu conexión WiFi e inténtalo de nuevo más tarde.",
     "Tiempo de espera de pantalla",
     "Tras este tiempo sin toques, la pantalla se apaga para ahorrar energía. Con el salvapantallas activado, muestra en su lugar un cielo estrellado atenuado con la hora.",
@@ -270,6 +271,11 @@ static const char* const I18N_ES[] = {
     "Informe meteorológico aeronáutico (METAR) para ",
 
     "Escanea para el seguimiento en vivo de este vuelo",
+
+    "Amanecer: ",
+    "Atardecer: ",
+    "El sol no se pone hoy en esta ubicación (día polar).",
+    "El sol no sale hoy en esta ubicación (noche polar).",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

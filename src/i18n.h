@@ -342,6 +342,11 @@ enum class StringId : uint8_t {
     // bestaetigen, siehe menu_screen.cpp::infoScreen().
     OTA_SUCCESS_BODY,
     OTA_RESTART_BUTTON,
+    // Feste Beschriftung ueber dem Changelog-Text auf dem Erfolgs-Screen
+    // (Config::CHANGELOG_LATEST, siehe changelog.h) - bewusst regulaer
+    // mehrsprachig, da sich NUR dieses Label nie aendert, anders als der
+    // Changelog-Inhalt selbst (siehe Kommentar in changelog.h).
+    OTA_CHANGELOG_LABEL,
     OTA_FAILED_BODY,
 
     // Eigener Bildschirm-Timeout-Screen (Menue > System > Bildschirm-
@@ -368,6 +373,16 @@ enum class StringId : uint8_t {
     WEATHER_METAR_PREFIX,
 
     DETAIL_QR_HINT,
+
+    // Sonnenauf-/untergang fuer den aktuell aktiven Standort, im Wetter-
+    // Info-Fenster (main.cpp::showWeatherInfo()) unterhalb von METAR
+    // angezeigt - nutzt die bereits vorhandene SunTimes::compute()-Logik
+    // (bisher nur intern fuer die Nachtdimmung verwendet, siehe
+    // isNightDimHours()).
+    WEATHER_SUNRISE_PREFIX,
+    WEATHER_SUNSET_PREFIX,
+    WEATHER_POLAR_DAY,
+    WEATHER_POLAR_NIGHT,
 
     COUNT
 };

@@ -252,6 +252,7 @@ static const char* const I18N_FR[] = {
     "Mise à jour installée",
     "Le nouveau micrologiciel a été installé avec succès. Veuillez redémarrer maintenant pour l'utiliser.",
     "Redémarrer maintenant",
+    "Nouveautés de cette version :",
     "La mise à jour n'a pas pu être téléchargée ou installée. L'appareil continue de fonctionner normalement avec le micrologiciel précédent. Merci de vérifier votre connexion WiFi et de réessayer plus tard.",
     "Délai d'inactivité",
     "Après ce délai sans contact, l'écran s'éteint pour économiser l'énergie. Avec l'écran de veille activé, il affiche à la place un ciel étoilé tamisé avec l'heure.",
@@ -270,6 +271,11 @@ static const char* const I18N_FR[] = {
     "Bulletin météo aéronautique (METAR) pour ",
 
     "Scanner pour le suivi en direct de ce vol",
+
+    "Lever du soleil : ",
+    "Coucher du soleil : ",
+    "Le soleil ne se couche pas aujourd'hui à cet endroit (jour polaire).",
+    "Le soleil ne se lève pas aujourd'hui à cet endroit (nuit polaire).",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

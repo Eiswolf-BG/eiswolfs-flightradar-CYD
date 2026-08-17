@@ -252,6 +252,7 @@ static const char* const I18N_TR[] = {
     "Güncelleme yüklendi",
     "Yeni donanım yazılımı başarıyla yüklendi. Kullanmaya başlamak için lütfen şimdi yeniden başlatın.",
     "Şimdi yeniden başlat",
+    "Bu sürümdeki yenilikler:",
     "Güncelleme indirilemedi veya yüklenemedi. Cihaz değişmeden önceki donanım yazılımıyla çalışmaya devam ediyor. Lütfen WiFi bağlantınızı kontrol edip daha sonra tekrar deneyin.",
     "Ekran Zaman Aşımı",
     "Bu süre boyunca dokunulmazsa ekran güç tasarrufu için kapanır. Ekran koruyucu açıksa, bunun yerine saatli, sönük bir yıldızlı gökyüzü gösterir.",
@@ -270,6 +271,11 @@ static const char* const I18N_TR[] = {
     "Havacılık hava raporu (METAR) - ",
 
     "Bu uçuşun canlı takibi için tarayın",
+
+    "Gün doğumu: ",
+    "Gün batımı: ",
+    "Bugün bu konumda güneş batmıyor (kutup günü).",
+    "Bugün bu konumda güneş doğmuyor (kutup gecesi).",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

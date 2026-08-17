@@ -69,6 +69,8 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Most-seen aircraft ranking** – a "Top" button on the Statistics screen shows the 5 aircraft logged most often across your whole flight logbook (see [Most-Seen Aircraft](#-most-seen-aircraft) below)
 - **METAR flight-weather report** – the Weather Info screen now also shows the raw METAR text for the nearest airport, right below the usual weather explanation (see [Weather Icon](#-weather-icon) below)
 - **Radar color themes** – choose between Green, Amber, or Blue for the radar screen (sweep line, panel border/text, buttons) under **Menu → System → "Radar Color Theme"**
+- **OTA update changelog** – after a firmware update installs successfully, the confirmation screen now shows a short, scrollable list of what changed in that version
+- **Sunrise/sunset times** – the Weather Info screen now also shows today's sunrise and sunset time for your currently active location, right below the METAR report
 
 ## Feature Deep-Dive
 
@@ -176,7 +178,7 @@ It always follows whichever location is currently active, including active [loca
 
 Powered by the free [Open-Meteo](https://open-meteo.com) API (no API key needed). Refreshed automatically in the background every 10 minutes, or immediately after switching to a different location.
 
-Tap the icon for a small info popup explaining that the shown weather always reflects your currently active location. That same popup also shows the **raw METAR text** for the nearest airport (from the free [aviationweather.gov](https://aviationweather.gov) data API), fetched in the same background cycle as the icon weather - handy if you're used to reading METARs and want the exact report instead of just an icon.
+Tap the icon for a small info popup explaining that the shown weather always reflects your currently active location. That same popup also shows the **raw METAR text** for the nearest airport (from the free [aviationweather.gov](https://aviationweather.gov) data API), fetched in the same background cycle as the icon weather - handy if you're used to reading METARs and want the exact report instead of just an icon. Below that, it also shows today's **sunrise and sunset time** for the active location.
 
 ### 📖 Flight logbook (ON/OFF)
 When enabled, the device logs **every newly sighted aircraft** (timestamp, hex code, callsign, registration, type, distance, altitude) into a CSV file on the SD card. An aircraft is only logged once per activation, even if it crosses the radar multiple times.

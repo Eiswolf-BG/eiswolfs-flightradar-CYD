@@ -187,8 +187,12 @@ in dieser Reihenfolge:
    2.6 -> 3.0), die Alex bewusst und absichtlich machen kann - Karl
    übernimmt in jedem Fall die genannte Nummer 1:1, ohne eigene Annahmen.
    Falls im Push-Wunsch keine explizite Versionsnummer genannt wurde, bei
-   Alex nachfragen statt zu raten. Erst NACH dem Eintragen der korrekten
-   Nummer: einmal sauber `pio run` bauen, DANACH erst der Rest des
+   Alex nachfragen statt zu raten. Zusammen mit `APP_VERSION` IMMER auch
+   `Config::CHANGELOG_LATEST` in `src/changelog.h` auf die Änderungen
+   DIESES Releases aktualisieren (kurze Bullet-Liste, Englisch) - wird auf
+   dem Gerät nach einem erfolgreichen OTA-Update auf dem "Update
+   installiert"-Screen angezeigt. Erst NACH dem Eintragen von Versionsnummer
+   UND Changelog: einmal sauber `pio run` bauen, DANACH erst der Rest des
    bekannten Workflows (README, Tag, index.html, Bin-Dateien, Commit/Push).
    (Hier bewusst NUR bauen, NICHT flashen - Ausnahme von der sonst
    geltenden Auto-Flash-Regel, siehe Abschnitt "Nach jedem erfolgreichen
