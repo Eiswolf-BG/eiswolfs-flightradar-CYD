@@ -33,10 +33,20 @@ namespace {
         snprintf(url, sizeof(url), "https://aviationweather.gov/api/data/metar?ids=%s&format=json", icao);
 
         http.setTimeout(Config::HTTP_TIMEOUT_MS);
-        if (!http.begin(client, url)) return;
+        if (!http.begin(client, url)) {
+            Serial.println("[Weather] METAR-Abfrage fehlgeschlagen: http.begin() lieferte false.");
+            return;
+        }
+
+        // Manche Server (aviationweather.gov eingeschlossen) lehnen
+        // Anfragen ohne User-Agent-Header eher ab bzw. liefern damit
+        // zuverlaessiger - der ESP32-HTTPClient sendet standardmaessig
+        // keinen. Rein defensiv, kostet nichts, falls nicht noetig.
+        http.addHeader("User-Agent", "EiswolfsFlightradarCYD/1.0");
 
         int code = http.GET();
         if (code != HTTP_CODE_OK) {
+            Serial.printf("[Weather] METAR-Abfrage fuer %s fehlgeschlagen: HTTP %d\n", icao, code);
             http.end();
             return;
         }
@@ -49,10 +59,20 @@ namespace {
 
         JsonDocument doc;
         DeserializationError err = deserializeJson(doc, body);
-        if (err || !doc.is<JsonArray>() || doc.size() == 0) return;
+        if (err) {
+            Serial.printf("[Weather] METAR-JSON fuer %s nicht lesbar: %s\n", icao, err.c_str());
+            return;
+        }
+        if (!doc.is<JsonArray>() || doc.size() == 0) {
+            Serial.printf("[Weather] METAR fuer %s: leere/unerwartete Antwort (evtl. keine aktuelle Meldung fuer diese Station).\n", icao);
+            return;
+        }
 
         const char* raw = doc[0]["rawOb"] | "";
-        if (!raw[0]) return;
+        if (!raw[0]) {
+            Serial.printf("[Weather] METAR fuer %s: kein rawOb-Feld in der Antwort.\n", icao);
+            return;
+        }
 
         currentMetarData.available = true;
         strncpy(currentMetarData.icao, icao, sizeof(currentMetarData.icao) - 1);
@@ -126,6 +146,7 @@ namespace {
         if (nearest.found) {
             fetchMetarFor(nearest.icao);
         } else {
+            Serial.println("[Weather] METAR uebersprungen: kein Flughafen in airports.csv auf der SD-Karte gefunden.");
             currentMetarData = Metar{};
         }
     }
