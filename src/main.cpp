@@ -36,6 +36,7 @@
 #include "first_run_complete_screen.h"
 #include "menu_stars.h"
 #include "ui_font.h"
+#include "changelog.h"
 #include <math.h>
 
 TFT_eSPI tft = TFT_eSPI();
@@ -571,6 +572,27 @@ void updateEmergencyBanner(uint32_t nowMs) {
     }
 }
 
+// Zeigt einmalig einen "Was ist neu?"-Changelog-Screen, wenn dieser Boot der
+// ERSTE nach einem Firmware-Wechsel ist (SettingsStore::lastSeenVersion()
+// weicht von der aktuellen Config::APP_VERSION ab) - egal ob der Wechsel per
+// OTA-Update oder per USB-Neuflashen passierte. Bewusst NICHT direkt auf dem
+// OTA-Erfolgs-Screen (siehe menu_screen.cpp::runOtaUpdateScreen()): dort
+// laeuft noch die ALTE Firmware, die den Changelog-Text der neuen Version
+// gar nicht kennen kann. Hier dagegen laeuft bereits die neue Firmware
+// (dieser Aufruf passiert ja erst nach dem Neustart, in setup()) - ihr
+// eigener, korrekt einkompilierter und mehrsprachiger changelogLatest()-Text
+// ist deshalb garantiert der richtige.
+void showWhatsNewIfNeeded(TFT_eSPI& tftRef) {
+    String lastSeen = SettingsStore::lastSeenVersion();
+    if (lastSeen == Config::APP_VERSION) return;
+
+    String body = String(I18n::t(StringId::OTA_CHANGELOG_LABEL)) + "\n" + Config::changelogLatest();
+    MenuScreen::showInfoScreen(tftRef, I18n::t(StringId::OTA_UPDATE_SUCCESS), body,
+                                TFT_GREEN, I18n::t(StringId::OK));
+
+    SettingsStore::setLastSeenVersion(Config::APP_VERSION);
+}
+
 void setup() {
     Serial.begin(115200);
     delay(300);
@@ -615,6 +637,17 @@ void setup() {
     // angewendet - hier mit dem jetzt geladenen Wert korrigieren, gleiches
     // Nachziehen wie bei invertDisplay() direkt drueber.
     ledcWrite(BACKLIGHT_PWM_CHANNEL, normalBacklightPwm());
+
+    if (isFirstRun) {
+        // Beim allerersten Start gibt es keine "vorherige Version", mit der
+        // man einen Changelog sinnvoll vergleichen koennte - der Willkommens-
+        // Ablauf weiter unten uebernimmt hier die Einfuehrung. Nur den
+        // aktuellen Versionsstand vermerken, damit ab dem naechsten
+        // Firmware-Wechsel showWhatsNewIfNeeded() korrekt greift.
+        SettingsStore::setLastSeenVersion(Config::APP_VERSION);
+    } else {
+        showWhatsNewIfNeeded(tft);
+    }
 
     WifiMgr::init();
     LocationPresets::init();

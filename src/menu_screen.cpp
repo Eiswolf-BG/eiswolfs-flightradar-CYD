@@ -611,16 +611,16 @@ namespace {
             // bestaetigt aktiv per Button, damit er den Erfolg auch wirklich
             // mitbekommt (vorher lief die Meldung nur 1,5s an, dann
             // Neustart - leicht zu verpassen).
-            // Changelog des installierten Releases (Config::changelogLatest(),
-            // siehe changelog.h/.cpp - liefert den Text bereits in der
-            // aktuell eingestellten Sprache) wird unter den Standardtext
-            // gehaengt - der Screen ist ueber infoScreen()/layoutWrapped()
-            // bereits automatisch scrollbar, falls der Gesamttext nicht auf
-            // einmal passt (Pfeil-Buttons erscheinen dann von selbst).
-            String successBody = String(I18n::t(StringId::OTA_SUCCESS_BODY)) + "\n\n" +
-                                  I18n::t(StringId::OTA_CHANGELOG_LABEL) + "\n" +
-                                  Config::changelogLatest();
-            infoScreen(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), successBody,
+            //
+            // BEWUSST OHNE Changelog an dieser Stelle (war testweise kurz
+            // drin, siehe Git-Historie): hier laeuft noch die ALTE, gerade
+            // zu ersetzende Firmware - die kennt den Changelog-Text der NEU
+            // heruntergeladenen Version gar nicht, der neue Code wird ja
+            // erst nach ESP.restart() tatsaechlich ausgefuehrt. Stattdessen
+            // zeigt main.cpp::showWhatsNewIfNeeded() den Changelog beim
+            // naechsten Boot an, wenn wirklich schon die neue Firmware
+            // laeuft (siehe dort).
+            infoScreen(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), I18n::t(StringId::OTA_SUCCESS_BODY),
                        TFT_GREEN, I18n::t(StringId::OTA_RESTART_BUTTON));
             ESP.restart();
         } else {
@@ -960,6 +960,11 @@ void run(TFT_eSPI& tft) {
             }
         }
     }
+}
+
+void showInfoScreen(TFT_eSPI& tft, const String& title, const String& body,
+                     uint16_t accentColor, const String& buttonLabel) {
+    infoScreen(tft, title, body, accentColor, buttonLabel);
 }
 
 }

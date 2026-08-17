@@ -27,6 +27,7 @@ namespace {
     uint8_t languageIdx = 0;
     uint8_t unitsModeVal = 0;
     uint8_t radarThemeIdx = 0;
+    char lastSeenVersionBuf[16] = {0};
 
     void applyKeyValue(const String& key, const String& value) {
         if (key == "range_index") {
@@ -74,6 +75,9 @@ namespace {
         } else if (key == "radar_theme") {
             int v = value.toInt();
             if (v >= 0 && v <= 2) radarThemeIdx = (uint8_t)v;
+        } else if (key == "last_seen_version") {
+            strncpy(lastSeenVersionBuf, value.c_str(), sizeof(lastSeenVersionBuf) - 1);
+            lastSeenVersionBuf[sizeof(lastSeenVersionBuf) - 1] = 0;
         }
     }
 }
@@ -134,6 +138,7 @@ void save() {
     f.printf("language=%d\n", languageIdx);
     f.printf("units_mode=%d\n", unitsModeVal);
     f.printf("radar_theme=%d\n", radarThemeIdx);
+    f.printf("last_seen_version=%s\n", lastSeenVersionBuf);
     f.close();
 }
 
@@ -267,6 +272,14 @@ void setRadarThemeIndex(uint8_t idx) {
         radarThemeIdx = idx;
         save();
     }
+}
+
+String lastSeenVersion() { return String(lastSeenVersionBuf); }
+
+void setLastSeenVersion(const String& version) {
+    strncpy(lastSeenVersionBuf, version.c_str(), sizeof(lastSeenVersionBuf) - 1);
+    lastSeenVersionBuf[sizeof(lastSeenVersionBuf) - 1] = 0;
+    save();
 }
 
 }

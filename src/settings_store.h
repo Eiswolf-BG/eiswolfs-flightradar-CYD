@@ -74,4 +74,17 @@ namespace SettingsStore {
     // radar_screen.cpp::themeBaseColor().
     uint8_t radarThemeIndex();
     void setRadarThemeIndex(uint8_t idx);
+
+    // Zuletzt vom Geraet GEBOOTETE Firmware-Version (Config::APP_VERSION zum
+    // Zeitpunkt des letzten Speicherns) - main.cpp::setup() vergleicht dies
+    // beim Start gegen die AKTUELLE Config::APP_VERSION, um genau EINMAL
+    // pro neuer Version den "Was ist neu?"-Changelog-Screen zu zeigen. "" =
+    // noch nie gespeichert (z.B. Geraete, die dieses Feature noch nicht
+    // kannten). WICHTIG, warum das erst NACH dem naechsten Boot passiert
+    // und nicht direkt auf dem OTA-Erfolgs-Screen: dort laeuft noch die
+    // ALTE (gerade zu ersetzende) Firmware, die den Changelog-Text der NEUEN
+    // Version noch gar nicht kennen kann - der neu heruntergeladene Code
+    // wird ja erst nach ESP.restart() tatsaechlich ausgefuehrt.
+    String lastSeenVersion();
+    void setLastSeenVersion(const String& version);
 }
