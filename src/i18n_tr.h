@@ -181,9 +181,6 @@ static const char* const I18N_TR[] = {
     "İrtifa",
     "Çağrı işareti",
 
-    "Hakkında",
-    "ESP32 CYD ekranı için",
-    "canlı ADS-B uçuş radarı.",
     "Sürüm: ",
 
     "Parlaklık: ",

@@ -181,9 +181,6 @@ static const char* const I18N_FR[] = {
     "Altitude",
     "Indicatif",
 
-    "À propos",
-    "Radar de vol ADS-B en",
-    "direct pour l'ESP32 CYD.",
     "Version : ",
 
     "Luminosité : ",

@@ -12,7 +12,6 @@
 #include "airline_filter_screen.h"
 #include "aircraft_watchlist_screen.h"
 #include "aircraft_list_screen.h"
-#include "about_screen.h"
 #include "brightness_screen.h"
 #include "timeout_screen.h"
 #include "language_screen.h"
@@ -96,6 +95,11 @@ namespace {
     // (siehe timeout_screen.cpp) - Zeilenzahl bleibt dadurch bei 10. Danach
     // +1 fuer den neuen "Radar-Farbschema"-Punkt (siehe
     // radar_theme_screen.h) = 11.
+    // BLEIBT bei 11, obwohl der eigene "Info"-Button entfernt wurde: dessen
+    // Slot wurde nicht ersatzlos gestrichen, sondern dem "Nach Update
+    // suchen"-Button zugeschlagen (der jetzt zwei Slots hoch ist und Version
+    // + Update-Hinweis zweizeilig zeigt, siehe checkUpdateBtn unten) - alle
+    // anderen Zeilen behalten dadurch exakt ihre bisherige Groesse.
     constexpr uint8_t SYSTEM_ROW_COUNT = 11;
     constexpr int16_t SYSTEM_ROW_GAP = 4;
     constexpr int16_t SYSTEM_START_Y = 18;
@@ -132,6 +136,23 @@ namespace {
         tft.setTextDatum(MC_DATUM);
         tft.setTextColor(fg, bg);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
+        tft.setTextDatum(TL_DATUM);
+    }
+
+    // Zweizeilige Variante von drawButton() - fuer den zusammengelegten
+    // "Nach Update suchen"-Button im System-Menue (siehe Page::System),
+    // der jetzt in Zeile 1 die aktuelle Version und in Zeile 2 den
+    // bisherigen Button-Text traegt, seit der eigene "Info"-Button/-Screen
+    // entfernt wurde (die Versionsnummer war dort der einzige wirklich
+    // relevante Inhalt).
+    void drawButtonTwoLines(TFT_eSPI& tft, const Rect& r, const String& line1, const String& line2) {
+        tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        constexpr int16_t LINE_GAP = 14;
+        tft.drawString(line1, r.x + r.w / 2, r.y + r.h / 2 - LINE_GAP / 2);
+        tft.drawString(line2, r.x + r.w / 2, r.y + r.h / 2 + LINE_GAP / 2);
         tft.setTextDatum(TL_DATUM);
     }
 
@@ -699,14 +720,24 @@ void run(TFT_eSPI& tft) {
             Rect webuiBtn     = systemRowRect(5);
             Rect radarThemeBtn = systemRowRect(6);
             // "Sicherung & Reset" (Backup/Restore/Werksreset, siehe
-            // Page::BackupReset unten) und "Nach Update suchen" stehen
-            // bewusst direkt ueber "Info", das seinerseits als letzter
-            // Punkt direkt ueber dem Zurueck-Button steht - so bleiben
-            // beide Positionen stabil, egal wie viele weitere Punkte davor
-            // noch dazukommen.
+            // Page::BackupReset unten) steht bewusst direkt ueber "Nach
+            // Update suchen", das seinerseits als letzter Punkt direkt
+            // ueber dem Zurueck-Button steht - so bleiben beide Positionen
+            // stabil, egal wie viele weitere Punkte davor noch dazukommen.
             Rect backupResetBtn = systemRowRect(7);
-            Rect checkUpdateBtn = systemRowRect(8);
-            Rect aboutBtn     = systemRowRect(9);
+            // Belegt bewusst ZWEI Zeilen-Slots (8 und 9, wo frueher
+            // zusaetzlich ein eigener "Info"-Button stand) statt nur einem -
+            // der einzige wirklich relevante Inhalt des alten Info-Screens
+            // (die Versionsnummer) steht jetzt als eigene Zeile direkt auf
+            // diesem groesseren Button (siehe drawButtonTwoLines() unten),
+            // der dadurch auch insgesamt leichter zu treffen ist. Die
+            // uebrigen Zeilen (0-7, 10) behalten ihre normale Einzelhoehe -
+            // SYSTEM_ROW_COUNT bleibt bewusst bei 11, damit sich an deren
+            // Groesse/Position nichts aendert.
+            Rect systemRow8 = systemRowRect(8);
+            Rect systemRow9 = systemRowRect(9);
+            Rect checkUpdateBtn = {systemRow8.x, systemRow8.y, systemRow8.w,
+                                    (int16_t)(systemRow9.y + systemRow9.h - systemRow8.y)};
             Rect backBtn      = systemRowRect(10);
 
             drawButton(tft, calibBtn, I18n::t(StringId::MENU_CALIBRATE));
@@ -722,8 +753,8 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, webuiBtn, I18n::t(StringId::MENU_LOGBOOK_WEBUI));
             drawButton(tft, radarThemeBtn, I18n::t(StringId::MENU_RADAR_THEME));
             drawButton(tft, backupResetBtn, I18n::t(StringId::MENU_BACKUP_RESET));
-            drawButton(tft, checkUpdateBtn, I18n::t(StringId::MENU_CHECK_UPDATE));
-            drawButton(tft, aboutBtn, I18n::t(StringId::MENU_ABOUT));
+            String checkUpdateLine1 = String(I18n::t(StringId::CHECK_UPDATE_VERSION_PREFIX)) + Config::APP_VERSION;
+            drawButtonTwoLines(tft, checkUpdateBtn, checkUpdateLine1, I18n::t(StringId::MENU_CHECK_UPDATE));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -755,8 +786,6 @@ void run(TFT_eSPI& tft) {
                 page = Page::BackupReset;
             } else if (checkUpdateBtn.contains(tap.x, tap.y)) {
                 runOtaUpdateScreen(tft);
-            } else if (aboutBtn.contains(tap.x, tap.y)) {
-                AboutScreen::run(tft);
             } else if (webuiBtn.contains(tap.x, tap.y)) {
                 WebUiScreen::run(tft);
             } else if (radarThemeBtn.contains(tap.x, tap.y)) {
