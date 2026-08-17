@@ -76,6 +76,11 @@ namespace {
         currentMetarData.icao[sizeof(currentMetarData.icao) - 1] = 0;
         strncpy(currentMetarData.raw, raw, sizeof(currentMetarData.raw) - 1);
         currentMetarData.raw[sizeof(currentMetarData.raw) - 1] = 0;
+
+        // Erfolgs-Log ergaenzt - vorher gab es bei Erfolg GAR KEINE
+        // Ausgabe, wodurch sich "Abfrage lief nie" nicht von "Abfrage lief
+        // still und erfolgreich durch" unterscheiden liess.
+        Serial.printf("[Weather] METAR fuer %s erfolgreich empfangen: %s\n", icao, currentMetarData.raw);
     }
 
     // Ordnet den WMO-Wettercode von Open-Meteo (Feld "weathercode", siehe
@@ -145,6 +150,8 @@ namespace {
         // Icon-Wetter oben.
         AirportLookup::Nearest nearest = AirportLookup::findNearest(lat, lon);
         if (nearest.found) {
+            Serial.printf("[Weather] Naechster Flughafen: %s (%s), %.0f km entfernt - frage METAR ab...\n",
+                          nearest.icao, nearest.name, nearest.distanceKm);
             fetchMetarFor(client, nearest.icao);
         } else {
             Serial.println("[Weather] METAR uebersprungen: kein Flughafen in airports.csv auf der SD-Karte gefunden.");
