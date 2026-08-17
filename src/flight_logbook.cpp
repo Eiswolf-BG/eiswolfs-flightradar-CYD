@@ -11,6 +11,13 @@
 namespace FlightLogbook {
 
 namespace {
+    // 24h-Sicherheitsabschaltung: falls das Flugbuch aus Versehen dauerhaft
+    // aktiviert bleibt, schaltet es sich nach spaetestens 24 Stunden von
+    // selbst wieder aus. Wird zuverlaessig durchgesetzt unabhaengig vom
+    // Erfolg der ADS-B-Abfrage (siehe enforceAutoOff() unten sowie
+    // net_task.cpp).
+    constexpr uint32_t LOGBOOK_AUTO_OFF_SECONDS = 24UL * 3600UL;
+
     constexpr uint16_t MAX_SEEN = 400;
     char seenHex[MAX_SEEN][7];
     uint16_t seenCount = 0;
@@ -201,29 +208,55 @@ void init() {
     }
 }
 
-void update() {
-    if (!SettingsStore::flightLogbookEnabled()) return;
+// 24h-Sicherheitsabschaltung: verhindert, dass ein unbemerkt aktives
+// Flugbuch die SD-Karte nach und nach vollschreibt (siehe
+// Bestaetigungsdialog beim Einschalten in menu_screen.cpp). Nur pruefen,
+// wenn die Uhrzeit schon synchronisiert ist.
+//
+// FRUEHER Teil von update() und wurde deshalb NUR bei einer ERFOLGREICHEN
+// ADS-B-Abfrage geprueft (update() wird in net_task.cpp nur im "if
+// (result.ok)"-Zweig aufgerufen) - schlugen die Abfragen laengere Zeit fehl
+// (WLAN-Aussetzer, Ausfall des ADS-B-Anbieters), lief die 24h-Grenze
+// unbemerkt weiter, ohne dass die Sicherheitsabschaltung je greifen konnte.
+// Jetzt eine eigene Funktion, die NetTask bei JEDEM Schleifendurchlauf
+// aufruft (siehe enforceAutoOff()), unabhaengig vom Abfrageerfolg.
+//
+// Rueckgabe: true, wenn das Flugbuch danach noch aktiv ist - false, wenn es
+// gerade abgeschaltet wurde oder ohnehin schon aus war.
+bool checkAutoOff() {
+    if (!SettingsStore::flightLogbookEnabled()) return false;
 
-    // 24h-Sicherheitsabschaltung: verhindert, dass ein unbemerkt aktives
-    // Flugbuch die SD-Karte nach und nach vollschreibt (siehe
-    // Bestaetigungsdialog beim Einschalten in menu_screen.cpp). Nur pruefen,
-    // wenn die Uhrzeit schon synchronisiert ist.
     time_t nowCheck = time(nullptr);
-    if (nowCheck > 8 * 3600 * 2) {
-        uint32_t enabledAt = SettingsStore::flightLogbookEnabledAtEpoch();
-        if (enabledAt == 0) {
-            // Migrations-Fall: Flugbuch war schon vor diesem Update aktiv
-            // (alte Einstellungsdatei ohne Zeitstempel) - Startzeitpunkt
-            // jetzt setzen, damit die 24h-Grenze trotzdem sicher greift.
-            SettingsStore::setFlightLogbookEnabledAtEpoch((uint32_t)nowCheck);
-        } else if ((uint32_t)nowCheck >= enabledAt &&
-                   (uint32_t)nowCheck - enabledAt >= 24UL * 3600UL) {
-            SettingsStore::setFlightLogbookEnabled(false);
-            SettingsStore::setFlightLogbookEnabledAtEpoch(0);
-            SettingsStore::setFlightLogbookSessionFile("");
-            return;
-        }
+    if (nowCheck <= 8 * 3600 * 2) return true; // Uhrzeit noch nicht synchronisiert - noch nicht pruefbar
+
+    uint32_t enabledAt = SettingsStore::flightLogbookEnabledAtEpoch();
+    if (enabledAt == 0) {
+        // Migrations-Fall: Flugbuch war schon vor diesem Update aktiv (alte
+        // Einstellungsdatei ohne Zeitstempel) - Startzeitpunkt jetzt setzen,
+        // damit die 24h-Grenze trotzdem sicher greift.
+        SettingsStore::setFlightLogbookEnabledAtEpoch((uint32_t)nowCheck);
+        return true;
     }
+
+    if ((uint32_t)nowCheck >= enabledAt && (uint32_t)nowCheck - enabledAt >= LOGBOOK_AUTO_OFF_SECONDS) {
+        SettingsStore::setFlightLogbookEnabled(false);
+        SettingsStore::setFlightLogbookEnabledAtEpoch(0);
+        SettingsStore::setFlightLogbookSessionFile("");
+        return false;
+    }
+
+    return true;
+}
+
+// Von NetTask bei JEDEM Schleifendurchlauf aufgerufen (siehe net_task.cpp),
+// unabhaengig davon, ob die letzte ADS-B-Abfrage erfolgreich war - siehe
+// Kommentar bei checkAutoOff() fuer den Grund.
+void enforceAutoOff() {
+    checkAutoOff();
+}
+
+void update() {
+    if (!checkAutoOff()) return;
 
     SdMutex::Guard guard;
 
