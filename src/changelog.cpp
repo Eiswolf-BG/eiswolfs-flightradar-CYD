@@ -9,33 +9,68 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 6;
 
     const char* const CHANGELOG_EN =
-        "- Removed the separate Info screen - the version number now shows "
-        "directly on the (now larger) 'Check for updates' button in System settings";
+        "- New sleep screen: big logo, clock, localized date, and version "
+        "number, with deeper dimming\n"
+        "- New: aircraft photo via QR code (planespotters.net) in the "
+        "flight detail panel\n"
+        "- Fix: flight logbook now reliably turns off after 24h, even "
+        "during ADS-B outages\n"
+        "- Fix: header sometimes kept showing stale text after leaving "
+        "the QR code screen";
 
     const char* const CHANGELOG_DE =
-        "- Der separate Info-Bildschirm wurde entfernt - die Versionsnummer "
-        "steht jetzt direkt auf dem (jetzt größeren) 'Nach Update "
-        "suchen'-Button in den Systemeinstellungen";
+        "- Neuer Ruhebildschirm: großes Logo, Uhrzeit, Datum (im "
+        "jeweiligen Sprachformat) und Versionsnummer, mit tieferer "
+        "Dimmung\n"
+        "- Neu: Flugzeug-Foto per QR-Code (planespotters.net) im "
+        "Flugzeug-Detail-Panel\n"
+        "- Fix: Flugbuch schaltet sich jetzt zuverlässig nach 24h "
+        "automatisch ab, auch bei ADS-B-Ausfällen\n"
+        "- Fix: Kopfzeile blieb nach dem QR-Code-Screen manchmal "
+        "fehlerhaft stehen";
 
     const char* const CHANGELOG_FR =
-        "- L'écran Info séparé a été supprimé - le numéro de version "
-        "s'affiche maintenant directement sur le bouton (plus grand) "
-        "« Rechercher des mises à jour » dans les réglages système";
+        "- Nouvel écran de veille : grand logo, heure, date (au format "
+        "local) et numéro de version, avec un assombrissement plus "
+        "prononcé\n"
+        "- Nouveau : photo de l'avion par code QR (planespotters.net) "
+        "dans le panneau de détails du vol\n"
+        "- Correction : le carnet de vol se désactive maintenant de "
+        "façon fiable après 24h, même en cas de panne ADS-B\n"
+        "- Correction : l'en-tête affichait parfois un texte obsolète "
+        "après l'écran du code QR";
 
     const char* const CHANGELOG_TR =
-        "- Ayrı Bilgi ekranı kaldırıldı - sürüm numarası artık Sistem "
-        "ayarlarındaki (artık daha büyük) 'Güncelleme ara' düğmesinde "
-        "doğrudan gösteriliyor";
+        "- Yeni bekleme ekranı: büyük logo, saat, yerel biçimde tarih ve "
+        "sürüm numarası, daha derin karartma ile\n"
+        "- Yeni: Uçak detay panelinde QR kod ile uçak fotoğrafı "
+        "(planespotters.net)\n"
+        "- Düzeltme: Uçuş defteri artık ADS-B kesintilerinde bile 24 "
+        "saat sonra güvenilir şekilde kapanıyor\n"
+        "- Düzeltme: QR kod ekranından dönüldüğünde üst bilgi bazen "
+        "eski metni göstermeye devam ediyordu";
 
     const char* const CHANGELOG_ES =
-        "- Se eliminó la pantalla de información independiente: el número "
-        "de versión ahora aparece directamente en el botón (más grande) "
-        "«Buscar actualizaciones» en Ajustes del sistema";
+        "- Nueva pantalla de reposo: logo grande, hora, fecha (en "
+        "formato local) y número de versión, con un atenuado más "
+        "profundo\n"
+        "- Nuevo: foto del avión mediante código QR (planespotters.net) "
+        "en el panel de detalles del vuelo\n"
+        "- Corrección: el diario de vuelo ahora se desactiva de forma "
+        "fiable tras 24h, incluso durante cortes de ADS-B\n"
+        "- Corrección: el encabezado a veces seguía mostrando texto "
+        "obsoleto tras salir de la pantalla del código QR";
 
     const char* const CHANGELOG_IT =
-        "- La schermata Info separata è stata rimossa: il numero di "
-        "versione ora appare direttamente sul pulsante (più grande) "
-        "\"Cerca aggiornamenti\" nelle impostazioni di sistema";
+        "- Nuova schermata di riposo: logo grande, ora, data (nel "
+        "formato locale) e numero di versione, con un'oscurità più "
+        "profonda\n"
+        "- Novità: foto dell'aereo tramite codice QR (planespotters.net) "
+        "nel pannello dei dettagli del volo\n"
+        "- Correzione: il diario di volo ora si disattiva in modo "
+        "affidabile dopo 24h, anche durante le interruzioni ADS-B\n"
+        "- Correzione: l'intestazione a volte continuava a mostrare "
+        "testo obsoleto dopo la schermata del codice QR";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT

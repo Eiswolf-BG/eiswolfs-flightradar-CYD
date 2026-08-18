@@ -60,7 +60,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Firmware version** is shown directly on the "Check for updates" button (Menu → System)
 - **Backup & Reset** (Menu → System → "Backup & Reset") – back up or restore your settings, or fully reset the device (wipes all on-device data and re-runs first-time setup) - handy for testing or handing the device to someone else
 - **Screen timeout with slider** (Menu → System → "Screen Timeout") – set how long until the display turns off after a period of no touches, from 1 to 15 minutes or "Never", using a drag slider instead of tapping through values one minute at a time
-- **Idle screensaver** (same screen, off by default) – instead of turning the display off completely after the timeout, shows a dimmed starfield with a large clock; a tap wakes it back up
+- **Idle screensaver** (same screen, off by default) – instead of turning the display off completely after the timeout, shows a dimmed starfield with the radar logo, a large clock, today's date (in your language's local format), and the firmware version, dimmed noticeably deeper than the regular night dimming; a tap wakes it back up
 - **OTA firmware updates over WiFi** (Menu → System → "Check for update") – checks the latest GitHub release and, if newer, downloads and installs it directly on the device, no cable or web flasher needed. Update results are shown as a clear on-screen message that requires confirmation, with an explicit restart button on success
 - **Live radar in the web UI** – scanning the QR code (or opening the device's IP) now shows a live radar with all currently visible aircraft at the top of the page, refreshing every few seconds, with the flight logbook below it as before (see [Web Export](#-web-export) below)
 - **Sun-based night dimming** – the night dimming window now follows the actual sunrise/sunset time at your location instead of a fixed 10pm-6am window, so it matches how dark it actually is outside depending on the season
@@ -71,6 +71,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Radar color themes** – choose between Green, Amber, or Blue for the radar screen (sweep line, panel border/text, buttons) under **Menu → System → "Radar Color Theme"**
 - **OTA update changelog** – after a firmware update installs successfully, the confirmation screen now shows a short, scrollable list of what changed in that version
 - **Sunrise/sunset times** – the Weather Info screen now also shows today's sunrise and sunset time for your currently active location, right below the METAR report
+- **Aircraft photo QR code** – if the aircraft's registration is known, the QR screen in the detail panel gets a "Photo" toggle button that switches to a second QR code linking to that aircraft's photos on [planespotters.net](https://planespotters.net)
 
 ## Feature Deep-Dive
 

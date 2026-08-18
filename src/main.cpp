@@ -35,6 +35,7 @@
 #include "first_run_location_screen.h"
 #include "first_run_complete_screen.h"
 #include "menu_stars.h"
+#include "radar_logo.h"
 #include "ui_font.h"
 #include "changelog.h"
 #include <math.h>
@@ -85,6 +86,15 @@ uint8_t normalBacklightPwm() {
 uint8_t nightDimBacklightPwm() {
     uint32_t normal = normalBacklightPwm();
     return (uint8_t)(normal * (100 - Config::NIGHT_DIM_REDUCTION_PERCENT) / 100);
+}
+
+// Eigene, deutlich staerkere Dimmstufe fuer den Ruhebildschirm (siehe
+// Config::SCREENSAVER_DIM_REDUCTION_PERCENT) - die normale Nachtabsenkung
+// war dafuer zu hell, da der Ruhebildschirm den ganzen Bildschirminhalt
+// ersetzt und oft laengere Zeit laeuft.
+uint8_t screensaverBacklightPwm() {
+    uint32_t normal = normalBacklightPwm();
+    return (uint8_t)(normal * (100 - Config::SCREENSAVER_DIM_REDUCTION_PERCENT) / 100);
 }
 
 struct Rect {
@@ -365,14 +375,69 @@ void drawWifiIcon(int16_t rightX, int16_t rowTop, int16_t rowH, int8_t rssi) {
     }
 }
 
-// Grosse, zentrierte Uhrzeit fuer den Ruhebildschirm (siehe
-// screensaverShowing oben) - eigene, groessere Variante der kleinen
-// Kopfzeilen-Uhr aus updateStatusLine(), da diese bewusst kompakt gehalten
-// ist. Loescht bei jedem Aufruf nur den eigenen schmalen Streifen in der
-// Bildschirmmitte (nicht den ganzen Bildschirm), damit die Sternenanimation
-// darum herum ungestoert weiterlaeuft. Zeichnet nichts, solange die Uhrzeit
-// noch nicht per NTP synchronisiert ist (gleiche Pruefung wie
-// updateStatusLine()/isNightDimHours()).
+constexpr int16_t SCREENSAVER_LOGO_CY = 100;
+constexpr float SCREENSAVER_LOGO_SCALE = 1.0f;
+
+// Layout darunter, von oben nach unten: kleine graue Versionsnummer direkt
+// unter dem Logo, dann - mit etwas Abstand - die grosse Uhrzeit, dann das
+// Datum. Alle drei Y-Positionen sind Mittelpunkte (MC_DATUM).
+constexpr int16_t SCREENSAVER_VERSION_CY = 192;
+constexpr int16_t SCREENSAVER_CLOCK_CY = 236;
+constexpr int16_t SCREENSAVER_DATE_CY = 278;
+
+void drawScreensaverLogo() {
+    RadarLogo::draw(tft, Config::SCREEN_WIDTH / 2, SCREENSAVER_LOGO_CY, SCREENSAVER_LOGO_SCALE);
+}
+
+// Kleine graue Versionsnummer unter dem Logo - dieselbe Config::APP_VERSION,
+// die auch auf dem "Nach Update suchen"-Button im System-Menue steht (siehe
+// menu_screen.cpp). Aendert sich nie waehrend der Ruhebildschirm aktiv ist,
+// deshalb wie das Logo nur EINMAL beim Betreten gezeichnet, nicht jede
+// Sekunde neu.
+void drawScreensaverVersion() {
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+    tft.setTextSize(1);
+    tft.drawString(String("v") + Config::APP_VERSION, Config::SCREEN_WIDTH / 2, SCREENSAVER_VERSION_CY);
+    tft.setTextSize(1);
+    tft.setTextDatum(TL_DATUM);
+}
+
+// Datum GEMAESS DER AKTUELLEN SPRACHE formatiert (nicht der
+// Einheiten-Einstellung wie die Uhrzeit unten) - Reihenfolge/Trennzeichen
+// unterscheiden sich je Sprachraum: DE/TR mit Punkten TT.MM.JJJJ, FR/ES/IT
+// mit Schraegstrichen TT/MM/JJJJ, EN im US-Format MM/TT/JJJJ (konsistent zur
+// bereits bestehenden Kopplung "Englisch/Imperial -> 12h mit AM/PM" weiter
+// unten sowie in updateStatusLine()). SettingsStore::language()-Werte wie in
+// i18n.cpp/changelog.cpp: 0=EN, 1=DE, 2=FR, 3=TR, 4=ES, 5=IT.
+void formatLocalizedDate(const struct tm& tmNow, char* out, size_t outLen) {
+    int day = tmNow.tm_mday;
+    int month = tmNow.tm_mon + 1;
+    int year = tmNow.tm_year + 1900;
+
+    switch (SettingsStore::language()) {
+        case 0: // EN
+            snprintf(out, outLen, "%02d/%02d/%04d", month, day, year);
+            break;
+        case 1: // DE
+        case 3: // TR
+            snprintf(out, outLen, "%02d.%02d.%04d", day, month, year);
+            break;
+        default: // FR, ES, IT
+            snprintf(out, outLen, "%02d/%02d/%04d", day, month, year);
+            break;
+    }
+}
+
+// Grosse, zentrierte Uhrzeit + Datum fuer den Ruhebildschirm (siehe
+// screensaverShowing oben) - eigene, deutlich groessere Variante der
+// kleinen Kopfzeilen-Uhr aus updateStatusLine(), da diese bewusst kompakt
+// gehalten ist. Loescht bei jedem Aufruf nur die eigenen schmalen Streifen
+// um Uhrzeit/Datum (nicht den ganzen Bildschirm), damit die
+// Sternenanimation und das Logo/die Versionsnummer darueber ungestoert
+// stehen bleiben. Zeichnet nichts, solange die Uhrzeit noch nicht per NTP
+// synchronisiert ist (gleiche Pruefung wie updateStatusLine()/
+// isNightDimHours()).
 void drawScreensaverClock() {
     time_t now = time(nullptr);
     if (now <= 8 * 3600 * 2) return;
@@ -389,13 +454,23 @@ void drawScreensaverClock() {
                  tmNow.tm_hour < 12 ? "AM" : "PM");
     }
 
-    constexpr int16_t CLOCK_BAND_H = 40;
-    int16_t cy = Config::SCREEN_HEIGHT / 2;
-    tft.fillRect(0, (int16_t)(cy - CLOCK_BAND_H / 2), Config::SCREEN_WIDTH, CLOCK_BAND_H, TFT_BLACK);
+    constexpr int16_t CLOCK_BAND_H = 44;
+    tft.fillRect(0, (int16_t)(SCREENSAVER_CLOCK_CY - CLOCK_BAND_H / 2), Config::SCREEN_WIDTH, CLOCK_BAND_H, TFT_BLACK);
     tft.setTextDatum(MC_DATUM);
     tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
-    tft.setTextSize(3);
-    tft.drawString(timeBuf, Config::SCREEN_WIDTH / 2, cy);
+    tft.setTextSize(5);
+    tft.drawString(timeBuf, Config::SCREEN_WIDTH / 2, SCREENSAVER_CLOCK_CY);
+    tft.setTextSize(1);
+    tft.setTextDatum(TL_DATUM);
+
+    char dateBuf[12];
+    formatLocalizedDate(tmNow, dateBuf, sizeof(dateBuf));
+    constexpr int16_t DATE_BAND_H = 20;
+    tft.fillRect(0, (int16_t)(SCREENSAVER_DATE_CY - DATE_BAND_H / 2), Config::SCREEN_WIDTH, DATE_BAND_H, TFT_BLACK);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+    tft.setTextSize(2);
+    tft.drawString(dateBuf, Config::SCREEN_WIDTH / 2, SCREENSAVER_DATE_CY);
     tft.setTextSize(1);
     tft.setTextDatum(TL_DATUM);
 }
@@ -815,6 +890,10 @@ void loop() {
             if (RadarScreen::handleTap(tft, tap.x, tap.y, CONTENT_TOP)) {
                 forceRedraw = true;
             }
+            if (RadarScreen::consumeHeaderRedrawFlag()) {
+                drawHeader();
+                updateStatusLine();
+            }
         }
     }
 
@@ -869,9 +948,11 @@ void loop() {
                 // ganz aus, fuer alle, die trotz Inaktivitaets-Timeout noch
                 // etwas auf dem Display sehen wollen.
                 screensaverShowing = true;
-                ledcWrite(BACKLIGHT_PWM_CHANNEL, nightDimBacklightPwm());
+                ledcWrite(BACKLIGHT_PWM_CHANNEL, screensaverBacklightPwm());
                 tft.fillScreen(TFT_BLACK);
                 MenuStars::reset();
+                drawScreensaverLogo();
+                drawScreensaverVersion();
                 lastScreensaverClockMs = 0; // sofortiges erstes Zeichnen erzwingen
             } else {
                 // Bewusst ganz aus (0) statt nur gedimmt - fuer den

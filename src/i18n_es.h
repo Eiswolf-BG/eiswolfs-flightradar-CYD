@@ -273,6 +273,10 @@ static const char* const I18N_ES[] = {
     "Atardecer: ",
     "El sol no se pone hoy en esta ubicación (día polar).",
     "El sol no sale hoy en esta ubicación (noche polar).",
+
+    "Escanea para ver fotos de este avión",
+    "Foto",
+    "Seguimiento",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

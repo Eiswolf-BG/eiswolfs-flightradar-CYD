@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "3.7.2";
+    constexpr const char* APP_VERSION = "3.7.5";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -28,6 +28,14 @@ namespace Config {
     // Dimm-Effekt bei niedrig eingestellter Normalhelligkeit wirkungslos
     // oder wuerde das Display nachts sogar heller machen als tagsueber.
     constexpr uint8_t NIGHT_DIM_REDUCTION_PERCENT = 40;
+
+    // Der Ruhebildschirm (Sternenhimmel + Uhrzeit, siehe main.cpp) dimmt
+    // deutlich staerker als die normale Nachtabsenkung oben - er ersetzt ja
+    // den kompletten Bildschirminhalt und laeuft oft ueber laengere Zeit
+    // (z.B. nachts als Deko), eine bloss leicht abgesenkte Helligkeit wirkte
+    // dafuer zu hell. Ebenfalls relativ zur eingestellten Normalhelligkeit,
+    // gleiches Prinzip wie NIGHT_DIM_REDUCTION_PERCENT.
+    constexpr uint8_t SCREENSAVER_DIM_REDUCTION_PERCENT = 75;
 
     constexpr const char* IP_GEO_HOST = "ip-api.com";
     constexpr const char* IP_GEO_PATH = "/json/?fields=status,lat,lon,offset,countryCode";

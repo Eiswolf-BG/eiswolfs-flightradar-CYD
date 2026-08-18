@@ -274,6 +274,10 @@ static const char* const I18N_EN[] = {
     "Sunset: ",
     "The sun does not set today at this location (polar day).",
     "The sun does not rise today at this location (polar night).",
+
+    "Scan for photos of this aircraft",
+    "Photo",
+    "Tracking",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,
