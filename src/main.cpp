@@ -907,6 +907,18 @@ void loop() {
                 // TFT-Speicher unveraendert stehen) muss hier explizit neu
                 // gezeichnet werden.
                 screensaverShowing = false;
+                // War beim Eintritt in den Ruhebildschirm noch ein Flugzeug-
+                // Detail-Panel offen, hat der Ruhebildschirm es komplett
+                // ueberschrieben - forceRedraw allein zeichnet zwar den
+                // Radar-Kreis neu, aber RadarScreen::render() wuerde das
+                // Panel selbst faelschlich als unveraendert annehmen (gleicher
+                // Flugzeug-Hex-Code wie vorher) und nur die Zeilen mit
+                // geaendertem Text neu zeichnen - Reste der Ruhebildschirm-
+                // Uhr/des Datums blieben dann im Panel-Bereich sichtbar
+                // stehen (Alex' Fotomeldung). Gleicher Grund/gleiche Loesung
+                // wie beim Menue/Wetter-Info-Overlay weiter unten, siehe
+                // RadarScreen::invalidatePanel().
+                RadarScreen::invalidatePanel();
                 drawHeader();
                 updateStatusLine();
                 forceRedraw = true;
