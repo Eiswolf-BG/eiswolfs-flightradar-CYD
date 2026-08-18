@@ -397,16 +397,44 @@ enum class StringId : uint8_t {
     WEATHER_POLAR_DAY,
     WEATHER_POLAR_NIGHT,
 
-    // Foto-Umschalter auf dem Flug-QR-Code-Screen (radar_screen.cpp::
-    // runFlightQrScreen()) - zusaetzlich zum bestehenden Live-Tracking-QR
-    // (DETAIL_QR_HINT oben) laesst sich dort jetzt, falls die Registrierung
-    // bekannt ist, auf einen zweiten QR-Code umschalten, der auf Fotos des
-    // Flugzeugs bei planespotters.net verlinkt. DETAIL_QR_BTN_PHOTO steht auf
-    // dem Umschalt-Button, WAEHREND der Live-Tracking-QR gezeigt wird (tippen
-    // wechselt zu Fotos), DETAIL_QR_BTN_TRACKING umgekehrt.
-    DETAIL_QR_HINT_PHOTO,
-    DETAIL_QR_BTN_PHOTO,
-    DETAIL_QR_BTN_TRACKING,
+    // Kurzfristige Wettervorhersage (main.cpp::showWeatherInfo(), unterhalb
+    // von METAR/Sonnenauf-untergang) - Open-Meteo liefert dafuer einen
+    // einzelnen stuendlichen Datenpunkt fuer "jetzt + 3 Stunden" (siehe
+    // Weather::currentForecast()). WEATHER_FORECAST_PREFIX hat die "3
+    // Stunden" bereits fest eingebaut (kein Platzhalter-Mechanismus fuer
+    // Zahlen in I18n vorhanden, gleiche Konvention wie bei den uebrigen
+    // *_PREFIX-Strings).
+    WEATHER_FORECAST_PREFIX,
+
+    // Textuelle Namen der von Weather::Condition zugeordneten Wetterlagen -
+    // bisher nur als Icon gezeichnet (main.cpp::drawWeatherIcon()), jetzt
+    // zusaetzlich als Text fuer die Kurzvorhersage gebraucht.
+    WEATHER_CONDITION_CLEAR,
+    WEATHER_CONDITION_PARTLY_CLOUDY,
+    WEATHER_CONDITION_CLOUDY,
+    WEATHER_CONDITION_RAIN,
+    WEATHER_CONDITION_SNOW,
+    WEATHER_CONDITION_THUNDERSTORM,
+
+    // Peilung (Kompassrichtung vom eigenen Standort zum ausgewaehlten
+    // Flugzeug, NICHT zu verwechseln mit dessen eigenem Kurs/HDG) als Text
+    // in der Distanz/Kurs-Zeile des Detail-Panels (radar_screen.cpp::
+    // drawDetailPanel()) - ergaenzt die bereits vorhandene grafische
+    // Peilungsanzeige auf dem Radar selbst (drawBearingIndicator()) um eine
+    // leicht lesbare Himmelsrichtung, bevor man ueberhaupt nach draussen
+    // schaut. DETAIL_BEARING_PREFIX steht vor der Gradzahl, die acht
+    // COMPASS_*-Werte sind die uebliche 8-Punkte-Kompass-Abkuerzung (in
+    // jeder Sprache anders, z.B. Ost="O" auf Deutsch/Franzoesisch/
+    // Spanisch/Italienisch, aber "E" auf Englisch, "D" auf Tuerkisch).
+    DETAIL_BEARING_PREFIX,
+    COMPASS_N,
+    COMPASS_NE,
+    COMPASS_E,
+    COMPASS_SE,
+    COMPASS_S,
+    COMPASS_SW,
+    COMPASS_W,
+    COMPASS_NW,
 
     COUNT
 };

@@ -18,12 +18,23 @@ namespace {
     bool hasLastLocation = false;
 
     Metar currentMetarData;
+    Forecast currentForecastData;
+
+    // Wie lange im Voraus die Kurzvorhersage gelten soll (siehe
+    // Weather::Forecast in weather.h) - eine einzelne konstante Stundenzahl,
+    // kein einstellbarer Wert, um die Sache bewusst einfach zu halten.
+    constexpr uint8_t FORECAST_HOURS_AHEAD = 3;
 
     // aviationweather.gov liefert bei format=json ein JSON-ARRAY (auch fuer
     // eine einzelne angefragte Station) - Feld "rawOb" enthaelt den
     // kompletten rohen METAR-Text (inkl. dem Wort "METAR" am Anfang, so wie
     // von der API geliefert). Kein API-Key noetig, dieselbe kostenlose
     // Daten-API, die z.B. auch ForeFlight/SkyVector nutzen.
+    //
+    // Bekommt den client von fetchNow() uebergeben (siehe dort) statt einen
+    // eigenen/globalen zu halten - siehe Kommentar bei fetchNow() zum
+    // "Bad file number"-Absturz, den ein dauerhaft gehaltener Client mit
+    // zwei verschiedenen Hosts verursacht hat.
     void fetchMetarFor(WiFiClientSecure& client, const char* icao) {
         HTTPClient http;
         char url[128];
@@ -99,21 +110,56 @@ namespace {
     void fetchNow(double lat, double lon) {
         if (WiFi.status() != WL_CONNECTED) return;
 
-        // Bewusst ein rein lokales WiFiClientSecure pro Aufruf statt eines
-        // dauerhaft gehaltenen globalen Objekts (wie zuvor) - dieselbe
-        // wiederverwendete Verbindung ueber viele Zyklen UND zwei
-        // verschiedene Hosts (Open-Meteo + aviationweather.gov) hinweg hat
-        // zu einem Socket-Fehler ("Bad file number") und einem haengenden
-        // NetTask gefuehrt. Gleiches Muster wie in AircraftDetails::update().
+        // Frisches, nur fuer diesen einen Aufruf lebendes Client-Objekt -
+        // vorher war das ein dauerhaft gehaltener globaler Client, der ueber
+        // die gesamte Laufzeit des Geraets (alle 10 Minuten) hinweg
+        // wiederverwendet wurde. Seit der METAR-Ergaenzung wurde DERSELBE
+        // Client dabei zusaetzlich fuer einen ZWEITEN, komplett anderen Host
+        // (aviationweather.gov statt api.open-meteo.com) genutzt - genau
+        // diese Kombination (dauerhaft gehalten + mehrere Hosts ueber sehr
+        // viele Zyklen) fuehrte zu einem "Bad file number"-Socket-Fehler und
+        // einem haengenden NetTask (siehe Testbericht). Ein frisches, rein
+        // lokales Client-Objekt pro Aufruf - dasselbe bewaehrte Muster wie
+        // AircraftDetails::update(), das ebenfalls einen einzigen lokalen
+        // Client fuer mehrere verschiedene Hosts innerhalb eines Aufrufs
+        // wiederverwendet, ihn danach aber komplett verwirft - behebt das.
         WiFiClientSecure client;
         client.setInsecure();
         client.setTimeout(Config::HTTP_TIMEOUT_MS);
 
+        // Kurzvorhersage (siehe Weather::Forecast) fuer genau EINEN
+        // stuendlichen Zeitpunkt ("jetzt + FORECAST_HOURS_AHEAD Stunden")
+        // ueber Open-Meteo's start_hour/end_hour-Parameter angefragt (beide
+        // auf dieselbe volle Stunde gesetzt), statt ueber den einfacheren
+        // forecast_hours-Parameter, der ab der aktuellen Tagesstunde 00:00
+        // zaehlt und damit mehrere Datenpunkte liefern wuerde, aus denen der
+        // richtige erst noch herausgesucht werden muesste. So liefert die
+        // Antwort direkt genau einen Eintrag - weniger Speicher, kein
+        // Zeitstempel-Abgleich noetig. Ohne "timezone"-Parameter interpretiert
+        // Open-Meteo start_hour/end_hour als UTC, exakt wie gmtime_r() hier
+        // rechnet - kein zusaetzlicher Standort-Zeitzonen-Versatz noetig.
+        // Bleibt leer (und die Vorhersage damit unverfuegbar), solange die
+        // Uhrzeit noch nicht per NTP synchronisiert ist (gleiche Pruefung
+        // wie bei isNightDimHours()) - ohne verlässliche Uhrzeit liesse sich
+        // "in 3 Stunden" gar nicht berechnen.
+        char forecastParams[100] = "";
+        time_t nowEpoch = time(nullptr);
+        if (nowEpoch > 8 * 3600 * 2) {
+            time_t target = nowEpoch + (time_t)FORECAST_HOURS_AHEAD * 3600;
+            struct tm tmTarget;
+            gmtime_r(&target, &tmTarget);
+            snprintf(forecastParams, sizeof(forecastParams),
+                     "&hourly=temperature_2m,weathercode"
+                     "&start_hour=%04d-%02d-%02dT%02d:00&end_hour=%04d-%02d-%02dT%02d:00",
+                     tmTarget.tm_year + 1900, tmTarget.tm_mon + 1, tmTarget.tm_mday, tmTarget.tm_hour,
+                     tmTarget.tm_year + 1900, tmTarget.tm_mon + 1, tmTarget.tm_mday, tmTarget.tm_hour);
+        }
+
         HTTPClient http;
-        char url[160];
+        char url[256];
         snprintf(url, sizeof(url),
-                 "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&current_weather=true",
-                 lat, lon);
+                 "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&current_weather=true%s",
+                 lat, lon, forecastParams);
 
         http.setTimeout(Config::HTTP_TIMEOUT_MS);
         if (!http.begin(client, url)) return;
@@ -139,6 +185,25 @@ namespace {
         if (wmoCode < 0) return;
 
         currentCondition = conditionFromWmoCode(wmoCode);
+
+        // Kurzvorhersage aus dem "hourly"-Teil derselben Antwort - dank
+        // start_hour/end_hour oben enthaelt jedes der beiden Arrays hoechstens
+        // einen einzigen Eintrag. Fehlt der "hourly"-Teil (z.B. weil oben
+        // mangels NTP-Zeit gar nicht erst danach gefragt wurde), liefert
+        // ArduinoJson fuer .as<JsonArray>() auf einem fehlenden Feld einfach
+        // ein leeres Array zurueck - currentForecastData wird dann korrekt
+        // auf "nicht verfuegbar" gesetzt statt mit einem veralteten Wert
+        // stehen zu bleiben.
+        Forecast forecast;
+        JsonArray hourlyTemp = doc["hourly"]["temperature_2m"].as<JsonArray>();
+        JsonArray hourlyCode = doc["hourly"]["weathercode"].as<JsonArray>();
+        if (hourlyTemp.size() > 0 && hourlyCode.size() > 0) {
+            forecast.available = true;
+            forecast.temperatureC = hourlyTemp[0].as<float>();
+            forecast.condition = conditionFromWmoCode(hourlyCode[0].as<int>());
+            forecast.hoursAhead = FORECAST_HOURS_AHEAD;
+        }
+        currentForecastData = forecast;
 
         // METAR-Flugwetterbericht fuer den naechstgelegenen Flughafen - im
         // selben Aufruf/Intervall wie das Icon-Wetter oben, damit dafuer
@@ -187,5 +252,7 @@ void update() {
 Condition current() { return currentCondition; }
 
 Metar currentMetar() { return currentMetarData; }
+
+Forecast currentForecast() { return currentForecastData; }
 
 }
