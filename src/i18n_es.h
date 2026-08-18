@@ -286,6 +286,8 @@ static const char* const I18N_ES[] = {
 
     "Rumbo: ",
     "N", "NE", "E", "SE", "S", "SO", "O", "NO",
+
+    "Espere, reiniciando...",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

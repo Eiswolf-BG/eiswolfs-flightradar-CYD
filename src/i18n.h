@@ -436,6 +436,15 @@ enum class StringId : uint8_t {
     COMPASS_W,
     COMPASS_NW,
 
+    // Ersetzt kurzzeitig den Text des Neustart-Buttons auf dem OTA-Erfolgs-
+    // Screen (menu_screen.cpp::runOtaUpdateScreen()), SOBALD er angetippt
+    // wurde - ESP.restart() braucht spuerbar einen Moment, bis das Geraet
+    // tatsaechlich neu startet, und ohne diese Rueckmeldung wurde in dieser
+    // Zeit oft mehrfach frustriert auf den (schon "erledigten") Button
+    // getippt (Alex' Testbericht). Siehe infoScreen()'s tappedLabel-Parameter
+    // in menu_screen.cpp.
+    OTA_RESTARTING,
+
     COUNT
 };
 

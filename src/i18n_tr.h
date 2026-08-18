@@ -286,6 +286,8 @@ static const char* const I18N_TR[] = {
 
     "Yön: ",
     "K", "KD", "D", "GD", "G", "GB", "B", "KB",
+
+    "Lütfen bekleyin, yeniden başlatılıyor...",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

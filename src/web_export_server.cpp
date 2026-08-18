@@ -6,6 +6,8 @@
 #include "aircraft_watchlist.h"
 #include "aircraft_table.h"
 #include "settings_store.h"
+#include "location_manager.h"
+#include "units.h"
 #include <WebServer.h>
 #include <ArduinoJson.h>
 #include <SD.h>
@@ -18,6 +20,15 @@ namespace {
     constexpr uint8_t MAX_DAYS_QUERIED = 31;
 
     WebServer server(80);
+
+    // Zeitstempel der letzten "/radar.json"-Abfrage - Grundlage fuer
+    // isRadarUiActive() (siehe web_export_server.h). Gefahrlos ohne Mutex/
+    // Atomics: server.handleClient() (und damit handleRadarJson()) laeuft
+    // synchron innerhalb von WebExportServer::update(), das ausschliesslich
+    // von NetTask auf Core 0 aufgerufen wird - kein anderer Task schreibt
+    // oder liest diese Variable.
+    uint32_t lastRadarJsonRequestMs = 0;
+    constexpr uint32_t RADAR_UI_ACTIVE_WINDOW_MS = 20000; // > 8s Poll-Intervall der Seite, mit Puffer
 
     // Nur reine Dateinamen/Labels aus Formularfeldern akzeptieren - kein
     // "/" und kein ".." - damit ueber die WebUI kein Ausbruch aus dem
@@ -58,6 +69,43 @@ namespace {
         return category[0] == 'A' && category[1] == '5';
     }
 
+    // Vollbild-Sternenhintergrund fuer die ganze Seite (nicht nur innerhalb
+    // des kleinen Radar-Canvas) - 1:1 uebernommen vom Web-Flasher
+    // (index.html, separat gehostet auf GitHub Pages, nicht Teil dieses
+    // Firmware-Repos), auf Wunsch von Alex, damit beide Web-Auftritte des
+    // Projekts denselben Look haben. Gleiche Dreieckswellen-Twinkle-Formel
+    // (Phase 0-255-0) wie MenuStars auf dem Geraet und wie die bestehenden
+    // Sterne INNERHALB des Radar-Canvas (siehe appendRadarSection() unten) -
+    // hier nur als eigenstaendiger Vollbild-Layer hinter dem gesamten
+    // Seiteninhalt statt nur hinter dem Radarkreis. Als eigenes <canvas>
+    // "#star-bg" ganz am Anfang von <body> eingefuegt (fixed, z-index:0,
+    // pointer-events:none - siehe CSS in htmlHeader()), waehrend der
+    // restliche Seiteninhalt in einen ".page"-Wrapper mit z-index:1
+    // gepackt wird (siehe htmlHeader()/handleRoot()/handleLists()), damit
+    // die Sterne zuverlaessig HINTER Text/Tabellen/Buttons bleiben.
+    void appendStarBackground(String& html) {
+        html += "<canvas id=\"star-bg\"></canvas>";
+        html += "<script>(function(){";
+        html += "var canvas=document.getElementById('star-bg');";
+        html += "if(!canvas)return;";
+        html += "var ctx=canvas.getContext('2d');";
+        html += "var stars=[];";
+        html += "function starCountFor(w,h){var density=(w*h)/9000;return Math.max(40,Math.min(160,Math.round(density)));}";
+        html += "function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}";
+        html += "function initStars(){var count=starCountFor(canvas.width,canvas.height);stars=[];";
+        html += "for(var i=0;i<count;i++){stars.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,phase:Math.random()*256,speed:1+Math.random()*2});}}";
+        html += "var resizeTimer=null;";
+        html += "window.addEventListener('resize',function(){clearTimeout(resizeTimer);resizeTimer=setTimeout(function(){resize();initStars();},150);});";
+        html += "resize();initStars();";
+        html += "function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);";
+        html += "for(var i=0;i<stars.length;i++){var s=stars[i];s.phase=(s.phase+s.speed)%256;";
+        html += "var bright=s.phase<128?s.phase*2:(255-s.phase)*2;";
+        html += "ctx.fillStyle='rgb(0,'+bright+',0)';ctx.fillRect(s.x,s.y,2,2);}";
+        html += "requestAnimationFrame(draw);}";
+        html += "draw();";
+        html += "})();</script>";
+    }
+
     String htmlHeader(const String& title) {
         String html;
         html += "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">";
@@ -87,7 +135,24 @@ namespace {
         html += "#radarControls select{background:#0a0f0d;color:#39ff14;border:1px solid #39ff14;border-radius:4px;padding:2px 6px;font-family:inherit;}";
         html += "#acInfo{display:none;max-width:400px;margin-top:8px;padding:8px 10px;border:1px solid #39ff14;border-radius:6px;font-size:13px;line-height:1.7;}";
         html += "#acInfo a{color:#ff3b3b;text-decoration:none;border:1px solid #ff3b3b;border-radius:4px;padding:2px 8px;display:inline-block;margin-top:4px;}";
+        // Sofortige optische Rueckmeldung beim Antippen/Klicken - reine
+        // CSS-":active"-Pseudoklasse, greift also schon beim Antippen
+        // (touchstart/mousedown), bevor ueberhaupt JavaScript ausgefuehrt
+        // wird. Gilt fuer JEDEN Button/Link im Info-Panel (Close UND den
+        // FlightAware-Link), Alex' Grundprinzip: ein Tap muss immer sofort
+        // sichtbar reagieren, egal was danach passiert oder wie lange es
+        // dauert - siehe gleiche Ueberlegung beim OTA-Neustart-Button.
+        html += "#acInfo a:active{background:#ff3b3b;color:#0a0f0d;}";
+        // Sternenhintergrund liegt als eigener, fixierter Layer HINTER der
+        // eigentlichen Seite (siehe appendStarBackground() oben) - ".page"
+        // bekommt deshalb einen eigenen Stacking-Context mit hoeherem
+        // z-index, sonst wuerde der Canvas-Layer (position:fixed) trotz
+        // z-index:0 vor dem normal fliessenden Seiteninhalt liegen.
+        html += "#star-bg{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;}";
+        html += ".page{position:relative;z-index:1;}";
         html += "</style></head><body>";
+        appendStarBackground(html);
+        html += "<div class=\"page\">";
         html += "<h1>" + title + "</h1>";
         return html;
     }
@@ -108,13 +173,28 @@ namespace {
     void appendRadarSection(String& html) {
         float deviceRangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
+        // Gleiche Auto/Metrisch/Imperial-Logik wie ueberall sonst am Geraet
+        // (Menues, Detailpanel, Listen - siehe LocationManager::
+        // useMetricUnits()) - die WebUI-Seite bleibt bewusst komplett
+        // Englisch (auf Wunsch von Alex, kein Aufwand fuer eine 6-sprachige
+        // Uebersetzung von >40 Textstellen), aber die angezeigten EINHEITEN
+        // sollen trotzdem zur Geraete-Einstellung passen, statt fuer alle
+        // Nutzer hart Kilometer zu zeigen (z.B. fuer jemanden in den USA).
+        // Das Options-"value" bleibt bewusst in km (wird 1:1 als
+        // "range_km"-Query-Parameter verschickt und in handleRadarJson()
+        // gegen Config::RANGE_STEPS_KM verglichen) - nur das sichtbare Label
+        // wechselt auf nm, exakt wie beim Reichweiten-Label am
+        // Geraete-Display selbst (siehe radar_screen.cpp, "%.0fnm").
+        bool metric = LocationManager::useMetricUnits();
+
         html += "<h2>Live Radar</h2>";
         html += "<div id=\"radarControls\">Range: <select id=\"radarRange\">";
         for (uint8_t i = 0; i < Config::RANGE_STEP_COUNT; i++) {
             bool isDefault = fabsf(Config::RANGE_STEPS_KM[i] - deviceRangeKm) < 0.5f;
+            float labelValue = metric ? Config::RANGE_STEPS_KM[i] : Units::kmToNm(Config::RANGE_STEPS_KM[i]);
             html += "<option value=\"" + String(Config::RANGE_STEPS_KM[i], 0) + "\"";
             if (isDefault) html += " selected";
-            html += ">" + String(Config::RANGE_STEPS_KM[i], 0) + " km</option>";
+            html += ">" + String(labelValue, 0) + (metric ? " km</option>" : " nm</option>");
         }
         html += "</select></div>";
         html += "<canvas id=\"radarCanvas\" width=\"360\" height=\"360\"></canvas>";
@@ -130,6 +210,16 @@ namespace {
         html += "var lastData={range_km:" + String(deviceRangeKm, 0) + ",aircraft:[]};";
         html += "var markers=[];";
         html += "var selectedHex=null;";
+        // Alle sichtbaren Distanz-/Reichweitenangaben (Ringe, Statuszeile,
+        // Info-Panel) laufen ueber diese zwei Funktionen statt Kilometer
+        // fest einzubrennen - die Werte selbst (data.range_km, a.dist_km)
+        // bleiben unveraendert in km, nur die ANZEIGE wechselt auf nm, wenn
+        // das Geraet auf Imperial/Auto-Imperial steht (siehe metric-Flag
+        // oben, serverseitig aus LocationManager::useMetricUnits() gesetzt -
+        // dieselbe Umrechnung 1nm=1.852km wie Units::kmToNm() in C++).
+        html += "var metric=" + String(metric ? "true" : "false") + ";";
+        html += "function fmtRange(km){return metric?(Math.round(km)+' km'):(Math.round(km/1.852)+' nm');}";
+        html += "function fmtDist(km){return metric?(km.toFixed(1)+' km'):((km/1.852).toFixed(1)+' nm');}";
 
         // Hintergrund-Sterne AUSSERHALB des Radarkreises - gleiches Prinzip
         // wie updateBgStars()/initBgStarsIfNeeded() in radar_screen.cpp
@@ -153,7 +243,7 @@ namespace {
         html += "drawStars();";
         html += "ctx.strokeStyle='#1f3a2b';ctx.fillStyle='#39ff14';ctx.font='10px monospace';ctx.textAlign='left';";
         html += "for(var ring=1;ring<=3;ring++){var r=R*ring/3;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();";
-        html += "ctx.fillText(Math.round(data.range_km*ring/3)+' km',cx+4,cy-r+10);}";
+        html += "ctx.fillText(fmtRange(data.range_km*ring/3),cx+4,cy-r+10);}";
         html += "ctx.strokeStyle='#12261a';ctx.beginPath();ctx.moveTo(cx-R,cy);ctx.lineTo(cx+R,cy);ctx.moveTo(cx,cy-R);ctx.lineTo(cx,cy+R);ctx.stroke();";
         // Alle vier Himmelsrichtungen (N/E/S/W), genau wie
         // drawStaticBackground() in radar_screen.cpp - vorher stand hier nur
@@ -187,12 +277,26 @@ namespace {
         html += "ctx.fillStyle=color;ctx.textAlign='center';ctx.fillText(a.callsign,x,y-8);";
         html += "markers.push({x:x,y:y,a:a});";
         html += "});";
-        html += "status.textContent=(data.aircraft||[]).length+' aircraft \\u00b7 range '+data.range_km+' km';";
-        // Falls das ausgewaehlte Flugzeug in dieser Aktualisierung nicht
-        // mehr vorkommt (z.B. aus der Reichweite geflogen), Infobox wieder
-        // schliessen statt veraltete Daten stehen zu lassen.
-        html += "if(selectedHex){var found=markers.filter(function(m){return m.a.hex===selectedHex;})[0];";
-        html += "if(found){showInfo(found.a);}else{selectedHex=null;hideInfo();}}";
+        html += "status.textContent=(data.aircraft||[]).length+' aircraft \\u00b7 range '+fmtRange(data.range_km);";
+        html += "}";
+
+        // WICHTIG: Das erneute Aufbauen der Infobox (showInfo(), baut u.a.
+        // den FlightAware-Link per innerHTML NEU auf) darf NICHT bei jedem
+        // draw()-Aufruf passieren - draw() laeuft auch alle 150ms rein lokal
+        // fuer das Sternenfunkeln (siehe setInterval() weiter unten), ganz
+        // ohne neue Daten. Bisher stand dieser Block direkt in draw() und
+        // hat dadurch den Link-Knoten im Info-Panel ~6-7 mal pro Sekunde neu
+        // erzeugt - ein Tap/Klick mitten in diesem staendigen Austausch traf
+        // oft ins Leere, weil der urspruengliche Link-Knoten schon durch
+        // einen neuen ersetzt war, bevor der Klick beim Browser "ankam"
+        // (Alex' Meldung: "muss man 10 mal anklicken"). Deshalb jetzt eine
+        // eigene Funktion, die NUR dann aufgerufen wird, wenn tatsaechlich
+        // neue Daten da sind (siehe poll() weiter unten, alle 8s) - der rein
+        // lokale 150ms-Sterne-Takt fasst die Infobox gar nicht mehr an.
+        html += "function refreshSelectedInfo(){";
+        html += "if(!selectedHex)return;";
+        html += "var found=markers.filter(function(m){return m.a.hex===selectedHex;})[0];";
+        html += "if(found){showInfo(found.a);}else{selectedHex=null;hideInfo();}";
         html += "}";
 
         // Info-Panel fuer ein angetipptes Flugzeug - bewusst eine eigene,
@@ -200,17 +304,37 @@ namespace {
         // Neuzeichnen einfach verschwindet), mit explizitem Schliessen-Link,
         // gleiches Grundprinzip wie infoScreen() am Geraet: der Nutzer soll
         // aktiv entscheiden, wann die Info wieder verschwindet.
-        html += "function fmtNum(n,d){return (typeof n==='number')?n.toFixed(d):'?';}";
         html += "function showInfo(a){";
         html += "var lines=[];";
         html += "lines.push('<b>'+(a.callsign||a.hex)+'</b> ('+a.hex+')');";
         html += "lines.push('Altitude: '+Math.round(a.alt_ft)+' ft');";
         html += "if(a.speed_kt){lines.push('Speed: '+Math.round(a.speed_kt)+' kt');}";
-        html += "lines.push('Distance: '+fmtNum(a.dist_km,1)+' km, bearing '+Math.round(a.bearing_deg)+'\\u00b0');";
+        html += "lines.push('Distance: '+fmtDist(a.dist_km)+', bearing '+Math.round(a.bearing_deg)+'\\u00b0');";
         html += "lines.push('Heading: '+Math.round(a.track_deg)+'\\u00b0');";
         html += "if(a.squawk){lines.push('Squawk: '+a.squawk);}";
+        // Link auf dieselbe FlightAware-Tracking-Seite, die auch der
+        // QR-Code am Geraete-Display zeigt (siehe runFlightQrScreen() in
+        // radar_screen.cpp) - keine eigene Foto-Logik noetig, FlightAware
+        // zeigt beim Herunterscrollen selbst schon Route/Details/Foto.
+        // Bewusst KEIN planespotters.net oder aehnliches - siehe
+        // Projektentscheidung, das dort nirgends mehr einzubauen
+        // (unzuverlaessig, zu viel Werbung). Nur bei echtem Rufzeichen
+        // anzeigen (has_callsign), sonst wuerde der Link auf einen
+        // Hex-Code zeigen und ins Leere fuehren.
+        html += "var hasTrackLink=!!a.has_callsign;";
+        html += "if(hasTrackLink){lines.push('<a href=\"https://flightaware.com/live/flight/'+encodeURIComponent(a.callsign)+'\" target=\"_blank\" rel=\"noopener\" id=\"acInfoTrack\">Track &amp; photo on FlightAware &rarr;</a>');}";
         html += "infoBox.innerHTML=lines.join('<br>')+'<br><a href=\"#\" id=\"acInfoClose\">Close</a>';";
         html += "infoBox.style.display='block';";
+        // Sofortiges Feedback beim Antippen des FlightAware-Links, damit klar
+        // ist, dass der Tipp angekommen ist, waehrend der neue Tab noch
+        // aufgebaut wird - der eigentliche Grund fuer die vorherige
+        // Unzuverlaessigkeit war aber refreshSelectedInfo() (siehe oben, war
+        // frueher Teil von draw()), nicht eine fehlende Rueckmeldung. Setzt
+        // sich von selbst zurueck, sobald die Infobox beim naechsten
+        // Poll-Zyklus (alle 8s) oder durch erneutes Antippen neu aufgebaut
+        // wird - kein manueller Reset noetig.
+        html += "if(hasTrackLink){var trackLink=document.getElementById('acInfoTrack');";
+        html += "trackLink.addEventListener('click',function(){trackLink.textContent='Seite wird geöffnet, bitte warten...';});}";
         html += "document.getElementById('acInfoClose').onclick=function(e){e.preventDefault();selectedHex=null;hideInfo();draw(lastData);};";
         html += "}";
         html += "function hideInfo(){infoBox.style.display='none';}";
@@ -229,15 +353,32 @@ namespace {
         html += "function poll(){";
         html += "var url='/radar.json';";
         html += "if(rangeSel&&rangeSel.value){url+='?range_km='+rangeSel.value;}";
-        html += "fetch(url).then(function(r){return r.json();}).then(draw).catch(function(){status.textContent='Connection lost - retrying...';});";
+        html += "fetch(url).then(function(r){return r.json();}).then(function(data){draw(data);refreshSelectedInfo();}).catch(function(){status.textContent='Connection lost - retrying...';});";
         html += "}";
         html += "poll();";
-        html += "setInterval(poll,3000);";
+        // Vorher alle 3s - staerker gedrosselt auf 8s (genau der Takt, in
+        // dem sich AircraftTable auf dem Geraet ueberhaupt erst aendert,
+        // siehe Config::FETCH_INTERVAL_MS in config.h), NACHDEM Alex ein
+        // ernstes Problem gemeldet hat: bei laenger geoeffnetem WebUI-
+        // Liveradar blieb die ADS-B-Aktualisierung auf dem Geraet komplett
+        // stehen (Radarscreen + Naeherungs-LED blinkten minutenlang mit
+        // einem laengst verschwundenen Flugzeug weiter), und normalisierte
+        // sich sofort wieder, sobald die WebUI-Seite geschlossen wurde.
+        // WebServer und die periodische ADS-B-Abfrage laufen beide im
+        // selben NetTask auf Core 0 und teilen sich denselben knappen
+        // WLAN-/Speicher-Spielraum des ESP32 (siehe auch WiFiClientSecure in
+        // adsb_client.cpp) - ein Abfragetakt von 3s war schneller als der
+        // Geraete-eigene Aktualisierungstakt von 8s und damit reine,
+        // vermeidbare Zusatzlast genau in dem Moment, in dem das Einfrieren
+        // auftrat. 8s deckt sich jetzt mit dem tatsaechlichen Update-Takt
+        // des Geraets - schnelleres Pollen haette ohnehin nie neuere Daten
+        // gezeigt.
+        html += "setInterval(poll,8000);";
         // Schnellerer, rein lokaler Redraw-Takt (alle 150ms, ohne Netzwerk-
         // Anfrage) nur fuer das Sternenfunkeln + die Auswahlmarkierung -
         // gleiches Grundprinzip wie tick() vs. render() auf dem
         // Geraete-Display: Flugzeugpositionen aktualisieren sich weiterhin
-        // nur alle 3s per poll(), die Sterne twinkeln aber fluessig dazwischen.
+        // nur alle 8s per poll(), die Sterne twinkeln aber fluessig dazwischen.
         html += "setInterval(function(){draw(lastData);},150);";
         html += "})();</script>";
     }
@@ -269,7 +410,7 @@ namespace {
             html += "</table>";
         }
 
-        html += "</body></html>";
+        html += "</div></body></html>";
         server.send(200, "text/html", html);
     }
 
@@ -399,7 +540,7 @@ namespace {
         html += "<input type=\"text\" name=\"callsign\" maxlength=\"8\" placeholder=\"e.g. DLH441\"> ";
         html += "<button class=\"addbtn\" type=\"submit\">Add</button></form>";
 
-        html += "</body></html>";
+        html += "</div></body></html>";
         server.send(200, "text/html", html);
     }
 
@@ -456,6 +597,7 @@ namespace {
     // "auffaellig" als sich gegenseitig ausschliessende Ring-Markierungen in
     // genau dieser Prioritaet.
     void handleRadarJson() {
+        lastRadarJsonRequestMs = millis();
         float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
         // Erlaubt der Web-Ansicht ein eigenes, unabhaengiges Zoomen (siehe
         // Reichweiten-Waehler in appendRadarSection()), OHNE die Geraete-
@@ -522,6 +664,13 @@ namespace {
             // zusaetzlicher Netzwerk-/SD-Zugriff noetig.
             o["speed_kt"] = a.groundSpeedKt;
             o["squawk"] = a.squawk;
+            // Unterscheidet ein echtes Rufzeichen vom Hex-Code-Fallback in
+            // "callsign" oben - der FlightAware-Tracking-Link im Info-Panel
+            // (siehe showInfo() weiter unten) braucht ein echtes Rufzeichen,
+            // sonst fuehrt der Link ins Leere (genau wie beim QR-Button am
+            // Geraete-Display, der aus demselben Grund nur bei a.callsign[0]
+            // ueberhaupt angezeigt wird, siehe radar_screen.cpp).
+            o["has_callsign"] = a.callsign[0] != 0;
         }
         AircraftTable::unlock();
 
@@ -552,6 +701,11 @@ void begin() {
 
 void update() {
     server.handleClient();
+}
+
+bool isRadarUiActive() {
+    return lastRadarJsonRequestMs != 0 &&
+           (millis() - lastRadarJsonRequestMs) < RADAR_UI_ACTIVE_WINDOW_MS;
 }
 
 }

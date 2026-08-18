@@ -286,6 +286,8 @@ static const char* const I18N_FR[] = {
 
     "Relèvement : ",
     "N", "NE", "E", "SE", "S", "SO", "O", "NO",
+
+    "Veuillez patienter, redémarrage...",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,
