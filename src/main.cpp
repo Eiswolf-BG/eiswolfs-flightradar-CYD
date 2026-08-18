@@ -659,15 +659,50 @@ void updateEmergencyBanner(uint32_t nowMs) {
 // (dieser Aufruf passiert ja erst nach dem Neustart, in setup()) - ihr
 // eigener, korrekt einkompilierter und mehrsprachiger changelogLatest()-Text
 // ist deshalb garantiert der richtige.
+//
+// Der AUFRUF dieser Funktion sitzt bewusst ganz am ENDE von setup() (nach
+// WLAN-/Standort-Aufbau, NetTask::begin() und dem allerersten Radarscreen-
+// Aufbau), NICHT direkt danach am Anfang: Alex meldete, dass der "OK"-Button
+// auf diesem Screen "spaet und ohne Meldung" reagierte und sich anfuehlte,
+// als wuerde danach nochmal neu gestartet. Tatsaechlich lag es daran, dass
+// der Screen vorher (an dieser fruehen Stelle in setup()) direkt gefolgt
+// wurde vom Splash-Screen-Aufbau und dem bis zu 16s langen WLAN-Verbindungs-
+// Wartezyklus weiter unten - der Tap auf "OK" wurde zwar sofort erkannt,
+// aber danach blieb der Bildschirm durch diese langen Wartezyklen einfach
+// unveraendert stehen (kein Feedback), bis der Splash-Screen (ein kompletter
+// Bildschirm-Wipe, sieht fast identisch zum eigentlichen Boot-Blackscreen
+// aus) auftauchte - das wirkte wie ein zweiter, unerklaerter Neustart.
+// Jetzt laeuft dieser Screen ERST NACHDEM WLAN/Standort/NetTask/Radarscreen
+// bereits vollstaendig aufgebaut sind - das System "laeuft" also schon, ein
+// Tap auf "OK" fuehrt direkt und ohne weitere Wartezyklen dahinter zurueck
+// zum (schon fertig gezeichneten) Radarscreen.
 void showWhatsNewIfNeeded(TFT_eSPI& tftRef) {
+    // otaJustInstalled() sofort konsumieren (auf false zuruecksetzen), egal
+    // wie diese Funktion unten entscheidet - so bleibt das Flag garantiert
+    // nie ueber diesen einen Boot hinaus "haengen" und kann sich nicht
+    // versehentlich auf einen spaeteren, voellig unabhaengigen Neustart
+    // auswirken.
+    bool otaFlag = SettingsStore::otaJustInstalled();
+    if (otaFlag) SettingsStore::setOtaJustInstalled(false);
+
     String lastSeen = SettingsStore::lastSeenVersion();
-    if (lastSeen == Config::APP_VERSION) return;
+    bool versionChanged = (lastSeen != Config::APP_VERSION);
+    if (versionChanged) {
+        SettingsStore::setLastSeenVersion(Config::APP_VERSION);
+    }
+
+    // Nur zeigen, wenn BEIDES zutrifft: die Version hat sich geaendert UND
+    // dieser Boot folgt direkt auf ein ueber das Menue ausgeloestes OTA-
+    // Update (otaFlag) - ein einfaches Neuflashen per USB mit einer anderen
+    // Versionsnummer (z.B. zu Testzwecken) soll den Changelog-Screen
+    // AUSDRUECKLICH NICHT zeigen (Alex' Meldung: der Screen erschien nach
+    // einem reinen Test-Flash, obwohl gar kein OTA-Update angestossen
+    // wurde).
+    if (!versionChanged || !otaFlag) return;
 
     String body = String(I18n::t(StringId::OTA_CHANGELOG_LABEL)) + "\n" + Config::changelogLatest();
     MenuScreen::showInfoScreen(tftRef, I18n::t(StringId::OTA_UPDATE_SUCCESS), body,
                                 TFT_GREEN, I18n::t(StringId::OK));
-
-    SettingsStore::setLastSeenVersion(Config::APP_VERSION);
 }
 
 void setup() {
@@ -722,9 +757,10 @@ void setup() {
         // aktuellen Versionsstand vermerken, damit ab dem naechsten
         // Firmware-Wechsel showWhatsNewIfNeeded() korrekt greift.
         SettingsStore::setLastSeenVersion(Config::APP_VERSION);
-    } else {
-        showWhatsNewIfNeeded(tft);
     }
+    // showWhatsNewIfNeeded() selbst wird bewusst NICHT hier (vor WLAN-/
+    // Standort-Aufbau) aufgerufen, sondern erst ganz am Ende von setup(),
+    // siehe dort - Begruendung ebenfalls dort.
 
     WifiMgr::init();
     LocationPresets::init();
@@ -834,6 +870,20 @@ void setup() {
     drawHeader();
     updateStatusLine();
     RadarScreen::render(tft, CONTENT_TOP);
+
+    if (!isFirstRun) {
+        showWhatsNewIfNeeded(tft);
+        // showWhatsNewIfNeeded() zeichnet (falls es etwas anzuzeigen gab)
+        // einen Vollbild-Overlay ueber den gerade fertig aufgebauten
+        // Radarscreen - genau wie bei jedem anderen Vollbild-Overlay
+        // (Menue, Wetter-Info, siehe loop()) muss danach explizit neu
+        // gezeichnet werden, sonst haelt RadarScreen::render() faelschlich
+        // Panel-Reste des Overlays fuer unveraendert und liesse sie stehen.
+        RadarScreen::invalidatePanel();
+        drawHeader();
+        updateStatusLine();
+        RadarScreen::render(tft, CONTENT_TOP);
+    }
 
     lastInteractionMs = millis();
 }
