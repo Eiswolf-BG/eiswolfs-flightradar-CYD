@@ -96,11 +96,28 @@ CheckInfo checkForUpdate() {
         http.end();
         return info;
     }
-    String body = http.getString();
-    http.end();
+    // Nur die Felder einlesen, die wir wirklich brauchen (tag_name,
+    // assets[].name, assets[].browser_download_url), statt der kompletten
+    // GitHub-Release-Antwort (die u.a. Beschreibungstext, Autor-Info,
+    // Uploader-Avatare etc. enthaelt - fuer ein Release mit langen
+    // Release-Notes durchaus mehrere KB). Direkt vom Stream geparst statt
+    // erst per http.getString() komplett in einen String zu laden - beides
+    // zusammen senkt den Speicherbedarf dieser Pruefung deutlich. Wichtig
+    // seit pollBackground() (siehe oben) alle paar Minuten im Hintergrund
+    // laeuft: ein kurzzeitig knapper Heap durch eine unnoetig grosse
+    // Zwischenkopie auf Core 0 kann gleichzeitige Speicher-/String-Arbeit
+    // auf Core 1 (z.B. den Ruhebildschirm-Text) beeintraechtigen - genau das
+    // hat Alex nach Einfuehrung der Hintergrund-Pruefung als gelegentlich
+    // "zusammengeschobene" Ziffern auf dem Ruhebildschirm gemeldet.
+    JsonDocument filter;
+    filter["tag_name"] = true;
+    filter["assets"][0]["name"] = true;
+    filter["assets"][0]["browser_download_url"] = true;
 
     JsonDocument doc;
-    DeserializationError jsonErr = deserializeJson(doc, body);
+    DeserializationError jsonErr =
+        deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
+    http.end();
     if (jsonErr) {
         Serial.printf("[OTA] Pruefung fehlgeschlagen: JSON-Fehler (%s)\n", jsonErr.c_str());
         return info;
