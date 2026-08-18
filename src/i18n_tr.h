@@ -276,9 +276,16 @@ static const char* const I18N_TR[] = {
     "Bugün bu konumda güneş batmıyor (kutup günü).",
     "Bugün bu konumda güneş doğmuyor (kutup gecesi).",
 
-    "Bu uçağın fotoğrafları için tarayın",
-    "Fotoğraf",
-    "Takip",
+    "3 saat sonra: ",
+    "Açık",
+    "Parçalı bulutlu",
+    "Bulutlu",
+    "Yağmur",
+    "Kar",
+    "Fırtına",
+
+    "Yön: ",
+    "K", "KD", "D", "GD", "G", "GB", "B", "KB",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

@@ -205,92 +205,53 @@ void drawWeatherIcon() {
     }
 }
 
-// Einfacher Zeilenumbruch fuer Fliesstext, analog zu layoutWrapped() in
-// menu_screen.cpp/webui_screen.cpp (siehe "keine geteilten Module"-Konvention
-// - jede Screen-Datei hat ihre eigene kleine Kopie). Ohne Scroll-Unterstuetzung,
-// da der Infotext des Wetter-Popups kurz genug ist, um immer komplett in die
-// verfuegbare Boxhoehe zu passen.
-int16_t weatherInfoLayoutWrapped(TFT_eSPI& tftRef, int16_t x, int16_t startY,
-                                  int16_t maxWidth, int16_t lineHeight, const String& text) {
-    int16_t y = startY;
-    int32_t start = 0;
-    int32_t len = text.length();
-    while (start < len) {
-        while (start < len && text[start] == ' ') start++;
-        if (start >= len) break;
-
-        String line = text.substring(start, len);
-        while (tftRef.textWidth(line) > maxWidth) {
-            int32_t lastSpace = line.lastIndexOf(' ');
-            if (lastSpace <= 0) break;
-            line = line.substring(0, lastSpace);
-        }
-
-        tftRef.setCursor(x, y);
-        tftRef.print(line);
-        y += lineHeight;
-        start += line.length();
+// Textform von Weather::Condition (bisher nur als Icon gezeichnet, siehe
+// drawWeatherIcon() oben) - fuer die Kurzvorhersage im Wetter-Info-Screen
+// (showWeatherInfo() unten) gebraucht, wo ein kleines Icon keinen Platz hat.
+const char* conditionLabel(Weather::Condition c) {
+    switch (c) {
+        case Weather::Condition::Clear:        return I18n::t(StringId::WEATHER_CONDITION_CLEAR);
+        case Weather::Condition::PartlyCloudy:  return I18n::t(StringId::WEATHER_CONDITION_PARTLY_CLOUDY);
+        case Weather::Condition::Cloudy:        return I18n::t(StringId::WEATHER_CONDITION_CLOUDY);
+        case Weather::Condition::Rain:          return I18n::t(StringId::WEATHER_CONDITION_RAIN);
+        case Weather::Condition::Snow:           return I18n::t(StringId::WEATHER_CONDITION_SNOW);
+        case Weather::Condition::Thunderstorm:  return I18n::t(StringId::WEATHER_CONDITION_THUNDERSTORM);
+        case Weather::Condition::Unknown:
+        default:
+            return "";
     }
-    return y;
-}
-
-void weatherInfoDrawButton(TFT_eSPI& tftRef, const Rect& r, const String& label) {
-    tftRef.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
-    tftRef.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
-    tftRef.setTextDatum(MC_DATUM);
-    tftRef.setTextColor(TFT_GREEN, TFT_BLACK);
-    tftRef.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
-    tftRef.setTextDatum(TL_DATUM);
 }
 
 // Kleines Info-Fenster beim Antippen des Wetter-Icons im Header - erklaert,
 // dass das angezeigte Wetter immer zum aktuell aktiven Standort (bzw.
 // aktivem Standort-Preset, siehe LocationManager::getHomeLocation())
-// gehoert. Gleicher geboxter Overlay-Stil wie confirmLogbookEnable() in
-// menu_screen.cpp, hier aber ohne Warnfarbe und nur mit einem
-// Zurueck-Button, da rein informativ (keine Bestaetigung noetig).
+// gehoert, gefolgt vom aktuellen Flugwetterbericht (METAR) und Sonnenauf-/
+// -untergang. Nutzt den gemeinsamen, automatisch scrollbaren Info-Screen aus
+// menu_screen.cpp (MenuScreen::showInfoScreen(), gleiches Muster wie z.B.
+// beim OTA-Erfolgs-Screen) statt einer eigenen, fest positionierten Anzeige -
+// die fruehere Annahme, der Text passe immer ohne Scrollen in die Box,
+// stimmte nicht mehr, sobald ein laengerer METAR-Bericht (siehe
+// Weather::currentMetar()) den Zurueck-Button ueberlappte (Alex'
+// Fotomeldung). showInfoScreen() blendet bei Bedarf automatisch Pfeil-
+// Buttons zum Scrollen ein, siehe dortiger Kommentar.
 void showWeatherInfo(TFT_eSPI& tftRef) {
-    constexpr int16_t BOX_X = 4;
-    constexpr int16_t BOX_Y = 4;
-    constexpr int16_t BOX_W = Config::SCREEN_WIDTH - 2 * BOX_X;
-    constexpr int16_t BOX_H = Config::SCREEN_HEIGHT - 2 * BOX_Y;
-    constexpr int16_t TEXT_MAX_WIDTH = BOX_W - 20;
-    constexpr int16_t LINE_H = 16;
-    constexpr int16_t TITLE_Y = BOX_Y + 16;
-    // Eine Leerzeile Abstand zwischen Titel und Fliesstext.
-    constexpr int16_t VIEW_TOP = TITLE_Y + 12 + LINE_H;
-
-    constexpr int16_t BTN_H = 36;
-    constexpr int16_t BOTTOM_MARGIN = 8;
-    constexpr int16_t BACK_Y = BOX_Y + BOX_H - BOTTOM_MARGIN - BTN_H;
-
     String body = I18n::t(StringId::WEATHER_INFO_BODY);
 
     // METAR-Flugwetterbericht (siehe weather.cpp::currentMetar()) als
-    // zusaetzlicher, zweiter Absatz unterhalb des bisherigen Erklaertexts -
-    // ALS EIGENER weatherInfoLayoutWrapped()-Aufruf statt ueber einen
-    // eingebetteten Zeilenumbruch ("\n") im String: die Umbruch-Funktion
-    // erkennt nur Leerzeichen als Trennstellen, ein roher "\n"-Buchstabe
-    // wuerde einfach als Textzeichen mitgezaehlt (falsche Breitenberechnung,
-    // ueberlappende Zeilen) statt einen echten Zeilenumbruch auszuloesen -
-    // gleiches Muster wie die zweigeteilte PARA1/PARA2-Anzeige in
-    // webui_screen.cpp.
+    // zusaetzlicher Absatz - "\n\n" erzeugt eine echte Leerzeile (siehe
+    // menu_screen.cpp::layoutWrapped()), "\n" einen einfachen Zeilenumbruch
+    // zwischen ICAO-Kennung und Rohtext.
     Weather::Metar metar = Weather::currentMetar();
-    String metarLabelLine;
-    String metarRawLine;
     if (metar.available) {
-        metarLabelLine = String(I18n::t(StringId::WEATHER_METAR_PREFIX)) + metar.icao + ":";
-        metarRawLine = metar.raw;
+        body += "\n\n";
+        body += String(I18n::t(StringId::WEATHER_METAR_PREFIX)) + metar.icao + ":\n";
+        body += metar.raw;
     }
 
     // Sonnenauf-/untergang fuer den aktuell aktiven Standort (gleiche
     // Berechnung wie isNightDimHours(), siehe dort) - passt thematisch gut
     // in den Wetter-Info-Screen und die Rechenlogik existierte bereits
     // (bisher nur intern fuer die Nachtdimmung genutzt, nie angezeigt).
-    // Eigener dritter "Absatz" unterhalb von METAR, aus demselben Grund wie
-    // dort ueber einen eigenen weatherInfoLayoutWrapped()-Aufruf statt
-    // eingebettetem "\n" (siehe Kommentar oben).
-    String sunLine;
     {
         double lat = 0, lon = 0;
         LocationManager::getHomeLocation(lat, lon);
@@ -302,6 +263,7 @@ void showWeatherInfo(TFT_eSPI& tftRef) {
                 SunTimes::Result sun = SunTimes::compute(lat, lon, tmNow.tm_year + 1900, tmNow.tm_mon + 1,
                                                           tmNow.tm_mday, LocationManager::utcOffsetSeconds());
                 if (sun.valid) {
+                    String sunLine;
                     if (sun.alwaysDay) {
                         sunLine = I18n::t(StringId::WEATHER_POLAR_DAY);
                     } else if (sun.alwaysNight) {
@@ -316,53 +278,30 @@ void showWeatherInfo(TFT_eSPI& tftRef) {
                         sunLine = String(I18n::t(StringId::WEATHER_SUNRISE_PREFIX)) + sunriseBuf + "   " +
                                   String(I18n::t(StringId::WEATHER_SUNSET_PREFIX)) + sunsetBuf;
                     }
+                    body += "\n\n";
+                    body += sunLine;
                 }
             }
         }
     }
 
-    Rect backBtn = {(int16_t)(BOX_X + 10), BACK_Y, (int16_t)(BOX_W - 20), BTN_H};
+    // Kurzvorhersage (siehe Weather::currentForecast()) als letzter Absatz -
+    // Temperatur in der gerade eingestellten Einheit (Celsius/Fahrenheit,
+    // gleiche Umschaltung wie sonst im Projekt ueber
+    // LocationManager::useMetricUnits()), gefolgt vom Wetterlage-Text
+    // (conditionLabel() oben).
+    Weather::Forecast forecast = Weather::currentForecast();
+    if (forecast.available) {
+        bool metric = LocationManager::useMetricUnits();
+        float displayTemp = metric ? forecast.temperatureC : (forecast.temperatureC * 9.0f / 5.0f + 32.0f);
+        char tempBuf[12];
+        snprintf(tempBuf, sizeof(tempBuf), "%.0f°%s", displayTemp, metric ? "C" : "F");
 
-    MenuStars::reset();
-
-    auto redraw = [&]() {
-        tftRef.fillScreen(TFT_BLACK);
-        tftRef.drawRoundRect(BOX_X, BOX_Y, BOX_W, BOX_H, 6, TFT_GREEN);
-
-        tftRef.setTextDatum(MC_DATUM);
-        tftRef.setTextColor(TFT_GREEN, TFT_BLACK);
-        tftRef.setTextSize(2);
-        tftRef.drawString(I18n::t(StringId::WEATHER_INFO_TITLE), BOX_X + BOX_W / 2, TITLE_Y);
-        tftRef.setTextSize(1);
-        tftRef.setTextDatum(TL_DATUM);
-
-        tftRef.setTextColor(TFT_GREEN, TFT_BLACK);
-        int16_t y = weatherInfoLayoutWrapped(tftRef, BOX_X + 10, VIEW_TOP, TEXT_MAX_WIDTH, LINE_H, body);
-
-        if (metarLabelLine.length() > 0) {
-            y += 8;
-            y = weatherInfoLayoutWrapped(tftRef, BOX_X + 10, y, TEXT_MAX_WIDTH, LINE_H, metarLabelLine);
-            y = weatherInfoLayoutWrapped(tftRef, BOX_X + 10, y, TEXT_MAX_WIDTH, LINE_H, metarRawLine);
-        }
-
-        if (sunLine.length() > 0) {
-            y += 8;
-            weatherInfoLayoutWrapped(tftRef, BOX_X + 10, y, TEXT_MAX_WIDTH, LINE_H, sunLine);
-        }
-
-        weatherInfoDrawButton(tftRef, backBtn, I18n::t(StringId::BACK));
-    };
-
-    redraw();
-
-    while (true) {
-        TouchInput::Point tap;
-        if (TouchInput::wasTapped(tap)) {
-            if (backBtn.contains(tap.x, tap.y)) return;
-        }
-        MenuStars::update(tftRef);
-        delay(20);
+        body += "\n\n";
+        body += String(I18n::t(StringId::WEATHER_FORECAST_PREFIX)) + tempBuf + ", " + conditionLabel(forecast.condition);
     }
+
+    MenuScreen::showInfoScreen(tftRef, I18n::t(StringId::WEATHER_INFO_TITLE), body, TFT_GREEN, I18n::t(StringId::BACK));
 }
 
 void drawWifiIcon(int16_t rightX, int16_t rowTop, int16_t rowH, int8_t rssi) {

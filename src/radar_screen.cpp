@@ -370,6 +370,32 @@ namespace {
         gfx.setTextDatum(TL_DATUM);
     }
 
+    // Ordnet eine Peilung (0-360, 0=Nord, im Uhrzeigersinn, siehe
+    // RadarMath::PolarCoord) der ueblichen 8-Punkte-Kompass-Abkuerzung zu
+    // (N/NO/O/SO/S/SW/W/NW im Deutschen, siehe COMPASS_*-Eintraege in
+    // i18n.h - jede Sprache hat eigene Abkuerzungen). Fuer die textuelle
+    // Peilungsanzeige im Detail-Panel (siehe drawDetailPanel() unten) -
+    // ergaenzt die bereits vorhandene grafische Anzeige (drawBearingIndicator()
+    // oben) um eine auf einen Blick lesbare Himmelsrichtung.
+    const char* compassLabel(float bearingDeg) {
+        // Jeder der 8 Sektoren ist 45 Grad breit, zentriert auf die jeweilige
+        // Haupt-/Zwischenrichtung (z.B. Nord = 337.5-22.5 Grad) - +22.5 und
+        // Ganzzahldivision durch 45 bildet das ohne Sonderfall fuer den
+        // Nord-Uebergang bei 0/360 Grad ab.
+        int sector = ((int)lround(bearingDeg + 22.5f) / 45) % 8;
+        if (sector < 0) sector += 8;
+        switch (sector) {
+            case 0: return I18n::t(StringId::COMPASS_N);
+            case 1: return I18n::t(StringId::COMPASS_NE);
+            case 2: return I18n::t(StringId::COMPASS_E);
+            case 3: return I18n::t(StringId::COMPASS_SE);
+            case 4: return I18n::t(StringId::COMPASS_S);
+            case 5: return I18n::t(StringId::COMPASS_SW);
+            case 6: return I18n::t(StringId::COMPASS_W);
+            default: return I18n::t(StringId::COMPASS_NW);
+        }
+    }
+
     // kurzer Kursstrich in Flugrichtung (headingDeg) MIT Pfeilspitze am Ende -
     // eine reine Linie ohne Spitze war nicht eindeutig lesbar (nicht erkennbar,
     // welches Ende "vorne" ist). Die Spitze besteht aus zwei kurzen Strichen,
@@ -857,11 +883,24 @@ namespace {
         // Laien-Nutzer aus Ländern mit imperialen Einheiten (v.a. USA)
         // nicht selbsterklaerend, "Meilen" sind dort die gebraeuchlichere
         // Alltags-Distanzeinheit (nm bleibt trotzdem stehen, da es zur
-        // Geschwindigkeit in kt passt: 1 kt = 1 nm/h).
-        snprintf(buf, sizeof(buf), "%s%.0fkm / %.0fnm / %.0fmi  %s%.0f", I18n::t(StringId::DETAIL_DIST),
+        // Geschwindigkeit in kt passt: 1 kt = 1 nm/h). Peilung (Richtung vom
+        // eigenen Standort zum Flugzeug, siehe compassLabel() oben) haengt
+        // bewusst hier an dieselbe Zeile an statt eine eigene zu bekommen -
+        // im Detail-Panel ist praktisch kein Platz mehr uebrig (286px Hoehe,
+        // schon jetzt bis auf ein paar Pixel mit den zehn bestehenden Zeilen
+        // ausgefuellt). Wird die Zeile dadurch zu breit fuer die Panel-
+        // Breite, scrollt sie automatisch wie jede andere lange Zeile hier
+        // (siehe updateMarqueeLine()) - kein Abschneiden noetig. Eigener,
+        // groesserer lokaler Puffer statt des sonst hier wiederverwendeten
+        // "buf" (nur 48 Byte, reicht fuer die laengeren Uebersetzungen mit
+        // allen drei Werten nicht mehr aus).
+        char distBuf[96];
+        snprintf(distBuf, sizeof(distBuf), "%s%.0fkm / %.0fnm / %.0fmi  %s%.0f  %s%.0f° %s",
+                 I18n::t(StringId::DETAIL_DIST),
                  a.distanceKm, Units::kmToNm(a.distanceKm), Units::kmToMi(a.distanceKm),
-                 I18n::t(StringId::DETAIL_HDG), a.headingDeg);
-        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.distHeading, String(buf), forceFull);
+                 I18n::t(StringId::DETAIL_HDG), a.headingDeg,
+                 I18n::t(StringId::DETAIL_BEARING_PREFIX), a.bearingDeg, compassLabel(a.bearingDeg));
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.distHeading, String(distBuf), forceFull);
         y += LINE_H;
 
         String squawkLine = String(I18n::t(StringId::DETAIL_SQUAWK)) + (a.squawk[0] ? a.squawk : I18n::t(StringId::DETAIL_UNKNOWN));
@@ -913,30 +952,12 @@ namespace {
         gfx.setTextDatum(TL_DATUM);
     }
 
-    // Zwei Modi fuer runFlightQrScreen() unten: Tracking (Standard, wie
-    // bisher) oder Photo (neu, nur verfuegbar wenn eine Registrierung
-    // bekannt ist).
-    enum class FlightQrMode { Tracking, Photo };
-
-    // Kleiner Umschalt-Button unten, zwischen Hinweiszeile und Zurueck-
-    // Button - nur sichtbar, wenn ueberhaupt eine Registrierung bekannt ist
-    // (siehe runFlightQrScreen()).
-    Rect qrModeButtonRect() {
-        return {10, 238, (int16_t)(Config::SCREEN_WIDTH - 20), 26};
-    }
-
-    // Vollbild-QR-Code fuer das uebergebene Rufzeichen/Registrierung -
-    // erreichbar ueber den "QR"-Button oben rechts im Detail-Panel (siehe
-    // drawDetailPanel()/qrButtonRect()). Zeigt standardmaessig einen
-    // FlightAware-Live-Tracking-Link; ist eine Registrierung bekannt (reg
-    // nicht leer), kann per Umschalt-Button (qrModeButtonRect()) auf einen
-    // zweiten QR-Code mit Fotos des Flugzeugs bei planespotters.net
-    // gewechselt werden (deren "/photos/reg/<Registrierung>"-Seite, kein
-    // API-Key/Aufruf noetig - der QR-Code verlinkt nur dorthin, das Foto
-    // selbst wird auf dem Handy des Nutzers geladen). Gleiches QRCode-
-    // Bibliotheks-Muster (Version 4, ECC_LOW, 4px-Module) wie der bestehende
-    // WebUI-QR-Code in webui_screen.cpp.
-    void runFlightQrScreen(TFT_eSPI& gfx, const char* callsign, const char* reg) {
+    // Vollbild-QR-Code mit einem FlightAware-Live-Tracking-Link fuer das
+    // uebergebene Rufzeichen - erreichbar ueber den "QR"-Button oben rechts
+    // im Detail-Panel (siehe drawDetailPanel()/qrButtonRect()). Gleiches
+    // QRCode-Bibliotheks-Muster (Version 4, ECC_LOW, 4px-Module) wie der
+    // bestehende WebUI-QR-Code in webui_screen.cpp.
+    void runFlightQrScreen(TFT_eSPI& gfx, const char* callsign) {
         MenuStars::reset();
         // Explizit setzen statt vom Aufrufer geerbt anzunehmen - die
         // Breitenberechnung in drawWrappedCenteredHint() unten haengt vom
@@ -947,12 +968,11 @@ namespace {
         cs.trim();
         cs.toUpperCase();
 
-        String regStr = String(reg);
-        regStr.trim();
-        regStr.toUpperCase();
-        bool hasReg = regStr.length() > 0;
-
-        FlightQrMode mode = FlightQrMode::Tracking;
+        // FlightAware statt z.B. Flightradar24 gewaehlt, da deren
+        // "/live/flight/<Rufzeichen>"-URL-Schema direkt mit dem rohen
+        // ADS-B-Rufzeichen funktioniert, ohne zusaetzliche Aufloesung ueber
+        // einen anderen Dienst.
+        String url = "https://flightaware.com/live/flight/" + cs;
 
         constexpr uint8_t QR_VERSION = 4;
         constexpr int16_t QR_SIZE_MODULES = 33; // Version 4: 4*4+17 = 33
@@ -962,69 +982,37 @@ namespace {
         constexpr int16_t QR_X = (Config::SCREEN_WIDTH - QR_PIXEL_SIZE) / 2;
         constexpr int16_t QR_Y = 40;
 
+        uint8_t qrData[qrcode_getBufferSize(QR_VERSION)];
+        QRCode qrcode;
+        qrcode_initText(&qrcode, qrData, QR_VERSION, ECC_LOW, url.c_str());
+
         Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
-        Rect modeBtn = qrModeButtonRect();
 
-        // Zeichnet den kompletten Screen fuer den jeweils aktuellen "mode"
-        // neu - beim ersten Aufruf UND jedesmal, wenn der Umschalt-Button
-        // getippt wird (siehe Schleife unten). URL/Titel/Hinweistext haengen
-        // vom Modus ab, deshalb hier statt einmalig vor der Schleife
-        // berechnet.
-        auto redraw = [&]() {
-            // FlightAware statt z.B. Flightradar24 gewaehlt, da deren
-            // "/live/flight/<Rufzeichen>"-URL-Schema direkt mit dem rohen
-            // ADS-B-Rufzeichen funktioniert, ohne zusaetzliche Aufloesung
-            // ueber einen anderen Dienst.
-            String url = (mode == FlightQrMode::Photo)
-                ? "https://www.planespotters.net/photos/reg/" + regStr
-                : "https://flightaware.com/live/flight/" + cs;
-            String title = (mode == FlightQrMode::Photo) ? regStr : cs;
-            const char* hint = (mode == FlightQrMode::Photo)
-                ? I18n::t(StringId::DETAIL_QR_HINT_PHOTO)
-                : I18n::t(StringId::DETAIL_QR_HINT);
+        gfx.fillScreen(TFT_BLACK);
+        gfx.setTextColor(themeBaseColor(gfx), TFT_BLACK);
+        gfx.setCursor(10, 14);
+        gfx.println(cs);
 
-            uint8_t qrData[qrcode_getBufferSize(QR_VERSION)];
-            QRCode qrcode;
-            qrcode_initText(&qrcode, qrData, QR_VERSION, ECC_LOW, url.c_str());
-
-            gfx.fillScreen(TFT_BLACK);
-            gfx.setTextColor(themeBaseColor(gfx), TFT_BLACK);
-            gfx.setCursor(10, 14);
-            gfx.println(title);
-
-            gfx.fillRect(QR_X, QR_Y, QR_PIXEL_SIZE, QR_PIXEL_SIZE, TFT_WHITE);
-            for (uint8_t my = 0; my < qrcode.size; my++) {
-                for (uint8_t mx = 0; mx < qrcode.size; mx++) {
-                    if (qrcode_getModule(&qrcode, mx, my)) {
-                        int16_t px = (int16_t)(QR_X + (QR_QUIET + mx) * QR_BLOCK);
-                        int16_t py = (int16_t)(QR_Y + (QR_QUIET + my) * QR_BLOCK);
-                        gfx.fillRect(px, py, QR_BLOCK, QR_BLOCK, TFT_BLACK);
-                    }
+        gfx.fillRect(QR_X, QR_Y, QR_PIXEL_SIZE, QR_PIXEL_SIZE, TFT_WHITE);
+        for (uint8_t my = 0; my < qrcode.size; my++) {
+            for (uint8_t mx = 0; mx < qrcode.size; mx++) {
+                if (qrcode_getModule(&qrcode, mx, my)) {
+                    int16_t px = (int16_t)(QR_X + (QR_QUIET + mx) * QR_BLOCK);
+                    int16_t py = (int16_t)(QR_Y + (QR_QUIET + my) * QR_BLOCK);
+                    gfx.fillRect(px, py, QR_BLOCK, QR_BLOCK, TFT_BLACK);
                 }
             }
+        }
 
-            drawWrappedCenteredHint(gfx, hint, Config::SCREEN_WIDTH / 2,
-                                    (int16_t)(QR_Y + QR_PIXEL_SIZE + 14), (int16_t)(Config::SCREEN_WIDTH - 20), 16);
+        drawWrappedCenteredHint(gfx, I18n::t(StringId::DETAIL_QR_HINT), Config::SCREEN_WIDTH / 2,
+                                (int16_t)(QR_Y + QR_PIXEL_SIZE + 14), (int16_t)(Config::SCREEN_WIDTH - 20), 16);
 
-            if (hasReg) {
-                drawButton(gfx, modeBtn, mode == FlightQrMode::Photo
-                           ? I18n::t(StringId::DETAIL_QR_BTN_TRACKING)
-                           : I18n::t(StringId::DETAIL_QR_BTN_PHOTO));
-            }
-
-            drawButton(gfx, backBtn, I18n::t(StringId::BACK));
-        };
-
-        redraw();
+        drawButton(gfx, backBtn, I18n::t(StringId::BACK));
 
         while (true) {
             TouchInput::Point tap;
             if (TouchInput::wasTapped(tap)) {
                 if (backBtn.contains(tap.x, tap.y)) return;
-                if (hasReg && modeBtn.contains(tap.x, tap.y)) {
-                    mode = (mode == FlightQrMode::Tracking) ? FlightQrMode::Photo : FlightQrMode::Tracking;
-                    redraw();
-                }
             }
             MenuStars::update(gfx);
             delay(20);
@@ -1469,7 +1457,7 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
         int16_t panelTop = Config::SCREEN_HEIGHT - DETAIL_PANEL_H;
         Rect qrBtn = qrButtonRect(panelTop);
         if (lastPanel.callsign[0] && qrBtn.contains(x, y)) {
-            runFlightQrScreen(tft, lastPanel.callsign, lastPanel.reg);
+            runFlightQrScreen(tft, lastPanel.callsign);
             lastPanel.valid = false;
             headerRedrawNeeded = true;
             return true;

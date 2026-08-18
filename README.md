@@ -38,7 +38,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Live radar screen** – circular radar view, sized to the full screen width, with a rotating green sweep line; each aircraft marker's heading line ends in a small arrowhead, so its direction of travel is unambiguous at a glance. Twinkling background stars fill the space outside the radar circle.
 - **Real ADS-B data** via the free [adsb.fi](https://adsb.fi) API, refreshed every 8 seconds
 - **Color-coded aircraft** by altitude (green `<10k ft`, yellow `10-30k ft`, red `>30k ft`) with an on-screen legend
-- **Tap an aircraft** to open a detail panel: callsign, airline, aircraft model (via [hexdb.io](https://hexdb.io)), flight route (origin/destination airport, resolved via a chain of three free lookup services for better coverage), altitude/speed/distance/heading in both metric and aviation units, estimated seat count, plus a "QR" button that shows a full-screen QR code linking to that flight's live-tracking page on FlightAware
+- **Tap an aircraft** to open a detail panel: callsign, airline, aircraft model (via [hexdb.io](https://hexdb.io)), flight route (origin/destination airport, resolved via a chain of three free lookup services for better coverage), altitude/speed/distance/heading/bearing in both metric and aviation units, estimated seat count, plus a "QR" button that shows a full-screen QR code linking to that flight's live-tracking page on FlightAware
 - **Bearing indicator** – with an aircraft selected, a dotted line plus a heading-in-degrees label points from the radar center to the compass edge, showing exactly which direction to look to spot it in the sky (not to be confused with the aircraft's own heading arrow)
 - **Empty-sky timer** – when no aircraft are currently in range, the info bar counts up how long the sky's been empty instead of showing the usual "tap for details" hint, which itself now also shows how many aircraft are currently visible
 - **Adjustable range** (10/25/50/100 km) via on-screen button
@@ -72,7 +72,8 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Radar color themes** – choose between Green, Amber, or Blue for the radar screen (sweep line, panel border/text, buttons) under **Menu → System → "Radar Color Theme"**
 - **OTA update changelog** – after a firmware update installs successfully, the confirmation screen now shows a short, scrollable list of what changed in that version
 - **Sunrise/sunset times** – the Weather Info screen now also shows today's sunrise and sunset time for your currently active location, right below the METAR report
-- **Aircraft photo QR code** – if the aircraft's registration is known, the QR screen in the detail panel gets a "Photo" toggle button that switches to a second QR code linking to that aircraft's photos on [planespotters.net](https://planespotters.net)
+- **Short weather forecast** – the Weather Info screen also shows a short forecast (temperature and conditions) 3 hours ahead, and now scrolls automatically if the combined text (including a long METAR report) doesn't fit on one screen
+- **Bearing to selected aircraft** – the detail panel now also shows a compass direction (e.g. "NE") alongside the numeric bearing, so you know which way to look without doing the math yourself
 
 ## Feature Deep-Dive
 
@@ -180,7 +181,7 @@ It always follows whichever location is currently active, including active [loca
 
 Powered by the free [Open-Meteo](https://open-meteo.com) API (no API key needed). Refreshed automatically in the background every 10 minutes, or immediately after switching to a different location.
 
-Tap the icon for a small info popup explaining that the shown weather always reflects your currently active location. That same popup also shows the **raw METAR text** for the nearest airport (from the free [aviationweather.gov](https://aviationweather.gov) data API), fetched in the same background cycle as the icon weather - handy if you're used to reading METARs and want the exact report instead of just an icon. Below that, it also shows today's **sunrise and sunset time** for the active location.
+Tap the icon for a small info popup explaining that the shown weather always reflects your currently active location. That same popup also shows the **raw METAR text** for the nearest airport (from the free [aviationweather.gov](https://aviationweather.gov) data API), fetched in the same background cycle as the icon weather - handy if you're used to reading METARs and want the exact report instead of just an icon. Below that, it also shows today's **sunrise and sunset time** for the active location, and a **short forecast** (temperature and conditions) 3 hours ahead. The popup scrolls automatically if all of this doesn't fit on one screen.
 
 ### 📖 Flight logbook (ON/OFF)
 When enabled, the device logs **every newly sighted aircraft** (timestamp, hex code, callsign, registration, type, distance, altitude) into a CSV file on the SD card. An aircraft is only logged once per activation, even if it crosses the radar multiple times.

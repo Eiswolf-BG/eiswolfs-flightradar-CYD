@@ -9,52 +9,68 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 6;
 
     const char* const CHANGELOG_EN =
-        "- Fix: waking the sleep screen while an aircraft detail panel "
-        "was still open could leave leftover clock/date pixels behind "
-        "in the panel area\n"
-        "- Fix: the clock on the sleep screen could overlap the date "
-        "below it, making the date appear corrupted after the display "
-        "refreshed";
+        "- New: short weather forecast (temperature + conditions, 3 "
+        "hours ahead) in the weather info window\n"
+        "- New: bearing (compass direction to the selected aircraft) "
+        "shown in the detail panel\n"
+        "- Fix: the weather info window now scrolls automatically for "
+        "longer text (e.g. a long aviation weather report)\n"
+        "- Removed: the photo-toggle on the QR code screen "
+        "(planespotters.net proved unreliable)";
 
     const char* const CHANGELOG_DE =
-        "- Fix: Beim Aufwachen aus dem Ruhebildschirm mit noch offenem "
-        "Flugzeug-Detail-Panel konnten Reste von Uhrzeit/Datum im "
-        "Panel-Bereich sichtbar stehen bleiben\n"
-        "- Fix: Die Uhrzeit im Ruhebildschirm konnte das darunterliegende "
-        "Datum überlappen, wodurch das Datum nach dem Aktualisieren "
-        "verzerrt/zusammengeschoben aussah";
+        "- Neu: Kurzvorhersage (Temperatur + Wetterlage, 3 Stunden "
+        "voraus) im Wetter-Info-Fenster\n"
+        "- Neu: Peilung (Himmelsrichtung zum ausgewählten Flugzeug) im "
+        "Detail-Panel\n"
+        "- Fix: Das Wetter-Info-Fenster scrollt jetzt automatisch bei "
+        "längeren Texten (z.B. langem Flugwetterbericht)\n"
+        "- Entfernt: Die Foto-Umschaltfunktion beim QR-Code "
+        "(planespotters.net war unzuverlässig)";
 
     const char* const CHANGELOG_FR =
-        "- Correction : au réveil de l'écran de veille alors qu'un "
-        "panneau de détails d'avion était encore ouvert, des restes de "
-        "l'heure/de la date pouvaient rester visibles dans le panneau\n"
-        "- Correction : l'heure affichée sur l'écran de veille pouvait "
-        "chevaucher la date en dessous, ce qui déformait l'affichage de "
-        "la date après une mise à jour";
+        "- Nouveau : courte prévision météo (température + conditions, "
+        "dans 3 heures) dans la fenêtre d'info météo\n"
+        "- Nouveau : relèvement (direction vers l'avion sélectionné) "
+        "affiché dans le panneau de détails\n"
+        "- Correction : la fenêtre d'info météo défile désormais "
+        "automatiquement pour les textes plus longs (par ex. un long "
+        "bulletin météo aéronautique)\n"
+        "- Supprimé : le bouton photo sur l'écran du QR code "
+        "(planespotters.net s'est révélé peu fiable)";
 
     const char* const CHANGELOG_TR =
-        "- Düzeltme: Uçak detay paneli açıkken bekleme ekranından "
-        "uyanıldığında panel alanında saat/tarih kalıntıları görünür "
-        "kalabiliyordu\n"
-        "- Düzeltme: Bekleme ekranındaki saat, altındaki tarihle "
-        "çakışabiliyordu, bu da ekran güncellendiğinde tarihin bozuk "
-        "görünmesine neden oluyordu";
+        "- Yeni: Hava durumu bilgi penceresinde kısa vadeli tahmin (3 "
+        "saat sonrası için sıcaklık + hava durumu)\n"
+        "- Yeni: Detay panelinde seçili uçağa olan yön (pusula yönü) "
+        "gösteriliyor\n"
+        "- Düzeltme: Hava durumu bilgi penceresi artık uzun metinlerde "
+        "(örn. uzun METAR raporu) otomatik olarak kayıyor\n"
+        "- Kaldırıldı: QR kod ekranındaki fotoğraf geçiş düğmesi "
+        "(planespotters.net güvenilir değildi)";
 
     const char* const CHANGELOG_ES =
-        "- Corrección: al despertar de la pantalla de reposo con un "
-        "panel de detalles de avión aún abierto, podían quedar restos "
-        "de la hora/fecha visibles en el panel\n"
-        "- Corrección: la hora en la pantalla de reposo podía "
-        "superponerse con la fecha debajo, haciendo que la fecha se "
-        "viera distorsionada tras actualizarse";
+        "- Novedad: previsión meteorológica breve (temperatura + "
+        "condición, dentro de 3 horas) en la ventana de información "
+        "meteorológica\n"
+        "- Novedad: rumbo (dirección hacia el avión seleccionado) en el "
+        "panel de detalles\n"
+        "- Corrección: la ventana de información meteorológica ahora se "
+        "desplaza automáticamente con textos más largos (p. ej. un "
+        "informe METAR largo)\n"
+        "- Eliminado: el botón de cambio a fotos en la pantalla del "
+        "código QR (planespotters.net resultó poco fiable)";
 
     const char* const CHANGELOG_IT =
-        "- Correzione: risvegliandosi dal salvaschermo con un pannello "
-        "dei dettagli dell'aereo ancora aperto, potevano rimanere "
-        "residui di ora/data visibili nel pannello\n"
-        "- Correzione: l'ora nel salvaschermo poteva sovrapporsi alla "
-        "data sottostante, facendo apparire la data distorta dopo "
-        "l'aggiornamento";
+        "- Novità: breve previsione meteo (temperatura + condizione, "
+        "tra 3 ore) nella finestra informazioni meteo\n"
+        "- Novità: rilevamento (direzione verso l'aereo selezionato) "
+        "nel pannello dei dettagli\n"
+        "- Correzione: la finestra informazioni meteo ora scorre "
+        "automaticamente per testi più lunghi (es. un lungo bollettino "
+        "METAR)\n"
+        "- Rimosso: il pulsante per le foto nella schermata del codice "
+        "QR (planespotters.net si è rivelato inaffidabile)";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT

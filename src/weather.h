@@ -49,4 +49,23 @@ namespace Weather {
     // und korrigiert sich spaetestens beim naechsten Abfrage-Intervall von
     // selbst).
     Metar currentMetar();
+
+    // Kurzfristige Kurzvorhersage (ein einzelner stuendlicher Datenpunkt
+    // "jetzt + hoursAhead Stunden", siehe fetchNow() in weather.cpp) fuer
+    // den Wetter-Info-Screen (main.cpp::showWeatherInfo()) - bewusst nur
+    // EIN Zeitpunkt statt einer mehrstuendigen Vorhersagereihe, damit das
+    // kleine Display uebersichtlich bleibt (siehe Absprache mit Alex).
+    // Benoetigt eine bereits per NTP synchronisierte Uhrzeit, um den
+    // gewuenschten zukuenftigen Zeitpunkt ueberhaupt berechnen zu koennen -
+    // ohne das bleibt available=false, genau wie bei fehlendem Standort.
+    struct Forecast {
+        bool available = false;
+        float temperatureC = 0;
+        Condition condition = Condition::Unknown;
+        uint8_t hoursAhead = 3;
+    };
+
+    // Wie current()/currentMetar() nur vom NetTask geschrieben, vom
+    // UI-Thread gelesen - gleiche Begruendung, kein Lock noetig.
+    Forecast currentForecast();
 }
