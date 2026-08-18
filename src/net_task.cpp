@@ -64,6 +64,24 @@ namespace {
 
                     float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
+                    // Solange die WebUI-Livekarte gerade aktiv geoeffnet ist
+                    // (siehe WebExportServer::isRadarUiActive()), auf der
+                    // groessten konfigurierten Reichweitenstufe abfragen -
+                    // sonst kann der Reichweiten-Waehler dort nie mehr
+                    // Flugzeuge zeigen als am Geraet selbst gerade
+                    // eingestellt ist (Flugzeuge ausserhalb der Geraete-
+                    // Reichweite werden ja gar nicht erst abgefragt/
+                    // gespeichert). Nur waehrend die WebUI tatsaechlich
+                    // genutzt wird, um die zusaetzliche Netzwerk-/Speicher-
+                    // last nicht dauerhaft allen Nutzern aufzuerlegen. Das
+                    // Geraete-Display selbst filtert beim Zeichnen weiterhin
+                    // unabhaengig auf seine eigene rangeIndex()-Reichweite
+                    // (siehe radar_screen.cpp), zeigt also trotzdem nur die
+                    // eingestellte Reichweite an.
+                    if (webServerStarted && WebExportServer::isRadarUiActive()) {
+                        rangeKm = Config::RANGE_STEPS_KM[Config::RANGE_STEP_COUNT - 1];
+                    }
+
                     auto result = AdsbClient::fetch(lat, lon, rangeKm,
                                                      tempTable, Config::MAX_TRACKED_AIRCRAFT);
 

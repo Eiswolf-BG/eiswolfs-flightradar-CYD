@@ -286,6 +286,8 @@ static const char* const I18N_DE[] = {
 
     "Peilung: ",
     "N", "NO", "O", "SO", "S", "SW", "W", "NW",
+
+    "Bitte warten, Gerät startet neu...",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

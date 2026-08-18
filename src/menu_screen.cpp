@@ -426,7 +426,8 @@ namespace {
     // Update, die der Nutzer auf keinen Fall verpassen darf. Gleicher
     // Kasten-/Scroll-Aufbau wie confirmWarningScreen(), nur mit einem
     // einzigen, ueber die volle Breite gehenden Button statt OK/Zurueck.
-    void infoScreen(TFT_eSPI& tft, const String& title, const String& body, uint16_t accentColor, const String& buttonLabel) {
+    void infoScreen(TFT_eSPI& tft, const String& title, const String& body, uint16_t accentColor,
+                     const String& buttonLabel, const String& tappedLabel = "") {
         constexpr int16_t BOX_X = 4;
         constexpr int16_t BOX_Y = 4;
         constexpr int16_t BOX_W = Config::SCREEN_WIDTH - 2 * BOX_X;
@@ -511,7 +512,15 @@ namespace {
         while (true) {
             TouchInput::Point tap;
             if (TouchInput::wasTapped(tap)) {
-                if (okBtn.contains(tap.x, tap.y)) return;
+                if (okBtn.contains(tap.x, tap.y)) {
+                    // Siehe Kommentar bei tappedLabel oben - sofortige
+                    // Rueckmeldung, dass der Tipp angekommen ist, bevor die
+                    // (evtl. spuerbar dauernde) Aktion des Aufrufers startet.
+                    if (tappedLabel.length() > 0) {
+                        drawButton(tft, okBtn, tappedLabel);
+                    }
+                    return;
+                }
                 if (scrollable && upBtn.contains(tap.x, tap.y) && scrollY > 0) {
                     scrollY -= SCROLL_STEP;
                     if (scrollY < 0) scrollY = 0;
@@ -620,8 +629,11 @@ namespace {
             // zeigt main.cpp::showWhatsNewIfNeeded() den Changelog beim
             // naechsten Boot an, wenn wirklich schon die neue Firmware
             // laeuft (siehe dort).
+            // tappedLabel (siehe infoScreen()-Kommentar oben) laesst den
+            // Button-Text sofort beim Antippen auf "Bitte warten..." wechseln
+            // - ESP.restart() direkt danach braucht spuerbar einen Moment.
             infoScreen(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), I18n::t(StringId::OTA_SUCCESS_BODY),
-                       TFT_GREEN, I18n::t(StringId::OTA_RESTART_BUTTON));
+                       TFT_GREEN, I18n::t(StringId::OTA_RESTART_BUTTON), I18n::t(StringId::OTA_RESTARTING));
             ESP.restart();
         } else {
             // Bewusst ein stehenbleibender Info-Screen statt der alten
