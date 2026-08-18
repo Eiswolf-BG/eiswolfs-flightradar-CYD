@@ -38,6 +38,33 @@ namespace {
         if (aMin != bMin) return aMin - bMin;
         return aPat - bPat;
     }
+
+    // Zuletzt bekannter Stand - wird von JEDER erfolgreich abgeschlossenen
+    // Pruefung aktualisiert (manueller Button-Check UND Hintergrund-Check,
+    // siehe applyResult() unten), damit z.B. nach einem manuellen Check per
+    // Button sofort auch die Badges (Menue-Button, "System"-Kachel,
+    // Ruhebildschirm) den aktuellen Stand zeigen, ohne auf den naechsten
+    // Hintergrund-Check warten zu muessen.
+    bool lastUpdateAvailable = false;
+    char lastAvailableVersion[16] = {0};
+    uint32_t lastBackgroundCheckMs = 0;
+
+    // Uebernimmt das Ergebnis einer abgeschlossenen Pruefung in den
+    // geteilten Stand - bei CheckResult::Error bewusst NICHTS aendern (der
+    // vorherige, zuletzt tatsaechlich bekannte Stand bleibt gueltig, bis
+    // eine erfolgreiche Pruefung ihn ersetzt; ein einzelner fehlgeschlagener
+    // Hintergrund-Check - z.B. ein kurzer WLAN-Hakler - soll nicht einfach
+    // einen bereits bekannten Update-Hinweis verschwinden lassen).
+    void applyResult(const CheckInfo& info) {
+        if (info.result == CheckResult::UpdateAvailable) {
+            lastUpdateAvailable = true;
+            strncpy(lastAvailableVersion, info.latestVersion, sizeof(lastAvailableVersion) - 1);
+            lastAvailableVersion[sizeof(lastAvailableVersion) - 1] = 0;
+        } else if (info.result == CheckResult::UpToDate) {
+            lastUpdateAvailable = false;
+            lastAvailableVersion[0] = 0;
+        }
+    }
 }
 
 CheckInfo checkForUpdate() {
@@ -109,7 +136,29 @@ CheckInfo checkForUpdate() {
     Serial.printf("[OTA] Pruefung erfolgreich: installiert=v%s neuestes=v%s -> %s\n", Config::APP_VERSION,
                   info.latestVersion,
                   info.result == CheckResult::UpdateAvailable ? "Update verfuegbar" : "bereits aktuell");
+    applyResult(info);
     return info;
+}
+
+void pollBackground() {
+    uint32_t now = millis();
+    if (now - lastBackgroundCheckMs < Config::OTA_BACKGROUND_CHECK_INTERVAL_MS) return;
+    lastBackgroundCheckMs = now;
+
+    // Kein WLAN -> gar nicht erst versuchen, einfach beim naechsten
+    // Intervall wieder pruefen (kein Fehlerfall, passiert z.B. regelmaessig
+    // kurz nach dem Booten, bevor WifiMgr verbunden hat).
+    if (WiFi.status() != WL_CONNECTED) return;
+
+    checkForUpdate(); // aktualisiert lastUpdateAvailable/lastAvailableVersion via applyResult()
+}
+
+bool isUpdateAvailable() {
+    return lastUpdateAvailable;
+}
+
+const char* availableVersion() {
+    return lastAvailableVersion;
 }
 
 bool performUpdate(const char* url, void (*onProgress)(uint8_t percent)) {

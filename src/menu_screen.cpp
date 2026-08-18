@@ -658,6 +658,14 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, regionBtn, I18n::t(StringId::MENU_CATEGORY_REGION));
             drawButton(tft, wifiBtn, I18n::t(StringId::MENU_CATEGORY_WIFI));
             drawButton(tft, systemBtn, I18n::t(StringId::MENU_CATEGORY_SYSTEM));
+            if (OtaUpdate::isUpdateAvailable()) {
+                // Gleicher kleiner roter Punkt wie am Menu-Button im Header
+                // (main.cpp::drawMenuButton()) - zeigt schon auf der
+                // Hauptseite des Menues, in welcher Kategorie sich das
+                // Update versteckt, ohne dass man erst durchklicken muss.
+                tft.fillCircle((int16_t)(systemBtn.x + systemBtn.w - 8), (int16_t)(systemBtn.y + 8), 4, TFT_RED);
+                tft.drawCircle((int16_t)(systemBtn.x + systemBtn.w - 8), (int16_t)(systemBtn.y + 8), 4, TFT_BLACK);
+            }
             drawButton(tft, flightBtn, I18n::t(StringId::MENU_CATEGORY_FLIGHT));
             drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
@@ -754,8 +762,23 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, webuiBtn, I18n::t(StringId::MENU_LOGBOOK_WEBUI));
             drawButton(tft, radarThemeBtn, I18n::t(StringId::MENU_RADAR_THEME));
             drawButton(tft, backupResetBtn, I18n::t(StringId::MENU_BACKUP_RESET));
-            String checkUpdateLine1 = String(I18n::t(StringId::CHECK_UPDATE_VERSION_PREFIX)) + Config::APP_VERSION;
+            // Zeigt "Update verfuegbar: vX.X.X" statt der laufenden Version,
+            // sobald der Hintergrund-Check (oder ein vorheriger manueller
+            // Check) eins gefunden hat - der eigentliche Tastendruck fuehrt
+            // trotzdem immer noch zu einem frischen checkForUpdate()-Aufruf
+            // in runOtaUpdateScreen(), diese Zeile ist nur eine Vorschau.
+            String checkUpdateLine1 = OtaUpdate::isUpdateAvailable()
+                ? String(I18n::t(StringId::OTA_UPDATE_AVAILABLE_PREFIX)) + OtaUpdate::availableVersion()
+                : String(I18n::t(StringId::CHECK_UPDATE_VERSION_PREFIX)) + Config::APP_VERSION;
             drawButtonTwoLines(tft, checkUpdateBtn, checkUpdateLine1, I18n::t(StringId::MENU_CHECK_UPDATE));
+            if (OtaUpdate::isUpdateAvailable()) {
+                // Gleicher kleiner roter Punkt wie an den anderen Stellen
+                // (Menu-Button, "System"-Kachel) - hier zusaetzlich zur
+                // bereits geaenderten Textzeile oben, damit der Button auch
+                // beim schnellen Ueberfliegen der Seite auffaellt.
+                tft.fillCircle((int16_t)(checkUpdateBtn.x + checkUpdateBtn.w - 8), (int16_t)(checkUpdateBtn.y + 8), 4, TFT_RED);
+                tft.drawCircle((int16_t)(checkUpdateBtn.x + checkUpdateBtn.w - 8), (int16_t)(checkUpdateBtn.y + 8), 4, TFT_BLACK);
+            }
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;

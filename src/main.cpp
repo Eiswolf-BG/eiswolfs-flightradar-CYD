@@ -38,6 +38,7 @@
 #include "radar_logo.h"
 #include "ui_font.h"
 #include "changelog.h"
+#include "ota_update.h"
 #include <math.h>
 
 TFT_eSPI tft = TFT_eSPI();
@@ -124,6 +125,17 @@ void drawMenuButton() {
     tft.setTextColor(color, TFT_BLACK);
     tft.drawString("Menu", menuBtn.x + menuBtn.w / 2, menuBtn.y + menuBtn.h / 2);
     tft.setTextDatum(TL_DATUM);
+
+    if (OtaUpdate::isUpdateAvailable()) {
+        // Kleiner roter Punkt oben rechts am Menu-Button - "es gibt etwas
+        // Neues zu sehen", analog zu App-Badges auf dem Smartphone. Bewusst
+        // rein optisch (keine Zahl/kein Text), da hier ohnehin nur GENAU
+        // EIN Zustand angezeigt werden muss (Update verfuegbar oder nicht).
+        // Gleiche Bedingung wird auch fuer die Badges auf der "System"-
+        // Kachel (menu_screen.cpp) und dem Update-Button selbst benutzt.
+        tft.fillCircle((int16_t)(menuBtn.x + menuBtn.w - 3), (int16_t)(menuBtn.y + 3), 3, TFT_RED);
+        tft.drawCircle((int16_t)(menuBtn.x + menuBtn.w - 3), (int16_t)(menuBtn.y + 3), 3, TFT_BLACK);
+    }
 }
 
 // Kleine, mit einfachen TFT_eSPI-Grundformen gezeichnete Wolke (kein
@@ -398,7 +410,22 @@ void drawScreensaverVersion() {
     tft.setTextDatum(MC_DATUM);
     tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
     tft.setTextSize(1);
-    tft.drawString(String("v") + Config::APP_VERSION, Config::SCREEN_WIDTH / 2, SCREENSAVER_VERSION_CY);
+    String versionText = String("v") + Config::APP_VERSION;
+    tft.drawString(versionText, Config::SCREEN_WIDTH / 2, SCREENSAVER_VERSION_CY);
+
+    if (OtaUpdate::isUpdateAvailable()) {
+        // Gleicher kleiner roter Punkt wie am Menu-Button/der "System"-
+        // Kachel (siehe drawMenuButton()) - dezent rechts neben der
+        // Versionsnummer platziert statt auf ihr, damit der ruhige
+        // Ruhebildschirm nicht zu sehr "aufgeweckt" wird. Wird - wie die
+        // Versionsnummer selbst - nur EINMAL beim Betreten des
+        // Ruhebildschirms gezeichnet (siehe Kommentar oben); ein waehrend
+        // des Ruhebildschirms neu gefundenes Update erscheint hier daher
+        // erst beim naechsten Betreten des Ruhebildschirms.
+        int16_t textHalfWidth = tft.textWidth(versionText) / 2;
+        tft.fillCircle((int16_t)(Config::SCREEN_WIDTH / 2 + textHalfWidth + 8), SCREENSAVER_VERSION_CY, 3, TFT_RED);
+    }
+
     tft.setTextSize(1);
     tft.setTextDatum(TL_DATUM);
 }
