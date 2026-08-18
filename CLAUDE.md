@@ -14,7 +14,9 @@ Standort-Presets (auch für fremde Orte weltweit), Airline-Filter, Flugbuch
 mit Statistik, und Menüs/Splash-Screen mit einer dezenten twinkelnden
 Sterne-Animation.
 
-Aktueller Stand: **v2.3.2**. Öffentliches Repo:
+Aktuelle Versionsnummer: siehe `Config::APP_VERSION` in `src/config.h`
+(dort immer aktuell, hier bewusst nicht mehr hart eingetragen, damit diese
+Datei nicht wieder veraltet). Öffentliches Repo:
 https://github.com/Eiswolf-BG/eiswolfs-flightradar-CYD
 
 ## Wer nutzt das?
@@ -160,9 +162,9 @@ für nach außen sichtbare Texte.
 
 ## Bekannte offene Punkte / mögliche nächste Schritte
 
-Keine akuten offenen Bugs bekannt (Stand v2.3.2). Mögliche Ideen für später,
-falls der Nutzer danach fragt: weitere Menüs mit Info-Buttons versehen,
-ggf. weitere Sprachen, ggf. Export/Teilen der Logbuch-Daten.
+Keine feste Liste hier gepflegt, da sie erfahrungsgemäß schnell veraltet -
+offene Ideen/Bugs bitte direkt als GitHub Issues im Repo tracken statt hier
+in der CLAUDE.md.
 ## Standard-Workflow: Push & Release
 
 WICHTIG - wann dieser Workflow startet: Der komplette Release-Workflow
@@ -193,10 +195,17 @@ in dieser Reihenfolge:
    nicht mehr und dürfen bei künftigen Releases nicht mehr gesucht werden).
    Falls im Push-Wunsch keine explizite Versionsnummer genannt wurde, bei
    Alex nachfragen statt zu raten. Zusammen mit `APP_VERSION` IMMER auch
-   `Config::CHANGELOG_LATEST` in `src/changelog.h` auf die Änderungen
-   DIESES Releases aktualisieren (kurze Bullet-Liste, Englisch) - wird auf
-   dem Gerät nach einem erfolgreichen OTA-Update auf dem "Update
-   installiert"-Screen angezeigt. Erst NACH dem Eintragen von Versionsnummer
+   den Changelog fuer DIESES Release aktualisieren - der ist MEHRSPRACHIG
+   (alle 6 Sprachen wie der Rest der Geraete-UI), liegt in
+   `src/changelog.cpp` als sechs Konstanten (`CHANGELOG_EN`, `CHANGELOG_DE`,
+   `CHANGELOG_FR`, `CHANGELOG_TR`, `CHANGELOG_ES`, `CHANGELOG_IT`, jeweils
+   eine kurze Bullet-Liste), ausgewaehlt ueber `changelogLatest()`
+   (deklariert in `src/changelog.h`) nach `SettingsStore::language()`. ALLE
+   6 Sprachen muessen aktualisiert werden, nicht nur Englisch - sonst zeigt
+   das Geraet nach dem naechsten Update fuer 5 von 6 Sprachen noch den
+   Changelog des VORHERIGEN Releases. Wird auf dem Geraet nach einem
+   erfolgreichen OTA-Update auf dem "Update installiert"-Screen angezeigt.
+   Erst NACH dem Eintragen von Versionsnummer
    UND Changelog: einmal sauber `pio run` bauen, DANACH erst der Rest des
    bekannten Workflows (README, Tag, index.html, Bin-Dateien, Commit/Push).
    (Hier bewusst NUR bauen, NICHT flashen - Ausnahme von der sonst
