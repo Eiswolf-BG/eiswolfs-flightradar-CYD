@@ -29,6 +29,12 @@ namespace {
     uint8_t radarThemeIdx = 0;
     char lastSeenVersionBuf[16] = {0};
 
+    // MUSS auf SD persistiert werden (nicht nur im RAM halten): wird kurz
+    // vor ESP.restart() gesetzt und erst im NAECHSTEN Boot-Zyklus gelesen -
+    // ein Neustart loescht den RAM komplett, siehe main.cpp::
+    // showWhatsNewIfNeeded().
+    bool otaJustInstalledFlag = false;
+
     void applyKeyValue(const String& key, const String& value) {
         if (key == "range_index") {
             int v = value.toInt();
@@ -78,6 +84,8 @@ namespace {
         } else if (key == "last_seen_version") {
             strncpy(lastSeenVersionBuf, value.c_str(), sizeof(lastSeenVersionBuf) - 1);
             lastSeenVersionBuf[sizeof(lastSeenVersionBuf) - 1] = 0;
+        } else if (key == "ota_just_installed") {
+            otaJustInstalledFlag = (value.toInt() != 0);
         }
     }
 }
@@ -139,6 +147,7 @@ void save() {
     f.printf("units_mode=%d\n", unitsModeVal);
     f.printf("radar_theme=%d\n", radarThemeIdx);
     f.printf("last_seen_version=%s\n", lastSeenVersionBuf);
+    f.printf("ota_just_installed=%d\n", otaJustInstalledFlag ? 1 : 0);
     f.close();
 }
 
@@ -279,6 +288,13 @@ String lastSeenVersion() { return String(lastSeenVersionBuf); }
 void setLastSeenVersion(const String& version) {
     strncpy(lastSeenVersionBuf, version.c_str(), sizeof(lastSeenVersionBuf) - 1);
     lastSeenVersionBuf[sizeof(lastSeenVersionBuf) - 1] = 0;
+    save();
+}
+
+bool otaJustInstalled() { return otaJustInstalledFlag; }
+
+void setOtaJustInstalled(bool value) {
+    otaJustInstalledFlag = value;
     save();
 }
 

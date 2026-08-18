@@ -87,4 +87,15 @@ namespace SettingsStore {
     // wird ja erst nach ESP.restart() tatsaechlich ausgefuehrt.
     String lastSeenVersion();
     void setLastSeenVersion(const String& version);
+
+    // Wird NUR im Erfolgsfall eines OTA-Updates gesetzt (siehe
+    // menu_screen.cpp::runOtaUpdateScreen(), direkt vor ESP.restart()) - der
+    // naechste Boot liest dieses Flag einmalig aus (main.cpp::
+    // showWhatsNewIfNeeded()) und setzt es dabei sofort wieder zurueck.
+    // Zusaetzlich zu lastSeenVersion noetig, damit der "Was ist neu"-
+    // Changelog-Screen WIRKLICH nur nach einem echten OTA-Update erscheint -
+    // nicht nach jedem simplen Neuflashen per USB mit einer anderen
+    // Versionsnummer (Alex' ausdruecklicher Wunsch).
+    bool otaJustInstalled();
+    void setOtaJustInstalled(bool value);
 }
