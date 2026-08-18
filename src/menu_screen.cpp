@@ -126,6 +126,12 @@ namespace {
                 (int16_t)(Config::SCREEN_WIDTH - 20), BACKUP_RESET_ROW_H};
     }
 
+    // Vorwaertsdeklaration - die eigentliche Definition steht weiter unten
+    // (wird auch fuer Titel in confirmWarningScreen()/infoScreen() benutzt),
+    // hier aber schon frueher fuer den automatischen Zeilenumbruch in
+    // drawButton() gebraucht (siehe dort).
+    int wrapTitleLines(TFT_eSPI& tft, const String& text, int16_t maxWidth, String* outLines, int maxLines);
+
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label,
                      bool active = false, bool danger = false) {
         uint16_t accent = danger ? TFT_RED : TFT_GREEN;
@@ -135,7 +141,30 @@ namespace {
         tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, accent);
         tft.setTextDatum(MC_DATUM);
         tft.setTextColor(fg, bg);
-        tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
+        // Automatischer Zeilenumbruch, falls der Text (z.B. eine laengere
+        // Uebersetzung oder ein dynamischer Text wie infoScreen()s
+        // tappedLabel) nicht in einer Zeile in den Button passt - sonst
+        // lief die Schrift links/rechts ueber den Button hinaus (Alex'
+        // Meldung beim "Bitte warten, Geraet startet neu..."-Text auf dem
+        // OTA-Neustart-Button). Faellt auf denselben Ein-Zeilen-Pfad wie
+        // vorher zurueck, wenn der Text ohnehin passt - bestehende Buttons
+        // sind also unveraendert. Gleiches Wortumbruch-Prinzip wie
+        // wrapTitleLines() (auf max. 2 Zeilen begrenzt - mehr passt bei der
+        // ueblichen Button-Hoehe ohnehin nicht mehr rein).
+        constexpr int16_t BTN_TEXT_PADDING = 10;
+        int16_t maxTextWidth = r.w - 2 * BTN_TEXT_PADDING;
+        if (maxTextWidth < 10 || tft.textWidth(label) <= maxTextWidth) {
+            tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
+        } else {
+            constexpr int MAX_BTN_LINES = 2;
+            String lines[MAX_BTN_LINES];
+            int lineCount = wrapTitleLines(tft, label, maxTextWidth, lines, MAX_BTN_LINES);
+            constexpr int16_t BTN_LINE_GAP = 14;
+            int16_t startY = (int16_t)(r.y + r.h / 2 - (lineCount - 1) * BTN_LINE_GAP / 2);
+            for (int i = 0; i < lineCount; i++) {
+                tft.drawString(lines[i], r.x + r.w / 2, (int16_t)(startY + i * BTN_LINE_GAP));
+            }
+        }
         tft.setTextDatum(TL_DATUM);
     }
 
