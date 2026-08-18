@@ -273,6 +273,10 @@ static const char* const I18N_IT[] = {
     "Tramonto: ",
     "Il sole non tramonta oggi in questo luogo (giorno polare).",
     "Il sole non sorge oggi in questo luogo (notte polare).",
+
+    "Scansiona per foto di questo aereo",
+    "Foto",
+    "Tracciamento",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

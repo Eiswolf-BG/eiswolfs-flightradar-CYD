@@ -273,6 +273,10 @@ static const char* const I18N_DE[] = {
     "Sonnenuntergang: ",
     "Die Sonne geht heute an diesem Ort nicht unter (Polartag).",
     "Die Sonne geht heute an diesem Ort nicht auf (Polarnacht).",
+
+    "Scannen für Fotos dieses Flugzeugs",
+    "Foto",
+    "Tracking",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

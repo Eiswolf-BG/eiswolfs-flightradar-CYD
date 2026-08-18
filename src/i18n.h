@@ -389,6 +389,17 @@ enum class StringId : uint8_t {
     WEATHER_POLAR_DAY,
     WEATHER_POLAR_NIGHT,
 
+    // Foto-Umschalter auf dem Flug-QR-Code-Screen (radar_screen.cpp::
+    // runFlightQrScreen()) - zusaetzlich zum bestehenden Live-Tracking-QR
+    // (DETAIL_QR_HINT oben) laesst sich dort jetzt, falls die Registrierung
+    // bekannt ist, auf einen zweiten QR-Code umschalten, der auf Fotos des
+    // Flugzeugs bei planespotters.net verlinkt. DETAIL_QR_BTN_PHOTO steht auf
+    // dem Umschalt-Button, WAEHREND der Live-Tracking-QR gezeigt wird (tippen
+    // wechselt zu Fotos), DETAIL_QR_BTN_TRACKING umgekehrt.
+    DETAIL_QR_HINT_PHOTO,
+    DETAIL_QR_BTN_PHOTO,
+    DETAIL_QR_BTN_TRACKING,
+
     COUNT
 };
 

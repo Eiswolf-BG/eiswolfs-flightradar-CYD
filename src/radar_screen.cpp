@@ -634,9 +634,16 @@ namespace {
         // keinen direkten Zugriff auf das aktuell ausgewaehlte Aircraft-
         // Objekt hat, sondern nur auf diesen zwischengespeicherten Zustand.
         char callsign[9] = {0};
+        char reg[9] = {0};
         LineMarquee airline, model, type, route, alt, speed, climb, distHeading, squawk, seats;
     };
     PanelState lastPanel;
+
+    // Siehe consumeHeaderRedrawFlag()/qrButtonRect()-Zweig in handleTap()
+    // unten - true, solange der Flug-QR-Code-Screen die Kopfzeile
+    // ueberschrieben hat und noch niemand drawHeader()/updateStatusLine()
+    // deswegen erneut aufgerufen hat.
+    bool headerRedrawNeeded = false;
 
     // Kleiner "QR"-Button oben rechts im Detail-Panel (siehe
     // drawDetailPanel()/handleTap() weiter unten) - oeffnet einen
@@ -760,6 +767,8 @@ namespace {
                 lastPanel.callsignText = txt;
                 strncpy(lastPanel.callsign, a.callsign, sizeof(lastPanel.callsign) - 1);
                 lastPanel.callsign[sizeof(lastPanel.callsign) - 1] = 0;
+                strncpy(lastPanel.reg, a.reg, sizeof(lastPanel.reg) - 1);
+                lastPanel.reg[sizeof(lastPanel.reg) - 1] = 0;
 
                 // QR-Button neu zeichnen, wann immer diese Zeile neu
                 // gezeichnet wird (nicht nur bei forceFull) - sonst koennte
@@ -904,26 +913,46 @@ namespace {
         gfx.setTextDatum(TL_DATUM);
     }
 
-    // Vollbild-QR-Code mit einem FlightAware-Live-Tracking-Link fuer das
-    // uebergebene Rufzeichen - erreichbar ueber den "QR"-Button oben rechts
-    // im Detail-Panel (siehe drawDetailPanel()/qrButtonRect()). Gleiches
-    // QRCode-Bibliotheks-Muster (Version 4, ECC_LOW, 4px-Module) wie der
-    // bestehende WebUI-QR-Code in webui_screen.cpp.
-    void runFlightQrScreen(TFT_eSPI& gfx, const char* callsign) {
+    // Zwei Modi fuer runFlightQrScreen() unten: Tracking (Standard, wie
+    // bisher) oder Photo (neu, nur verfuegbar wenn eine Registrierung
+    // bekannt ist).
+    enum class FlightQrMode { Tracking, Photo };
+
+    // Kleiner Umschalt-Button unten, zwischen Hinweiszeile und Zurueck-
+    // Button - nur sichtbar, wenn ueberhaupt eine Registrierung bekannt ist
+    // (siehe runFlightQrScreen()).
+    Rect qrModeButtonRect() {
+        return {10, 238, (int16_t)(Config::SCREEN_WIDTH - 20), 26};
+    }
+
+    // Vollbild-QR-Code fuer das uebergebene Rufzeichen/Registrierung -
+    // erreichbar ueber den "QR"-Button oben rechts im Detail-Panel (siehe
+    // drawDetailPanel()/qrButtonRect()). Zeigt standardmaessig einen
+    // FlightAware-Live-Tracking-Link; ist eine Registrierung bekannt (reg
+    // nicht leer), kann per Umschalt-Button (qrModeButtonRect()) auf einen
+    // zweiten QR-Code mit Fotos des Flugzeugs bei planespotters.net
+    // gewechselt werden (deren "/photos/reg/<Registrierung>"-Seite, kein
+    // API-Key/Aufruf noetig - der QR-Code verlinkt nur dorthin, das Foto
+    // selbst wird auf dem Handy des Nutzers geladen). Gleiches QRCode-
+    // Bibliotheks-Muster (Version 4, ECC_LOW, 4px-Module) wie der bestehende
+    // WebUI-QR-Code in webui_screen.cpp.
+    void runFlightQrScreen(TFT_eSPI& gfx, const char* callsign, const char* reg) {
         MenuStars::reset();
         // Explizit setzen statt vom Aufrufer geerbt anzunehmen - die
         // Breitenberechnung in drawWrappedCenteredHint() unten haengt vom
         // aktuellen textSize-Zustand ab, siehe dortiger Kommentar.
         gfx.setTextSize(1);
 
-        // FlightAware statt z.B. Flightradar24 gewaehlt, da deren
-        // "/live/flight/<Rufzeichen>"-URL-Schema direkt mit dem rohen
-        // ADS-B-Rufzeichen funktioniert, ohne zusaetzliche Aufloesung ueber
-        // einen anderen Dienst.
         String cs = String(callsign);
         cs.trim();
         cs.toUpperCase();
-        String url = "https://flightaware.com/live/flight/" + cs;
+
+        String regStr = String(reg);
+        regStr.trim();
+        regStr.toUpperCase();
+        bool hasReg = regStr.length() > 0;
+
+        FlightQrMode mode = FlightQrMode::Tracking;
 
         constexpr uint8_t QR_VERSION = 4;
         constexpr int16_t QR_SIZE_MODULES = 33; // Version 4: 4*4+17 = 33
@@ -933,37 +962,69 @@ namespace {
         constexpr int16_t QR_X = (Config::SCREEN_WIDTH - QR_PIXEL_SIZE) / 2;
         constexpr int16_t QR_Y = 40;
 
-        uint8_t qrData[qrcode_getBufferSize(QR_VERSION)];
-        QRCode qrcode;
-        qrcode_initText(&qrcode, qrData, QR_VERSION, ECC_LOW, url.c_str());
-
         Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+        Rect modeBtn = qrModeButtonRect();
 
-        gfx.fillScreen(TFT_BLACK);
-        gfx.setTextColor(themeBaseColor(gfx), TFT_BLACK);
-        gfx.setCursor(10, 14);
-        gfx.println(cs);
+        // Zeichnet den kompletten Screen fuer den jeweils aktuellen "mode"
+        // neu - beim ersten Aufruf UND jedesmal, wenn der Umschalt-Button
+        // getippt wird (siehe Schleife unten). URL/Titel/Hinweistext haengen
+        // vom Modus ab, deshalb hier statt einmalig vor der Schleife
+        // berechnet.
+        auto redraw = [&]() {
+            // FlightAware statt z.B. Flightradar24 gewaehlt, da deren
+            // "/live/flight/<Rufzeichen>"-URL-Schema direkt mit dem rohen
+            // ADS-B-Rufzeichen funktioniert, ohne zusaetzliche Aufloesung
+            // ueber einen anderen Dienst.
+            String url = (mode == FlightQrMode::Photo)
+                ? "https://www.planespotters.net/photos/reg/" + regStr
+                : "https://flightaware.com/live/flight/" + cs;
+            String title = (mode == FlightQrMode::Photo) ? regStr : cs;
+            const char* hint = (mode == FlightQrMode::Photo)
+                ? I18n::t(StringId::DETAIL_QR_HINT_PHOTO)
+                : I18n::t(StringId::DETAIL_QR_HINT);
 
-        gfx.fillRect(QR_X, QR_Y, QR_PIXEL_SIZE, QR_PIXEL_SIZE, TFT_WHITE);
-        for (uint8_t my = 0; my < qrcode.size; my++) {
-            for (uint8_t mx = 0; mx < qrcode.size; mx++) {
-                if (qrcode_getModule(&qrcode, mx, my)) {
-                    int16_t px = (int16_t)(QR_X + (QR_QUIET + mx) * QR_BLOCK);
-                    int16_t py = (int16_t)(QR_Y + (QR_QUIET + my) * QR_BLOCK);
-                    gfx.fillRect(px, py, QR_BLOCK, QR_BLOCK, TFT_BLACK);
+            uint8_t qrData[qrcode_getBufferSize(QR_VERSION)];
+            QRCode qrcode;
+            qrcode_initText(&qrcode, qrData, QR_VERSION, ECC_LOW, url.c_str());
+
+            gfx.fillScreen(TFT_BLACK);
+            gfx.setTextColor(themeBaseColor(gfx), TFT_BLACK);
+            gfx.setCursor(10, 14);
+            gfx.println(title);
+
+            gfx.fillRect(QR_X, QR_Y, QR_PIXEL_SIZE, QR_PIXEL_SIZE, TFT_WHITE);
+            for (uint8_t my = 0; my < qrcode.size; my++) {
+                for (uint8_t mx = 0; mx < qrcode.size; mx++) {
+                    if (qrcode_getModule(&qrcode, mx, my)) {
+                        int16_t px = (int16_t)(QR_X + (QR_QUIET + mx) * QR_BLOCK);
+                        int16_t py = (int16_t)(QR_Y + (QR_QUIET + my) * QR_BLOCK);
+                        gfx.fillRect(px, py, QR_BLOCK, QR_BLOCK, TFT_BLACK);
+                    }
                 }
             }
-        }
 
-        drawWrappedCenteredHint(gfx, I18n::t(StringId::DETAIL_QR_HINT), Config::SCREEN_WIDTH / 2,
-                                (int16_t)(QR_Y + QR_PIXEL_SIZE + 14), (int16_t)(Config::SCREEN_WIDTH - 20), 16);
+            drawWrappedCenteredHint(gfx, hint, Config::SCREEN_WIDTH / 2,
+                                    (int16_t)(QR_Y + QR_PIXEL_SIZE + 14), (int16_t)(Config::SCREEN_WIDTH - 20), 16);
 
-        drawButton(gfx, backBtn, I18n::t(StringId::BACK));
+            if (hasReg) {
+                drawButton(gfx, modeBtn, mode == FlightQrMode::Photo
+                           ? I18n::t(StringId::DETAIL_QR_BTN_TRACKING)
+                           : I18n::t(StringId::DETAIL_QR_BTN_PHOTO));
+            }
+
+            drawButton(gfx, backBtn, I18n::t(StringId::BACK));
+        };
+
+        redraw();
 
         while (true) {
             TouchInput::Point tap;
             if (TouchInput::wasTapped(tap)) {
                 if (backBtn.contains(tap.x, tap.y)) return;
+                if (hasReg && modeBtn.contains(tap.x, tap.y)) {
+                    mode = (mode == FlightQrMode::Tracking) ? FlightQrMode::Photo : FlightQrMode::Tracking;
+                    redraw();
+                }
             }
             MenuStars::update(gfx);
             delay(20);
@@ -1072,6 +1133,12 @@ uint16_t themeColor(TFT_eSPI& gfx) {
 
 void invalidatePanel() {
     lastPanel.valid = false;
+}
+
+bool consumeHeaderRedrawFlag() {
+    bool v = headerRedrawNeeded;
+    headerRedrawNeeded = false;
+    return v;
 }
 
 void render(TFT_eSPI& tft, int16_t top) {
@@ -1395,8 +1462,9 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
         int16_t panelTop = Config::SCREEN_HEIGHT - DETAIL_PANEL_H;
         Rect qrBtn = qrButtonRect(panelTop);
         if (lastPanel.callsign[0] && qrBtn.contains(x, y)) {
-            runFlightQrScreen(tft, lastPanel.callsign);
+            runFlightQrScreen(tft, lastPanel.callsign, lastPanel.reg);
             lastPanel.valid = false;
+            headerRedrawNeeded = true;
             return true;
         }
 
