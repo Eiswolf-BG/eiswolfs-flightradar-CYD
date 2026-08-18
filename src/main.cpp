@@ -438,6 +438,21 @@ void formatLocalizedDate(const struct tm& tmNow, char* out, size_t outLen) {
 // stehen bleiben. Zeichnet nichts, solange die Uhrzeit noch nicht per NTP
 // synchronisiert ist (gleiche Pruefung wie updateStatusLine()/
 // isNightDimHours()).
+// Zuletzt tatsaechlich GEZEICHNETE Uhrzeit/Datum-Strings (nicht nur
+// berechnete) - drawScreensaverClock() wird zwar jede Sekunde AUFGERUFEN,
+// soll den jeweiligen Streifen aber nur dann loeschen+neu zeichnen, wenn
+// sich der Text seit dem letzten Mal wirklich geaendert hat (die Uhrzeit nur
+// einmal pro Minute, das Datum quasi nur einmal pro Tag). Vorher wurden
+// beide Streifen JEDE Sekunde blind schwarz uebermalt und neu gezeichnet,
+// was als sichtbares, abwechselndes Flackern auffiel (siehe Alex' Meldung) -
+// gleiches Prinzip wie bei den Detail-Panel-Zeilen in radar_screen.cpp
+// (updateMarqueeLine(): "if (!forceFull && m.text == newText) return;").
+// Auf leeren String zurueckgesetzt, wann immer der Ruhebildschirm neu
+// betreten wird (siehe dortiges "lastScreensaverClockMs = 0;"), damit das
+// erste Zeichnen nach dem Betreten immer passiert.
+String lastScreensaverTimeText;
+String lastScreensaverDateText;
+
 void drawScreensaverClock() {
     time_t now = time(nullptr);
     if (now <= 8 * 3600 * 2) return;
@@ -454,25 +469,33 @@ void drawScreensaverClock() {
                  tmNow.tm_hour < 12 ? "AM" : "PM");
     }
 
-    constexpr int16_t CLOCK_BAND_H = 44;
-    tft.fillRect(0, (int16_t)(SCREENSAVER_CLOCK_CY - CLOCK_BAND_H / 2), Config::SCREEN_WIDTH, CLOCK_BAND_H, TFT_BLACK);
-    tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
-    tft.setTextSize(5);
-    tft.drawString(timeBuf, Config::SCREEN_WIDTH / 2, SCREENSAVER_CLOCK_CY);
-    tft.setTextSize(1);
-    tft.setTextDatum(TL_DATUM);
+    if (lastScreensaverTimeText != timeBuf) {
+        lastScreensaverTimeText = timeBuf;
+
+        constexpr int16_t CLOCK_BAND_H = 44;
+        tft.fillRect(0, (int16_t)(SCREENSAVER_CLOCK_CY - CLOCK_BAND_H / 2), Config::SCREEN_WIDTH, CLOCK_BAND_H, TFT_BLACK);
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+        tft.setTextSize(5);
+        tft.drawString(timeBuf, Config::SCREEN_WIDTH / 2, SCREENSAVER_CLOCK_CY);
+        tft.setTextSize(1);
+        tft.setTextDatum(TL_DATUM);
+    }
 
     char dateBuf[12];
     formatLocalizedDate(tmNow, dateBuf, sizeof(dateBuf));
-    constexpr int16_t DATE_BAND_H = 20;
-    tft.fillRect(0, (int16_t)(SCREENSAVER_DATE_CY - DATE_BAND_H / 2), Config::SCREEN_WIDTH, DATE_BAND_H, TFT_BLACK);
-    tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
-    tft.setTextSize(2);
-    tft.drawString(dateBuf, Config::SCREEN_WIDTH / 2, SCREENSAVER_DATE_CY);
-    tft.setTextSize(1);
-    tft.setTextDatum(TL_DATUM);
+    if (lastScreensaverDateText != dateBuf) {
+        lastScreensaverDateText = dateBuf;
+
+        constexpr int16_t DATE_BAND_H = 20;
+        tft.fillRect(0, (int16_t)(SCREENSAVER_DATE_CY - DATE_BAND_H / 2), Config::SCREEN_WIDTH, DATE_BAND_H, TFT_BLACK);
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+        tft.setTextSize(2);
+        tft.drawString(dateBuf, Config::SCREEN_WIDTH / 2, SCREENSAVER_DATE_CY);
+        tft.setTextSize(1);
+        tft.setTextDatum(TL_DATUM);
+    }
 }
 
 constexpr int16_t WIFI_ICON_W = 22;
@@ -953,6 +976,8 @@ void loop() {
                 MenuStars::reset();
                 drawScreensaverLogo();
                 drawScreensaverVersion();
+                lastScreensaverTimeText = "";
+                lastScreensaverDateText = "";
                 lastScreensaverClockMs = 0; // sofortiges erstes Zeichnen erzwingen
             } else {
                 // Bewusst ganz aus (0) statt nur gedimmt - fuer den
