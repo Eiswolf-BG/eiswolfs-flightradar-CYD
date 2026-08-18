@@ -40,7 +40,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Color-coded aircraft** by altitude (green `<10k ft`, yellow `10-30k ft`, red `>30k ft`) with an on-screen legend
 - **Tap an aircraft** to open a detail panel: callsign, airline, aircraft model (via [hexdb.io](https://hexdb.io)), flight route (origin/destination airport, resolved via a chain of three free lookup services for better coverage), altitude/speed/distance/heading in both metric and aviation units, estimated seat count, plus a "QR" button that shows a full-screen QR code linking to that flight's live-tracking page on FlightAware
 - **Bearing indicator** – with an aircraft selected, a dotted line plus a heading-in-degrees label points from the radar center to the compass edge, showing exactly which direction to look to spot it in the sky (not to be confused with the aircraft's own heading arrow)
-- **Empty-sky timer** – when no aircraft are currently in range, the info bar counts up how long the sky's been empty instead of showing the usual "tap for details" hint
+- **Empty-sky timer** – when no aircraft are currently in range, the info bar counts up how long the sky's been empty instead of showing the usual "tap for details" hint, which itself now also shows how many aircraft are currently visible
 - **Adjustable range** (10/25/50/100 km) via on-screen button
 - **Aircraft list view** – a sortable list (by distance, altitude, or callsign) of every aircraft currently in range, tap any row to jump straight to its detail panel (see [Aircraft List](#-aircraft-list) below)
 - **Touch-driven WiFi setup** and on-screen keyboard for first-time configuration, with up to 3 saved networks (see [WiFi Manager](#-wifi-manager-up-to-3-saved-networks) below)

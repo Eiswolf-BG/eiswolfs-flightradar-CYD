@@ -136,6 +136,14 @@ enum class StringId : uint8_t {
     RADAR_TAP_FOR_DETAILS,
     RADAR_EMPTY_SKY_PREFIX,
 
+    // Anzahl aktuell sichtbarer Flugzeuge, der Hinweiszeile RADAR_TAP_FOR_DETAILS
+    // vorangestellt (radar_screen.cpp, "kind == TapForDetails"-Zweig) - z.B.
+    // "5 Flugzeuge - Für mehr Details ein Flugzeug antippen". SINGULAR ist der
+    // komplette Text fuer genau 1 Flugzeug, PLURAL_SUFFIX wird an die Zahl
+    // angehaengt (String(count) + PLURAL_SUFFIX) fuer 0 oder mehr als 1.
+    RADAR_AIRCRAFT_COUNT_SINGULAR,
+    RADAR_AIRCRAFT_COUNT_PLURAL_SUFFIX,
+
     DETAIL_MODEL,
     DETAIL_TYPE,
     DETAIL_LOADING_DOTS,
