@@ -499,11 +499,24 @@ void drawScreensaverClock() {
     if (lastScreensaverTimeText != timeBuf) {
         lastScreensaverTimeText = timeBuf;
 
+        // WICHTIG: TFT_eSPI zeichnet bei MC_DATUM + Freefont (UiFont11pt) UND
+        // unterschiedlicher Text-/Hintergrundfarbe intern selbst ein
+        // Hintergrund-Rechteck vor dem Text (siehe TFT_eSPI.cpp drawString()).
+        // Dessen Hoehe basiert NICHT auf den tatsaechlich gezeichneten Ziffern,
+        // sondern auf dem groessten Ascent/Descent des GESAMTEN Fonts
+        // (glyph_ab/glyph_bb, einmalig von setFreeFont() ueber alle Zeichen
+        // berechnet) - bei textSize(5) reicht dieses interne Rechteck bis zu
+        // 45px unter SCREENSAVER_CLOCK_CY und ueberschrieb damit unsichtbar
+        // einen Teil des darunterliegenden Datums, sobald sich die Uhrzeit
+        // (nicht das Datum) aenderte. Das war die Ursache des "zusammen-
+        // geschobenen" Datums im Ruhebildschirm. textSize(3) haelt dieses
+        // interne Rechteck bei SCREENSAVER_CLOCK_CY=236 auf 218..263, also mit
+        // 5px Abstand ueber dem Datums-Streifen (Band beginnt bei 268).
         constexpr int16_t CLOCK_BAND_H = 44;
         tft.fillRect(0, (int16_t)(SCREENSAVER_CLOCK_CY - CLOCK_BAND_H / 2), Config::SCREEN_WIDTH, CLOCK_BAND_H, TFT_BLACK);
         tft.setTextDatum(MC_DATUM);
         tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
-        tft.setTextSize(5);
+        tft.setTextSize(3);
         tft.drawString(timeBuf, Config::SCREEN_WIDTH / 2, SCREENSAVER_CLOCK_CY);
         tft.setTextSize(1);
         tft.setTextDatum(TL_DATUM);
