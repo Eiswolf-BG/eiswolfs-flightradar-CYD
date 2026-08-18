@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "3.7.6";
+    constexpr const char* APP_VERSION = "3.7.7";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -68,6 +68,18 @@ namespace Config {
     // minuetlich und die kostenlose Open-Meteo-API soll nicht unnoetig oft
     // belastet werden.
     constexpr uint32_t WEATHER_FETCH_INTERVAL_MS = 600000; // 10 Minuten
+
+    // Intervall fuer die automatische Hintergrund-Pruefung auf neue
+    // Firmware-Updates (siehe OtaUpdate::pollBackground(), aufgerufen aus
+    // net_task.cpp) - ein neues Firmware-Release erscheint zwar hoechstens
+    // alle paar Wochen, 3 Minuten sind aber bewusst trotzdem gewaehlt: so
+    // zeigt sich ein frisch veroeffentlichtes Update schnell als Badge, statt
+    // erst nach einer viertel Stunde. 3 Minuten = maximal 20 Anfragen/Stunde
+    // an die GitHub-API, immer noch unter deren anonymem Limit von 60
+    // Anfragen/Stunde - bei mehreren Geraeten an derselben Heim-IP
+    // entsprechend vervielfacht, im Blick behalten, falls das Limit je
+    // erreicht wird.
+    constexpr uint32_t OTA_BACKGROUND_CHECK_INTERVAL_MS = 3UL * 60UL * 1000UL; // 3 Minuten
 
     constexpr float DEFAULT_PROXIMITY_ALERT_KM = 8.0f;
 

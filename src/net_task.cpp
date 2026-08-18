@@ -11,6 +11,7 @@
 #include "led_alert.h"
 #include "web_export_server.h"
 #include "weather.h"
+#include "ota_update.h"
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -41,6 +42,11 @@ namespace {
 
             AircraftDetails::update();
             Weather::update();
+            // Kuemmert sich intern um ihr eigenes, deutlich selteneres
+            // Intervall (Config::OTA_BACKGROUND_CHECK_INTERVAL_MS, siehe
+            // ota_update.cpp) - hier einfach jede Schleife mit aufrufen,
+            // genau wie Weather::update() oben.
+            OtaUpdate::pollBackground();
             // Unabhaengig vom Erfolg der ADS-B-Abfrage weiter unten pruefen,
             // damit die 24h-Sicherheitsabschaltung des Flugbuchs auch waehrend
             // laengerer WLAN-/ADS-B-Ausfaelle zuverlaessig greift (siehe
