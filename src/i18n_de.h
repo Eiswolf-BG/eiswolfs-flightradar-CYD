@@ -135,6 +135,8 @@ static const char* const I18N_DE[] = {
 
     "Für mehr Details ein Flugzeug antippen",
     "Leerer Himmel seit ",
+    "1 Flugzeug",
+    " Flugzeuge",
 
     "Modell: ",
     "Typ: ",

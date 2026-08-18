@@ -135,6 +135,8 @@ static const char* const I18N_TR[] = {
 
     "Daha fazla ayrıntı için bir uçağa dokunun",
     "Boş gökyüzü: ",
+    "1 uçak",
+    " uçak",
 
     "Model: ",
     "Tip: ",

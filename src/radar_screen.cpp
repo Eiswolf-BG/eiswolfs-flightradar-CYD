@@ -1436,7 +1436,14 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
         infoText = String(I18n::t(StringId::RADAR_EMPTY_SKY_PREFIX)) + buf;
     } else {
         kind = InfoMsgKind::TapForDetails;
-        infoText = I18n::t(StringId::RADAR_TAP_FOR_DETAILS);
+        // Anzahl sichtbarer Flugzeuge der Hinweiszeile voranstellen (z.B.
+        // "5 Flugzeuge - Für mehr Details ein Flugzeug antippen") - auf
+        // einen Blick sichtbar, ohne dass man erst tippen oder zaehlen
+        // muss. visibleCountNow ist oben ohnehin schon berechnet.
+        String countText = (visibleCountNow == 1)
+            ? I18n::t(StringId::RADAR_AIRCRAFT_COUNT_SINGULAR)
+            : String(visibleCountNow) + I18n::t(StringId::RADAR_AIRCRAFT_COUNT_PLURAL_SUFFIX);
+        infoText = countText + " - " + I18n::t(StringId::RADAR_TAP_FOR_DETAILS);
     }
 
     constexpr int16_t INFO_TEXT_X = 8;

@@ -135,6 +135,8 @@ static const char* const I18N_IT[] = {
 
     "Tocca un aereo per maggiori dettagli",
     "Cielo vuoto da ",
+    "1 aereo",
+    " aerei",
 
     "Modello: ",
     "Tipo: ",

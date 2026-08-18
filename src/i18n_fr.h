@@ -135,6 +135,8 @@ static const char* const I18N_FR[] = {
 
     "Touchez un avion pour plus de détails",
     "Ciel vide depuis ",
+    "1 avion",
+    " avions",
 
     "Modèle : ",
     "Type : ",

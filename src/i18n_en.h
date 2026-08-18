@@ -136,6 +136,8 @@ static const char* const I18N_EN[] = {
 
     "Tap an aircraft for more details",
     "Empty sky for ",
+    "1 aircraft",
+    " aircraft",
 
     "Model: ",
     "Type: ",
