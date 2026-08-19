@@ -9,38 +9,40 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 6;
 
     const char* const CHANGELOG_EN =
-        "- Fix: the \"what's new\" screen after an update now appears only "
-        "once the device is fully up and running, so tapping OK returns "
-        "straight to the live radar instead of a confusing pause";
+        "- New: tap the WiFi signal bars in the header to jump straight "
+        "to the WiFi settings\n"
+        "- New: tap the app title in the header for a QR code linking to "
+        "the project's GitHub page";
 
     const char* const CHANGELOG_DE =
-        "- Fix: Der 'Was ist neu'-Screen nach einer Aktualisierung "
-        "erscheint jetzt erst, wenn das Geraet vollstaendig hochgefahren "
-        "ist - ein Tipp auf OK fuehrt direkt zum Liveradar, statt einer "
-        "verwirrenden Pause";
+        "- Neu: Antippen der WLAN-Balken im Header fuehrt direkt zu den "
+        "WLAN-Einstellungen\n"
+        "- Neu: Antippen des App-Titels im Header zeigt einen QR-Code, "
+        "der zur GitHub-Seite des Projekts fuehrt";
 
     const char* const CHANGELOG_FR =
-        "- Correction : l'écran « nouveautés » après une mise à jour "
-        "n'apparaît désormais qu'une fois l'appareil complètement "
-        "démarré - toucher OK ramène directement au radar en direct, "
-        "sans pause déroutante";
+        "- Nouveau : toucher les barres de signal Wi-Fi dans l'en-tête "
+        "ouvre directement les réglages Wi-Fi\n"
+        "- Nouveau : toucher le titre de l'application dans l'en-tête "
+        "affiche un code QR menant à la page GitHub du projet";
 
     const char* const CHANGELOG_TR =
-        "- Düzeltme: Güncelleme sonrası 'yenilikler' ekranı artık cihaz "
-        "tamamen açıldıktan sonra gösteriliyor - OK'a dokunmak kafa "
-        "karıştırıcı bir bekleme yerine doğrudan canlı radara dönüyor";
+        "- Yeni: Üst bilgideki WiFi sinyal çubuklarına dokunmak "
+        "doğrudan WiFi ayarlarını açar\n"
+        "- Yeni: Üst bilgideki uygulama başlığına dokunmak, projenin "
+        "GitHub sayfasına götüren bir QR kodu gösterir";
 
     const char* const CHANGELOG_ES =
-        "- Corrección: la pantalla de novedades tras una actualización "
-        "ahora aparece solo cuando el dispositivo ya está completamente "
-        "iniciado - tocar OK vuelve directo al radar en vivo, sin una "
-        "pausa confusa";
+        "- Novedad: tocar las barras de señal WiFi en la cabecera abre "
+        "directamente los ajustes WiFi\n"
+        "- Novedad: tocar el título de la app en la cabecera muestra un "
+        "código QR que lleva a la página de GitHub del proyecto";
 
     const char* const CHANGELOG_IT =
-        "- Correzione: la schermata delle novità dopo un aggiornamento "
-        "ora appare solo quando il dispositivo è completamente avviato - "
-        "toccando OK si torna direttamente al radar live, senza una "
-        "pausa poco chiara";
+        "- Novità: toccare le barre del segnale WiFi nell'intestazione "
+        "apre direttamente le impostazioni WiFi\n"
+        "- Novità: toccare il titolo dell'app nell'intestazione mostra "
+        "un codice QR che porta alla pagina GitHub del progetto";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT
