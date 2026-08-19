@@ -4,6 +4,7 @@
 #include <SD.h>
 #include <WiFi.h>
 #include <time.h>
+#include <qrcode.h>
 
 #include "config.h"
 #include "aircraft.h"
@@ -21,6 +22,7 @@
 #include "touch_input.h"
 #include "calibration_screen.h"
 #include "wifi_setup_screen.h"
+#include "wifi_manage_screen.h"
 #include "menu_screen.h"
 #include "settings_store.h"
 #include "net_task.h"
@@ -107,10 +109,28 @@ struct Rect {
 
 Rect menuBtn = {Config::SCREEN_WIDTH - 90, 3, 54, 22};
 
+// Tippbereich fuer den Projekt-Titel oben links ("Eiswolfs FR", siehe
+// drawHeader()) - oeffnet den GitHub-QR-Code-Screen (runGithubQrScreen()
+// unten). Bewusst grosszuegig bemessen (bis kurz vor weatherIconRect),
+// nicht nur exakt der schmale Textbereich selbst - gleiches Prinzip wie
+// bei weatherIconRect/wifiIconRect.
+Rect titleRect = {0, 0, 100, 24};
+
 // Platz, an dem frueher der Cam-Button war (siehe entfernte Screenshot-
 // Funktion) - zeigt jetzt stattdessen ein kleines Wetter-Icon fuer den
 // aktuell aktiven Standort (siehe weather.cpp/Weather::update()).
 Rect weatherIconRect = {(int16_t)(menuBtn.x - 46), 3, 42, 22};
+
+// Tippbereich fuer die WLAN-Balken oben rechts (siehe updateWifiIcon()/
+// drawWifiIcon() unten, WIFI_ICON_W/H dort) - bewusst GROESSER als das
+// eigentlich gezeichnete 22x14px-Icon (rechts vom Menu-Button, in der
+// Luecke bis zum Bildschirmrand), damit das kleine Icon auch mit
+// ungenauem Tippen zuverlaessig trifft - gleiches Prinzip wie bei
+// weatherIconRect oben (auch dort ist der Tippbereich groesser als das
+// sichtbare Icon). Ueberlappt menuBtn nicht (startet erst 2px rechts von
+// dessen Ende).
+Rect wifiIconRect = {(int16_t)(menuBtn.x + menuBtn.w + 2), 3,
+                      (int16_t)(Config::SCREEN_WIDTH - (menuBtn.x + menuBtn.w + 2) - 2), 22};
 
 void drawMenuButton() {
     // Folgt jetzt dem auf dem Radar-Screen gewaehlten Farbschema (Menue >
@@ -486,6 +506,86 @@ void updateWifiIcon() {
     tft.fillRect(iconX, iconY, WIFI_ICON_W, WIFI_ICON_H, TFT_BLACK);
     if (WiFi.status() == WL_CONNECTED) {
         drawWifiIcon(Config::SCREEN_WIDTH - 4, iconY, WIFI_ICON_H, WiFi.RSSI());
+    }
+}
+
+// Vollbild-QR-Code, der auf das GitHub-Repository des Projekts verlinkt -
+// erreichbar durch Antippen des Projekt-Titels ("Eiswolfs FR") oben links
+// im Header (siehe titleRect oben, Tap-Handling in loop()). Gleiches
+// Zeichen-/Ablaufmuster wie radar_screen.cpp::runFlightQrScreen() (dort
+// fuer den Live-Tracking-Link eines konkreten Fluges), hier aber ohne
+// dynamischen Inhalt - Titel und Ziel-URL sind fest. Bewusst fest TFT_GREEN
+// statt RadarScreen::themeColor() - alle anderen Vollbild-Screens in
+// main.cpp (z.B. showWeatherInfo()) bleiben ebenfalls fest gruen, nur der
+// persistente Menu-Header-Button folgt dem gewaehlten Farbschema (siehe
+// Kommentar bei RadarScreen::themeColor() in radar_screen.h).
+void runGithubQrScreen(TFT_eSPI& tftRef) {
+    MenuStars::reset();
+    tftRef.setTextSize(1);
+
+    constexpr int16_t TITLE_CY = 20;
+    // Textgroesse 2 (siehe drawString() unten) - Zeichenhoehe des
+    // eingebauten Fonts ist 8px, mal Groesse 2 = 16px, MC_DATUM zentriert
+    // also 8px ueber und unter TITLE_CY.
+    constexpr int16_t TITLE_BOTTOM = TITLE_CY + 8;
+
+    constexpr uint8_t QR_VERSION = 4;
+    constexpr int16_t QR_SIZE_MODULES = 33; // Version 4: 4*4+17 = 33
+    constexpr int16_t QR_BLOCK = 4;
+    constexpr int16_t QR_QUIET = 2;
+    constexpr int16_t QR_PIXEL_SIZE = (QR_SIZE_MODULES + 2 * QR_QUIET) * QR_BLOCK;
+    constexpr int16_t QR_X = (Config::SCREEN_WIDTH - QR_PIXEL_SIZE) / 2;
+
+    constexpr int16_t BACK_BTN_TOP = Config::SCREEN_HEIGHT - 50;
+    // Mittig im freien Raum zwischen Titel und Zurueck-Button platziert
+    // (Alex' Wunsch: vorher war der QR-Code spuerbar zu weit oben) statt
+    // eines festen Y-Werts.
+    constexpr int16_t QR_Y = TITLE_BOTTOM + (BACK_BTN_TOP - TITLE_BOTTOM - QR_PIXEL_SIZE) / 2;
+
+    Rect backBtn = {10, BACK_BTN_TOP, (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+
+    // Feste Projekt-URL - 54 Zeichen, komfortabel innerhalb der 78-Byte-
+    // Kapazitaet von QR-Version 4 bei ECC_LOW (gleiche Version wie beim
+    // Flug-QR-Code oben, dessen URLs aehnlich lang sind).
+    constexpr const char* GITHUB_URL = "https://github.com/Eiswolf-BG/eiswolfs-flightradar-CYD";
+
+    uint8_t qrData[qrcode_getBufferSize(QR_VERSION)];
+    QRCode qrcode;
+    qrcode_initText(&qrcode, qrData, QR_VERSION, ECC_LOW, GITHUB_URL);
+
+    tftRef.fillScreen(TFT_BLACK);
+    tftRef.setTextDatum(MC_DATUM);
+    tftRef.setTextColor(TFT_GREEN, TFT_BLACK);
+    tftRef.setTextSize(2);
+    tftRef.drawString("Eiswolf's Github", Config::SCREEN_WIDTH / 2, TITLE_CY);
+    tftRef.setTextSize(1);
+    tftRef.setTextDatum(TL_DATUM);
+
+    tftRef.fillRect(QR_X, QR_Y, QR_PIXEL_SIZE, QR_PIXEL_SIZE, TFT_WHITE);
+    for (uint8_t my = 0; my < qrcode.size; my++) {
+        for (uint8_t mx = 0; mx < qrcode.size; mx++) {
+            if (qrcode_getModule(&qrcode, mx, my)) {
+                int16_t px = (int16_t)(QR_X + (QR_QUIET + mx) * QR_BLOCK);
+                int16_t py = (int16_t)(QR_Y + (QR_QUIET + my) * QR_BLOCK);
+                tftRef.fillRect(px, py, QR_BLOCK, QR_BLOCK, TFT_BLACK);
+            }
+        }
+    }
+
+    tftRef.fillRoundRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h, 4, TFT_BLACK);
+    tftRef.drawRoundRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h, 4, TFT_GREEN);
+    tftRef.setTextDatum(MC_DATUM);
+    tftRef.setTextColor(TFT_GREEN, TFT_BLACK);
+    tftRef.drawString(I18n::t(StringId::BACK), backBtn.x + backBtn.w / 2, backBtn.y + backBtn.h / 2);
+    tftRef.setTextDatum(TL_DATUM);
+
+    while (true) {
+        TouchInput::Point tap;
+        if (TouchInput::wasTapped(tap)) {
+            if (backBtn.contains(tap.x, tap.y)) return;
+        }
+        MenuStars::update(tftRef);
+        delay(20);
     }
 }
 
@@ -929,7 +1029,17 @@ void loop() {
     }
 
     if (tapped) {
-        if (menuBtn.contains(tap.x, tap.y)) {
+        if (titleRect.contains(tap.x, tap.y)) {
+            // Vollbild-QR-Code auf das GitHub-Repository - siehe
+            // runGithubQrScreen() oben.
+            runGithubQrScreen(tft);
+            // Gleicher Grund wie bei den anderen Vollbild-Overlays unten -
+            // auch dieser Screen ueberschreibt den kompletten Bildschirm.
+            RadarScreen::invalidatePanel();
+            drawHeader();
+            updateStatusLine();
+            forceRedraw = true;
+        } else if (menuBtn.contains(tap.x, tap.y)) {
             MenuScreen::run(tft);
             // Menue lief als Vollbild-Screen und kann dabei ein evtl. noch
             // offenes Flugzeug-Detail-Panel komplett ueberschrieben haben -
@@ -946,6 +1056,18 @@ void loop() {
             showWeatherInfo(tft);
             // Gleicher Grund wie beim Menue oben - auch der Wetter-Info-
             // Screen ist ein Vollbild-Overlay.
+            RadarScreen::invalidatePanel();
+            drawHeader();
+            updateStatusLine();
+            forceRedraw = true;
+        } else if (wifiIconRect.contains(tap.x, tap.y)) {
+            // Gleiche Vollbild-Overlay-WLAN-Einstellungen wie ueber Menue >
+            // WLAN erreichbar (siehe menu_screen.cpp) - hier per Antippen
+            // der WLAN-Balken direkt vom Radarscreen aus erreichbar, ohne
+            // erst durchs Menue zu muessen.
+            WifiManageScreen::run(tft);
+            // Gleicher Grund wie beim Menue oben - auch dieser Screen ist
+            // ein Vollbild-Overlay.
             RadarScreen::invalidatePanel();
             drawHeader();
             updateStatusLine();
