@@ -198,6 +198,13 @@ void run(TFT_eSPI& tft) {
             }
         }
 
+        // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS. Nicht
+        // waehrend aktivem Ziehen des Schiebereglers ausloesen (dragging) -
+        // dabei bleibt lastTapMs unveraendert (wasTapped() feuert erst beim
+        // Loslassen), ein laengerer Ziehvorgang darf aber nicht als
+        // Inaktivitaet gewertet werden.
+        if (!dragging && TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) done = true;
+
         MenuStars::update(tft);
         delay(20);
     }

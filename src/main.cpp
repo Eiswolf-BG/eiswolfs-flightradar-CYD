@@ -38,6 +38,7 @@
 #include "first_run_complete_screen.h"
 #include "menu_stars.h"
 #include "radar_logo.h"
+#include "github_screen_logo_image.h"
 #include "ui_font.h"
 #include "changelog.h"
 #include "ota_update.h"
@@ -523,28 +524,34 @@ void runGithubQrScreen(TFT_eSPI& tftRef) {
     MenuStars::reset();
     tftRef.setTextSize(1);
 
-    constexpr int16_t TITLE_CY = 20;
-    // Textgroesse 2 (siehe drawString() unten) - Zeichenhoehe des
-    // eingebauten Fonts ist 8px, mal Groesse 2 = 16px, MC_DATUM zentriert
-    // also 8px ueber und unter TITLE_CY.
-    constexpr int16_t TITLE_BOTTOM = TITLE_CY + 8;
+    // Alex' eigenes Avatar-Bild (auf all seinen Social-Kanaelen genutzt)
+    // statt des Radar-Logos vom Splashscreen - als 240x240px Graustufen-
+    // RGB565-Bitmap eingebettet (siehe github_screen_logo_image.h), ueber
+    // die VOLLE Bildschirmbreite bis knapp ueber den Zurueck-Button (Alex'
+    // Wunsch: "Foto in voller Breite direkt auf den Zurueckbutton, 5px
+    // darueber"). Der QR-Code liegt oben links im dunklen Bildbereich neben
+    // dem Kopf, statt darunter Platz zu beanspruchen.
+    constexpr int16_t BACK_BTN_H = 30;
+    constexpr int16_t BACK_BTN_TOP = Config::SCREEN_HEIGHT - 40;
+    constexpr int16_t LOGO_GAP_ABOVE_BTN = 5;
+    constexpr int16_t LOGO_BOTTOM = BACK_BTN_TOP - LOGO_GAP_ABOVE_BTN;
+    constexpr int16_t LOGO_TOP = LOGO_BOTTOM - GITHUB_SCREEN_LOGO_H;
 
     constexpr uint8_t QR_VERSION = 4;
     constexpr int16_t QR_SIZE_MODULES = 33; // Version 4: 4*4+17 = 33
-    constexpr int16_t QR_BLOCK = 4;
+    constexpr int16_t QR_BLOCK = 2;
     constexpr int16_t QR_QUIET = 2;
     constexpr int16_t QR_PIXEL_SIZE = (QR_SIZE_MODULES + 2 * QR_QUIET) * QR_BLOCK;
-    constexpr int16_t QR_X = (Config::SCREEN_WIDTH - QR_PIXEL_SIZE) / 2;
+    // Ganz oben links in die Bildschirmecke (Alex' Wunsch: "sollte das Foto
+    // nicht beruehren, ganz hoch ins linke Eck damit") - unabhaengig von
+    // LOGO_TOP an der Bildschirmkante ausgerichtet, statt am Bildanfang, da
+    // Alex' Foto bis dicht an die obere linke Ecke heranreicht.
+    constexpr int16_t QR_X = 4;
+    constexpr int16_t QR_Y = 4;
 
-    constexpr int16_t BACK_BTN_TOP = Config::SCREEN_HEIGHT - 50;
-    // Mittig im freien Raum zwischen Titel und Zurueck-Button platziert
-    // (Alex' Wunsch: vorher war der QR-Code spuerbar zu weit oben) statt
-    // eines festen Y-Werts.
-    constexpr int16_t QR_Y = TITLE_BOTTOM + (BACK_BTN_TOP - TITLE_BOTTOM - QR_PIXEL_SIZE) / 2;
+    Rect backBtn = {10, BACK_BTN_TOP, (int16_t)(Config::SCREEN_WIDTH - 20), BACK_BTN_H};
 
-    Rect backBtn = {10, BACK_BTN_TOP, (int16_t)(Config::SCREEN_WIDTH - 20), 40};
-
-    // Feste Projekt-URL - 54 Zeichen, komfortabel innerhalb der 78-Byte-
+    // Feste Projekt-URL - 56 Zeichen, komfortabel innerhalb der 78-Byte-
     // Kapazitaet von QR-Version 4 bei ECC_LOW (gleiche Version wie beim
     // Flug-QR-Code oben, dessen URLs aehnlich lang sind).
     constexpr const char* GITHUB_URL = "https://github.com/Eiswolf-BG/eiswolfs-flightradar-CYD";
@@ -554,12 +561,13 @@ void runGithubQrScreen(TFT_eSPI& tftRef) {
     qrcode_initText(&qrcode, qrData, QR_VERSION, ECC_LOW, GITHUB_URL);
 
     tftRef.fillScreen(TFT_BLACK);
-    tftRef.setTextDatum(MC_DATUM);
-    tftRef.setTextColor(TFT_GREEN, TFT_BLACK);
-    tftRef.setTextSize(2);
-    tftRef.drawString("Eiswolf's Github", Config::SCREEN_WIDTH / 2, TITLE_CY);
-    tftRef.setTextSize(1);
-    tftRef.setTextDatum(TL_DATUM);
+    // setSwapBytes(true) noetig, damit pushImage() unser Graustufen-Array
+    // korrekt (statt farbstichig) darstellt - direkt danach wieder auf
+    // false zurueckgesetzt, damit alle anderen Zeichenoperationen (Text,
+    // fillRect etc.) unveraendert bleiben.
+    tftRef.setSwapBytes(true);
+    tftRef.pushImage(0, LOGO_TOP, GITHUB_SCREEN_LOGO_W, GITHUB_SCREEN_LOGO_H, GITHUB_SCREEN_LOGO);
+    tftRef.setSwapBytes(false);
 
     tftRef.fillRect(QR_X, QR_Y, QR_PIXEL_SIZE, QR_PIXEL_SIZE, TFT_WHITE);
     for (uint8_t my = 0; my < qrcode.size; my++) {
@@ -572,10 +580,13 @@ void runGithubQrScreen(TFT_eSPI& tftRef) {
         }
     }
 
+    // Grauer statt gruener Button (Alex' Wunsch: "Zurueckbutton soll graue
+    // Schrift und eine graue Umrandung haben") - passt zum zurueckhaltenden,
+    // graustufigen Look dieses Screens (Foto + graue Sterne).
     tftRef.fillRoundRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h, 4, TFT_BLACK);
-    tftRef.drawRoundRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h, 4, TFT_GREEN);
+    tftRef.drawRoundRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h, 4, TFT_LIGHTGREY);
     tftRef.setTextDatum(MC_DATUM);
-    tftRef.setTextColor(TFT_GREEN, TFT_BLACK);
+    tftRef.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
     tftRef.drawString(I18n::t(StringId::BACK), backBtn.x + backBtn.w / 2, backBtn.y + backBtn.h / 2);
     tftRef.setTextDatum(TL_DATUM);
 
@@ -584,7 +595,11 @@ void runGithubQrScreen(TFT_eSPI& tftRef) {
         if (TouchInput::wasTapped(tap)) {
             if (backBtn.contains(tap.x, tap.y)) return;
         }
-        MenuStars::update(tftRef);
+        // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+        if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return;
+        // gray=true - graue statt gruene Sterne (Alex' Wunsch), siehe
+        // Kommentar bei MenuStars::update().
+        MenuStars::update(tftRef, true);
         delay(20);
     }
 }
