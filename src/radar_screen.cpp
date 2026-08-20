@@ -13,6 +13,7 @@
 #include "world_map.h"
 #include "airline_filter.h"
 #include "aircraft_watchlist.h"
+#include "aircraft_watchlist_screen.h"
 #include "i18n.h"
 #include "touch_input.h"
 #include "menu_stars.h"
@@ -81,9 +82,49 @@ namespace {
         bool isGroundVehicle;
         bool isRotorcraft;
         bool isHeavy;
+        // Fuer den CRT-Phosphor-Effekt (siehe crtPhosphorColor() unten) -
+        // bearingDeg wird fuer die Sweep-Treffer-Erkennung in tick()
+        // gebraucht, crtFadeEligible markiert niedrig fliegende Flugzeuge
+        // (Warnfarben/Bodenfahrzeuge sind NIE davon betroffen).
+        float bearingDeg;
+        bool crtFadeEligible;
     };
     constexpr uint8_t MAX_HIT_POINTS = Config::MAX_TRACKED_AIRCRAFT;
     HitPoint hitPoints[MAX_HIT_POINTS];
+
+    // Phosphor-Nachleucht-Zustand fuer den CRT-Phosphor-Effekt, hex-basiert
+    // statt ueber den hitPoints-Index verknuepft - der Index aendert sich bei
+    // jedem render() durch die entfernungsbasierte Neusortierung in
+    // AircraftTable::postFetchUpdate(), ein Flugzeug muesste sonst bei jeder
+    // Neusortierung seinen Nachleucht-Fortschritt verlieren. Laeuft
+    // kontinuierlich im Hintergrund mit (unabhaengig vom aktiven
+    // Farbschema), damit beim Umschalten mitten im Betrieb sofort ein
+    // konsistenter Zustand vorliegt - siehe render()/tick().
+    struct PhosphorEntry {
+        char hex[7] = {0};
+        bool used = false;
+        bool seenThisRender = false;
+        bool everSwept = false;
+        uint32_t lastSweptMs = 0;
+    };
+    PhosphorEntry phosphorEntries[MAX_HIT_POINTS];
+
+    PhosphorEntry* findOrCreatePhosphor(const char* hex) {
+        for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) {
+            if (phosphorEntries[i].used && strcmp(phosphorEntries[i].hex, hex) == 0) {
+                return &phosphorEntries[i];
+            }
+        }
+        for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) {
+            if (!phosphorEntries[i].used) {
+                phosphorEntries[i] = PhosphorEntry{};
+                phosphorEntries[i].used = true;
+                strncpy(phosphorEntries[i].hex, hex, sizeof(phosphorEntries[i].hex) - 1);
+                return &phosphorEntries[i];
+            }
+        }
+        return nullptr; // sollte nie vorkommen, gleiche Kapazitaet wie hitPoints[]
+    }
 
     char selectedHex[7] = {0};
 
@@ -227,6 +268,34 @@ namespace {
     float prevSweepAngleDeg = -1.0f;
     constexpr float SWEEP_DEGREES_PER_SEC = 45.0f;
 
+    // Volle Umdrehung in ms - Fade-Dauer des CRT-Phosphor-Effekts (siehe
+    // crtPhosphorColor() unten), an SWEEP_DEGREES_PER_SEC gekoppelt statt
+    // fest verdrahtet, damit beides zwangslaeufig synchron bleibt.
+    constexpr uint32_t CRT_FADE_MS = (uint32_t)(360.0f / SWEEP_DEGREES_PER_SEC * 1000.0f);
+
+    // Ankreuzbares Extra "Radar-Puls" (SettingsStore::radarPulseEnabled(),
+    // siehe radar_theme_screen.cpp) - ein auslaufender Ring vom Radar-
+    // Zentrum aus bei jedem frischen ADS-B-Datenabruf, ausgeloest in
+    // render() ueber einen Versionsvergleich (siehe lastPulseVersion dort)
+    // und animiert in tick() ueber PULSE_DURATION_MS.
+    bool pulseActive = false;
+    uint32_t pulseStartMs = 0;
+    // -1 = im letzten Tick kein Ring gezeichnet, nichts zu loeschen.
+    int16_t prevPulseRadius = -1;
+    constexpr uint32_t PULSE_DURATION_MS = 1400;
+    // Reicht ueber den reinen Radar-Kreis hinaus Richtung Bildschirmrand,
+    // ohne die exakten Bildschirmecken auszurechnen (Alex' Wunsch: "ca. das
+    // 1.4-fache des Radar-Kreis-Radius").
+    constexpr float PULSE_MAX_RADIUS_FACTOR = 1.4f;
+
+    // Merkt sich die zuletzt in render() gesehene AircraftTable::version() -
+    // NICHT bei jedem render()-Aufruf pulsen, da viele Aufrufe nur durch
+    // UI-bedingtes forceRedraw kommen (siehe main.cpp), nicht durch echte
+    // neue Daten. Startwert absichtlich 0xFFFFFFFF (statt UINT32_MAX, um
+    // nicht von <cstdint> abhaengig zu sein), damit der allererste
+    // render()-Aufruf ebenfalls als "neue Daten" zaehlt.
+    uint32_t lastPulseVersion = 0xFFFFFFFFu;
+
     // Gleiche Logik wie main.cpp::isNightDimHours() - Nacht = zwischen
     // Sonnenuntergang und Sonnenaufgang am aktiven Standort (siehe
     // sun_times.h), mit Rueckfall auf ein festes 22:00-06:00-Fenster,
@@ -302,6 +371,60 @@ namespace {
     // Dimm-Ton (160,30,0) sah auf dem Display eher orange-braun statt rot
     // aus und war dadurch nicht mehr klar von der gelben Stufe zu
     // unterscheiden. Rot bleibt deshalb Tag und Nacht der reine TFT_RED-Ton.
+    // Ankreuzbares Extra "CRT-Phosphor" (SettingsStore::crtPhosphorEnabled(),
+    // siehe radar_theme_screen.cpp) - unabhaengig vom gewaehlten Farbschema
+    // (Gruen/Amber/Blau) kombinierbar, faedet niedrig fliegende Flugzeug-
+    // Marker in der jeweiligen Themefarbe aus, siehe crtPhosphorColor().
+    bool crtModeActive() {
+        return SettingsStore::crtPhosphorEnabled();
+    }
+
+    // Skaliert eine RGB565-Farbe gleichmaessig auf allen drei Kanälen
+    // (0.0 = schwarz, 1.0 = unveraendert) - generischer Helper fuer den
+    // CRT-Phosphor-Fade UND den Radar-Puls-Ring (siehe unten), damit beide
+    // Effekte die jeweils aktive Themefarbe respektieren statt eine fest
+    // codierte Farbe zu verwenden.
+    uint16_t scaleColorBrightness(uint16_t color565, float fraction) {
+        if (fraction < 0.0f) fraction = 0.0f;
+        if (fraction > 1.0f) fraction = 1.0f;
+        uint16_t r5 = (color565 >> 11) & 0x1F;
+        uint16_t g6 = (color565 >> 5) & 0x3F;
+        uint16_t b5 = color565 & 0x1F;
+        r5 = (uint16_t)(r5 * fraction + 0.5f);
+        g6 = (uint16_t)(g6 * fraction + 0.5f);
+        b5 = (uint16_t)(b5 * fraction + 0.5f);
+        return (uint16_t)((r5 << 11) | (g6 << 5) | b5);
+    }
+
+    // Helligkeit des CRT-Phosphor-Markers zum Zeitpunkt "nowMs": TFT_BLACK
+    // (unsichtbar), solange der Sweep-Strahl das Flugzeug noch nie erfasst
+    // hat (ph == nullptr oder everSwept == false) - taucht ein Flugzeug neu
+    // auf, bleibt es also bis zum naechsten Strahl-Treffer verborgen. Danach
+    // faedet die Farbe ueber eine volle Umdrehung (CRT_FADE_MS) linear von
+    // der aktuell gewaehlten Themefarbe (voll) auf ein dunkles Minimum
+    // (~40/255 = "fast verblasst") aus - respektiert also Gruen/Amber/Blau.
+    uint16_t crtPhosphorColor(TFT_eSPI& gfx, const PhosphorEntry* ph, uint32_t nowMs) {
+        if (!ph || !ph->everSwept) return TFT_BLACK;
+        uint32_t elapsed = nowMs - ph->lastSweptMs;
+        float fraction = (float)elapsed / (float)CRT_FADE_MS;
+        if (fraction > 1.0f) fraction = 1.0f;
+        constexpr float MIN_BRIGHTNESS_FRACTION = 40.0f / 255.0f;
+        float brightnessFraction = 1.0f - fraction * (1.0f - MIN_BRIGHTNESS_FRACTION);
+        uint16_t themeColor = nightDimActiveNow() ? themeDimColor(gfx) : themeBaseColor(gfx);
+        return scaleColorBrightness(themeColor, brightnessFraction);
+    }
+
+    // Bogen-Test mit 360/0-Wrap-Behandlung: ist "target" (eine Peilung in
+    // Grad) beim Fortschreiten des Sweep-Strahls von oldAngle zu newAngle
+    // ueberstrichen worden? Fuer den CRT-Phosphor-Effekt in tick().
+    bool sweepCrossedBearing(float oldAngle, float newAngle, float target) {
+        if (newAngle >= oldAngle) {
+            return target >= oldAngle && target < newAngle;
+        }
+        // Sweep ist ueber 360/0 gewrappt (z.B. oldAngle=350, newAngle=8).
+        return target >= oldAngle || target < newAngle;
+    }
+
     uint16_t colorForAltitude(TFT_eSPI& gfx, int32_t altFt) {
         bool dim = nightDimActiveNow();
         if (altFt < Config::COLOR_LOW_ALT_THRESHOLD_FT)
@@ -680,6 +803,18 @@ namespace {
         return {(int16_t)(Config::SCREEN_WIDTH - 42), (int16_t)(panelTop + 4), 38, 24};
     }
 
+    // Kleiner "+WL"/"-WL"-Button direkt links neben dem QR-Button (siehe
+    // drawDetailPanel()/handleTap() weiter unten) - fuegt das aktuell
+    // angezeigte Flugzeug per einem Tipp zur Beobachtungsliste
+    // (AircraftWatchlist) hinzu bzw. entfernt es wieder, statt den Umweg
+    // ueber Menue > Flugoptionen > Beobachtungsliste mit manueller
+    // Rufzeichen-Eingabe zu gehen. Gleiche Hoehe/Breite wie der QR-Button,
+    // 4px Abstand dazwischen.
+    Rect watchlistButtonRect(int16_t panelTop) {
+        Rect qr = qrButtonRect(panelTop);
+        return {(int16_t)(qr.x - 4 - 38), qr.y, 38, 24};
+    }
+
     // Zeichnet eine Detail-Panel-Zeile NEU, wenn sich ihr Text geaendert
     // hat (oder das Panel komplett neu aufgebaut wird) - merkt sich dabei
     // auch, ob der Text zu breit fuer die verfuegbare Breite ist
@@ -777,17 +912,19 @@ namespace {
         int16_t y = panelTop + 26;
 
         {
-            // QR_BTN_RESERVED_W spart rechts Platz fuer den neuen QR-Button
-            // (siehe qrButtonRect()) frei, damit ein langes Rufzeichen nicht
-            // darunter/dahinter verschwindet.
-            constexpr int16_t QR_BTN_RESERVED_W = 42;
+            // Reserviert rechts Platz fuer QR- UND Beobachtungslisten-Button
+            // (siehe qrButtonRect()/watchlistButtonRect()) frei, damit ein
+            // langes Rufzeichen nicht darunter/dahinter verschwindet -
+            // direkt aus watchlistButtonRect(panelTop).x berechnet (statt
+            // eines fest verdrahteten Breitenwerts), da dieser Button jetzt
+            // die linke Kante der reservierten Flaeche markiert.
             String txt = a.callsign[0] ? a.callsign : a.hex;
             bool callsignChanged = forceFull || lastPanel.callsignText != txt;
             if (callsignChanged) {
                 gfx.fillRect(0, y - 22, Config::SCREEN_WIDTH, 28, TFT_BLACK);
                 gfx.setTextColor(themeBaseColor(gfx), TFT_BLACK);
                 gfx.setTextSize(2);
-                int16_t callsignMaxW = a.callsign[0] ? (int16_t)(textMaxWidth - QR_BTN_RESERVED_W) : textMaxWidth;
+                int16_t callsignMaxW = a.callsign[0] ? (int16_t)(watchlistButtonRect(panelTop).x - 14) : textMaxWidth;
                 printLineTruncated(gfx, 8, y, callsignMaxW, txt);
                 gfx.setTextSize(1);
                 lastPanel.callsignText = txt;
@@ -817,6 +954,30 @@ namespace {
                     gfx.setTextDatum(MC_DATUM);
                     gfx.setTextColor(TFT_BLACK, themeBaseColor(gfx));
                     gfx.drawString("QR", qrBtn.x + qrBtn.w / 2, qrBtn.y + qrBtn.h / 2);
+                    gfx.setTextDatum(TL_DATUM);
+
+                    // Beobachtungslisten-Button direkt links daneben - zeigt
+                    // "+" oder "-" je nach Beobachtungsstatus, ABER das ist
+                    // rein informativ (nur das Symbol aendert sich).
+                    // Antippen bleibt in handleTap() unveraendert: fuegt ueber
+                    // AircraftWatchlist::addWatched() hinzu, falls noch nicht
+                    // drauf, und springt danach immer in den
+                    // Beobachtungslisten-Screen - kein direktes Entfernen ueber
+                    // diesen Button (frueherer Ansatz hatte einen Bug: das
+                    // rohe Rufzeichen aus dem Detail-Panel stimmte oft nicht
+                    // exakt mit der intern normalisierten Version in
+                    // AircraftWatchlist ueberein, siehe normalize() in
+                    // aircraft_watchlist.cpp - dadurch schlug das direkte
+                    // Entfernen oft fehl). Entfernen geschieht weiterhin nur
+                    // im Beobachtungslisten-Screen selbst ueber das
+                    // vorhandene "X". Gleicher visueller Stil wie der
+                    // QR-Button.
+                    Rect wlBtn = watchlistButtonRect(panelTop);
+                    gfx.fillRoundRect(wlBtn.x, wlBtn.y, wlBtn.w, wlBtn.h, 4, themeBaseColor(gfx));
+                    gfx.setTextDatum(MC_DATUM);
+                    gfx.setTextColor(TFT_BLACK, themeBaseColor(gfx));
+                    const char* wlSymbol = AircraftWatchlist::isWatched(a.callsign) ? "-" : "+";
+                    gfx.drawString(wlSymbol, wlBtn.x + wlBtn.w / 2, wlBtn.y + wlBtn.h / 2);
                     gfx.setTextDatum(TL_DATUM);
                 }
             }
@@ -1135,6 +1296,19 @@ void render(TFT_eSPI& tft, int16_t top) {
     Layout L = computeLayout(top);
     float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
+    // Radar-Puls-Trigger: NUR bei echter Datenaenderung (Versionsvergleich),
+    // nicht bei jedem render()-Aufruf - siehe Kommentar bei lastPulseVersion
+    // oben. Laeuft unabhaengig davon, ob gerade ein Detail-Panel offen ist,
+    // damit kein Datenwechsel waehrend eines geoeffneten Panels verloren geht.
+    uint32_t currentDataVersion = AircraftTable::version();
+    if (currentDataVersion != lastPulseVersion) {
+        lastPulseVersion = currentDataVersion;
+        if (SettingsStore::radarPulseEnabled()) {
+            pulseActive = true;
+            pulseStartMs = millis();
+        }
+    }
+
     bool panelAlreadyOpen = selectedHex[0] && lastPanel.valid &&
                             strcmp(lastPanel.hex, selectedHex) == 0;
 
@@ -1189,6 +1363,7 @@ void render(TFT_eSPI& tft, int16_t top) {
     uint8_t visibleCount = 0; // nach allen Filtern (Reichweite, Bodenfahrzeuge, Airline-Filter)
 
     for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) hitPoints[i].valid = false;
+    for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) phosphorEntries[i].seenThisRender = false;
 
     for (uint8_t i = 0; i < count && i < MAX_HIT_POINTS; i++) {
         Aircraft& a = snapshot[i];
@@ -1216,7 +1391,22 @@ void render(TFT_eSPI& tft, int16_t top) {
         // unten), der jetzt ausschliesslich fuer Militaer-/Regierungs-
         // Rufzeichen reserviert ist.
         bool isHeavy = isHeavyCategory(a.category);
-        uint16_t color = isGroundVehicle ? colorForGroundVehicle(tft) : colorForAltitude(tft, a.altBaroFt);
+        // Nur niedrig fliegende Flugzeuge (keine Bodenfahrzeuge) sind vom
+        // CRT-Phosphor-Effekt betroffen - Warnfarben (gelb/rot) und die
+        // blauen Bodenfahrzeug-Marker bleiben in JEDEM Farbschema immer voll
+        // sichtbar. Der Phosphor-Zustand wird unabhaengig vom aktiven
+        // Farbschema kontinuierlich mitgetrackt (siehe PhosphorEntry oben),
+        // nur die tatsaechliche Farbe wird ausschliesslich im CRT-Modus
+        // ueberschrieben.
+        bool crtFadeEligible = !isGroundVehicle && a.altBaroFt < Config::COLOR_LOW_ALT_THRESHOLD_FT;
+        uint16_t color;
+        if (crtFadeEligible) {
+            PhosphorEntry* ph = findOrCreatePhosphor(a.hex);
+            if (ph) ph->seenThisRender = true;
+            color = crtModeActive() ? crtPhosphorColor(tft, ph, millis()) : colorForAltitude(tft, a.altBaroFt);
+        } else {
+            color = isGroundVehicle ? colorForGroundVehicle(tft) : colorForAltitude(tft, a.altBaroFt);
+        }
         bool isSelected = selectedHex[0] && strcmp(a.hex, selectedHex) == 0;
         bool isEmergency = SettingsStore::emergencyAlertEnabled() && isEmergencySquawk(a.squawk);
         bool isWatched = SettingsStore::watchlistAlertEnabled() && AircraftWatchlist::isWatched(a.callsign);
@@ -1265,8 +1455,20 @@ void render(TFT_eSPI& tft, int16_t top) {
         hitPoints[i].isGroundVehicle = isGroundVehicle;
         hitPoints[i].isRotorcraft = isRotorcraft;
         hitPoints[i].isHeavy = isHeavy;
+        hitPoints[i].bearingDeg = a.bearingDeg;
+        hitPoints[i].crtFadeEligible = crtFadeEligible;
         strncpy(hitPoints[i].hex, a.hex, sizeof(hitPoints[i].hex) - 1);
         strncpy(hitPoints[i].callsign, a.callsign, sizeof(hitPoints[i].callsign) - 1);
+    }
+
+    // PhosphorEntry-Eintraege freigeben, die in diesem Durchlauf nicht
+    // gebraucht wurden (Flugzeug ausser Reichweite geraten oder ganz
+    // verschwunden) - sonst wuerde die feste Kapazitaet (gleiche Groesse wie
+    // hitPoints[]) irgendwann von "toten" Eintraegen belegt bleiben.
+    for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) {
+        if (phosphorEntries[i].used && !phosphorEntries[i].seenThisRender) {
+            phosphorEntries[i].used = false;
+        }
     }
 
     if (visibleCount > 0) lastAircraftSeenMs = millis();
@@ -1346,19 +1548,67 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
 
     if (prevSweepAngleDeg >= 0.0f) {
         drawSweepLine(tft, L, prevSweepAngleDeg, TFT_BLACK);
+        // Alten Radar-Puls-Ring (falls im letzten Tick gezeichnet) ebenfalls
+        // erst schwarz uebermalen, BEVOR der statische Hintergrund
+        // wiederhergestellt wird - gleiches Prinzip wie bei der Sweep-Linie.
+        if (prevPulseRadius >= 0) {
+            tft.drawCircle(L.cx, L.cy, prevPulseRadius, TFT_BLACK);
+        }
         drawStaticBackground(tft, L, rangeKm);
         tft.fillCircle(L.cx, L.cy, 3, TFT_WHITE);
     }
 
+    float oldSweepAngle = sweepAngleDeg;
     sweepAngleDeg += SWEEP_DEGREES_PER_SEC * (deltaMs / 1000.0f);
     if (sweepAngleDeg >= 360.0f) sweepAngleDeg -= 360.0f;
 
     drawSweepLine(tft, L, sweepAngleDeg, sweepLineColor(tft));
     prevSweepAngleDeg = sweepAngleDeg;
 
+    // Radar-Puls (SettingsStore::radarPulseEnabled(), ausgeloest in
+    // render() bei echter Datenaenderung) - Ring waechst linear ueber
+    // PULSE_DURATION_MS von 0 auf PULSE_MAX_RADIUS_FACTOR * L.radius, dabei
+    // faedet die Helligkeit gleichzeitig von voll auf 0. Die weiter unten
+    // folgende Flugzeug-Marker-Schleife zeichnet eventuell vom Ring
+    // ueberdeckte Marker automatisch wieder her (laeuft bei jedem Tick neu).
+    uint32_t nowMs = millis();
+    if (pulseActive) {
+        uint32_t elapsed = nowMs - pulseStartMs;
+        if (elapsed >= PULSE_DURATION_MS) {
+            pulseActive = false;
+            prevPulseRadius = -1;
+        } else {
+            float fraction = (float)elapsed / (float)PULSE_DURATION_MS;
+            int16_t pulseRadius = (int16_t)(fraction * L.radius * PULSE_MAX_RADIUS_FACTOR);
+            float brightnessFraction = 1.0f - fraction;
+            uint16_t pulseColor = scaleColorBrightness(sweepLineColor(tft), brightnessFraction);
+            tft.drawCircle(L.cx, L.cy, pulseRadius, pulseColor);
+            prevPulseRadius = pulseRadius;
+        }
+    }
+
     for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) {
         if (!hitPoints[i].valid) continue;
-        const HitPoint& hp = hitPoints[i];
+        HitPoint& hp = hitPoints[i];
+
+        // CRT-Phosphor-Effekt: Sweep-Treffer-Erkennung laeuft unabhaengig
+        // vom aktiven Farbschema kontinuierlich mit (siehe Kommentar bei
+        // crtFadeEligible in render()), die Marker-Farbe wird aber nur im
+        // CRT-Modus tatsaechlich ueberschrieben - alle anderen Marker
+        // (Warnfarben, Bodenfahrzeuge) bleiben unveraendert wie bisher.
+        if (hp.crtFadeEligible) {
+            if (sweepCrossedBearing(oldSweepAngle, sweepAngleDeg, hp.bearingDeg)) {
+                PhosphorEntry* ph = findOrCreatePhosphor(hp.hex);
+                if (ph) {
+                    ph->everSwept = true;
+                    ph->lastSweptMs = nowMs;
+                }
+            }
+            if (crtModeActive()) {
+                PhosphorEntry* ph = findOrCreatePhosphor(hp.hex);
+                hp.color = crtPhosphorColor(tft, ph, nowMs);
+            }
+        }
 
         bool inAlertRange = hp.distanceKm <= Config::LED_ALERT_RADIUS_KM;
         if (inAlertRange && !ledBlinkOn) {
@@ -1460,6 +1710,21 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
         Rect qrBtn = qrButtonRect(panelTop);
         if (lastPanel.callsign[0] && qrBtn.contains(x, y)) {
             runFlightQrScreen(tft, lastPanel.callsign);
+            lastPanel.valid = false;
+            headerRedrawNeeded = true;
+            return true;
+        }
+
+        Rect wlBtn = watchlistButtonRect(panelTop);
+        if (lastPanel.callsign[0] && wlBtn.contains(x, y)) {
+            // Ignoriert stillschweigend, falls das Flugzeug schon drauf
+            // steht oder die Liste voll ist - kein Problem, der
+            // Beobachtungslisten-Screen zeigt danach ohnehin den
+            // tatsaechlichen Stand.
+            AircraftWatchlist::addWatched(lastPanel.callsign);
+            AircraftWatchlistScreen::run(tft);
+            // Vollbild-Overlay wie der QR-Code-Screen - gleiches Muster wie
+            // beim QR-Button oben (Panel-Neuaufbau + Kopfzeile erneuern).
             lastPanel.valid = false;
             headerRedrawNeeded = true;
             return true;

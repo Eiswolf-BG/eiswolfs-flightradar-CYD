@@ -256,8 +256,8 @@ static const char* const I18N_DE[] = {
     "Bildschirm-Timeout",
     "Nach dieser Zeit ohne Berührung schaltet sich das Display ab, um Strom zu sparen. Ist der Ruhebildschirm aktiviert, zeigt es stattdessen einen gedimmten Sternenhimmel mit Uhrzeit.",
 
-    "Radar-Farbschema",
-    "Radar-Farbschema",
+    "Radar-Darstellung",
+    "Radar-Darstellung",
     "Grün (Standard)",
     "Amber",
     "Blau",
@@ -288,6 +288,9 @@ static const char* const I18N_DE[] = {
     "N", "NO", "O", "SO", "S", "SW", "W", "NW",
 
     "Bitte warten, Gerät startet neu...",
+
+    "CRT-Phosphor",
+    "Radar-Puls",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

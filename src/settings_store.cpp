@@ -27,6 +27,10 @@ namespace {
     uint8_t languageIdx = 0;
     uint8_t unitsModeVal = 0;
     uint8_t radarThemeIdx = 0;
+    // Zwei unabhaengige, ankreuzbare Radar-Extras (radar_theme_screen.cpp) -
+    // AUS per Default, siehe Kommentar in settings_store.h.
+    bool crtPhosphorOn = false;
+    bool radarPulseOn = false;
     char lastSeenVersionBuf[16] = {0};
 
     // MUSS auf SD persistiert werden (nicht nur im RAM halten): wird kurz
@@ -81,6 +85,10 @@ namespace {
         } else if (key == "radar_theme") {
             int v = value.toInt();
             if (v >= 0 && v <= 2) radarThemeIdx = (uint8_t)v;
+        } else if (key == "crt_phosphor") {
+            crtPhosphorOn = (value.toInt() != 0);
+        } else if (key == "radar_pulse") {
+            radarPulseOn = (value.toInt() != 0);
         } else if (key == "last_seen_version") {
             strncpy(lastSeenVersionBuf, value.c_str(), sizeof(lastSeenVersionBuf) - 1);
             lastSeenVersionBuf[sizeof(lastSeenVersionBuf) - 1] = 0;
@@ -146,6 +154,8 @@ void save() {
     f.printf("language=%d\n", languageIdx);
     f.printf("units_mode=%d\n", unitsModeVal);
     f.printf("radar_theme=%d\n", radarThemeIdx);
+    f.printf("crt_phosphor=%d\n", crtPhosphorOn ? 1 : 0);
+    f.printf("radar_pulse=%d\n", radarPulseOn ? 1 : 0);
     f.printf("last_seen_version=%s\n", lastSeenVersionBuf);
     f.printf("ota_just_installed=%d\n", otaJustInstalledFlag ? 1 : 0);
     f.close();
@@ -281,6 +291,20 @@ void setRadarThemeIndex(uint8_t idx) {
         radarThemeIdx = idx;
         save();
     }
+}
+
+bool crtPhosphorEnabled() { return crtPhosphorOn; }
+
+void setCrtPhosphorEnabled(bool on) {
+    crtPhosphorOn = on;
+    save();
+}
+
+bool radarPulseEnabled() { return radarPulseOn; }
+
+void setRadarPulseEnabled(bool on) {
+    radarPulseOn = on;
+    save();
 }
 
 String lastSeenVersion() { return String(lastSeenVersionBuf); }

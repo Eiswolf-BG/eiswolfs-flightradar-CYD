@@ -1,7 +1,7 @@
 #pragma once
 #include <Arduino.h>
 
-enum class StringId : uint8_t {
+enum class StringId : uint16_t {
     OK = 0,
     CANCEL,
     BACK,
@@ -444,6 +444,17 @@ enum class StringId : uint8_t {
     // getippt (Alex' Testbericht). Siehe infoScreen()'s tappedLabel-Parameter
     // in menu_screen.cpp.
     OTA_RESTARTING,
+
+    // Ankreuzbares Kaestchen im Radar-Darstellung-Menue (radar_theme_screen.cpp,
+    // SettingsStore::crtPhosphorEnabled()) - unabhaengig von den drei
+    // Farbschema-Buttons, faedet niedrig fliegende Flugzeuge wie ein alter
+    // Roehrenradarschirm aus, in der jeweils gewaehlten Theme-Farbe.
+    RADAR_THEME_CRT,
+
+    // Zweites ankreuzbares Kaestchen im selben Menue
+    // (SettingsStore::radarPulseEnabled()) - ein auslaufender Ring vom
+    // Radar-Zentrum aus bei jedem frischen ADS-B-Datenabruf.
+    RADAR_PULSE_TOGGLE,
 
     COUNT
 };

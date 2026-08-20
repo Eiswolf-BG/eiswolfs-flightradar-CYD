@@ -256,8 +256,8 @@ static const char* const I18N_IT[] = {
     "Timeout schermo",
     "Dopo questo tempo senza tocchi, lo schermo si spegne per risparmiare energia. Con il salvaschermo attivo, mostra invece un cielo stellato attenuato con l'orario.",
 
-    "Tema colore radar",
-    "Tema colore radar",
+    "Visualizzazione radar",
+    "Visualizzazione radar",
     "Verde (predefinito)",
     "Ambra",
     "Blu",
@@ -288,6 +288,9 @@ static const char* const I18N_IT[] = {
     "N", "NE", "E", "SE", "S", "SO", "O", "NO",
 
     "Attendere, riavvio in corso...",
+
+    "Fosforo CRT",
+    "Impulso radar",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

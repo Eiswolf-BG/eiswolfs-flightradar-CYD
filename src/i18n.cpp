@@ -23,8 +23,8 @@ const char* t(StringId id) {
     uint8_t lang = SettingsStore::language();
     if (lang >= LANG_COUNT) lang = 0;
 
-    uint8_t idx = (uint8_t)id;
-    if (idx >= (uint8_t)StringId::COUNT) return "?";
+    uint16_t idx = (uint16_t)id;
+    if (idx >= (uint16_t)StringId::COUNT) return "?";
 
     return TABLES[lang][idx];
 }

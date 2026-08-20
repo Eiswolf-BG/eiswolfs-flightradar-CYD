@@ -68,12 +68,24 @@ namespace SettingsStore {
     uint8_t unitsMode();
     void setUnitsMode(uint8_t mode);
 
-    // Radar-Farbschema (Menue > System > Radar-Farbschema): 0=Gruen
+    // Radar-Farbschema (Menue > System > Radar-Darstellung): 0=Gruen
     // (Standard), 1=Amber, 2=Blau - betrifft nur den Radar-Screen (Sweep-
     // Linie, Panel-Rahmen/Text, niedrig fliegende Flugzeuge), siehe
     // radar_screen.cpp::themeBaseColor().
     uint8_t radarThemeIndex();
     void setRadarThemeIndex(uint8_t idx);
+
+    // Zwei unabhaengige, ankreuzbare Extras im selben Menue (radar_theme_
+    // screen.cpp) - lassen sich mit JEDEM der drei Farbschemata oben
+    // kombinieren, deshalb eigene Einstellungen statt weiterer Werte fuer
+    // radarThemeIndex(). Beide AUS per Default (bewusste Zusatz-Optik, die
+    // man selbst aktiviert). Siehe radar_screen.cpp::crtModeActive()/
+    // Radar-Puls-Logik in render()/tick().
+    bool crtPhosphorEnabled();
+    void setCrtPhosphorEnabled(bool on);
+
+    bool radarPulseEnabled();
+    void setRadarPulseEnabled(bool on);
 
     // Zuletzt vom Geraet GEBOOTETE Firmware-Version (Config::APP_VERSION zum
     // Zeitpunkt des letzten Speicherns) - main.cpp::setup() vergleicht dies

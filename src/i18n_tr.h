@@ -256,8 +256,8 @@ static const char* const I18N_TR[] = {
     "Ekran Zaman Aşımı",
     "Bu süre boyunca dokunulmazsa ekran güç tasarrufu için kapanır. Ekran koruyucu açıksa, bunun yerine saatli, sönük bir yıldızlı gökyüzü gösterir.",
 
-    "Radar Renk Teması",
-    "Radar Renk Teması",
+    "Radar Görünümü",
+    "Radar Görünümü",
     "Yeşil (varsayılan)",
     "Amber",
     "Mavi",
@@ -288,6 +288,9 @@ static const char* const I18N_TR[] = {
     "K", "KD", "D", "GD", "G", "GB", "B", "KB",
 
     "Lütfen bekleyin, yeniden başlatılıyor...",
+
+    "CRT Fosfor",
+    "Radar Nabzı",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

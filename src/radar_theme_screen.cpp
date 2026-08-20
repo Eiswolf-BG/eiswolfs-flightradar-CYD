@@ -5,11 +5,14 @@
 #include "i18n.h"
 #include "config.h"
 
-// Einstell-Screen fuer das Radar-Farbschema (Menue > System > Radar-
-// Farbschema) - exakt dasselbe 3-Wege-Auswahl-Muster wie units_screen.cpp
-// (Gruen/Amber/Blau statt Auto/Metrisch/Imperial). Betrifft NUR den
-// Radar-Screen (siehe radar_screen.cpp::themeBaseColor()), alle anderen
-// Bildschirme bleiben unveraendert gruen.
+// Einstell-Screen fuer die Radar-Darstellung (Menue > System > Radar-
+// Darstellung). Oben drei EXKLUSIVE Farbschema-Buttons (Gruen/Amber/Blau,
+// SettingsStore::radarThemeIndex(), gleiches 3-Wege-Auswahl-Muster wie
+// units_screen.cpp), darunter zwei UNABHAENGIGE, ankreuzbare Extras
+// (CRT-Phosphor, Radar-Puls) - lassen sich mit JEDEM der drei Farbschemata
+// kombinieren, deshalb eigene bool-Einstellungen statt weiterer Werte fuer
+// radarThemeIndex(). Betrifft NUR den Radar-Screen (siehe radar_screen.cpp),
+// alle anderen Bildschirme bleiben unveraendert gruen.
 namespace RadarThemeScreen {
 
 namespace {
@@ -31,9 +34,39 @@ namespace {
         tft.setTextDatum(TL_DATUM);
     }
 
-    constexpr int16_t ROW_H = 40;
-    constexpr int16_t ROW_GAP = 8;
+    // Echtes ankreuzbares Kaestchen links neben dem Label statt eines
+    // Text-Buttons mit "An/Aus"-Suffix (Alex' ausdruecklicher Wunsch) - die
+    // ganze Zeile bleibt trotzdem antippbar (nicht nur das Kaestchen
+    // selbst), gleiche Rect.contains()-Flaeche wie bei den Theme-Buttons.
+    void drawCheckboxRow(TFT_eSPI& tft, const Rect& r, const String& label, bool checked) {
+        tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+
+        constexpr int16_t BOX_SIZE = 22;
+        int16_t boxX = r.x + 10;
+        int16_t boxY = (int16_t)(r.y + (r.h - BOX_SIZE) / 2);
+        if (checked) {
+            tft.fillRoundRect(boxX, boxY, BOX_SIZE, BOX_SIZE, 3, TFT_GREEN);
+        } else {
+            tft.drawRoundRect(boxX, boxY, BOX_SIZE, BOX_SIZE, 3, TFT_GREEN);
+        }
+
+        tft.setTextDatum(ML_DATUM);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.drawString(label, (int16_t)(boxX + BOX_SIZE + 10), (int16_t)(r.y + r.h / 2));
+        tft.setTextDatum(TL_DATUM);
+    }
+
+    // Zeilenhoehe aus dem verfuegbaren Platz errechnet (gleiches Muster wie
+    // SYSTEM_ROW_H in menu_screen.cpp) statt fest verdrahtet - 6 Zeilen
+    // (3 Farbschemata + 2 Kaestchen + Zurueck) muessen mit ca. 10px Reserve
+    // zum unteren Rand aufs Display passen.
+    constexpr uint8_t ROW_COUNT = 6;
+    constexpr int16_t ROW_GAP = 6;
     constexpr int16_t START_Y = 40;
+    constexpr int16_t END_Y = Config::SCREEN_HEIGHT - 10;
+    constexpr int16_t ROW_H =
+        (END_Y - START_Y - (ROW_COUNT - 1) * ROW_GAP) / ROW_COUNT;
 
     Rect rowRect(uint8_t index) {
         return {10, (int16_t)(START_Y + index * (ROW_H + ROW_GAP)),
@@ -43,7 +76,8 @@ namespace {
 
 void run(TFT_eSPI& tft) {
     constexpr uint8_t THEME_COUNT = 3;
-    StringId labels[THEME_COUNT] = {StringId::RADAR_THEME_GREEN, StringId::RADAR_THEME_AMBER, StringId::RADAR_THEME_BLUE};
+    StringId themeLabels[THEME_COUNT] = {StringId::RADAR_THEME_GREEN, StringId::RADAR_THEME_AMBER,
+                                          StringId::RADAR_THEME_BLUE};
 
     bool done = false;
     MenuStars::reset();
@@ -53,15 +87,21 @@ void run(TFT_eSPI& tft) {
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::RADAR_THEME_TITLE));
 
-        uint8_t current = SettingsStore::radarThemeIndex();
+        uint8_t currentTheme = SettingsStore::radarThemeIndex();
         Rect themeRects[THEME_COUNT];
 
         for (uint8_t i = 0; i < THEME_COUNT; i++) {
             themeRects[i] = rowRect(i);
-            drawButton(tft, themeRects[i], I18n::t(labels[i]), i == current);
+            drawButton(tft, themeRects[i], I18n::t(themeLabels[i]), i == currentTheme);
         }
 
-        Rect backBtn = rowRect(THEME_COUNT);
+        Rect crtRow = rowRect(THEME_COUNT);
+        drawCheckboxRow(tft, crtRow, I18n::t(StringId::RADAR_THEME_CRT), SettingsStore::crtPhosphorEnabled());
+
+        Rect pulseRow = rowRect(THEME_COUNT + 1);
+        drawCheckboxRow(tft, pulseRow, I18n::t(StringId::RADAR_PULSE_TOGGLE), SettingsStore::radarPulseEnabled());
+
+        Rect backBtn = rowRect(THEME_COUNT + 2);
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
         TouchInput::Point tap;
@@ -79,6 +119,14 @@ void run(TFT_eSPI& tft) {
                 SettingsStore::setRadarThemeIndex(i);
                 handled = true;
             }
+        }
+        if (!handled && crtRow.contains(tap.x, tap.y)) {
+            SettingsStore::setCrtPhosphorEnabled(!SettingsStore::crtPhosphorEnabled());
+            handled = true;
+        }
+        if (!handled && pulseRow.contains(tap.x, tap.y)) {
+            SettingsStore::setRadarPulseEnabled(!SettingsStore::radarPulseEnabled());
+            handled = true;
         }
         if (!handled && backBtn.contains(tap.x, tap.y)) {
             done = true;

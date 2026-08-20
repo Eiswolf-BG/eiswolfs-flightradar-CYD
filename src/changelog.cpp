@@ -9,56 +9,52 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 6;
 
     const char* const CHANGELOG_EN =
-        "- Fix: menus and settings screens now respect the display "
-        "timeout again - after 2 minutes without a tap they return "
-        "automatically to the radar screen\n"
-        "- Fix: occasionally seeing the same aircraft twice on the radar "
-        "(duplicate reports from the data source) is now filtered out\n"
-        "- Improved: reworked GitHub screen layout";
+        "- New: the Radar Display menu now offers a CRT-Phosphor glow "
+        "effect and a Radar Pulse animation as independent options, "
+        "combinable with any color scheme\n"
+        "- New: aircraft can now be added to the watchlist directly "
+        "from the detail panel with a single tap";
 
     const char* const CHANGELOG_DE =
-        "- Behoben: Menues und Einstellungsseiten respektieren jetzt "
-        "wieder den Bildschirm-Timeout - nach 2 Minuten ohne Antippen "
-        "springt es automatisch zum Radarscreen zurueck\n"
-        "- Behoben: gelegentlich doppelt angezeigte Flugzeuge auf dem "
-        "Radar (doppelte Meldungen der Datenquelle) werden jetzt "
-        "herausgefiltert\n"
-        "- Verbessert: GitHub-Screen-Layout ueberarbeitet";
+        "- Neu: Das Menü \"Radar-Darstellung\" bietet jetzt einen "
+        "CRT-Phosphor-Leuchteffekt und eine Radar-Puls-Animation als "
+        "unabhängige Optionen, kombinierbar mit jedem Farbschema\n"
+        "- Neu: Flugzeuge lassen sich jetzt mit einem Tipp direkt aus "
+        "dem Detail-Panel zur Beobachtungsliste hinzufügen";
 
     const char* const CHANGELOG_FR =
-        "- Corrigé : les menus et écrans de réglages respectent à "
-        "nouveau le délai d'extinction de l'écran - après 2 minutes "
-        "sans contact, retour automatique à l'écran radar\n"
-        "- Corrigé : un même avion parfois affiché deux fois sur le "
-        "radar (signalements en double de la source de données) est "
-        "maintenant filtré\n"
-        "- Amélioré : mise en page de l'écran GitHub revue";
+        "- Nouveau : le menu « Affichage radar » propose désormais un "
+        "effet de rémanence CRT-Phosphore et une animation d'impulsion "
+        "radar en options indépendantes, combinables avec n'importe "
+        "quel thème de couleur\n"
+        "- Nouveau : possibilité d'ajouter un avion à la liste de "
+        "surveillance d'un simple tap directement depuis le panneau de "
+        "détails";
 
     const char* const CHANGELOG_TR =
-        "- Düzeltme: menüler ve ayar ekranları artık ekran zaman "
-        "aşımına yeniden uyuyor - 2 dakika dokunulmazsa otomatik "
-        "olarak radar ekranına döner\n"
-        "- Düzeltme: radarda bazen aynı uçağın iki kez görünmesi (veri "
-        "kaynağından gelen yinelenen bildirimler) artık filtreleniyor\n"
-        "- İyileştirme: GitHub ekranı düzeni yenilendi";
+        "- Yeni: \"Radar Görünümü\" menüsü artık her renk temasıyla "
+        "birleştirilebilen, birbirinden bağımsız bir CRT Fosfor "
+        "parlama efekti ve bir Radar Nabzı animasyonu sunuyor\n"
+        "- Yeni: Uçaklar artık detay panelinden tek dokunuşla doğrudan "
+        "takip listesine eklenebiliyor";
 
     const char* const CHANGELOG_ES =
-        "- Corregido: los menús y pantallas de ajustes vuelven a "
-        "respetar el tiempo de espera de la pantalla - tras 2 minutos "
-        "sin tocar, regresan automáticamente a la pantalla del radar\n"
-        "- Corregido: ver ocasionalmente el mismo avión dos veces en el "
-        "radar (avisos duplicados de la fuente de datos) ahora se "
-        "filtra\n"
-        "- Mejorado: diseño de la pantalla de GitHub renovado";
+        "- Novedad: el menú \"Aspecto del radar\" ofrece ahora un "
+        "efecto de resplandor Fósforo CRT y una animación de Pulso de "
+        "radar como opciones independientes, combinables con cualquier "
+        "esquema de color\n"
+        "- Novedad: ahora se puede añadir un avión a la lista de "
+        "seguimiento con un solo toque directamente desde el panel de "
+        "detalles";
 
     const char* const CHANGELOG_IT =
-        "- Corretto: i menu e le schermate delle impostazioni ora "
-        "rispettano di nuovo il timeout dello schermo - dopo 2 minuti "
-        "senza toccare lo schermo tornano automaticamente al radar\n"
-        "- Corretto: vedere occasionalmente lo stesso aereo due volte "
-        "sul radar (segnalazioni duplicate della fonte dati) ora viene "
-        "filtrato\n"
-        "- Migliorato: layout della schermata GitHub rinnovato";
+        "- Novità: il menu \"Aspetto del radar\" offre ora un effetto "
+        "di luminescenza Fosforo CRT e un'animazione Impulso radar "
+        "come opzioni indipendenti, combinabili con qualsiasi schema "
+        "di colori\n"
+        "- Novità: ora è possibile aggiungere un aereo alla lista di "
+        "controllo con un solo tocco direttamente dal pannello dei "
+        "dettagli";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT
