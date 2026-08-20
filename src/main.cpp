@@ -58,6 +58,7 @@ uint32_t lastSweepMs = 0;
 uint32_t lastStatusLineMs = 0;
 uint32_t lastRenderedVersion = 0xFFFFFFFF;
 Weather::Condition lastRenderedWeather = Weather::Condition::Unknown;
+bool lastRenderedUpdateAvailable = false;
 bool forceRedraw = false;
 bool wasEmergency = false;
 bool bannerBlinkOn = false;
@@ -629,6 +630,7 @@ void drawHeader() {
     updateWifiIcon();
     drawWeatherIcon();
     lastRenderedWeather = Weather::current();
+    lastRenderedUpdateAvailable = OtaUpdate::isUpdateAvailable();
 }
 
 void updateStatusLine() {
@@ -686,6 +688,19 @@ void updateStatusLine() {
     if (weatherNow != lastRenderedWeather) {
         lastRenderedWeather = weatherNow;
         drawWeatherIcon();
+    }
+
+    // Gleiches Prinzip wie beim Wetter-Icon oben: der rote "Update
+    // verfuegbar"-Punkt am Menu-Button wurde bisher nur bei einem vollen
+    // drawHeader() neu gezeichnet, nicht periodisch - auf dem normalen,
+    // nicht angetippten Radarscreen blieb er deshalb oft minutenlang
+    // unsichtbar, obwohl der Hintergrund-Check (siehe ota_update.cpp)
+    // laengst ein neues Release gefunden hatte. updateStatusLine() laeuft
+    // hier jede Sekunde, unabhaengig vom Ruhebildschirm.
+    bool updateAvailableNow = OtaUpdate::isUpdateAvailable();
+    if (updateAvailableNow != lastRenderedUpdateAvailable) {
+        lastRenderedUpdateAvailable = updateAvailableNow;
+        drawMenuButton();
     }
 }
 

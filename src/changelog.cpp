@@ -9,38 +9,39 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 6;
 
     const char* const CHANGELOG_EN =
-        "- New: the clock in the radar screen header is now tappable "
-        "and jumps straight to the screen-timeout settings - the "
-        "entire header is now interactive";
+        "- Fix: the update-available red dot on the radar screen now "
+        "appears reliably within minutes of a new release, instead of "
+        "only showing once the screensaver kicked in";
 
     const char* const CHANGELOG_DE =
-        "- Neu: Die Uhr in der Kopfzeile des Radarscreens ist jetzt "
-        "antippbar und springt direkt zu den Bildschirm-Timeout-"
-        "Einstellungen - damit ist die komplette Kopfzeile jetzt "
-        "interaktiv";
+        "- Fix: Der rote Update-verfügbar-Punkt auf dem Radarscreen "
+        "erscheint jetzt zuverlässig innerhalb weniger Minuten nach "
+        "einem neuen Release, statt erst wenn der Ruhebildschirm "
+        "ansprang";
 
     const char* const CHANGELOG_FR =
-        "- Nouveau : l'horloge dans l'en-tête de l'écran radar est "
-        "désormais tactile et ouvre directement les réglages du délai "
-        "d'extinction de l'écran - tout l'en-tête est maintenant "
-        "interactif";
+        "- Correction : le point rouge « mise à jour disponible » sur "
+        "l'écran radar apparaît désormais de façon fiable quelques "
+        "minutes après une nouvelle version, au lieu de n'apparaître "
+        "qu'au démarrage de l'économiseur d'écran";
 
     const char* const CHANGELOG_TR =
-        "- Yeni: Radar ekranı başlığındaki saat artık dokunulabilir "
-        "ve doğrudan ekran zaman aşımı ayarlarını açıyor - böylece "
-        "tüm başlık artık etkileşimli";
+        "- Düzeltme: Radar ekranındaki kırmızı güncelleme noktası "
+        "artık yeni bir sürümden sonra dakikalar içinde güvenilir "
+        "şekilde görünüyor, öncesinde yalnızca ekran koruyucu devreye "
+        "girdiğinde görünüyordu";
 
     const char* const CHANGELOG_ES =
-        "- Novedad: el reloj en la cabecera de la pantalla del radar "
-        "ahora se puede tocar y abre directamente los ajustes de "
-        "tiempo de espera de la pantalla - toda la cabecera es ahora "
-        "interactiva";
+        "- Corrección: el punto rojo de actualización disponible en "
+        "la pantalla del radar ahora aparece de forma fiable a los "
+        "pocos minutos de una nueva versión, en lugar de aparecer "
+        "solo cuando se activaba el salvapantallas";
 
     const char* const CHANGELOG_IT =
-        "- Novità: l'orologio nell'intestazione della schermata radar "
-        "ora è toccabile e apre direttamente le impostazioni del "
-        "timeout dello schermo - l'intera intestazione è ora "
-        "interattiva";
+        "- Correzione: il puntino rosso di aggiornamento disponibile "
+        "sulla schermata radar ora appare in modo affidabile entro "
+        "pochi minuti da una nuova versione, invece di apparire solo "
+        "all'avvio del salvaschermo";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT
