@@ -256,8 +256,8 @@ static const char* const I18N_FR[] = {
     "Délai d'inactivité",
     "Après ce délai sans contact, l'écran s'éteint pour économiser l'énergie. Avec l'écran de veille activé, il affiche à la place un ciel étoilé tamisé avec l'heure.",
 
-    "Thème de couleur radar",
-    "Thème de couleur radar",
+    "Affichage radar",
+    "Affichage radar",
     "Vert (par défaut)",
     "Ambre",
     "Bleu",
@@ -288,6 +288,9 @@ static const char* const I18N_FR[] = {
     "N", "NE", "E", "SE", "S", "SO", "O", "NO",
 
     "Veuillez patienter, redémarrage...",
+
+    "Phosphore CRT",
+    "Pulsation radar",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

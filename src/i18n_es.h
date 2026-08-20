@@ -256,8 +256,8 @@ static const char* const I18N_ES[] = {
     "Tiempo de espera de pantalla",
     "Tras este tiempo sin toques, la pantalla se apaga para ahorrar energía. Con el salvapantallas activado, muestra en su lugar un cielo estrellado atenuado con la hora.",
 
-    "Tema de color del radar",
-    "Tema de color del radar",
+    "Pantalla del radar",
+    "Pantalla del radar",
     "Verde (predeterminado)",
     "Ámbar",
     "Azul",
@@ -288,6 +288,9 @@ static const char* const I18N_ES[] = {
     "N", "NE", "E", "SE", "S", "SO", "O", "NO",
 
     "Espere, reiniciando...",
+
+    "Fósforo CRT",
+    "Pulso de radar",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

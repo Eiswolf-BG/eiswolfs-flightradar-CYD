@@ -70,11 +70,12 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Live flight tracking QR code** – a "QR" button in the aircraft detail panel shows a full-screen QR code linking straight to that flight's FlightAware live-tracking page, so you can pull it up on your phone in one scan
 - **Most-seen aircraft ranking** – a "Top" button on the Statistics screen shows the 5 aircraft logged most often across your whole flight logbook (see [Most-Seen Aircraft](#-most-seen-aircraft) below)
 - **METAR flight-weather report** – the Weather Info screen now also shows the raw METAR text for the nearest airport, right below the usual weather explanation (see [Weather Icon](#-weather-icon) below)
-- **Radar color themes** – choose between Green, Amber, or Blue for the radar screen (sweep line, panel border/text, buttons) under **Menu → System → "Radar Color Theme"**
+- **Radar Display** – choose between Green, Amber, or Blue for the radar screen (sweep line, panel border/text, buttons) under **Menu → System → "Radar Display"**, plus two independent, combinable extras: a CRT-Phosphor glow effect that fades low-altitude aircraft markers in and out as the sweep passes them, and a Radar Pulse animation - an expanding ring from the radar center on every fresh data update
 - **OTA update changelog** – after a firmware update installs successfully, the confirmation screen now shows a short, scrollable list of what changed in that version
 - **Sunrise/sunset times** – the Weather Info screen now also shows today's sunrise and sunset time for your currently active location, right below the METAR report
 - **Short weather forecast** – the Weather Info screen also shows a short forecast (temperature and conditions) 3 hours ahead, and now scrolls automatically if the combined text (including a long METAR report) doesn't fit on one screen
 - **Bearing to selected aircraft** – the detail panel now also shows a compass direction (e.g. "NE") alongside the numeric bearing, so you know which way to look without doing the math yourself
+- **Quick watchlist add** – a "+"/"-" button in the aircraft detail panel, right next to the "QR" button, adds the currently shown aircraft to the [Watchlist](#-watchlist) with a single tap instead of typing its callsign manually
 
 ## Feature Deep-Dive
 
@@ -208,7 +209,7 @@ Continuously monitors all visible aircraft for one of the three international **
 If the device detects one of these codes, the RGB LED **blinks red rapidly** (noticeably faster/more urgent than the green proximity blink), and a flashing red banner appears in the radar header showing the callsign and squawk code. Takes priority over all other LED indications (proximity, heartbeat).
 
 ### 🎯 Watchlist
-Track up to **5 specific flights** by their exact callsign (e.g. `DLH441`) - unlike the Airline Filter, which matches whole airlines, this targets one specific flight. As soon as a watched aircraft appears anywhere within the current radar range, it gets a **cyan ring** on the radar and the **RGB LED blinks blue** - handy for spotting a particular flight, e.g. when someone you know is arriving. Takes priority over the normal proximity alert, but not over an emergency squawk. Menu → Flight Options → **"Watchlist"** / **"Watchlist alert"**.
+Track up to **5 specific flights** by their exact callsign (e.g. `DLH441`) - unlike the Airline Filter, which matches whole airlines, this targets one specific flight. As soon as a watched aircraft appears anywhere within the current radar range, it gets a **cyan ring** on the radar and the **RGB LED blinks blue** - handy for spotting a particular flight, e.g. when someone you know is arriving. Takes priority over the normal proximity alert, but not over an emergency squawk. Add flights either via Menu → Flight Options → **"Watchlist"** (manual callsign entry) or with a single tap on the "+"/"-" button in an aircraft's detail panel on the radar screen. Turn the alert on/off separately under **"Watchlist alert"**.
 
 ### 📍 Location Presets
 See the dedicated section above: [Location Presets](#-location-presets) – save up to 3 fixed locations, or enter any place in the world to watch the air traffic there.

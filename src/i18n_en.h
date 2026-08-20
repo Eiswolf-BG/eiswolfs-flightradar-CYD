@@ -257,8 +257,8 @@ static const char* const I18N_EN[] = {
     "Screen Timeout",
     "After this time without touch, the display turns off to save power. With the screensaver on, it dims to a starfield with a clock instead.",
 
-    "Radar Color Theme",
-    "Radar Color Theme",
+    "Radar Display",
+    "Radar Display",
     "Green (default)",
     "Amber",
     "Blue",
@@ -289,6 +289,9 @@ static const char* const I18N_EN[] = {
     "N", "NE", "E", "SE", "S", "SW", "W", "NW",
 
     "Please wait, restarting...",
+
+    "CRT Phosphor",
+    "Radar Pulse",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,
