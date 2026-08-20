@@ -88,10 +88,32 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
     for (JsonObject ac : acArray) {
         if (idx >= tableCapacity) break;
 
+        const char* hex = ac["hex"] | "";
+
+        // Manche ADS-B-Aggregatoren (adsb.fi eingeschlossen) melden ein und
+        // dasselbe Flugzeug in seltenen Faellen zweimal in derselben Antwort
+        // (z.B. ueber unterschiedliche Empfangs-/MLAT-Pfade) - das zeigte
+        // sich als Alex' Bugmeldung: nach einer Reichweitenaenderung kurz
+        // zwei Punkte fuer dasselbe Flugzeug auf dem Radar, die sich erst
+        // nach 1-2 Abfragen von selbst korrigierten (sobald die Quelle
+        // ihrerseits wieder nur einen Eintrag lieferte). Hier bereits beim
+        // Einlesen ausschliessen statt erst beim Zeichnen zu bemerken - ein
+        // bereits uebernommener Hex-Code wird ignoriert, der erste Eintrag
+        // (idx 0..idx-1) bleibt massgeblich.
+        bool duplicate = false;
+        if (hex[0] != '\0') {
+            for (uint8_t j = 0; j < idx; j++) {
+                if (strcmp(table[j].hex, hex) == 0) {
+                    duplicate = true;
+                    break;
+                }
+            }
+        }
+        if (duplicate) continue;
+
         Aircraft& a = table[idx];
         a = Aircraft{};
 
-        const char* hex = ac["hex"] | "";
         strncpy(a.hex, hex, sizeof(a.hex) - 1);
 
         const char* flight = ac["flight"] | "";

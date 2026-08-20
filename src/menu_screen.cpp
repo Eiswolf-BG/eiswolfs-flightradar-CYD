@@ -411,6 +411,10 @@ namespace {
                     redraw();
                 }
             }
+            // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+            // "false" (= Abbrechen) als sicherer Standard, da diese Funktion
+            // fuer Warnungen wie die Werksreset-Bestaetigung genutzt wird.
+            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return false;
             MenuStars::update(tft);
             delay(20);
         }
@@ -531,6 +535,8 @@ namespace {
                     redraw();
                 }
             }
+            // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return;
             MenuStars::update(tft);
             delay(20);
         }
@@ -692,6 +698,12 @@ void run(TFT_eSPI& tft) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
+                // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+                // Bricht die AEUSSERE Seiten-Schleife (while (!done)) mit ab,
+                // egal auf welcher Menue-Unterseite man gerade steht - kommt
+                // dadurch beim Verlassen von run() automatisch beim
+                // Radarscreen raus.
+                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
             }
@@ -724,6 +736,12 @@ void run(TFT_eSPI& tft) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
+                // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+                // Bricht die AEUSSERE Seiten-Schleife (while (!done)) mit ab,
+                // egal auf welcher Menue-Unterseite man gerade steht - kommt
+                // dadurch beim Verlassen von run() automatisch beim
+                // Radarscreen raus.
+                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
             }
@@ -804,6 +822,12 @@ void run(TFT_eSPI& tft) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
+                // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+                // Bricht die AEUSSERE Seiten-Schleife (while (!done)) mit ab,
+                // egal auf welcher Menue-Unterseite man gerade steht - kommt
+                // dadurch beim Verlassen von run() automatisch beim
+                // Radarscreen raus.
+                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
             }
@@ -859,6 +883,12 @@ void run(TFT_eSPI& tft) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
+                // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+                // Bricht die AEUSSERE Seiten-Schleife (while (!done)) mit ab,
+                // egal auf welcher Menue-Unterseite man gerade steht - kommt
+                // dadurch beim Verlassen von run() automatisch beim
+                // Radarscreen raus.
+                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
             }
@@ -950,6 +980,12 @@ void run(TFT_eSPI& tft) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
+                // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+                // Bricht die AEUSSERE Seiten-Schleife (while (!done)) mit ab,
+                // egal auf welcher Menue-Unterseite man gerade steht - kommt
+                // dadurch beim Verlassen von run() automatisch beim
+                // Radarscreen raus.
+                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
             }

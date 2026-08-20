@@ -285,7 +285,13 @@ namespace {
 
         while (true) {
             TouchInput::Point tap;
-            if (!TouchInput::wasTapped(tap)) { MenuStars::update(tft); delay(20); continue; }
+            if (!TouchInput::wasTapped(tap)) {
+                // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return false;
+                MenuStars::update(tft);
+                delay(20);
+                continue;
+            }
 
             if (addressBtn.contains(tap.x, tap.y)) return AddressSearchScreen::run(tft);
             if (coordsBtn.contains(tap.x, tap.y)) return addPresetByCoordsFlow(tft);
@@ -564,6 +570,8 @@ namespace {
                     redraw();
                 }
             }
+            // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return;
             MenuStars::update(tft);
             delay(20);
         }
@@ -692,6 +700,8 @@ void run(TFT_eSPI& tft) {
         TouchInput::Point tap;
         while (true) {
             if (TouchInput::wasTapped(tap)) break;
+            // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
             MenuStars::update(tft);
             drawMarquee(tft, AIRPORT_LINE_X, airportLineY, AIRPORT_LINE_W, 20);
             for (uint8_t i = 0; i < count; i++) {

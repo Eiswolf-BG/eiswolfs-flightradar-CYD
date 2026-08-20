@@ -32,7 +32,7 @@ void reset() {
     initialized = false;
 }
 
-void update(TFT_eSPI& tft) {
+void update(TFT_eSPI& tft, bool gray) {
     if (!initialized) initStars();
 
     uint32_t now = millis();
@@ -44,7 +44,7 @@ void update(TFT_eSPI& tft) {
         uint8_t bright = (stars[i].phase < 128)
             ? (uint8_t)(stars[i].phase * 2)
             : (uint8_t)((255 - stars[i].phase) * 2);
-        uint16_t color = tft.color565(0, bright, 0);
+        uint16_t color = gray ? tft.color565(bright, bright, bright) : tft.color565(0, bright, 0);
         tft.drawPixel(stars[i].x, stars[i].y, color);
     }
 }

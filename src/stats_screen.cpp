@@ -158,6 +158,8 @@ void run(TFT_eSPI& tft) {
                 redraw();
             }
         }
+        // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+        if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) done = true;
         MenuStars::update(tft);
         delay(20);
     }

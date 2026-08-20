@@ -29,4 +29,13 @@ namespace TouchInput {
     // Liefert genau einmal pro physischer Beruehrung "true" (beim Loslassen),
     // mitsamt der zuletzt bekannten Position. Fuer Buttons/Tastatur gedacht.
     bool wasTapped(Point& outPoint);
+
+    // Millisekunden seit dem letzten abgeschlossenen Tap (siehe wasTapped()) -
+    // fuer den Inaktivitaets-Timeout innerhalb von Vollbild-Menues/Screens
+    // gedacht (siehe Config::MENU_IDLE_TIMEOUT_MS), die jeweils in ihrer
+    // eigenen blockierenden Touch-Schleife stecken und sonst den normalen
+    // Bildschirm-Timeout (main.cpp::loop()) komplett aussetzen wuerden, so
+    // lange sie geoeffnet bleiben - siehe Alex' Bugmeldung "Displaytimeout
+    // reagiert nicht mehr, wenn ein Menue offen ist".
+    uint32_t msSinceLastTap();
 }

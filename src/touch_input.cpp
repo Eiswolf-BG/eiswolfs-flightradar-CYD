@@ -24,6 +24,10 @@ namespace {
     bool lastTouched = false;
     Point lastRaw;
 
+    // Zeitpunkt des letzten abgeschlossenen Taps (siehe wasTapped()/
+    // msSinceLastTap()) - fuer den Menue-Inaktivitaets-Timeout.
+    uint32_t lastTapMs = 0;
+
     int16_t clampi(int16_t v, int16_t lo, int16_t hi) {
         if (v < lo) return lo;
         if (v > hi) return hi;
@@ -36,6 +40,7 @@ void begin() {
                     Config::TOUCH_MOSI_PIN, Config::TOUCH_CS_PIN);
     touch.begin(touchSpi);
     touch.setRotation(0);
+    lastTapMs = millis();
 }
 
 bool hasCalibration() { return calibrationLoaded; }
@@ -119,7 +124,13 @@ bool wasTapped(Point& outPoint) {
     lastTouched = cur.touched;
     if (cur.touched) lastRaw = cur;
 
+    if (fired) lastTapMs = millis();
+
     return fired;
+}
+
+uint32_t msSinceLastTap() {
+    return millis() - lastTapMs;
 }
 
 }

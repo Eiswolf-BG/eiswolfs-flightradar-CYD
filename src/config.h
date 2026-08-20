@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "3.8.4";
+    constexpr const char* APP_VERSION = "3.8.5";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -80,6 +80,18 @@ namespace Config {
     // entsprechend vervielfacht, im Blick behalten, falls das Limit je
     // erreicht wird.
     constexpr uint32_t OTA_BACKGROUND_CHECK_INTERVAL_MS = 3UL * 60UL * 1000UL; // 3 Minuten
+
+    // Inaktivitaets-Timeout INNERHALB von Vollbild-Menues/Einstellungs-
+    // Screens (Menue, WLAN-Verwaltung, GitHub-QR-Screen, etc.) - jeder dieser
+    // Screens haengt in seiner eigenen blockierenden Touch-Schleife und
+    // haelt dadurch den normalen Bildschirm-Timeout (SCREEN_TIMEOUT_MIN/MAX_
+    // MINUTES oben, main.cpp::loop()) komplett an, solange er offen bleibt -
+    // das Geraet blieb sonst z.B. auf dem Tisch liegend mit voller
+    // Beleuchtung im Menue haengen, ohne dass der eingestellte Timeout je
+    // greift (Alex' Bugmeldung). Nach dieser Zeit ohne Tap springt der
+    // jeweilige Screen automatisch zum Radarscreen zurueck, danach greift
+    // der normale Timeout wieder ganz regulaer.
+    constexpr uint32_t MENU_IDLE_TIMEOUT_MS = 2UL * 60UL * 1000UL; // 2 Minuten
 
     constexpr float DEFAULT_PROXIMITY_ALERT_KM = 8.0f;
 
