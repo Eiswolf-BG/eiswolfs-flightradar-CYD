@@ -24,6 +24,7 @@
 #include "wifi_setup_screen.h"
 #include "wifi_manage_screen.h"
 #include "menu_screen.h"
+#include "timeout_screen.h"
 #include "settings_store.h"
 #include "net_task.h"
 #include "radar_screen.h"
@@ -132,6 +133,20 @@ Rect weatherIconRect = {(int16_t)(menuBtn.x - 46), 3, 42, 22};
 // dessen Ende).
 Rect wifiIconRect = {(int16_t)(menuBtn.x + menuBtn.w + 2), 3,
                       (int16_t)(Config::SCREEN_WIDTH - (menuBtn.x + menuBtn.w + 2) - 2), 22};
+
+// Tippbereich fuer die kleine Kopfzeilen-Uhr (siehe updateStatusLine()) -
+// oeffnet den Bildschirm-Timeout-Screen (Menue > System > Bildschirm-
+// Timeout), macht damit die komplette Kopfzeile reaktiv (Titel/Menu-
+// Button/Wetter/WLAN sind es bereits, siehe titleRect/weatherIconRect/
+// wifiIconRect). Breite (80px) entspricht der Breite, die
+// updateStatusLine() beim Uhrzeit-Neuzeichnen jede Sekunde loescht
+// (CLOCK_CLEAR_W dort). Startet aber bewusst erst UNTER titleRect (dessen
+// Bereich bis y=24 reicht), nicht bei CLOCK_CLEAR_TOP (y=20) wie der
+// geloeschte Bereich dort - sonst wuerde sich diese Tippzone mit titleRect
+// ueberlappen und ein Tipp im Ueberlappungsbereich traefe wegen der
+// if/else-Reihenfolge immer titleRect statt hier den Timeout-Screen zu
+// oeffnen.
+Rect clockRect = {0, (int16_t)(titleRect.y + titleRect.h), 80, (int16_t)(CONTENT_TOP - (titleRect.y + titleRect.h))};
 
 void drawMenuButton() {
     // Folgt jetzt dem auf dem Radar-Screen gewaehlten Farbschema (Menue >
@@ -1083,6 +1098,18 @@ void loop() {
             WifiManageScreen::run(tft);
             // Gleicher Grund wie beim Menue oben - auch dieser Screen ist
             // ein Vollbild-Overlay.
+            RadarScreen::invalidatePanel();
+            drawHeader();
+            updateStatusLine();
+            forceRedraw = true;
+        } else if (clockRect.contains(tap.x, tap.y)) {
+            // Uhr in der Kopfzeile antippen -> direkter Sprung zum
+            // Bildschirm-Timeout-Screen (sonst nur ueber Menue > System >
+            // Bildschirm-Timeout erreichbar) - macht damit die komplette
+            // Kopfzeile reaktiv (Alex' Wunsch).
+            TimeoutScreen::run(tft);
+            // Gleicher Grund wie bei den anderen Vollbild-Overlays oben -
+            // auch dieser Screen ueberschreibt den kompletten Bildschirm.
             RadarScreen::invalidatePanel();
             drawHeader();
             updateStatusLine();
