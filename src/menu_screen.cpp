@@ -6,8 +6,6 @@
 #include "stats_history_screen.h"
 #include "logbook_files_screen.h"
 #include "webui_screen.h"
-#include "ota_update.h"
-#include "net_task.h"
 #include "location_presets_screen.h"
 #include "airline_filter_screen.h"
 #include "aircraft_watchlist_screen.h"
@@ -19,6 +17,8 @@
 #include "radar_theme_screen.h"
 #include "settings_backup.h"
 #include "settings_store.h"
+#include "ota_update.h"
+#include "net_task.h"
 #include "menu_stars.h"
 #include "i18n.h"
 #include "config.h"
@@ -35,18 +35,18 @@ namespace {
         }
     };
 
-    // ROW_GAP/ROW_START_Y bleiben unveraendert (werden von flightRowRect()
-    // weiter unten mitbenutzt, siehe FLIGHT_ROW_H).
+    // ROW_GAP/ROW_START_Y bleiben unveraendert (werden von subMenuRowRect()
+    // weiter unten mitbenutzt).
     constexpr int16_t ROW_GAP = 1;
     constexpr int16_t ROW_START_Y = 18;
 
     // Region-Unterseite (Sprache/Einheiten/Zurueck, nur 3 Eintraege):
     // Zeilenhoehe/-abstand werden aus der tatsaechlich verfuegbaren
-    // Bildschirmflaeche errechnet (gleiches Muster wie bei SYSTEM_ROW_H
-    // weiter unten), statt die kleine, fuer volle Seiten (z.B.
-    // Flugoptionen: 14 Eintraege) gedachte feste Hoehe (vorher 22px) zu
-    // benutzen - die liess bei nur 3 Eintraegen fast den ganzen Bildschirm
-    // leer und machte die Buttons winzig und schwer zu treffen.
+    // Bildschirmflaeche errechnet (gleiches Muster wie bei subMenuRowRect()
+    // weiter unten), statt eine kleine, fuer volle Seiten gedachte feste
+    // Hoehe (vorher 22px) zu benutzen - die liess bei nur 3 Eintraegen fast
+    // den ganzen Bildschirm leer und machte die Buttons winzig und schwer
+    // zu treffen.
     constexpr uint8_t REGION_ROW_COUNT = 3;
     constexpr int16_t REGION_ROW_GAP = 10;
     constexpr int16_t REGION_END_Y = Config::SCREEN_HEIGHT - 10;
@@ -67,66 +67,21 @@ namespace {
                 (int16_t)(Config::SCREEN_WIDTH - 20), CAT_ROW_H};
     }
 
-    // Zeilenhoehe aus dem verfuegbaren Platz errechnet (gleiches Muster wie
-    // SYSTEM_ROW_H weiter unten) statt fest verdrahtet - mit dem neuen 15.
-    // Eintrag (Helikopter-Filter) rutschte der Zurueck-Button sonst unten
-    // aus dem Display.
-    constexpr uint8_t FLIGHT_ROW_COUNT = 15;
-    constexpr int16_t FLIGHT_END_Y = Config::SCREEN_HEIGHT - 10;
-    constexpr int16_t FLIGHT_ROW_H =
-        (FLIGHT_END_Y - ROW_START_Y - (FLIGHT_ROW_COUNT - 1) * ROW_GAP) / FLIGHT_ROW_COUNT;
-    Rect flightRowRect(uint8_t index) {
-        return {10, (int16_t)(ROW_START_Y + index * (FLIGHT_ROW_H + ROW_GAP)),
-                (int16_t)(Config::SCREEN_WIDTH - 20), FLIGHT_ROW_H};
-    }
-
-    // Eigene, groesser berechnete Zeilenhoehe NUR fuer die System-Seite: mit
-    // nur 10 Eintraegen (vs. z.B. 14 auf der Flugoptionen-Seite) liess die
-    // normale rowRect()-Hoehe (22px) unten viel ungenutzten Platz frei. Die
-    // Hoehe wird hier stattdessen aus der tatsaechlich verfuegbaren
-    // Bildschirmflaeche errechnet, sodass die Buttons den Platz bis knapp
-    // ueber den Bildschirmrand ausfuellen - andere Seiten bleiben bei ihren
-    // eigenen, unveraenderten Zeilenhoehen.
-    // War 10, bevor "Sicherung"/"Wiederherstellen" in die neue
-    // "Sicherung & Reset"-Unterseite ausgelagert wurden (siehe
-    // BACKUP_RESET_ROW_COUNT unten) und dort durch einen einzelnen
-    // Ordner-Button ersetzt wurden: -2 (Backup/Restore raus) +1 (neuer
-    // Ordner-Button) = 9. Danach +1 fuer den neuen "Nach Update
-    // suchen"-Punkt (OTA-Update, siehe ota_update.h) = 10. Der
-    // Ruhebildschirm-Umschalter, der zwischenzeitlich hier eine eigene
-    // Zeile hatte, ist in den neuen Bildschirm-Timeout-Screen umgezogen
-    // (siehe timeout_screen.cpp) - Zeilenzahl bleibt dadurch bei 10. Danach
-    // +1 fuer den neuen "Radar-Farbschema"-Punkt (siehe
-    // radar_theme_screen.h) = 11.
-    // BLEIBT bei 11, obwohl der eigene "Info"-Button entfernt wurde: dessen
-    // Slot wurde nicht ersatzlos gestrichen, sondern dem "Nach Update
-    // suchen"-Button zugeschlagen (der jetzt zwei Slots hoch ist und Version
-    // + Update-Hinweis zweizeilig zeigt, siehe checkUpdateBtn unten) - alle
-    // anderen Zeilen behalten dadurch exakt ihre bisherige Groesse.
-    constexpr uint8_t SYSTEM_ROW_COUNT = 11;
-    constexpr int16_t SYSTEM_ROW_GAP = 4;
-    constexpr int16_t SYSTEM_START_Y = 18;
-    constexpr int16_t SYSTEM_END_Y = Config::SCREEN_HEIGHT - 10;
-    constexpr int16_t SYSTEM_ROW_H =
-        (SYSTEM_END_Y - SYSTEM_START_Y - (SYSTEM_ROW_COUNT - 1) * SYSTEM_ROW_GAP) / SYSTEM_ROW_COUNT;
-    Rect systemRowRect(uint8_t index) {
-        return {10, (int16_t)(SYSTEM_START_Y + index * (SYSTEM_ROW_H + SYSTEM_ROW_GAP)),
-                (int16_t)(Config::SCREEN_WIDTH - 20), SYSTEM_ROW_H};
-    }
-
-    // Eigene Zeilenhoehe fuer die neue "Sicherung & Reset"-Unterseite (4
-    // Eintraege: Sichern/Wiederherstellen/Zuruecksetzen/Zurueck) - gleiches
-    // "aus verfuegbarem Platz errechnen"-Muster wie bei SYSTEM_ROW_H.
-    // ROW_START_Y wird mitbenutzt (siehe oben, gemeinsam mit rowRect()/
-    // flightRowRect()), nur GAP/COUNT/H sind eigene Werte.
-    constexpr uint8_t BACKUP_RESET_ROW_COUNT = 4;
-    constexpr int16_t BACKUP_RESET_ROW_GAP = 10;
-    constexpr int16_t BACKUP_RESET_END_Y = Config::SCREEN_HEIGHT - 10;
-    constexpr int16_t BACKUP_RESET_ROW_H =
-        (BACKUP_RESET_END_Y - ROW_START_Y - (BACKUP_RESET_ROW_COUNT - 1) * BACKUP_RESET_ROW_GAP) / BACKUP_RESET_ROW_COUNT;
-    Rect backupResetRowRect(uint8_t index) {
-        return {10, (int16_t)(ROW_START_Y + index * (BACKUP_RESET_ROW_H + BACKUP_RESET_ROW_GAP)),
-                (int16_t)(Config::SCREEN_WIDTH - 20), BACKUP_RESET_ROW_H};
+    // Generische, aus der tatsaechlich verfuegbaren Bildschirmflaeche
+    // berechnete Zeilenhoehe fuer eine Unterseite mit "count" Eintraegen -
+    // ersetzt die vorher fuer jede Seite einzeln kopierten FLIGHT_ROW_H/
+    // SYSTEM_ROW_H/BACKUP_RESET_ROW_H-Konstantenbloecke (gleiches Grundmuster,
+    // nur COUNT/GAP unterschiedlich). Noetig geworden, weil die Flugoptionen-
+    // und System-Seiten jetzt in mehrere kleinere Unterseiten aufgeteilt sind
+    // (grosse Kategorie-Buttons statt langer Einzelzeilen-Listen, Alex'
+    // Wunsch, analog zum Hauptmenue) - jede dieser Unterseiten hat eine
+    // andere Anzahl Eintraege, ein fester Konstanten-Satz pro Seite haette
+    // hier nur unnoetig viel fast identischen Code bedeutet.
+    Rect subMenuRowRect(uint8_t index, uint8_t count, int16_t gap = 10) {
+        int16_t endY = Config::SCREEN_HEIGHT - 10;
+        int16_t rowH = (int16_t)((endY - ROW_START_Y - (int16_t)(count - 1) * gap) / count);
+        return {10, (int16_t)(ROW_START_Y + index * (rowH + gap)),
+                (int16_t)(Config::SCREEN_WIDTH - 20), rowH};
     }
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label,
@@ -249,10 +204,18 @@ namespace {
         return y;
     }
 
-    // Zerlegt einen Titel in bis zu maxLines Zeilen nach dem gleichen
-    // Wortumbruch-Prinzip wie layoutWrapped() - ein Titel wird aber nie
-    // gescrollt, sondern muss immer komplett sichtbar sein, daher eine
-    // eigene, einfachere Variante ohne Scroll-Unterstuetzung.
+    // Zerlegt einen Titel-Text in bis zu maxLines Zeilen, die jeweils bei
+    // der aktuell auf tft gesetzten Textgroesse in maxWidth passen (gleiches
+    // Wortumbruch-Prinzip wie layoutWrapped(), nur ohne Scroll-Fenster, da
+    // ein Titel immer komplett sichtbar sein muss statt gescrollt zu
+    // werden). Frueher wurde bei zu langem Titel nur zwischen Textgroesse
+    // 2/1 umgeschaltet, aber auch bei Groesse 1 konnte ein langer Titel
+    // (z.B. "Pruefung fehlgeschlagen. WLAN pruefen.") immer noch breiter
+    // als die Box sein und lief dann links/rechts ueber den Bildschirmrand
+    // hinaus. Gibt die tatsaechliche Zeilenzahl zurueck (mindestens 1); im
+    // seltenen Fall, dass der Text nach maxLines Zeilen immer noch nicht
+    // vollstaendig umgebrochen ist, landet der Rest unveraendert in der
+    // letzten erlaubten Zeile.
     int wrapTitleLines(TFT_eSPI& tft, const String& text, int16_t maxWidth, String* outLines, int maxLines) {
         int count = 0;
         int32_t start = 0;
@@ -280,29 +243,28 @@ namespace {
         return count;
     }
 
-    // Warn-Ueberlage, die praktisch den kompletten Bildschirm einnimmt (nur
-    // ein paar Pixel Rand) - urspruenglich nur fuers Einschalten des
-    // Flugbuchs gebaut (erklaert, warum es sich nach 24h automatisch
-    // wieder abschaltet), jetzt generisch mit uebergebenen Titel-/Text-
-    // StringIds, damit sie auch fuer die "Einstellungen zuruecksetzen"-
-    // Bestaetigung (Werksreset) wiederverwendet werden kann - beides sind
-    // seltene, potenziell folgenreiche Aktionen, die dieselbe deutliche
-    // Warnung verdienen. "Achtung!!!" (titleId) steht ganz oben, mit einer
-    // Leerzeile Abstand zum Fliesstext (bodyId) darunter; der Text
-    // scrollt bei Bedarf (laengere Uebersetzungen) ueber eigene Pfeil-
-    // Buttons, OK/Zurueck bleiben dabei immer unten fix und
-    // kollisionsfrei sichtbar. Sternchen laufen im Hintergrund mit, wie auf
-    // allen anderen Menue-Screens (nur der Radar-Screen selbst spart sich
-    // das wegen der CPU-Last durch Abfragen/Zeichnen). Gibt true zurueck,
-    // wenn "OK" angetippt wurde, false bei "Zurueck".
-    //
+    // Warn-/Bestaetigungs-Ueberlage, die praktisch den kompletten Bildschirm
+    // einnimmt (nur ein paar Pixel Rand) - urspruenglich nur fuers
+    // Einschalten des Flugbuchs gebaut (erklaert, warum es sich nach 24h
+    // automatisch wieder abschaltet), jetzt generisch mit uebergebenem
+    // Titel-/Text-String, damit sie auch fuer die "Einstellungen
+    // zuruecksetzen"-Bestaetigung (Werksreset) und die OTA-Update-
+    // Bestaetigung wiederverwendet werden kann - alles seltene, potenziell
+    // folgenreiche Aktionen, die dieselbe deutliche Bestaetigung verdienen.
+    // accentColor (Default TFT_RED fuer die beiden bestehenden, wirklich
+    // destruktiven Aufrufer) faerbt Rahmen und Titel - der OTA-Aufrufer
+    // uebergibt TFT_GREEN, da ein Update zwar bestaetigt werden sollte,
+    // aber keine "gefaehrliche" Loesch-Aktion wie Werksreset/Flugbuch ist.
     // title/body stehen VOR dem Aufruf per I18n::t() fest (statt StringIds
     // entgegenzunehmen), damit auch dynamisch zusammengesetzte Texte (z.B.
-    // mit eingefuegter Versionsnummer bei OTA) moeglich sind. accentColor
-    // (Default TFT_RED fuer die beiden bestehenden, wirklich destruktiven
-    // Aufrufer) faerbt Rahmen und Titel - der OTA-Aufrufer uebergibt
-    // TFT_GREEN, da ein Update zwar bestaetigt werden sollte, aber keine
-    // "gefaehrliche" Loesch-Aktion wie Werksreset/Flugbuch ist.
+    // mit eingefuegter Versionsnummer bei OTA) moeglich sind. "Achtung!!!"
+    // (title) steht ganz oben, mit einer Leerzeile Abstand zum Fliesstext
+    // (body) darunter; der Text scrollt bei Bedarf (laengere Uebersetzungen)
+    // ueber eigene Pfeil-Buttons, OK/Zurueck bleiben dabei immer unten fix
+    // und kollisionsfrei sichtbar. Sternchen laufen im Hintergrund mit, wie
+    // auf allen anderen Menue-Screens (nur der Radar-Screen selbst spart
+    // sich das wegen der CPU-Last durch Abfragen/Zeichnen). Gibt true
+    // zurueck, wenn "OK" angetippt wurde, false bei "Zurueck".
     bool confirmWarningScreen(TFT_eSPI& tft, const String& title, const String& body, uint16_t accentColor = TFT_RED) {
         constexpr int16_t BOX_X = 4;
         constexpr int16_t BOX_Y = 4;
@@ -312,11 +274,12 @@ namespace {
         constexpr int16_t LINE_H = 16;
         constexpr int16_t TITLE_Y = BOX_Y + 16;
 
-        // Titel-Text vorab in so viele Zeilen umbrechen, wie bei Größe 2
-        // (oder bei zu langem Text Größe 1) nötig sind - siehe
-        // wrapTitleLines() oben. VIEW_TOP hängt dadurch von der
-        // tatsächlichen Zeilenzahl des Titels ab, ist also kein constexpr
-        // mehr wie vorher (wo immer nur eine Titelzeile angenommen wurde).
+        // Titel-Text vorab in so viele Zeilen umbrechen, wie bei Groesse 2
+        // (oder bei zu langem Text Groesse 1) noetig sind - siehe
+        // wrapTitleLines() oben. VIEW_TOP (Start des Fliesstexts) haengt
+        // dadurch von der tatsaechlichen Zeilenzahl des Titels ab, ist also
+        // kein constexpr mehr wie vorher (wo immer nur eine Titelzeile
+        // angenommen wurde).
         tft.setTextSize(2);
         uint8_t titleTextSize = 2;
         if (tft.textWidth(title) > TEXT_MAX_WIDTH) {
@@ -326,13 +289,13 @@ namespace {
         constexpr int MAX_TITLE_LINES = 3;
         String titleLines[MAX_TITLE_LINES];
         int titleLineCount = wrapTitleLines(tft, title, TEXT_MAX_WIDTH, titleLines, MAX_TITLE_LINES);
-        // Fließtext wird immer bei Größe 1 vermessen/gezeichnet (siehe
-        // layoutWrapped()-Aufrufe unten) - Größe hier zurücksetzen, falls
+        // Fliesstext wird immer bei Groesse 1 vermessen/gezeichnet (siehe
+        // layoutWrapped()-Aufrufe unten) - Groesse hier zurücksetzen, falls
         // obiger Titel-Breitentest sie auf 2 stehen gelassen hat, sonst
-        // würde die gleich folgende totalH-Berechnung (vor dem ersten
-        // redraw()) mit falscher (zu breiter) Schriftgröße rechnen.
+        // wuerde die gleich folgende totalH-Berechnung (vor dem ersten
+        // redraw()) mit falscher (zu breiter) Schriftgroesse rechnen.
         tft.setTextSize(1);
-        // Eine Leerzeile Abstand zwischen Titel und Fließtext.
+        // Eine Leerzeile Abstand zwischen Titel und Fliesstext.
         int16_t VIEW_TOP = (int16_t)(TITLE_Y + titleLineCount * LINE_H + 12);
 
         constexpr int16_t BTN_H = 36;
@@ -372,13 +335,9 @@ namespace {
 
             tft.setTextDatum(MC_DATUM);
             tft.setTextColor(accentColor, TFT_BLACK);
-            // Statische Titel ("Achtung!!!") sind kurz genug fuer Groesse 2,
-            // aber der OTA-Aufrufer baut den Titel dynamisch mit
-            // Versionsnummer zusammen (z.B. "Update verfuegbar: v3.5.0") -
-            // das passt bei Groesse 2 nicht mehr in die Box und lief vorher
-            // links/rechts ueber den Bildschirmrand hinaus. Deshalb hier
-            // die Breite bei Groesse 2 pruefen und bei Bedarf auf Groesse 1
-            // zurueckfallen, statt eine feste Groesse anzunehmen.
+            // Titel-Groesse/-Zeilen wurden oben vor der Layout-Berechnung
+            // bereits einmalig ermittelt (titleTextSize/titleLines) - hier
+            // nur noch zeichnen, ueber ggf. mehrere Zeilen gestapelt.
             tft.setTextSize(titleTextSize);
             for (int i = 0; i < titleLineCount; i++) {
                 tft.drawString(titleLines[i], BOX_X + BOX_W / 2, (int16_t)(TITLE_Y + i * LINE_H));
@@ -433,6 +392,18 @@ namespace {
     // Update, die der Nutzer auf keinen Fall verpassen darf. Gleicher
     // Kasten-/Scroll-Aufbau wie confirmWarningScreen(), nur mit einem
     // einzigen, ueber die volle Breite gehenden Button statt OK/Zurueck.
+    //
+    // tappedLabel (optional, Standard leer): Manche Aufrufer (siehe
+    // runOtaUpdateScreen() unten, Erfolgsfall) fuehren nach dem Antippen
+    // noch eine kurze, aber spuerbar dauernde Aktion aus (hier:
+    // ESP.restart(), das WLAN/Netzwerk-Cleanup vor dem eigentlichen Neustart
+    // macht) - ohne sichtbare Rueckmeldung wirkte der Screen in dieser Zeit
+    // eingefroren, und Alex' Testbericht zeigte mehrfaches frustriertes
+    // Nachtippen auf den (eigentlich schon "erledigten") Button. Ist
+    // tappedLabel gesetzt, wird der Button-Text beim Antippen SOFORT darauf
+    // umgeschaltet (z.B. "Bitte warten, Geraet startet neu..."), bevor
+    // infoScreen() zurueckkehrt und der Aufrufer seine (dauernde) Aktion
+    // startet - der Tipp wurde also sichtbar registriert.
     void infoScreen(TFT_eSPI& tft, const String& title, const String& body, uint16_t accentColor,
                      const String& buttonLabel, const String& tappedLabel = "") {
         constexpr int16_t BOX_X = 4;
@@ -443,11 +414,10 @@ namespace {
         constexpr int16_t LINE_H = 16;
         constexpr int16_t TITLE_Y = BOX_Y + 16;
 
-        // Titel-Text vorab in so viele Zeilen umbrechen, wie bei Größe 2
-        // (oder bei zu langem Text Größe 1) nötig sind - siehe
-        // wrapTitleLines() oben. VIEW_TOP hängt dadurch von der
-        // tatsächlichen Zeilenzahl des Titels ab, ist also kein constexpr
-        // mehr wie vorher (wo immer nur eine Titelzeile angenommen wurde).
+        // Siehe wrapTitleLines()/confirmWarningScreen() oben - Titel kann
+        // je nach Textlaenge/Sprache mehrere Zeilen brauchen, VIEW_TOP ist
+        // deshalb kein constexpr mehr, sondern haengt von der tatsaechlich
+        // benoetigten Zeilenzahl ab.
         tft.setTextSize(2);
         uint8_t titleTextSize = 2;
         if (tft.textWidth(title) > TEXT_MAX_WIDTH) {
@@ -457,13 +427,9 @@ namespace {
         constexpr int MAX_TITLE_LINES = 3;
         String titleLines[MAX_TITLE_LINES];
         int titleLineCount = wrapTitleLines(tft, title, TEXT_MAX_WIDTH, titleLines, MAX_TITLE_LINES);
-        // Fließtext wird immer bei Größe 1 vermessen/gezeichnet (siehe
-        // layoutWrapped()-Aufrufe unten) - Größe hier zurücksetzen, falls
-        // obiger Titel-Breitentest sie auf 2 stehen gelassen hat, sonst
-        // würde die gleich folgende totalH-Berechnung (vor dem ersten
-        // redraw()) mit falscher (zu breiter) Schriftgröße rechnen.
+        // Fliesstext wird immer bei Groesse 1 vermessen/gezeichnet - siehe
+        // Kommentar in confirmWarningScreen().
         tft.setTextSize(1);
-        // Eine Leerzeile Abstand zwischen Titel und Fließtext.
         int16_t VIEW_TOP = (int16_t)(TITLE_Y + titleLineCount * LINE_H + 12);
 
         constexpr int16_t BTN_H = 40;
@@ -497,6 +463,8 @@ namespace {
 
             tft.setTextDatum(MC_DATUM);
             tft.setTextColor(accentColor, TFT_BLACK);
+            // Titel-Groesse/-Zeilen wurden oben vor der Layout-Berechnung
+            // bereits einmalig ermittelt (titleTextSize/titleLines).
             tft.setTextSize(titleTextSize);
             for (int i = 0; i < titleLineCount; i++) {
                 tft.drawString(titleLines[i], BOX_X + BOX_W / 2, (int16_t)(TITLE_Y + i * LINE_H));
@@ -598,6 +566,13 @@ namespace {
         tft.drawString(I18n::t(StringId::OTA_CHECKING), Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
         tft.setTextDatum(TL_DATUM);
 
+        // NetTask (Core 0) waehrend der eigentlichen Netzwerk-Anfrage
+        // pausieren - siehe net_task.h::pause() fuer die Begruendung
+        // (geteilte WLAN-Funk-/TLS-Ressourcen zwischen Core 0 und dieser
+        // OTA-Anfrage auf Core 1). Bewusst NUR um den eigentlichen
+        // HTTPS-Aufruf herum, nicht um die anschliessende Bestaetigungs-
+        // Anzeige, damit ADS-B/WebUI/Wetter nicht laenger als noetig
+        // stillstehen, waehrend der Nutzer in Ruhe die Bestaetigung liest.
         NetTask::pause();
         OtaUpdate::CheckInfo info = OtaUpdate::checkForUpdate();
         NetTask::resume();
@@ -619,6 +594,9 @@ namespace {
         otaProgressTft = &tft;
         tft.fillScreen(TFT_BLACK);
         drawOtaProgress(0);
+        // Gleicher Grund wie oben bei checkForUpdate() - waehrend des
+        // eigentlichen Downloads/Flashens darf NetTask nicht gleichzeitig
+        // um die WLAN-Funk-/TLS-Ressourcen konkurrieren.
         NetTask::pause();
         bool ok = OtaUpdate::performUpdate(info.downloadUrl, drawOtaProgress);
         NetTask::resume();
@@ -662,7 +640,17 @@ namespace {
         }
     }
 
-    enum class Page { Main, Region, System, Flight, BackupReset };
+    // Neue Untermenues (SystemDisplay/SystemTools/FlightStatsLogbook/
+    // FlightLed/FlightTools) - entstanden beim Aufraeumen der Flugoptionen-/
+    // System-Seiten in grosse Kategorie-Buttons statt langer Einzelzeilen-
+    // Listen (Alex' Wunsch, analog zum Hauptmenue). System und Flight sind
+    // dadurch selbst jetzt auch Kategorie-Seiten (wie Main), keine flachen
+    // Listen mehr.
+    enum class Page {
+        Main, Region, System, Flight, BackupReset,
+        SystemDisplay, SystemTools,
+        FlightStatsLogbook, FlightLed, FlightTools
+    };
 }
 
 void run(TFT_eSPI& tft) {
@@ -762,47 +750,22 @@ void run(TFT_eSPI& tft) {
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_SYSTEM));
 
-            Rect calibBtn     = systemRowRect(0);
-            Rect invertBtn    = systemRowRect(1);
-            Rect brightnessBtn = systemRowRect(2);
-            Rect timeoutBtn   = systemRowRect(3);
-            Rect nightDimBtn  = systemRowRect(4);
-            Rect webuiBtn     = systemRowRect(5);
-            Rect radarThemeBtn = systemRowRect(6);
-            // "Sicherung & Reset" (Backup/Restore/Werksreset, siehe
-            // Page::BackupReset unten) steht bewusst direkt ueber "Nach
-            // Update suchen", das seinerseits als letzter Punkt direkt
-            // ueber dem Zurueck-Button steht - so bleiben beide Positionen
-            // stabil, egal wie viele weitere Punkte davor noch dazukommen.
-            Rect backupResetBtn = systemRowRect(7);
-            // Belegt bewusst ZWEI Zeilen-Slots (8 und 9, wo frueher
-            // zusaetzlich ein eigener "Info"-Button stand) statt nur einem -
-            // der einzige wirklich relevante Inhalt des alten Info-Screens
-            // (die Versionsnummer) steht jetzt als eigene Zeile direkt auf
-            // diesem groesseren Button (siehe drawButtonTwoLines() unten),
-            // der dadurch auch insgesamt leichter zu treffen ist. Die
-            // uebrigen Zeilen (0-7, 10) behalten ihre normale Einzelhoehe -
-            // SYSTEM_ROW_COUNT bleibt bewusst bei 11, damit sich an deren
-            // Groesse/Position nichts aendert.
-            Rect systemRow8 = systemRowRect(8);
-            Rect systemRow9 = systemRowRect(9);
-            Rect checkUpdateBtn = {systemRow8.x, systemRow8.y, systemRow8.w,
-                                    (int16_t)(systemRow9.y + systemRow9.h - systemRow8.y)};
-            Rect backBtn      = systemRowRect(10);
+            // Kompakte Kategorie-Seite (3 grosse Buttons + Zurueck statt
+            // vorher 11 einzelne Zeilen) - "Anzeige" und "Werkzeuge" fassen
+            // die frueheren Einzelpunkte in zwei Untermenues zusammen (siehe
+            // Page::SystemDisplay/Page::SystemTools unten). "Nach Update
+            // suchen" bleibt bewusst ein eigener, sofort sichtbarer Button
+            // (kein Untermenue, nur eine einzelne Aktion) - zeigt weiterhin
+            // direkt Version + roten Punkt. Gleiche catRowRect()-Groesse wie
+            // das Hauptmenue (Page::Main), passt auch mit 4 Zeilen (statt
+            // dort 5) noch komfortabel auf den Bildschirm.
+            Rect displayBtn      = catRowRect(0);
+            Rect toolsBtn        = catRowRect(1);
+            Rect checkUpdateBtn  = catRowRect(2);
+            Rect backBtn         = catRowRect(3);
 
-            drawButton(tft, calibBtn, I18n::t(StringId::MENU_CALIBRATE));
-
-            String invertLabel = SettingsStore::displayInverted()
-                                      ? I18n::t(StringId::MENU_DISPLAY_INVERTED)
-                                      : I18n::t(StringId::MENU_DISPLAY_NORMAL);
-            drawButton(tft, invertBtn, invertLabel);
-
-            drawButton(tft, brightnessBtn, brightnessLabel(SettingsStore::brightnessPercent()));
-            drawButton(tft, timeoutBtn, screenTimeoutLabel(SettingsStore::screenTimeoutMinutes()));
-            drawButton(tft, nightDimBtn, I18n::t(StringId::MENU_NIGHT_DIMMING) + onOff(SettingsStore::nightDimmingEnabled()));
-            drawButton(tft, webuiBtn, I18n::t(StringId::MENU_LOGBOOK_WEBUI));
-            drawButton(tft, radarThemeBtn, I18n::t(StringId::MENU_RADAR_THEME));
-            drawButton(tft, backupResetBtn, I18n::t(StringId::MENU_BACKUP_RESET));
+            drawButton(tft, displayBtn, I18n::t(StringId::MENU_CATEGORY_DISPLAY));
+            drawButton(tft, toolsBtn, I18n::t(StringId::MENU_CATEGORY_SYSTEM_TOOLS));
             // Zeigt "Update verfuegbar: vX.X.X" statt der laufenden Version,
             // sobald der Hintergrund-Check (oder ein vorheriger manueller
             // Check) eins gefunden hat - der eigentliche Tastendruck fuehrt
@@ -835,13 +798,51 @@ void run(TFT_eSPI& tft) {
                 delay(20);
             }
 
-            if (calibBtn.contains(tap.x, tap.y)) {
-                CalibrationScreen::run(tft);
-            } else if (invertBtn.contains(tap.x, tap.y)) {
-                bool newState = !SettingsStore::displayInverted();
-                SettingsStore::setDisplayInverted(newState);
-                tft.invertDisplay(newState);
-            } else if (brightnessBtn.contains(tap.x, tap.y)) {
+            if (displayBtn.contains(tap.x, tap.y)) {
+                page = Page::SystemDisplay;
+            } else if (toolsBtn.contains(tap.x, tap.y)) {
+                page = Page::SystemTools;
+            } else if (checkUpdateBtn.contains(tap.x, tap.y)) {
+                runOtaUpdateScreen(tft);
+            } else if (backBtn.contains(tap.x, tap.y)) {
+                page = Page::Main;
+            }
+
+        } else if (page == Page::SystemDisplay) {
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setCursor(10, 14);
+            tft.println(I18n::t(StringId::MENU_CATEGORY_DISPLAY));
+
+            // Alles, was das Aussehen des Displays selbst betrifft
+            // (Helligkeit, Timeout, Nachtmodus, Invertieren, Radar-
+            // Farbschema) - vorher einzelne Zeilen auf der flachen System-
+            // Liste, jetzt hier zusammengefasst (siehe Page::System oben).
+            Rect brightnessBtn = subMenuRowRect(0, 6);
+            Rect timeoutBtn    = subMenuRowRect(1, 6);
+            Rect nightDimBtn   = subMenuRowRect(2, 6);
+            Rect invertBtn     = subMenuRowRect(3, 6);
+            Rect radarThemeBtn = subMenuRowRect(4, 6);
+            Rect backBtn       = subMenuRowRect(5, 6);
+
+            drawButton(tft, brightnessBtn, brightnessLabel(SettingsStore::brightnessPercent()));
+            drawButton(tft, timeoutBtn, screenTimeoutLabel(SettingsStore::screenTimeoutMinutes()));
+            drawButton(tft, nightDimBtn, I18n::t(StringId::MENU_NIGHT_DIMMING) + onOff(SettingsStore::nightDimmingEnabled()));
+            String invertLabel = SettingsStore::displayInverted()
+                                      ? I18n::t(StringId::MENU_DISPLAY_INVERTED)
+                                      : I18n::t(StringId::MENU_DISPLAY_NORMAL);
+            drawButton(tft, invertBtn, invertLabel);
+            drawButton(tft, radarThemeBtn, I18n::t(StringId::MENU_RADAR_THEME));
+            drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
+
+            TouchInput::Point tap;
+            while (true) {
+                if (TouchInput::wasTapped(tap)) break;
+                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                MenuStars::update(tft);
+                delay(20);
+            }
+
+            if (brightnessBtn.contains(tap.x, tap.y)) {
                 BrightnessScreen::run(tft);
             } else if (timeoutBtn.contains(tap.x, tap.y)) {
                 // Vorher: Durchklicken per wiederholtem Antippen (0-10, ein
@@ -853,16 +854,52 @@ void run(TFT_eSPI& tft) {
                 TimeoutScreen::run(tft);
             } else if (nightDimBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setNightDimmingEnabled(!SettingsStore::nightDimmingEnabled());
-            } else if (backupResetBtn.contains(tap.x, tap.y)) {
-                page = Page::BackupReset;
-            } else if (checkUpdateBtn.contains(tap.x, tap.y)) {
-                runOtaUpdateScreen(tft);
-            } else if (webuiBtn.contains(tap.x, tap.y)) {
-                WebUiScreen::run(tft);
+            } else if (invertBtn.contains(tap.x, tap.y)) {
+                bool newState = !SettingsStore::displayInverted();
+                SettingsStore::setDisplayInverted(newState);
+                tft.invertDisplay(newState);
             } else if (radarThemeBtn.contains(tap.x, tap.y)) {
                 RadarThemeScreen::run(tft);
             } else if (backBtn.contains(tap.x, tap.y)) {
-                page = Page::Main;
+                page = Page::System;
+            }
+
+        } else if (page == Page::SystemTools) {
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setCursor(10, 14);
+            tft.println(I18n::t(StringId::MENU_CATEGORY_SYSTEM_TOOLS));
+
+            // Wartungs-/Einrichtungs-Funktionen, die nicht taeglich
+            // gebraucht werden - Kalibrierung, Web-Livekarte-Info und
+            // Sicherung & Reset (das bestehende Page::BackupReset-Untermenue
+            // bleibt unveraendert, wird jetzt nur eine Ebene tiefer erreicht:
+            // System > Werkzeuge > Sicherung & Reset).
+            Rect calibBtn       = subMenuRowRect(0, 4);
+            Rect webuiBtn       = subMenuRowRect(1, 4);
+            Rect backupResetBtn = subMenuRowRect(2, 4);
+            Rect backBtn        = subMenuRowRect(3, 4);
+
+            drawButton(tft, calibBtn, I18n::t(StringId::MENU_CALIBRATE));
+            drawButton(tft, webuiBtn, I18n::t(StringId::MENU_LOGBOOK_WEBUI));
+            drawButton(tft, backupResetBtn, I18n::t(StringId::MENU_BACKUP_RESET));
+            drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
+
+            TouchInput::Point tap;
+            while (true) {
+                if (TouchInput::wasTapped(tap)) break;
+                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                MenuStars::update(tft);
+                delay(20);
+            }
+
+            if (calibBtn.contains(tap.x, tap.y)) {
+                CalibrationScreen::run(tft);
+            } else if (webuiBtn.contains(tap.x, tap.y)) {
+                WebUiScreen::run(tft);
+            } else if (backupResetBtn.contains(tap.x, tap.y)) {
+                page = Page::BackupReset;
+            } else if (backBtn.contains(tap.x, tap.y)) {
+                page = Page::System;
             }
 
         } else if (page == Page::BackupReset) {
@@ -870,10 +907,10 @@ void run(TFT_eSPI& tft) {
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_BACKUP_RESET));
 
-            Rect backupBtn  = backupResetRowRect(0);
-            Rect restoreBtn = backupResetRowRect(1);
-            Rect resetBtn   = backupResetRowRect(2);
-            Rect backBtn    = backupResetRowRect(3);
+            Rect backupBtn  = subMenuRowRect(0, 4);
+            Rect restoreBtn = subMenuRowRect(1, 4);
+            Rect resetBtn   = subMenuRowRect(2, 4);
+            Rect backBtn    = subMenuRowRect(3, 4);
 
             drawButton(tft, backupBtn, I18n::t(StringId::MENU_BACKUP));
             drawButton(tft, restoreBtn, I18n::t(StringId::MENU_RESTORE));
@@ -935,61 +972,41 @@ void run(TFT_eSPI& tft) {
                     }
                 }
             } else if (backBtn.contains(tap.x, tap.y)) {
-                page = Page::System;
+                // Jetzt ueber Page::SystemTools erreicht (System > Werkzeuge
+                // > Sicherung & Reset), nicht mehr direkt ueber Page::System -
+                // "Zurueck" fuehrt deshalb dorthin zurueck statt zur System-
+                // Kategorie-Seite, damit die Navigation stimmig bleibt.
+                page = Page::SystemTools;
             }
 
-        } else { // Page::Flight
+        } else if (page == Page::Flight) {
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_FLIGHT));
 
-            // Reine An/Aus-Schalter (Heartbeat, Notfall-Alarm, Naeherungs-LED,
-            // Flugbuch, Beobachtungsalarm, Bodenfahrzeuge-Filter) stehen
-            // bewusst gemeinsam am Ende der Liste, direkt ueber dem
-            // Zurueck-Button - zuerst die LED-gesteuerten Alarme (Heartbeat,
-            // Notfall, Naeherung; siehe LedAlert::Mode) zusammenhaengend,
-            // danach die beiden nicht-LED-basierten Schalter Flugbuch und
-            // Beobachtungsalarm sowie zuletzt der Bodenfahrzeuge-Filter.
-            Rect aircraftListBtn = flightRowRect(0);
-            Rect statsBtn      = flightRowRect(1);
-            Rect statsHistoryBtn = flightRowRect(2);
-            Rect logFilesBtn   = flightRowRect(3);
-            Rect locationBtn   = flightRowRect(4);
-            Rect airlineBtn    = flightRowRect(5);
-            Rect watchlistBtn      = flightRowRect(6);
-            Rect heartbeatBtn  = flightRowRect(7);
-            Rect emergencyBtn  = flightRowRect(8);
-            Rect proximityBtn  = flightRowRect(9);
-            Rect logbookBtn    = flightRowRect(10);
-            Rect watchlistAlertBtn = flightRowRect(11);
-            Rect groundBtn     = flightRowRect(12);
-            Rect helicoptersBtn = flightRowRect(13);
-            Rect backBtn       = flightRowRect(14);
+            // Kompakte Kategorie-Seite (6 grosse Buttons statt vorher 15
+            // einzelne Zeilen) - Flugzeugliste und Beobachtungsliste bleiben
+            // bewusst eigene, direkt erreichbare Buttons (meistgenutzte
+            // Funktionen), die restlichen Punkte stecken in drei
+            // thematischen Untermenues (siehe Page::FlightStatsLogbook/
+            // Page::FlightLed/Page::FlightTools unten).
+            Rect aircraftListBtn = subMenuRowRect(0, 6);
+            Rect watchlistBtn    = subMenuRowRect(1, 6);
+            Rect statsLogbookBtn = subMenuRowRect(2, 6);
+            Rect ledBtn          = subMenuRowRect(3, 6);
+            Rect toolsBtn        = subMenuRowRect(4, 6);
+            Rect backBtn         = subMenuRowRect(5, 6);
 
             drawButton(tft, aircraftListBtn, I18n::t(StringId::MENU_AIRCRAFT_LIST));
-            drawButton(tft, statsBtn, I18n::t(StringId::MENU_STATISTICS));
-            drawButton(tft, statsHistoryBtn, I18n::t(StringId::MENU_STATS_HISTORY));
-            drawButton(tft, logFilesBtn, I18n::t(StringId::MENU_LOGBOOK_FILES));
-            drawButton(tft, locationBtn, I18n::t(StringId::MENU_LOCATION_PRESETS));
-            drawButton(tft, airlineBtn, I18n::t(StringId::MENU_AIRLINE_FILTER));
             drawButton(tft, watchlistBtn, I18n::t(StringId::MENU_WATCHLIST));
-            drawButton(tft, heartbeatBtn, I18n::t(StringId::MENU_LED_HEARTBEAT) + onOff(SettingsStore::ledHeartbeatEnabled()));
-            drawButton(tft, emergencyBtn, I18n::t(StringId::MENU_EMERGENCY_ALERT) + onOff(SettingsStore::emergencyAlertEnabled()));
-            drawButton(tft, proximityBtn, I18n::t(StringId::MENU_PROXIMITY_LED) + onOff(SettingsStore::proximityAlertEnabled()));
-            drawButton(tft, logbookBtn, I18n::t(StringId::MENU_FLIGHT_LOGBOOK) + onOff(SettingsStore::flightLogbookEnabled()));
-            drawButton(tft, watchlistAlertBtn, I18n::t(StringId::MENU_WATCHLIST_ALERT) + onOff(SettingsStore::watchlistAlertEnabled()));
-            drawButton(tft, groundBtn, I18n::t(StringId::MENU_HIDE_GROUND) + onOff(SettingsStore::hideGroundVehicles()));
-            drawButton(tft, helicoptersBtn, I18n::t(StringId::MENU_ONLY_HELICOPTERS) + onOff(SettingsStore::onlyHelicopters()));
+            drawButton(tft, statsLogbookBtn, I18n::t(StringId::MENU_CATEGORY_STATS_LOGBOOK));
+            drawButton(tft, ledBtn, I18n::t(StringId::MENU_CATEGORY_LED));
+            drawButton(tft, toolsBtn, I18n::t(StringId::MENU_CATEGORY_TOOLS));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
-                // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
-                // Bricht die AEUSSERE Seiten-Schleife (while (!done)) mit ab,
-                // egal auf welcher Menue-Unterseite man gerade steht - kommt
-                // dadurch beim Verlassen von run() automatisch beim
-                // Radarscreen raus.
                 if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
@@ -1002,24 +1019,49 @@ void run(TFT_eSPI& tft) {
                     // statt in der Flugoptionen-Seite stehen zu bleiben.
                     done = true;
                 }
-            } else if (statsBtn.contains(tap.x, tap.y)) {
+            } else if (watchlistBtn.contains(tap.x, tap.y)) {
+                AircraftWatchlistScreen::run(tft);
+            } else if (statsLogbookBtn.contains(tap.x, tap.y)) {
+                page = Page::FlightStatsLogbook;
+            } else if (ledBtn.contains(tap.x, tap.y)) {
+                page = Page::FlightLed;
+            } else if (toolsBtn.contains(tap.x, tap.y)) {
+                page = Page::FlightTools;
+            } else if (backBtn.contains(tap.x, tap.y)) {
+                page = Page::Main;
+            }
+
+        } else if (page == Page::FlightStatsLogbook) {
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setCursor(10, 14);
+            tft.println(I18n::t(StringId::MENU_CATEGORY_STATS_LOGBOOK));
+
+            Rect statsBtn        = subMenuRowRect(0, 5);
+            Rect statsHistoryBtn = subMenuRowRect(1, 5);
+            Rect logFilesBtn     = subMenuRowRect(2, 5);
+            Rect logbookBtn      = subMenuRowRect(3, 5);
+            Rect backBtn         = subMenuRowRect(4, 5);
+
+            drawButton(tft, statsBtn, I18n::t(StringId::MENU_STATISTICS));
+            drawButton(tft, statsHistoryBtn, I18n::t(StringId::MENU_STATS_HISTORY));
+            drawButton(tft, logFilesBtn, I18n::t(StringId::MENU_LOGBOOK_FILES));
+            drawButton(tft, logbookBtn, I18n::t(StringId::MENU_FLIGHT_LOGBOOK) + onOff(SettingsStore::flightLogbookEnabled()));
+            drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
+
+            TouchInput::Point tap;
+            while (true) {
+                if (TouchInput::wasTapped(tap)) break;
+                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                MenuStars::update(tft);
+                delay(20);
+            }
+
+            if (statsBtn.contains(tap.x, tap.y)) {
                 StatsScreen::run(tft);
             } else if (statsHistoryBtn.contains(tap.x, tap.y)) {
                 StatsHistoryScreen::run(tft);
             } else if (logFilesBtn.contains(tap.x, tap.y)) {
                 LogbookFilesScreen::run(tft);
-            } else if (locationBtn.contains(tap.x, tap.y)) {
-                LocationPresetsScreen::run(tft);
-            } else if (airlineBtn.contains(tap.x, tap.y)) {
-                AirlineFilterScreen::run(tft);
-            } else if (watchlistBtn.contains(tap.x, tap.y)) {
-                AircraftWatchlistScreen::run(tft);
-            } else if (heartbeatBtn.contains(tap.x, tap.y)) {
-                SettingsStore::setLedHeartbeatEnabled(!SettingsStore::ledHeartbeatEnabled());
-            } else if (emergencyBtn.contains(tap.x, tap.y)) {
-                SettingsStore::setEmergencyAlertEnabled(!SettingsStore::emergencyAlertEnabled());
-            } else if (proximityBtn.contains(tap.x, tap.y)) {
-                SettingsStore::setProximityAlertEnabled(!SettingsStore::proximityAlertEnabled());
             } else if (logbookBtn.contains(tap.x, tap.y)) {
                 if (SettingsStore::flightLogbookEnabled()) {
                     // Ausschalten ist immer unbedenklich - keine Bestaetigung noetig.
@@ -1035,14 +1077,82 @@ void run(TFT_eSPI& tft) {
                     // vorhandene alte Datei weiterzuschreiben.
                     SettingsStore::setFlightLogbookSessionFile("");
                 }
-            } else if (watchlistAlertBtn.contains(tap.x, tap.y)) {
-                SettingsStore::setWatchlistAlertEnabled(!SettingsStore::watchlistAlertEnabled());
+            } else if (backBtn.contains(tap.x, tap.y)) {
+                page = Page::Flight;
+            }
+
+        } else if (page == Page::FlightLed) {
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setCursor(10, 14);
+            tft.println(I18n::t(StringId::MENU_CATEGORY_LED));
+
+            Rect heartbeatBtn = subMenuRowRect(0, 4);
+            Rect emergencyBtn = subMenuRowRect(1, 4);
+            Rect proximityBtn = subMenuRowRect(2, 4);
+            Rect backBtn      = subMenuRowRect(3, 4);
+
+            drawButton(tft, heartbeatBtn, I18n::t(StringId::MENU_LED_HEARTBEAT) + onOff(SettingsStore::ledHeartbeatEnabled()));
+            drawButton(tft, emergencyBtn, I18n::t(StringId::MENU_EMERGENCY_ALERT) + onOff(SettingsStore::emergencyAlertEnabled()));
+            drawButton(tft, proximityBtn, I18n::t(StringId::MENU_PROXIMITY_LED) + onOff(SettingsStore::proximityAlertEnabled()));
+            drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
+
+            TouchInput::Point tap;
+            while (true) {
+                if (TouchInput::wasTapped(tap)) break;
+                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                MenuStars::update(tft);
+                delay(20);
+            }
+
+            if (heartbeatBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setLedHeartbeatEnabled(!SettingsStore::ledHeartbeatEnabled());
+            } else if (emergencyBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setEmergencyAlertEnabled(!SettingsStore::emergencyAlertEnabled());
+            } else if (proximityBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setProximityAlertEnabled(!SettingsStore::proximityAlertEnabled());
+            } else if (backBtn.contains(tap.x, tap.y)) {
+                page = Page::Flight;
+            }
+
+        } else { // Page::FlightTools
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setCursor(10, 14);
+            tft.println(I18n::t(StringId::MENU_CATEGORY_TOOLS));
+
+            Rect locationBtn       = subMenuRowRect(0, 6);
+            Rect airlineBtn        = subMenuRowRect(1, 6);
+            Rect groundBtn         = subMenuRowRect(2, 6);
+            Rect helicoptersBtn    = subMenuRowRect(3, 6);
+            Rect watchlistAlertBtn = subMenuRowRect(4, 6);
+            Rect backBtn           = subMenuRowRect(5, 6);
+
+            drawButton(tft, locationBtn, I18n::t(StringId::MENU_LOCATION_PRESETS));
+            drawButton(tft, airlineBtn, I18n::t(StringId::MENU_AIRLINE_FILTER));
+            drawButton(tft, groundBtn, I18n::t(StringId::MENU_HIDE_GROUND) + onOff(SettingsStore::hideGroundVehicles()));
+            drawButton(tft, helicoptersBtn, I18n::t(StringId::MENU_ONLY_HELICOPTERS) + onOff(SettingsStore::onlyHelicopters()));
+            drawButton(tft, watchlistAlertBtn, I18n::t(StringId::MENU_WATCHLIST_ALERT) + onOff(SettingsStore::watchlistAlertEnabled()));
+            drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
+
+            TouchInput::Point tap;
+            while (true) {
+                if (TouchInput::wasTapped(tap)) break;
+                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                MenuStars::update(tft);
+                delay(20);
+            }
+
+            if (locationBtn.contains(tap.x, tap.y)) {
+                LocationPresetsScreen::run(tft);
+            } else if (airlineBtn.contains(tap.x, tap.y)) {
+                AirlineFilterScreen::run(tft);
             } else if (groundBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setHideGroundVehicles(!SettingsStore::hideGroundVehicles());
             } else if (helicoptersBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setOnlyHelicopters(!SettingsStore::onlyHelicopters());
+            } else if (watchlistAlertBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setWatchlistAlertEnabled(!SettingsStore::watchlistAlertEnabled());
             } else if (backBtn.contains(tap.x, tap.y)) {
-                page = Page::Main;
+                page = Page::Flight;
             }
         }
     }

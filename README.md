@@ -77,6 +77,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Bearing to selected aircraft** – the detail panel now also shows a compass direction (e.g. "NE") alongside the numeric bearing, so you know which way to look without doing the math yourself
 - **Quick watchlist add** – a "+"/"-" button in the aircraft detail panel, right next to the "QR" button, adds the currently shown aircraft to the [Watchlist](#-watchlist) with a single tap instead of typing its callsign manually
 - **Show helicopters only** – a new toggle under **Menu → Flight Options** filters the radar, aircraft list, and web live map down to helicopters (see [Show helicopters only](#-show-helicopters-only-onoff) below)
+- **Reorganized menus** – the Flight Options and System menus are now grouped into a handful of large category buttons (Stats & Logbook, LED Alerts, Tools, Display) instead of long lists, making it easier to find your way around
 
 ## Feature Deep-Dive
 

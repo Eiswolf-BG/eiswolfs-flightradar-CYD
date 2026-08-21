@@ -293,6 +293,11 @@ static const char* const I18N_EN[] = {
     "CRT Phosphor",
     "Radar Pulse",
     "Show helicopters only: ",
+    "Display",
+    "Tools",
+    "Stats & Logbook",
+    "LED Alerts",
+    "Tools",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,
