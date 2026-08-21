@@ -347,13 +347,20 @@ Was Karl bei einem Silent Push stattdessen tut:
 5. Das bestehende GitHub Release der aktuellen Version aktualisieren, indem
    das firmware.bin-Asset per `gh release upload <bestehende-version> .pio/build/esp32dev/firmware.bin --clobber --repo Eiswolf-BG/eiswolfs-flightradar-CYD`
    ersetzt wird - es wird KEIN neues Release erstellt
+6. Das Geraet direkt per USB flashen (z.B. `pio run -t upload`), NICHT auf
+   OTA verlassen - das ist bei einem Silent Push IMMER Pflicht, nicht optional,
+   da die OTA-Update-Suche den Fix wegen der unveraenderten Versionsnummer nie
+   als verfuegbares Update anzeigen wird. Falls das Geraet gerade nicht per USB
+   angeschlossen/erreichbar ist, bitte Alex explizit darauf hinweisen, dass sie
+   es zum Flashen anschliessen muss, bevor der Fix bei ihr ankommt.
 
-Wichtiger Hinweis fuer Alex/Claude: Da sich die Versionsnummer nicht aendert,
-erkennt die In-App-OTA-Update-Pruefung (Vergleich von Config::APP_VERSION
-gegen den GitHub-Release-Tag-Namen) den Silent-Push-Fix NICHT als verfuegbares
-Update - das Geraet meldet "up to date", obwohl die neue Binary bereits
-veroeffentlicht ist. Wer den Fix erhalten will, braucht einen frischen
-manuellen (Re-)Flash statt sich auf die gewohnte OTA-Update-Suche zu verlassen.
+Wichtiger Hinweis: Weil sich die Versionsnummer nicht aendert, erkennt die
+In-App-OTA-Update-Pruefung (Vergleich von Config::APP_VERSION gegen den
+GitHub-Release-Tag-Namen) den Silent-Push-Fix NICHT als verfuegbares Update -
+das Geraet meldet "up to date", obwohl die neue Binary bereits veroeffentlicht
+ist. Deshalb ist Schritt 6 (direktes USB-Flashen durch Karl) bei einem Silent
+Push zwingend und nicht optional - anders als beim normalen Release-Workflow,
+bei dem Alex selbst per OTA aktualisiert.
 
 Bitte NICHT den normalen Workflow (Schritt 0 Versionsnummer, Changelog,
 README, Tag) anwenden, wenn Alex explizit "Silent Push" sagt - nur wenn sie
