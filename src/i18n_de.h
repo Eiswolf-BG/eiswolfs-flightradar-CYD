@@ -65,7 +65,7 @@ static const char* const I18N_DE[] = {
     "Näherungs-LED: ",
     "LED-Herzschlag: ",
     "Flugbuch: ",
-    "Bodenfahrzeuge ausblenden: ",
+    "Bodenfahrzeuge anzeigen: ",
     "Airline-Filter",
     "Beobachtungsliste",
     "Beobachtungs-Alarm: ",

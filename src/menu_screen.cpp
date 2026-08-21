@@ -1128,7 +1128,16 @@ void run(TFT_eSPI& tft) {
 
             drawButton(tft, locationBtn, I18n::t(StringId::MENU_LOCATION_PRESETS));
             drawButton(tft, airlineBtn, I18n::t(StringId::MENU_AIRLINE_FILTER));
-            drawButton(tft, groundBtn, I18n::t(StringId::MENU_HIDE_GROUND) + onOff(SettingsStore::hideGroundVehicles()));
+            // Label jetzt "Bodenfahrzeuge anzeigen" statt "...ausblenden" -
+            // Alex' Meldung: "ausblenden: AN" liest sich unlogisch (klingt,
+            // als waere Ausblenden aktiv gewaehlt, obwohl "AN" hier eigentlich
+            // "Fahrzeuge sind sichtbar" bedeuten sollte). Deshalb Anzeige-
+            // Text UMGEKEHRT zum gespeicherten hideGroundVehicles()-Wert -
+            // die Einstellung selbst (SettingsStore::hideGroundVehicles(),
+            // Speicherformat, radar_screen.cpp/aircraft_list_screen.cpp/
+            // web_export_server.cpp-Filterlogik) bleibt unveraendert, nur
+            // wie es hier angezeigt wird, ist gedreht.
+            drawButton(tft, groundBtn, I18n::t(StringId::MENU_HIDE_GROUND) + onOff(!SettingsStore::hideGroundVehicles()));
             drawButton(tft, helicoptersBtn, I18n::t(StringId::MENU_ONLY_HELICOPTERS) + onOff(SettingsStore::onlyHelicopters()));
             drawButton(tft, watchlistAlertBtn, I18n::t(StringId::MENU_WATCHLIST_ALERT) + onOff(SettingsStore::watchlistAlertEnabled()));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
