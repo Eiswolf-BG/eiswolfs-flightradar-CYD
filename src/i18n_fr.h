@@ -291,6 +291,7 @@ static const char* const I18N_FR[] = {
 
     "Phosphore CRT",
     "Pulsation radar",
+    "Afficher uniquement les hélicoptères : ",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

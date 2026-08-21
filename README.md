@@ -76,6 +76,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Short weather forecast** – the Weather Info screen also shows a short forecast (temperature and conditions) 3 hours ahead, and now scrolls automatically if the combined text (including a long METAR report) doesn't fit on one screen
 - **Bearing to selected aircraft** – the detail panel now also shows a compass direction (e.g. "NE") alongside the numeric bearing, so you know which way to look without doing the math yourself
 - **Quick watchlist add** – a "+"/"-" button in the aircraft detail panel, right next to the "QR" button, adds the currently shown aircraft to the [Watchlist](#-watchlist) with a single tap instead of typing its callsign manually
+- **Show helicopters only** – a new toggle under **Menu → Flight Options** filters the radar, aircraft list, and web live map down to helicopters (see [Show helicopters only](#-show-helicopters-only-onoff) below)
 
 ## Feature Deep-Dive
 
@@ -225,6 +226,9 @@ When shown, ground vehicles render as distinct **blue square markers** on the ra
 Helicopters (ADS-B emitter category "A7") get their own marker too - a filled circle with a rotor cross instead of the usual arrowhead, since a hovering helicopter doesn't have a meaningful "forward heading" to point in.
 
 "Heavy" aircraft (category "A5" - wide-body jets over 136 tonnes MTOW, e.g. A380, B747, B777) also get a distinct marker - a larger circle with an outer ring plus the usual heading line, so they stand out at a glance from smaller aircraft.
+
+### 🚁 Show helicopters only (ON/OFF)
+Filters the radar, the [Aircraft list](#-aircraft-list), and the Live Radar web page down to helicopters only (ADS-B emitter category "A7"), hiding all other aircraft. Off by default. Handy if you're specifically interested in rotorcraft traffic (medevac, police, sightseeing tours) rather than the usual fixed-wing airliners passing overhead.
 
 ### 📶 WiFi Manager
 See the dedicated section above: [WiFi Manager](#-wifi-manager-up-to-3-saved-networks) – save up to 3 WiFi networks at once.

@@ -24,6 +24,7 @@ namespace {
     bool nightDimmingOn = true;
     bool screensaverOn = false;
     bool hideGroundVehiclesOn = true;
+    bool onlyHelicoptersOn = false;
     uint8_t languageIdx = 0;
     uint8_t unitsModeVal = 0;
     uint8_t radarThemeIdx = 0;
@@ -76,6 +77,8 @@ namespace {
             screensaverOn = (value.toInt() != 0);
         } else if (key == "hide_ground_vehicles") {
             hideGroundVehiclesOn = (value.toInt() != 0);
+        } else if (key == "only_helicopters") {
+            onlyHelicoptersOn = (value.toInt() != 0);
         } else if (key == "language") {
             int v = value.toInt();
             if (v >= 0 && v <= 5) languageIdx = (uint8_t)v;
@@ -151,6 +154,7 @@ void save() {
     f.printf("night_dimming=%d\n", nightDimmingOn ? 1 : 0);
     f.printf("screensaver=%d\n", screensaverOn ? 1 : 0);
     f.printf("hide_ground_vehicles=%d\n", hideGroundVehiclesOn ? 1 : 0);
+    f.printf("only_helicopters=%d\n", onlyHelicoptersOn ? 1 : 0);
     f.printf("language=%d\n", languageIdx);
     f.printf("units_mode=%d\n", unitsModeVal);
     f.printf("radar_theme=%d\n", radarThemeIdx);
@@ -263,6 +267,13 @@ bool hideGroundVehicles() { return hideGroundVehiclesOn; }
 
 void setHideGroundVehicles(bool on) {
     hideGroundVehiclesOn = on;
+    save();
+}
+
+bool onlyHelicopters() { return onlyHelicoptersOn; }
+
+void setOnlyHelicopters(bool on) {
+    onlyHelicoptersOn = on;
     save();
 }
 

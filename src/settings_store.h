@@ -59,6 +59,9 @@ namespace SettingsStore {
     bool hideGroundVehicles();
     void setHideGroundVehicles(bool on);
 
+    bool onlyHelicopters();
+    void setOnlyHelicopters(bool on);
+
     // Sprache der Benutzeroberflaeche: 0=EN,1=DE,2=FR,3=TR,4=ES,5=IT.
     uint8_t language();
     void setLanguage(uint8_t lang);

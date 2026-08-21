@@ -9,39 +9,36 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 6;
 
     const char* const CHANGELOG_EN =
-        "- Fix: the update-available red dot on the radar screen now "
-        "appears reliably within minutes of a new release, instead of "
-        "only showing once the screensaver kicked in";
+        "- New: a \"Show helicopters only\" toggle in the flight "
+        "options menu now lets you filter the radar, aircraft list, "
+        "and web live map down to helicopters";
 
     const char* const CHANGELOG_DE =
-        "- Fix: Der rote Update-verfügbar-Punkt auf dem Radarscreen "
-        "erscheint jetzt zuverlässig innerhalb weniger Minuten nach "
-        "einem neuen Release, statt erst wenn der Ruhebildschirm "
-        "ansprang";
+        "- Neu: Ein \"Nur Helikopter anzeigen\"-Schalter im "
+        "Flugoptionen-Menü filtert Radar, Flugzeugliste und "
+        "Web-Livekarte jetzt auf Helikopter";
 
     const char* const CHANGELOG_FR =
-        "- Correction : le point rouge « mise à jour disponible » sur "
-        "l'écran radar apparaît désormais de façon fiable quelques "
-        "minutes après une nouvelle version, au lieu de n'apparaître "
-        "qu'au démarrage de l'économiseur d'écran";
+        "- Nouveau : un interrupteur « Afficher uniquement les "
+        "hélicoptères » dans le menu des options de vol permet "
+        "désormais de filtrer le radar, la liste des avions et la "
+        "carte web en direct sur les hélicoptères uniquement";
 
     const char* const CHANGELOG_TR =
-        "- Düzeltme: Radar ekranındaki kırmızı güncelleme noktası "
-        "artık yeni bir sürümden sonra dakikalar içinde güvenilir "
-        "şekilde görünüyor, öncesinde yalnızca ekran koruyucu devreye "
-        "girdiğinde görünüyordu";
+        "- Yeni: Uçuş seçenekleri menüsündeki \"Sadece helikopterleri "
+        "göster\" anahtarı artık radarı, uçak listesini ve web canlı "
+        "haritasını yalnızca helikopterlere göre filtreleyebiliyor";
 
     const char* const CHANGELOG_ES =
-        "- Corrección: el punto rojo de actualización disponible en "
-        "la pantalla del radar ahora aparece de forma fiable a los "
-        "pocos minutos de una nueva versión, en lugar de aparecer "
-        "solo cuando se activaba el salvapantallas";
+        "- Novedad: un interruptor \"Mostrar solo helicópteros\" en "
+        "el menú de opciones de vuelo ahora permite filtrar el radar, "
+        "la lista de aeronaves y el mapa web en vivo solo a "
+        "helicópteros";
 
     const char* const CHANGELOG_IT =
-        "- Correzione: il puntino rosso di aggiornamento disponibile "
-        "sulla schermata radar ora appare in modo affidabile entro "
-        "pochi minuti da una nuova versione, invece di apparire solo "
-        "all'avvio del salvaschermo";
+        "- Novità: un interruttore \"Mostra solo elicotteri\" nel "
+        "menu delle opzioni di volo ora consente di filtrare radar, "
+        "elenco aeromobili e mappa web live solo sugli elicotteri";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT

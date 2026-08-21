@@ -1371,6 +1371,8 @@ void render(TFT_eSPI& tft, int16_t top) {
 
         if (SettingsStore::hideGroundVehicles() && a.category[0] == 'C') continue;
 
+        if (SettingsStore::onlyHelicopters() && !(a.category[0] == 'A' && a.category[1] == '7')) continue;
+
         if (AirlineFilter::isHidden(a.callsign)) continue;
 
         visibleCount++;

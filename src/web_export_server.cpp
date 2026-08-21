@@ -614,6 +614,7 @@ namespace {
             }
         }
         bool hideGround = SettingsStore::hideGroundVehicles();
+        bool onlyHeli = SettingsStore::onlyHelicopters();
         bool emergencyOn = SettingsStore::emergencyAlertEnabled();
         bool watchOn = SettingsStore::watchlistAlertEnabled();
 
@@ -630,9 +631,12 @@ namespace {
 
             bool isGroundVehicle = a.category[0] == 'C';
             if (hideGround && isGroundVehicle) continue;
-            if (AirlineFilter::isHidden(a.callsign)) continue;
 
             bool isRotorcraft = a.category[0] == 'A' && a.category[1] == '7';
+            if (onlyHeli && !isRotorcraft) continue;
+
+            if (AirlineFilter::isHidden(a.callsign)) continue;
+
             bool isHeavy = isHeavyCategoryWeb(a.category);
             bool isEmergency = emergencyOn && isEmergencySquawkWeb(a.squawk);
             bool isWatched = watchOn && AircraftWatchlist::isWatched(a.callsign);

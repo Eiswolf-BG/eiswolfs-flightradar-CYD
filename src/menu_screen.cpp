@@ -67,11 +67,14 @@ namespace {
                 (int16_t)(Config::SCREEN_WIDTH - 20), CAT_ROW_H};
     }
 
-    // Eigene, etwas kompaktere Zeilenhoehe NUR fuer die Flugoptionen-Seite:
-    // die normale rowRect()-Hoehe (22px) liess bei 13 Eintraegen schon keinen
-    // Platz mehr fuer einen weiteren - andere Seiten (Region/System) bleiben
-    // bei der normalen Hoehe unveraendert, um dort nichts zu verschieben.
-    constexpr int16_t FLIGHT_ROW_H = 20;
+    // Zeilenhoehe aus dem verfuegbaren Platz errechnet (gleiches Muster wie
+    // SYSTEM_ROW_H weiter unten) statt fest verdrahtet - mit dem neuen 15.
+    // Eintrag (Helikopter-Filter) rutschte der Zurueck-Button sonst unten
+    // aus dem Display.
+    constexpr uint8_t FLIGHT_ROW_COUNT = 15;
+    constexpr int16_t FLIGHT_END_Y = Config::SCREEN_HEIGHT - 10;
+    constexpr int16_t FLIGHT_ROW_H =
+        (FLIGHT_END_Y - ROW_START_Y - (FLIGHT_ROW_COUNT - 1) * ROW_GAP) / FLIGHT_ROW_COUNT;
     Rect flightRowRect(uint8_t index) {
         return {10, (int16_t)(ROW_START_Y + index * (FLIGHT_ROW_H + ROW_GAP)),
                 (int16_t)(Config::SCREEN_WIDTH - 20), FLIGHT_ROW_H};
@@ -960,7 +963,8 @@ void run(TFT_eSPI& tft) {
             Rect logbookBtn    = flightRowRect(10);
             Rect watchlistAlertBtn = flightRowRect(11);
             Rect groundBtn     = flightRowRect(12);
-            Rect backBtn       = flightRowRect(13);
+            Rect helicoptersBtn = flightRowRect(13);
+            Rect backBtn       = flightRowRect(14);
 
             drawButton(tft, aircraftListBtn, I18n::t(StringId::MENU_AIRCRAFT_LIST));
             drawButton(tft, statsBtn, I18n::t(StringId::MENU_STATISTICS));
@@ -975,6 +979,7 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, logbookBtn, I18n::t(StringId::MENU_FLIGHT_LOGBOOK) + onOff(SettingsStore::flightLogbookEnabled()));
             drawButton(tft, watchlistAlertBtn, I18n::t(StringId::MENU_WATCHLIST_ALERT) + onOff(SettingsStore::watchlistAlertEnabled()));
             drawButton(tft, groundBtn, I18n::t(StringId::MENU_HIDE_GROUND) + onOff(SettingsStore::hideGroundVehicles()));
+            drawButton(tft, helicoptersBtn, I18n::t(StringId::MENU_ONLY_HELICOPTERS) + onOff(SettingsStore::onlyHelicopters()));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -1034,6 +1039,8 @@ void run(TFT_eSPI& tft) {
                 SettingsStore::setWatchlistAlertEnabled(!SettingsStore::watchlistAlertEnabled());
             } else if (groundBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setHideGroundVehicles(!SettingsStore::hideGroundVehicles());
+            } else if (helicoptersBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setOnlyHelicopters(!SettingsStore::onlyHelicopters());
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::Main;
             }
