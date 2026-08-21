@@ -447,6 +447,11 @@ namespace {
         uint32_t lastStepMs = 0;
     };
     RowMarquee rowMarquees[LocationPresets::MAX_PRESETS];
+    // Eigene Laufschrift fuer die "Automatisch"-Zeile (siehe unten, GPS-
+    // Umbau) - die Zeile ist seit dem GPS-Knopf schmaler als vorher, der
+    // Text "Automatisch (GPS/IP)" passt in manchen Sprachen dann nicht
+    // mehr rein, gleiches Laufschrift-Prinzip wie bei den Preset-Namen.
+    RowMarquee autoMarquee;
 
     // Wie setupMarquee() oben, aber ohne Textgroessen-Umschaltung (die
     // Preset-Zeilen nutzen durchgehend Size 1).
@@ -514,6 +519,8 @@ namespace {
         totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA5), 0, 0, 0, false);
         totalH += 8;
         totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA6), 0, 0, 0, false);
+        totalH += 8;
+        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA7), 0, 0, 0, false);
 
         int16_t maxScroll = totalH - VIEW_BOTTOM;
         if (maxScroll < 0) maxScroll = 0;
@@ -545,7 +552,9 @@ namespace {
             y += 8;
             y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA5), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
             y += 8;
-            layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA6), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
+            y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA6), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
+            y += 8;
+            layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA7), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
 
             drawButton(tft, backBtn, I18n::t(StringId::BACK));
             if (scrollable) {
@@ -598,9 +607,46 @@ void run(TFT_eSPI& tft) {
         uint8_t count = LocationPresets::count();
         int16_t y = 36;
 
-        Rect autoRect = {10, y, (int16_t)(Config::SCREEN_WIDTH - 20), ROW_H};
+        // GPS-Knopf (siehe LocationManager::setGpsEnabled()) - vorher gab es
+        // im ganzen Projekt KEINE Stelle, die GPS ueberhaupt einschaltet,
+        // obwohl "Automatisch (GPS/IP)" das schon suggerierte. Sitzt bewusst
+        // direkt neben der "Automatisch"-Zeile (gleiches Prinzip wie die
+        // "X"-Entfernen-Knoepfe neben den Preset-Zeilen unten) statt an
+        // anderer Stelle im Menue, weil GPS nur in Kombination mit
+        // "Automatisch" ueberhaupt eine Wirkung hat (siehe
+        // LocationManager::getHomeLocation() - GPS wird nur genutzt, wenn
+        // kein manuelles Preset aktiv ist).
+        constexpr int16_t GPS_BTN_W = 56;
+        Rect autoRect = {10, y, (int16_t)(Config::SCREEN_WIDTH - 20 - GPS_BTN_W - 6), ROW_H};
+        Rect gpsToggleRect = {(int16_t)(Config::SCREEN_WIDTH - 10 - GPS_BTN_W), y, GPS_BTN_W, ROW_H};
+
         String autoLabel = I18n::t(StringId::LOCATION_AUTO);
-        drawButton(tft, autoRect, active < 0 ? ("> " + autoLabel) : autoLabel, active < 0);
+        String autoDisplay = active < 0 ? ("> " + autoLabel) : autoLabel;
+        // Gleiches Laufschrift-Ausweich-Muster wie bei den Preset-Zeilen
+        // unten (RowMarquee) - die Zeile ist durch den GPS-Knopf schmaler
+        // geworden, "Automatisch (GPS/IP)" passt in manchen Sprachen (z.B.
+        // Franzoesisch/Spanisch) nicht mehr ungekuerzt rein.
+        if (tft.textWidth(autoDisplay) <= autoRect.w - 10) {
+            autoMarquee.needsScroll = false;
+            drawButton(tft, autoRect, autoDisplay, active < 0);
+        } else {
+            setupRowMarquee(tft, autoMarquee, autoDisplay, (int16_t)(autoRect.w - 10));
+            drawRowMarquee(tft, autoRect, autoMarquee, active < 0);
+        }
+
+        bool gpsOn = LocationManager::isGpsEnabled();
+        drawButton(tft, gpsToggleRect, "GPS", gpsOn);
+        if (gpsOn && !LocationManager::hasGpsFix()) {
+            // GPS ist eingeschaltet, hat aber noch keinen Fix (z.B. gerade
+            // erst gestartet oder kein Modul angeschlossen) - kleiner
+            // schwarz gefuellter Punkt mit gruenem Rand oben rechts im
+            // Knopf, sichtbar auch auf dem dann gruen gefuellten
+            // "aktiv"-Hintergrund des Knopfes. Sobald ein Fix da ist,
+            // verschwindet der Punkt wieder - der volle gruene Knopf allein
+            // signalisiert dann "GPS aktiv und funktioniert".
+            tft.fillCircle((int16_t)(gpsToggleRect.x + gpsToggleRect.w - 8), (int16_t)(gpsToggleRect.y + 8), 3, TFT_BLACK);
+            tft.drawCircle((int16_t)(gpsToggleRect.x + gpsToggleRect.w - 8), (int16_t)(gpsToggleRect.y + 8), 3, TFT_GREEN);
+        }
         y += ROW_H + ROW_GAP;
 
         Rect rowRects[LocationPresets::MAX_PRESETS];
@@ -704,6 +750,9 @@ void run(TFT_eSPI& tft) {
             if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
             MenuStars::update(tft);
             drawMarquee(tft, AIRPORT_LINE_X, airportLineY, AIRPORT_LINE_W, 20);
+            if (autoMarquee.needsScroll) {
+                drawRowMarquee(tft, autoRect, autoMarquee, active < 0);
+            }
             for (uint8_t i = 0; i < count; i++) {
                 if (rowMarquees[i].needsScroll) {
                     drawRowMarquee(tft, rowRects[i], rowMarquees[i], active == (int8_t)i);
@@ -715,6 +764,9 @@ void run(TFT_eSPI& tft) {
         bool handled = false;
         if (infoBtn.contains(tap.x, tap.y)) {
             runInfoScreen(tft);
+            handled = true;
+        } else if (gpsToggleRect.contains(tap.x, tap.y)) {
+            LocationManager::setGpsEnabled(!LocationManager::isGpsEnabled());
             handled = true;
         } else if (autoRect.contains(tap.x, tap.y)) {
             LocationPresets::setActiveIndex(-1);

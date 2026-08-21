@@ -78,6 +78,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Quick watchlist add** – a "+"/"-" button in the aircraft detail panel, right next to the "QR" button, adds the currently shown aircraft to the [Watchlist](#-watchlist) with a single tap instead of typing its callsign manually
 - **Show helicopters only** – a new toggle under **Menu → Flight Options** filters the radar, aircraft list, and web live map down to helicopters (see [Show helicopters only](#-show-helicopters-only-onoff) below)
 - **Reorganized menus** – the Flight Options and System menus are now grouped into a handful of large category buttons (Stats & Logbook, LED Alerts, Tools, Display) instead of long lists, making it easier to find your way around
+- **Optional GPS module support** – a new "GPS" button in [Location Presets](#-location-presets) turns reading from a connected GPS module on/off, so your location can follow your movement live instead of only being estimated via IP
 
 ## Feature Deep-Dive
 
@@ -88,6 +89,8 @@ to 3 fixed locations and switch between them.
 
 **Good to know:** only **one** location is ever active at a time – either "Auto"
 or exactly one of the 3 presets. Tap an entry to make it the active one.
+
+**Optional GPS module:** a "GPS" button next to "Auto" turns reading from a connected GPS module on/off (only has any effect when "Auto" is the active location). With GPS enabled and a module wired up, your location follows your movement live (e.g. while driving) instead of only being roughly estimated via IP - without a connected module, the button simply has no effect. Wiring: GPS module TX to GPIO22, GPS module RX to GPIO27, 3.3V and GND, 9600 baud (NMEA protocol). See the "?" info button on the Location Presets screen for the same details on-device.
 
 **The actual trick:** you don't have to enter *your own* location there – you can
 enter the coordinates of **any place in the world** and the radar will show the

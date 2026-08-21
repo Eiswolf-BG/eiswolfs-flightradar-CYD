@@ -471,6 +471,13 @@ enum class StringId : uint16_t {
     MENU_CATEGORY_LED,
     MENU_CATEGORY_TOOLS,
 
+    // Siebter Info-Absatz im Standort-Presets-Screen (Menue > Flugoptionen >
+    // Tools > Standort-Presets > "?"), erklaert den neuen "GPS"-Knopf neben
+    // "Automatisch" sowie die Verkabelung eines physischen GPS-Moduls -
+    // siehe location_presets_screen.cpp und LocationManager::setGpsEnabled().
+    // Ans Ende angehaengt, gleicher Grund wie oben.
+    LOCATION_INFO_PARA7,
+
     COUNT
 };
 

@@ -9,42 +9,50 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 6;
 
     const char* const CHANGELOG_EN =
-        "- New: the Flight Options and System menus are now "
-        "reorganized into a handful of large category buttons (Stats "
-        "& Logbook, LED Alerts, Tools, Display) instead of long lists "
-        "- easier to find your way around";
+        "- New: a \"GPS\" button next to \"Auto\" in Location Presets turns "
+        "reading from a connected GPS module on/off - when on, your "
+        "location follows your movement live instead of only being "
+        "estimated via IP (wiring: GPS TX to GPIO22, GPS RX to GPIO27, "
+        "9600 baud NMEA - see the \"?\" info screen for details)";
 
     const char* const CHANGELOG_DE =
-        "- Neu: Die Menüs \"Flugoptionen\" und \"System\" sind jetzt "
-        "in wenige große Kategorie-Buttons (Statistik & Flugbuch, "
-        "LED-Alarme, Werkzeuge, Anzeige) statt langer Listen "
-        "umstrukturiert - einfacher, sich zurechtzufinden";
+        "- Neu: Ein \"GPS\"-Knopf neben \"Automatisch\" in den Standort-"
+        "Presets schaltet die Auswertung eines angeschlossenen GPS-Moduls "
+        "ein/aus - eingeschaltet folgt dein Standort live deiner Bewegung "
+        "statt nur ungefähr per IP geschätzt zu werden (Verkabelung: "
+        "GPS-TX an GPIO22, GPS-RX an GPIO27, 9600 Baud NMEA - Details im "
+        "\"?\"-Info-Screen)";
 
     const char* const CHANGELOG_FR =
-        "- Nouveau : les menus « Options de vol » et « Système » sont "
-        "désormais réorganisés en quelques grands boutons de "
-        "catégorie (Statistiques et carnet de vol, Alertes LED, "
-        "Outils, Affichage) au lieu de longues listes - plus facile "
-        "de s'y retrouver";
+        "- Nouveau : un bouton \"GPS\" à côté de \"Auto\" dans les "
+        "emplacements de position active/désactive la lecture d'un module "
+        "GPS connecté - activé, ta position suit tes déplacements en "
+        "direct au lieu d'être seulement estimée par IP (câblage : TX GPS "
+        "sur GPIO22, RX GPS sur GPIO27, 9600 bauds NMEA - détails dans "
+        "l'écran d'info \"?\")";
 
     const char* const CHANGELOG_TR =
-        "- Yeni: \"Uçuş Seçenekleri\" ve \"Sistem\" menüleri artık "
-        "uzun listeler yerine birkaç büyük kategori düğmesine "
-        "(İstatistik ve Uçuş Defteri, LED Uyarıları, Araçlar, Ekran) "
-        "göre yeniden düzenlendi - gezinmek artık daha kolay";
+        "- Yeni: Konum Ön Ayarları'nda \"Otomatik\" yanındaki \"GPS\" "
+        "düğmesi, bağlı bir GPS modülünün okunmasını açar/kapatır - "
+        "açıkken konumun hareketini canlı takip eder, sadece IP üzerinden "
+        "tahmini olarak belirlenmez (bağlantı: GPS TX GPIO22'ye, GPS RX "
+        "GPIO27'ye, 9600 baud NMEA - detaylar \"?\" bilgi ekranında)";
 
     const char* const CHANGELOG_ES =
-        "- Novedad: los menús \"Opciones de vuelo\" y \"Sistema\" "
-        "ahora están reorganizados en unos pocos botones de "
-        "categoría grandes (Estadísticas y diario de vuelo, Alertas "
-        "LED, Herramientas, Pantalla) en lugar de listas largas - más "
-        "fácil de orientarse";
+        "- Novedad: un botón \"GPS\" junto a \"Automático\" en Ubicaciones "
+        "predefinidas activa/desactiva la lectura de un módulo GPS "
+        "conectado - activado, tu ubicación sigue tu movimiento en vivo "
+        "en lugar de estimarse solo por IP (cableado: TX GPS a GPIO22, RX "
+        "GPS a GPIO27, 9600 baudios NMEA - detalles en la pantalla de "
+        "info \"?\")";
 
     const char* const CHANGELOG_IT =
-        "- Novità: i menu \"Opzioni di volo\" e \"Sistema\" sono ora "
-        "riorganizzati in pochi grandi pulsanti di categoria "
-        "(Statistiche e diario di volo, Avvisi LED, Strumenti, "
-        "Schermo) invece di lunghe liste - più facile orientarsi";
+        "- Novità: un pulsante \"GPS\" accanto ad \"Automatico\" nelle "
+        "posizioni preimpostate attiva/disattiva la lettura di un modulo "
+        "GPS collegato - attivo, la tua posizione segue il tuo movimento "
+        "in tempo reale invece di essere stimata solo via IP "
+        "(collegamento: TX GPS su GPIO22, RX GPS su GPIO27, 9600 baud "
+        "NMEA - dettagli nella schermata info \"?\")";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT
