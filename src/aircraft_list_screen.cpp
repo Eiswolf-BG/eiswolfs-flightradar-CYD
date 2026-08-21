@@ -91,6 +91,8 @@ bool run(TFT_eSPI& tft) {
             if (!table[i].valid) continue;
             if (table[i].distanceKm > rangeKm * 1.05f) continue;
             if (SettingsStore::hideGroundVehicles() && table[i].category[0] == 'C') continue;
+
+            if (SettingsStore::onlyHelicopters() && !(table[i].category[0] == 'A' && table[i].category[1] == '7')) continue;
             if (AirlineFilter::isHidden(table[i].callsign)) continue;
             snapshot[count++] = table[i];
         }

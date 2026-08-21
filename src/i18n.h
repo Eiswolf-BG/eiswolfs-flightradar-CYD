@@ -456,6 +456,11 @@ enum class StringId : uint16_t {
     // Radar-Zentrum aus bei jedem frischen ADS-B-Datenabruf.
     RADAR_PULSE_TOGGLE,
 
+    // Schalter im Flugoptionen-Menue (Menue > Flugoptionen), neben "Boden-
+    // fahrzeuge ausblenden" - filtert Radar/Flugzeugliste/Web-Livekarte auf
+    // Helikopter (ADS-B-Emitter-Kategorie "A7").
+    MENU_ONLY_HELICOPTERS,
+
     COUNT
 };
 
