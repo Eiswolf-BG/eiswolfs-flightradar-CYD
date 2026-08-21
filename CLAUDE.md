@@ -113,9 +113,36 @@ mit Foto vom echten Display), bevor der Code als fertig gilt.
       delay(20);
   }
   ```
-- Menüstruktur: Hauptmenü → 4 Kategorien (Land/Region, WLAN/Netzwerk,
-  System, Flugoptionen) → jeweils Unterseiten. WLAN/Netzwerk hat aktuell
-  KEIN eigenes Untermenü mehr, springt direkt in die Netzwerk-Verwaltung.
+- Menüstruktur (Stand v4.0.0): Hauptmenü → 4 Kategorien (Land/Region,
+  WLAN/Netzwerk, System, Flugoptionen). WLAN/Netzwerk hat weiterhin KEIN
+  eigenes Untermenü, springt direkt in die Netzwerk-Verwaltung.
+
+  System → 3 Kategorie-Buttons + Zurück:
+    - Anzeige: Helligkeit, Bildschirm-Timeout, Nachtmodus, Invertieren,
+      Radar-Farbschema, Zurück
+    - Werkzeuge: Kalibrierung, Web-Livekarte, Sicherung & Reset (eigenes
+      Untermenü: Sichern, Wiederherstellen, Werksreset, Zurück), Zurück
+    - Nach Update suchen (direkte Aktion, KEIN Untermenü - bewusst so,
+      bleibt immer sofort sichtbar mit Version + rotem Update-Punkt und
+      darf bei künftigen Umbauten nicht vergraben werden)
+    - Zurück
+
+  Flugoptionen → 6 Buttons + Zurück:
+    - Flugzeugliste (direkt)
+    - Beobachtungsliste (direkt)
+    - Statistik & Logbuch: Statistiken, Statistik-Verlauf, Logbuch-Dateien,
+      Flugbuch an/aus, Zurück
+    - LED-Alarme: Heartbeat, Notfall-Alarm, Näherungs-LED, Zurück
+    - Tools: Standort-Presets, Airline-Filter, Bodenfahrzeuge ausblenden,
+      Nur Helikopter anzeigen, Beobachtungsalarm, Zurück
+    - Zurück
+
+  System und Flugoptionen sind damit selbst auch Kategorie-Seiten
+  (gleiches Bild-Prinzip wie das Hauptmenü), keine flachen Listen mehr.
+  Alle Unterseiten mit mehr als 3 Eintraegen nutzen dafuer
+  `subMenuRowRect(index, count)` in menu_screen.cpp statt fester
+  Zeilenhoehen-Konstanten pro Seite (ersetzt die fruehere FLIGHT_ROW_H/
+  SYSTEM_ROW_H/BACKUP_RESET_ROW_H-Wiederholung).
 - Viele Screens mit Text-Eingabe (Airline-Code, Koordinaten, WLAN-Passwort)
   haben einen "?"-Info-Button oben rechts, der einen scrollbaren
   Erklär-Screen öffnet (Muster: `location_presets_screen.cpp` und
