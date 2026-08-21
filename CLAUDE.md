@@ -318,6 +318,47 @@ in dieser Reihenfolge:
    nötig, außer `gh` sollte einmal die Authentifizierung verlieren (dann
    erneut `gh auth login`, siehe oben).
 
+## Silent Push (Minimal-Fix ohne neues Release)
+
+Manchmal bittet Alex explizit um einen "Silent Push" - das ist ein bewusst
+abweichender, schlankerer Ablauf für sehr kleine Änderungen (z.B. Textkorrekturen,
+Wording-Fixes, kleine Anzeige-Logik-Umkehrungen), bei denen sich ein vollständiges
+neues Release nicht lohnt. Grund: Alex möchte nicht mehrfach am Tag eine neue
+Versionsnummer veröffentlichen müssen.
+
+Ein Silent Push bedeutet IMMER:
+
+- KEINE Versionsänderung (Config::APP_VERSION in config.h bleibt exakt wie sie ist)
+- KEIN Changelog-Eintrag (src/changelog.cpp wird nicht angefasst)
+- KEINE README-Ergänzung
+- KEIN neuer Git-Tag
+- KEINE Änderung an versions/ (kein Archivieren, keine neue Version dort)
+- KEINE Änderung an der Versions-Dropdown-Liste in index.html
+
+Was Karl bei einem Silent Push stattdessen tut:
+
+1. Die angeforderte Code-Änderung umsetzen (z.B. Text-/Logik-Fix)
+2. pio run bauen (Pflicht, wie immer - liefert die neuen Binaries)
+3. Die Binaries in-place ersetzen: die drei Root-.bin-Dateien
+   (bootloader.bin/firmware.bin/partitions.bin) sowie die entsprechenden
+   Dateien im Web-Flasher (die Dateien der AKTUELL bestehenden Version -
+   es wird KEIN neuer Eintrag angelegt)
+4. Committen und pushen (ohne neuen Tag)
+5. Das bestehende GitHub Release der aktuellen Version aktualisieren, indem
+   das firmware.bin-Asset per `gh release upload <bestehende-version> .pio/build/esp32dev/firmware.bin --clobber --repo Eiswolf-BG/eiswolfs-flightradar-CYD`
+   ersetzt wird - es wird KEIN neues Release erstellt
+
+Wichtiger Hinweis fuer Alex/Claude: Da sich die Versionsnummer nicht aendert,
+erkennt die In-App-OTA-Update-Pruefung (Vergleich von Config::APP_VERSION
+gegen den GitHub-Release-Tag-Namen) den Silent-Push-Fix NICHT als verfuegbares
+Update - das Geraet meldet "up to date", obwohl die neue Binary bereits
+veroeffentlicht ist. Wer den Fix erhalten will, braucht einen frischen
+manuellen (Re-)Flash statt sich auf die gewohnte OTA-Update-Suche zu verlassen.
+
+Bitte NICHT den normalen Workflow (Schritt 0 Versionsnummer, Changelog,
+README, Tag) anwenden, wenn Alex explizit "Silent Push" sagt - nur wenn sie
+das nicht sagt, gilt der normale Standard-Workflow.
+
 ## Nach jedem erfolgreichen Build automatisch flashen
 
 Sobald `pio run` (Build) erfolgreich ohne Fehler durchgelaufen ist, IMMER direkt
