@@ -65,7 +65,7 @@ static const char* const I18N_TR[] = {
     "Yakınlık LED'i: ",
     "LED kalp atışı: ",
     "Uçuş kayıt defteri: ",
-    "Kara araçlarını gizle: ",
+    "Kara araçlarını göster: ",
     "Havayolu filtresi",
     "İzleme listesi",
     "İzleme uyarısı: ",

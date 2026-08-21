@@ -65,7 +65,7 @@ static const char* const I18N_EN[] = {
     "Proximity LED: ",
     "LED heartbeat: ",
     "Flight logbook: ",
-    "Hide ground vehicles: ",
+    "Show ground vehicles: ",
     "Airline filter",
     "Watchlist",
     "Watchlist alert: ",

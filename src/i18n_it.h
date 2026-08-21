@@ -65,7 +65,7 @@ static const char* const I18N_IT[] = {
     "LED di prossimità: ",
     "Battito LED: ",
     "Diario di volo: ",
-    "Nascondi veicoli a terra: ",
+    "Mostra veicoli a terra: ",
     "Filtro compagnie",
     "Lista di controllo",
     "Allarme di controllo: ",
