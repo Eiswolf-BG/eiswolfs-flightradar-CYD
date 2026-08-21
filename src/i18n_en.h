@@ -298,6 +298,7 @@ static const char* const I18N_EN[] = {
     "Stats & Logbook",
     "LED Alerts",
     "Tools",
+    "New: the \"GPS\" button next to \"Auto\" turns reading from a connected GPS module on/off. When on, your location follows your movement live (e.g. while driving) instead of only being roughly determined via IP. Wiring: GPS module TX to GPIO22, GPS module RX to GPIO27 (usually unused), 3.3V and GND, 9600 baud (NMEA). Without a connected module, the button simply has no effect.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

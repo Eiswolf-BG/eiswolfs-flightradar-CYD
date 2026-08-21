@@ -297,6 +297,7 @@ static const char* const I18N_DE[] = {
     "Statistik & Flugbuch",
     "LED-Alarme",
     "Werkzeuge",
+    "Neu: Der \"GPS\"-Knopf neben \"Automatisch\" schaltet die Auswertung eines angeschlossenen GPS-Moduls ein/aus. Eingeschaltet folgt dein Standort live deiner Bewegung (z.B. im Auto), statt nur ungefähr per IP bestimmt zu werden. Verkabelung: GPS-Modul-TX an GPIO22, GPS-Modul-RX an GPIO27 (meist ungenutzt), 3,3V und GND, 9600 Baud (NMEA). Ohne angeschlossenes Modul bleibt der Knopf einfach wirkungslos.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,
