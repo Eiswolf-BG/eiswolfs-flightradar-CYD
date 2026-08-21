@@ -461,6 +461,16 @@ enum class StringId : uint16_t {
     // Helikopter (ADS-B-Emitter-Kategorie "A7").
     MENU_ONLY_HELICOPTERS,
 
+    // Neue Kategorie-Untermenues, entstanden beim Aufteilen der Flugoptionen-/
+    // System-Seiten in grosse Kategorie-Buttons statt langer Einzelzeilen-
+    // Listen (siehe menu_screen.cpp, Page::SystemDisplay/SystemTools/
+    // FlightStatsLogbook/FlightLed/FlightTools).
+    MENU_CATEGORY_DISPLAY,
+    MENU_CATEGORY_SYSTEM_TOOLS,
+    MENU_CATEGORY_STATS_LOGBOOK,
+    MENU_CATEGORY_LED,
+    MENU_CATEGORY_TOOLS,
+
     COUNT
 };
 

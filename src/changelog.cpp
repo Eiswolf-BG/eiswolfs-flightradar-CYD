@@ -9,36 +9,42 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 6;
 
     const char* const CHANGELOG_EN =
-        "- New: a \"Show helicopters only\" toggle in the flight "
-        "options menu now lets you filter the radar, aircraft list, "
-        "and web live map down to helicopters";
+        "- New: the Flight Options and System menus are now "
+        "reorganized into a handful of large category buttons (Stats "
+        "& Logbook, LED Alerts, Tools, Display) instead of long lists "
+        "- easier to find your way around";
 
     const char* const CHANGELOG_DE =
-        "- Neu: Ein \"Nur Helikopter anzeigen\"-Schalter im "
-        "Flugoptionen-Menü filtert Radar, Flugzeugliste und "
-        "Web-Livekarte jetzt auf Helikopter";
+        "- Neu: Die Menüs \"Flugoptionen\" und \"System\" sind jetzt "
+        "in wenige große Kategorie-Buttons (Statistik & Flugbuch, "
+        "LED-Alarme, Werkzeuge, Anzeige) statt langer Listen "
+        "umstrukturiert - einfacher, sich zurechtzufinden";
 
     const char* const CHANGELOG_FR =
-        "- Nouveau : un interrupteur « Afficher uniquement les "
-        "hélicoptères » dans le menu des options de vol permet "
-        "désormais de filtrer le radar, la liste des avions et la "
-        "carte web en direct sur les hélicoptères uniquement";
+        "- Nouveau : les menus « Options de vol » et « Système » sont "
+        "désormais réorganisés en quelques grands boutons de "
+        "catégorie (Statistiques et carnet de vol, Alertes LED, "
+        "Outils, Affichage) au lieu de longues listes - plus facile "
+        "de s'y retrouver";
 
     const char* const CHANGELOG_TR =
-        "- Yeni: Uçuş seçenekleri menüsündeki \"Sadece helikopterleri "
-        "göster\" anahtarı artık radarı, uçak listesini ve web canlı "
-        "haritasını yalnızca helikopterlere göre filtreleyebiliyor";
+        "- Yeni: \"Uçuş Seçenekleri\" ve \"Sistem\" menüleri artık "
+        "uzun listeler yerine birkaç büyük kategori düğmesine "
+        "(İstatistik ve Uçuş Defteri, LED Uyarıları, Araçlar, Ekran) "
+        "göre yeniden düzenlendi - gezinmek artık daha kolay";
 
     const char* const CHANGELOG_ES =
-        "- Novedad: un interruptor \"Mostrar solo helicópteros\" en "
-        "el menú de opciones de vuelo ahora permite filtrar el radar, "
-        "la lista de aeronaves y el mapa web en vivo solo a "
-        "helicópteros";
+        "- Novedad: los menús \"Opciones de vuelo\" y \"Sistema\" "
+        "ahora están reorganizados en unos pocos botones de "
+        "categoría grandes (Estadísticas y diario de vuelo, Alertas "
+        "LED, Herramientas, Pantalla) en lugar de listas largas - más "
+        "fácil de orientarse";
 
     const char* const CHANGELOG_IT =
-        "- Novità: un interruttore \"Mostra solo elicotteri\" nel "
-        "menu delle opzioni di volo ora consente di filtrare radar, "
-        "elenco aeromobili e mappa web live solo sugli elicotteri";
+        "- Novità: i menu \"Opzioni di volo\" e \"Sistema\" sono ora "
+        "riorganizzati in pochi grandi pulsanti di categoria "
+        "(Statistiche e diario di volo, Avvisi LED, Strumenti, "
+        "Schermo) invece di lunghe liste - più facile orientarsi";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT

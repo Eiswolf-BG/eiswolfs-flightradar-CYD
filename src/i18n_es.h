@@ -292,6 +292,11 @@ static const char* const I18N_ES[] = {
     "Fósforo CRT",
     "Pulso de radar",
     "Mostrar solo helicópteros: ",
+    "Pantalla",
+    "Herramientas",
+    "Estadísticas y diario de vuelo",
+    "Alertas LED",
+    "Herramientas",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

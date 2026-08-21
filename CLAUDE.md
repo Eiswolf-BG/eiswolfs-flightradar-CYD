@@ -205,10 +205,25 @@ in dieser Reihenfolge:
    das Geraet nach dem naechsten Update fuer 5 von 6 Sprachen noch den
    Changelog des VORHERIGEN Releases. Wird auf dem Geraet nach einem
    erfolgreichen OTA-Update auf dem "Update installiert"-Screen angezeigt.
-   Erst NACH dem Eintragen von Versionsnummer
-   UND Changelog: einmal sauber `pio run` bauen, DANACH erst der Rest des
-   bekannten Workflows (README, Tag, index.html, Bin-Dateien, Commit/Push).
-   (Hier bewusst NUR bauen, NICHT flashen - Ausnahme von der sonst
+
+   WICHTIG - Versionsnummer NUR an dieser Stelle im Code eintragen, nicht
+   frueher: Waehrend des vorherigen Entwickelns/Testens (Build+Flash-Zyklen
+   vor dem eigentlichen Push-Wunsch, siehe "Nach jedem erfolgreichen Build
+   automatisch flashen" unten) bleibt `Config::APP_VERSION` immer auf der
+   zuletzt veroeffentlichten Nummer stehen - Karl aendert sie dort NIEMALS
+   selbst, auch nicht vorlaeufig oder testweise, auch wenn zwischendurch
+   beliebig oft `pio run`+Flash zum Testen laeuft. Erst wenn der Push-Wunsch
+   mit der neuen Nummer tatsaechlich kommt, wird `APP_VERSION` genau einmal
+   hier in Schritt 0 auf die neue Nummer gesetzt (kein eigener, separater
+   `pio run`-Verifizierungsschritt direkt danach - der Code selbst wurde ja
+   bereits waehrend der vorherigen Test-Zyklen durchgebaut, nur Versions-
+   nummer und Changelog-Text sind neu). Direkt weiter mit dem Rest des
+   bekannten Workflows (README, Tag, index.html, Commit/Push). Der EINE
+   Build, der die neue Versionsnummer tatsaechlich in die Binaries backt,
+   passiert erst in Schritt 5 (dort wird ohnehin gebaut, um die
+   Bin-Dateien fuers Release vorzubereiten) - nicht vorher als eigener
+   Zwischenschritt.
+   (Bewusst NICHT flashen nach diesem Build - Ausnahme von der sonst
    geltenden Auto-Flash-Regel, siehe Abschnitt "Nach jedem erfolgreichen
    Build automatisch flashen" weiter unten. Das Testgerät soll auf der
    bisherigen Version bleiben, damit das neue Release per OTA getestet
@@ -244,9 +259,11 @@ in dieser Reihenfolge:
     aktuelle Version (`value="manifest.json"`, `data-version="vNEU"`, Text
     "vNEU (latest)") plus die beiden jetzt in `versions/` verbliebenen
     Versionen (`value="versions/vX.Y.Z/manifest.json"`, neueste zuerst).
-5. Prüfen, ob `bootloader.bin`, `firmware.bin`, `partitions.bin` im
-   Hauptverzeichnis dem aktuellen Build in `.pio/build/esp32dev/`
-   entsprechen - falls nicht, von dort kopieren.
+5. `pio run` bauen (dies ist der EINE Build des gesamten Release-Workflows,
+   siehe Kommentar in Schritt 0 - erst hier steckt die neue Versionsnummer
+   tatsächlich in den Binaries). Danach `bootloader.bin`, `firmware.bin`,
+   `partitions.bin` im Hauptverzeichnis mit dem frischen Build in
+   `.pio/build/esp32dev/` überschreiben.
 6. Alle diese Änderungen (Code + README + Web-Flasher-Dateien) zusammen
    committen und pushen (`git push`, plus `git push origin vX.Y.Z` falls ein
    Tag erstellt wurde).
@@ -291,4 +308,17 @@ direkt per Kabel zu flashen. Für alle anderen Anlässe (normales
 Entwickeln/Testen, einzelne Fixes) gilt die automatische Flash-Regel
 unverändert weiter.
 
-Bitte diese Regel jetzt in die CLAUDE.md-Datei einpflegen.
+WICHTIG - `Config::APP_VERSION` beim normalen Entwickeln/Testen NIEMALS
+ändern: Für jede dieser normalen Test-Iterationen (dieser Abschnitt hier,
+nicht die Push & Release-Routine oben) gilt ganz normal `pio run` +
+Flashen wie gewohnt, aber die Versionsnummer in `src/config.h` bleibt dabei
+immer unverändert auf der zuletzt veröffentlichten Nummer stehen - auch
+wenn ein größeres, noch unveröffentlichtes Feature getestet wird (z.B.
+ein geplanter Sprung auf eine neue Hauptversion). Der Versionssprung
+passiert ausschließlich einmalig in Schritt 0 der Push & Release-Routine,
+sobald Alex den Push tatsächlich anfordert - nie vorher, auch nicht
+versuchsweise oder "damit man es schon sieht". Grund: Alex will nach dem
+Push sauber per OTA von der zuletzt veröffentlichten auf die neue Version
+aktualisieren können; zeigt das Testgerät zwischendurch schon eine neue
+(aber noch nicht veröffentlichte) Nummer an, funktioniert dieser Versions-
+vergleich nicht mehr zuverlässig.
