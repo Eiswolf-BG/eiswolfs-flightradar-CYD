@@ -478,6 +478,15 @@ enum class StringId : uint16_t {
     // Ans Ende angehaengt, gleicher Grund wie oben.
     LOCATION_INFO_PARA7,
 
+    // Schalter fuer die 180-Grad-Bildschirmdrehung (Menue > System >
+    // Anzeige, siehe menu_screen.cpp::Page::SystemDisplay und
+    // SettingsStore::displayRotated180()) - hilft bei Tischmontage, wo das
+    // TFT-Panel von oben betrachtet sonst ausgewaschen wirkt (GitHub-
+    // Meldung eines Nutzers). Text wird wie bei MENU_HIDE_GROUND mit
+    // onOff() kombiniert, daher ohne AN/AUS im String selbst. Ans Ende
+    // angehaengt, gleicher Grund wie oben.
+    MENU_DISPLAY_ROTATE,
+
     COUNT
 };
 

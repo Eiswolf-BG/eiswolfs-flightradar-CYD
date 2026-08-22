@@ -889,6 +889,13 @@ void setup() {
 
     SettingsStore::load();
     tft.invertDisplay(SettingsStore::displayInverted());
+    // 180-Grad-Drehung fuer Tischmontage (Menue > System > Anzeige) -
+    // Rotation 2 ist bei diesem Panel/Treiber das 180-Grad-Gegenstueck zu
+    // Rotation 0 (beide Portrait, gleiche 240x320-Aufloesung, nur gespiegelt
+    // - siehe SCREEN_WIDTH/SCREEN_HEIGHT in config.h). Touch-Chip muss
+    // separat informiert werden, siehe touch_input.cpp.
+    tft.setRotation(SettingsStore::displayRotated180() ? 2 : 0);
+    TouchInput::setRotated180(SettingsStore::displayRotated180());
     // Der erste ledcWrite() oben (vor SettingsStore::load()) kannte die
     // gespeicherte Helligkeit noch nicht und hat den Default (100%)
     // angewendet - hier mit dem jetzt geladenen Wert korrigieren, gleiches

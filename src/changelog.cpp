@@ -9,50 +9,46 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 6;
 
     const char* const CHANGELOG_EN =
-        "- New: a \"GPS\" button next to \"Auto\" in Location Presets turns "
-        "reading from a connected GPS module on/off - when on, your "
-        "location follows your movement live instead of only being "
-        "estimated via IP (wiring: GPS TX to GPIO22, GPS RX to GPIO27, "
-        "9600 baud NMEA - see the \"?\" info screen for details)";
+        "- New: a \"Rotate screen (180°)\" switch in Menu > System > "
+        "Display flips the screen (and touch input) upside down - useful "
+        "when the device stands on a table, since the panel's viewing "
+        "angle otherwise washes out the radar circles when looked at "
+        "from above";
 
     const char* const CHANGELOG_DE =
-        "- Neu: Ein \"GPS\"-Knopf neben \"Automatisch\" in den Standort-"
-        "Presets schaltet die Auswertung eines angeschlossenen GPS-Moduls "
-        "ein/aus - eingeschaltet folgt dein Standort live deiner Bewegung "
-        "statt nur ungefähr per IP geschätzt zu werden (Verkabelung: "
-        "GPS-TX an GPIO22, GPS-RX an GPIO27, 9600 Baud NMEA - Details im "
-        "\"?\"-Info-Screen)";
+        "- Neu: Ein Schalter \"Bildschirm drehen (180°)\" im Menü > "
+        "System > Anzeige dreht Bild und Touch-Eingabe auf den Kopf - "
+        "nützlich, wenn das Gerät auf einem Tisch steht, da der "
+        "Blickwinkel des Panels die Radarkreise von oben betrachtet "
+        "sonst auswäscht";
 
     const char* const CHANGELOG_FR =
-        "- Nouveau : un bouton \"GPS\" à côté de \"Auto\" dans les "
-        "emplacements de position active/désactive la lecture d'un module "
-        "GPS connecté - activé, ta position suit tes déplacements en "
-        "direct au lieu d'être seulement estimée par IP (câblage : TX GPS "
-        "sur GPIO22, RX GPS sur GPIO27, 9600 bauds NMEA - détails dans "
-        "l'écran d'info \"?\")";
+        "- Nouveau : un interrupteur \"Tourner l'écran (180°)\" dans "
+        "Menu > Système > Affichage retourne l'écran (et la saisie "
+        "tactile) - utile lorsque l'appareil est posé sur une table, car "
+        "l'angle de vue du panneau délave sinon les cercles radar vus "
+        "d'en haut";
 
     const char* const CHANGELOG_TR =
-        "- Yeni: Konum Ön Ayarları'nda \"Otomatik\" yanındaki \"GPS\" "
-        "düğmesi, bağlı bir GPS modülünün okunmasını açar/kapatır - "
-        "açıkken konumun hareketini canlı takip eder, sadece IP üzerinden "
-        "tahmini olarak belirlenmez (bağlantı: GPS TX GPIO22'ye, GPS RX "
-        "GPIO27'ye, 9600 baud NMEA - detaylar \"?\" bilgi ekranında)";
+        "- Yeni: Menü > Sistem > Ekran'daki \"Ekranı 180° döndür\" "
+        "anahtarı ekranı (ve dokunmatik girişi) ters çevirir - cihaz bir "
+        "masa üzerinde dururken kullanışlıdır, çünkü panelin görüş açısı "
+        "yukarıdan bakıldığında radar çemberlerini söndüren bir etki "
+        "yaratır";
 
     const char* const CHANGELOG_ES =
-        "- Novedad: un botón \"GPS\" junto a \"Automático\" en Ubicaciones "
-        "predefinidas activa/desactiva la lectura de un módulo GPS "
-        "conectado - activado, tu ubicación sigue tu movimiento en vivo "
-        "en lugar de estimarse solo por IP (cableado: TX GPS a GPIO22, RX "
-        "GPS a GPIO27, 9600 baudios NMEA - detalles en la pantalla de "
-        "info \"?\")";
+        "- Novedad: un interruptor \"Girar pantalla (180°)\" en Menú > "
+        "Sistema > Pantalla invierte la pantalla (y la entrada táctil) - "
+        "útil cuando el dispositivo está sobre una mesa, ya que el "
+        "ángulo de visión del panel visto desde arriba deslava los "
+        "círculos del radar";
 
     const char* const CHANGELOG_IT =
-        "- Novità: un pulsante \"GPS\" accanto ad \"Automatico\" nelle "
-        "posizioni preimpostate attiva/disattiva la lettura di un modulo "
-        "GPS collegato - attivo, la tua posizione segue il tuo movimento "
-        "in tempo reale invece di essere stimata solo via IP "
-        "(collegamento: TX GPS su GPIO22, RX GPS su GPIO27, 9600 baud "
-        "NMEA - dettagli nella schermata info \"?\")";
+        "- Novità: un interruttore \"Ruota schermo (180°)\" in Menu > "
+        "Sistema > Schermo capovolge lo schermo (e l'input touch) - "
+        "utile quando il dispositivo è appoggiato su un tavolo, poiché "
+        "l'angolo di visione del pannello visto dall'alto sbiadisce i "
+        "cerchi del radar";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT

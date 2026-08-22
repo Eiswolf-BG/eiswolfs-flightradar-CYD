@@ -817,12 +817,18 @@ void run(TFT_eSPI& tft) {
             // (Helligkeit, Timeout, Nachtmodus, Invertieren, Radar-
             // Farbschema) - vorher einzelne Zeilen auf der flachen System-
             // Liste, jetzt hier zusammengefasst (siehe Page::System oben).
-            Rect brightnessBtn = subMenuRowRect(0, 6);
-            Rect timeoutBtn    = subMenuRowRect(1, 6);
-            Rect nightDimBtn   = subMenuRowRect(2, 6);
-            Rect invertBtn     = subMenuRowRect(3, 6);
-            Rect radarThemeBtn = subMenuRowRect(4, 6);
-            Rect backBtn       = subMenuRowRect(5, 6);
+            Rect brightnessBtn = subMenuRowRect(0, 7);
+            Rect timeoutBtn    = subMenuRowRect(1, 7);
+            Rect nightDimBtn   = subMenuRowRect(2, 7);
+            Rect invertBtn     = subMenuRowRect(3, 7);
+            Rect radarThemeBtn = subMenuRowRect(4, 7);
+            // Fuer Tischmontage (GitHub-Meldung: Radarkreise "waschen" von
+            // oben betrachtet aus, wegen der eingeschraenkten vertikalen
+            // Blickwinkel des TFT-Panels) - dreht Bild UND Touch-Mapping um
+            // 180 Grad, siehe SettingsStore::displayRotated180() und
+            // TouchInput::setRotated180().
+            Rect rotateBtn     = subMenuRowRect(5, 7);
+            Rect backBtn       = subMenuRowRect(6, 7);
 
             drawButton(tft, brightnessBtn, brightnessLabel(SettingsStore::brightnessPercent()));
             drawButton(tft, timeoutBtn, screenTimeoutLabel(SettingsStore::screenTimeoutMinutes()));
@@ -832,6 +838,7 @@ void run(TFT_eSPI& tft) {
                                       : I18n::t(StringId::MENU_DISPLAY_NORMAL);
             drawButton(tft, invertBtn, invertLabel);
             drawButton(tft, radarThemeBtn, I18n::t(StringId::MENU_RADAR_THEME));
+            drawButton(tft, rotateBtn, I18n::t(StringId::MENU_DISPLAY_ROTATE) + onOff(SettingsStore::displayRotated180()));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -860,6 +867,11 @@ void run(TFT_eSPI& tft) {
                 tft.invertDisplay(newState);
             } else if (radarThemeBtn.contains(tap.x, tap.y)) {
                 RadarThemeScreen::run(tft);
+            } else if (rotateBtn.contains(tap.x, tap.y)) {
+                bool newRotated = !SettingsStore::displayRotated180();
+                SettingsStore::setDisplayRotated180(newRotated);
+                tft.setRotation(newRotated ? 2 : 0);
+                TouchInput::setRotated180(newRotated);
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::System;
             }

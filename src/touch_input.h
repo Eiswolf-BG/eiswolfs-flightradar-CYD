@@ -11,6 +11,16 @@ namespace TouchInput {
 
     void begin();
 
+    // Muss gesetzt werden, wenn der Bildschirm um 180 Grad gedreht ist
+    // (Menue > System > Anzeige > Bildschirm drehen, siehe menu_screen.cpp
+    // und tft.setRotation() in main.cpp). Der Touch-Chip hat sein eigenes,
+    // an die physische Panel-Ausrichtung gebundenes Koordinatensystem, das
+    // von tft.setRotation() NICHT mitgedreht wird - mappedPoint() spiegelt
+    // die kalibrierten Koordinaten deshalb zusaetzlich, wenn dieses Flag
+    // gesetzt ist. Die eigentliche Kalibrierung (rawPoint()-basiert) bleibt
+    // davon unberuehrt und muss beim Umschalten nicht neu gemacht werden.
+    void setRotated180(bool rotated);
+
     // Laedt calibration.txt von der SD-Karte. Gibt false zurueck, wenn keine
     // vorhanden oder ungueltig ist.
     bool loadCalibration();

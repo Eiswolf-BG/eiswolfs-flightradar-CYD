@@ -9,6 +9,9 @@ namespace SettingsStore {
 namespace {
     uint8_t rangeIdx = Config::DEFAULT_RANGE_INDEX;
     bool inverted = true; // Dieses Board braucht invertDisplay(true) fuer korrekte Farben (siehe main.cpp)
+    // AUS per Default - Tischmontage (180 Grad) ist ein bewusstes Opt-in
+    // ueber Menue > System > Anzeige, siehe settings_store.h.
+    bool rotated180 = false;
     uint8_t brightnessPct = Config::BRIGHTNESS_MAX_PERCENT;
     bool emergencyAlertOn = true;
     bool proximityAlertOn = true;
@@ -48,6 +51,8 @@ namespace {
             }
         } else if (key == "invert") {
             inverted = (value.toInt() != 0);
+        } else if (key == "rotate_180") {
+            rotated180 = (value.toInt() != 0);
         } else if (key == "brightness_percent") {
             int v = value.toInt();
             if (v >= Config::BRIGHTNESS_MIN_PERCENT && v <= Config::BRIGHTNESS_MAX_PERCENT) {
@@ -142,6 +147,7 @@ void save() {
     if (!f) return;
     f.printf("range_index=%d\n", rangeIdx);
     f.printf("invert=%d\n", inverted ? 1 : 0);
+    f.printf("rotate_180=%d\n", rotated180 ? 1 : 0);
     f.printf("brightness_percent=%d\n", brightnessPct);
     f.printf("emergency_alert=%d\n", emergencyAlertOn ? 1 : 0);
     f.printf("proximity_alert=%d\n", proximityAlertOn ? 1 : 0);
@@ -178,6 +184,13 @@ bool displayInverted() { return inverted; }
 
 void setDisplayInverted(bool inv) {
     inverted = inv;
+    save();
+}
+
+bool displayRotated180() { return rotated180; }
+
+void setDisplayRotated180(bool rot) {
+    rotated180 = rot;
     save();
 }
 

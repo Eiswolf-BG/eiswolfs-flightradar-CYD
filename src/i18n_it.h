@@ -298,6 +298,7 @@ static const char* const I18N_IT[] = {
     "Avvisi LED",
     "Strumenti",
     "Novità: il pulsante \"GPS\" accanto ad \"Automatico\" attiva/disattiva la lettura di un modulo GPS collegato. Se attivo, la tua posizione segue il tuo movimento in tempo reale (es. in auto) invece di essere determinata solo approssimativamente via IP. Collegamento: TX del modulo GPS su GPIO22, RX del modulo GPS su GPIO27 (di solito inutilizzato), 3,3V e GND, 9600 baud (NMEA). Senza modulo collegato, il pulsante semplicemente non ha alcun effetto.",
+    "Ruota schermo (180°): ",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

@@ -24,6 +24,10 @@ namespace {
     bool lastTouched = false;
     Point lastRaw;
 
+    // Siehe setRotated180() in touch_input.h - Default false (normale
+    // Ausrichtung), wird beim Boot bzw. beim Umschalten im Menue gesetzt.
+    bool rotated180 = false;
+
     // Zeitpunkt des letzten abgeschlossenen Taps (siehe wasTapped()/
     // msSinceLastTap()) - fuer den Menue-Inaktivitaets-Timeout.
     uint32_t lastTapMs = 0;
@@ -41,6 +45,10 @@ void begin() {
     touch.begin(touchSpi);
     touch.setRotation(0);
     lastTapMs = millis();
+}
+
+void setRotated180(bool rotated) {
+    rotated180 = rotated;
 }
 
 bool hasCalibration() { return calibrationLoaded; }
@@ -105,6 +113,15 @@ Point mappedPoint() {
 
     long mx = map((long)raw.x, calXmin, calXmax, MARGIN_PX, Config::SCREEN_WIDTH - MARGIN_PX);
     long my = map((long)raw.y, calYmin, calYmax, MARGIN_PX, Config::SCREEN_HEIGHT - MARGIN_PX);
+
+    if (rotated180) {
+        // Touch-Chip-Koordinaten sind an die physische Panel-Ausrichtung
+        // gebunden, nicht an tft.setRotation() - bei gedrehtem Display muss
+        // hier zusaetzlich gespiegelt werden, sonst zeigen Taps auf den
+        // (visuell) verschobenen Buttons ins Leere.
+        mx = (Config::SCREEN_WIDTH - 1) - mx;
+        my = (Config::SCREEN_HEIGHT - 1) - my;
+    }
 
     out.x = clampi((int16_t)mx, 0, Config::SCREEN_WIDTH - 1);
     out.y = clampi((int16_t)my, 0, Config::SCREEN_HEIGHT - 1);

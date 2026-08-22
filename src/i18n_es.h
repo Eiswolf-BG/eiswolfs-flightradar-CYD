@@ -298,6 +298,7 @@ static const char* const I18N_ES[] = {
     "Alertas LED",
     "Herramientas",
     "Novedad: el botón \"GPS\" junto a \"Automático\" activa/desactiva la lectura de un módulo GPS conectado. Activado, tu ubicación sigue tu movimiento en vivo (p. ej. en coche) en lugar de determinarse solo aproximadamente por IP. Cableado: TX del módulo GPS a GPIO22, RX del módulo GPS a GPIO27 (normalmente sin usar), 3,3V y GND, 9600 baudios (NMEA). Sin módulo conectado, el botón simplemente no tiene efecto.",
+    "Girar pantalla (180°): ",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

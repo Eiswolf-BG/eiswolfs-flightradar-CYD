@@ -79,6 +79,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Show helicopters only** – a new toggle under **Menu → Flight Options** filters the radar, aircraft list, and web live map down to helicopters (see [Show helicopters only](#-show-helicopters-only-onoff) below)
 - **Reorganized menus** – the Flight Options and System menus are now grouped into a handful of large category buttons (Stats & Logbook, LED Alerts, Tools, Display) instead of long lists, making it easier to find your way around
 - **Optional GPS module support** – a new "GPS" button in [Location Presets](#-location-presets) turns reading from a connected GPS module on/off, so your location can follow your movement live instead of only being estimated via IP
+- **Rotate screen (180°)** – a new switch under **Menu → System → Display** flips the screen and touch input upside down, useful for table-mount setups where the panel's limited vertical viewing angle otherwise washes out the radar circles when looked at from above
 
 ## Feature Deep-Dive
 

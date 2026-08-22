@@ -11,6 +11,14 @@ namespace SettingsStore {
     bool displayInverted();
     void setDisplayInverted(bool inverted);
 
+    // 180-Grad-Drehung fuer Tischmontage (Menue > System > Anzeige) - das
+    // TFT-Panel hat eingeschraenkte vertikale Blickwinkel, von oben
+    // betrachtet "waschen" die Radarkreise sonst aus (GitHub-Meldung eines
+    // Nutzers). Dreht Bild UND Touch-Mapping, siehe main.cpp/
+    // touch_input.cpp. AUS per Default (normale Ausrichtung unveraendert).
+    bool displayRotated180();
+    void setDisplayRotated180(bool rotated);
+
     // Display-Helligkeit in Prozent (Config::BRIGHTNESS_MIN_PERCENT..MAX_PERCENT).
     uint8_t brightnessPercent();
     void setBrightnessPercent(uint8_t percent);
