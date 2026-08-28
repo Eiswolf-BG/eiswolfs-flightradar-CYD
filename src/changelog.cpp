@@ -9,46 +9,48 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 6;
 
     const char* const CHANGELOG_EN =
-        "- New: a \"Rotate screen (180°)\" switch in Menu > System > "
-        "Display flips the screen (and touch input) upside down - useful "
-        "when the device stands on a table, since the panel's viewing "
-        "angle otherwise washes out the radar circles when looked at "
-        "from above";
+        "- New: choose IATA or ICAO airport codes for the route display "
+        "in Menu > Location/Region > Units\n"
+        "- Fix: switched the ADS-B data source from adsb.fi to adsb.lol "
+        "- adsb.fi had started silently answering the device's requests "
+        "with empty results without any error";
 
     const char* const CHANGELOG_DE =
-        "- Neu: Ein Schalter \"Bildschirm drehen (180°)\" im Menü > "
-        "System > Anzeige dreht Bild und Touch-Eingabe auf den Kopf - "
-        "nützlich, wenn das Gerät auf einem Tisch steht, da der "
-        "Blickwinkel des Panels die Radarkreise von oben betrachtet "
-        "sonst auswäscht";
+        "- Neu: Flughafencodes für die Routenanzeige wahlweise als IATA "
+        "oder ICAO im Menü > Land/Region > Einheiten\n"
+        "- Fix: ADS-B-Datenquelle von adsb.fi auf adsb.lol umgestellt - "
+        "adsb.fi hatte begonnen, Anfragen vom Gerät serverseitig ohne "
+        "Fehlermeldung leer zu beantworten";
 
     const char* const CHANGELOG_FR =
-        "- Nouveau : un interrupteur \"Tourner l'écran (180°)\" dans "
-        "Menu > Système > Affichage retourne l'écran (et la saisie "
-        "tactile) - utile lorsque l'appareil est posé sur une table, car "
-        "l'angle de vue du panneau délave sinon les cercles radar vus "
-        "d'en haut";
+        "- Nouveau : choisir les codes aéroport IATA ou OACI pour "
+        "l'affichage de la route dans Menu > Lieu/Région > Unités\n"
+        "- Correction : changement de la source de données ADS-B, "
+        "d'adsb.fi vers adsb.lol - adsb.fi avait commencé à répondre aux "
+        "requêtes de l'appareil avec des résultats vides, sans aucune "
+        "erreur";
 
     const char* const CHANGELOG_TR =
-        "- Yeni: Menü > Sistem > Ekran'daki \"Ekranı 180° döndür\" "
-        "anahtarı ekranı (ve dokunmatik girişi) ters çevirir - cihaz bir "
-        "masa üzerinde dururken kullanışlıdır, çünkü panelin görüş açısı "
-        "yukarıdan bakıldığında radar çemberlerini söndüren bir etki "
-        "yaratır";
+        "- Yeni: Menü > Konum/Bölge > Birimler'de rota gösterimi için "
+        "IATA veya ICAO havalimanı kodları seçilebilir\n"
+        "- Düzeltme: ADS-B veri kaynağı adsb.fi'den adsb.lol'e "
+        "değiştirildi - adsb.fi, cihazın isteklerine herhangi bir hata "
+        "vermeden sessizce boş sonuçlar döndürmeye başlamıştı";
 
     const char* const CHANGELOG_ES =
-        "- Novedad: un interruptor \"Girar pantalla (180°)\" en Menú > "
-        "Sistema > Pantalla invierte la pantalla (y la entrada táctil) - "
-        "útil cuando el dispositivo está sobre una mesa, ya que el "
-        "ángulo de visión del panel visto desde arriba deslava los "
-        "círculos del radar";
+        "- Novedad: elegir códigos de aeropuerto IATA o ICAO para la "
+        "ruta mostrada en Menú > Ubicación/Región > Unidades\n"
+        "- Corrección: se cambió la fuente de datos ADS-B de adsb.fi a "
+        "adsb.lol - adsb.fi había empezado a responder a las peticiones "
+        "del dispositivo con resultados vacíos, sin ningún error";
 
     const char* const CHANGELOG_IT =
-        "- Novità: un interruttore \"Ruota schermo (180°)\" in Menu > "
-        "Sistema > Schermo capovolge lo schermo (e l'input touch) - "
-        "utile quando il dispositivo è appoggiato su un tavolo, poiché "
-        "l'angolo di visione del pannello visto dall'alto sbiadisce i "
-        "cerchi del radar";
+        "- Novità: scegliere i codici aeroportuali IATA o ICAO per la "
+        "rotta mostrata in Menu > Posizione/Regione > Unità\n"
+        "- Correzione: la fonte dati ADS-B è stata cambiata da adsb.fi "
+        "ad adsb.lol - adsb.fi aveva iniziato a rispondere alle "
+        "richieste del dispositivo con risultati vuoti, senza alcun "
+        "errore";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT

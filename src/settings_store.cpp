@@ -30,6 +30,9 @@ namespace {
     bool onlyHelicoptersOn = false;
     uint8_t languageIdx = 0;
     uint8_t unitsModeVal = 0;
+    // AUS per Default (ICAO) - IATA-Anzeige ist ein bewusstes Opt-in ueber
+    // Menue > Land/Region > Einheiten, siehe settings_store.h.
+    bool iataAirportCodesOn = false;
     uint8_t radarThemeIdx = 0;
     // Zwei unabhaengige, ankreuzbare Radar-Extras (radar_theme_screen.cpp) -
     // AUS per Default, siehe Kommentar in settings_store.h.
@@ -90,6 +93,8 @@ namespace {
         } else if (key == "units_mode") {
             int v = value.toInt();
             if (v >= 0 && v <= 2) unitsModeVal = (uint8_t)v;
+        } else if (key == "airport_code_iata") {
+            iataAirportCodesOn = (value.toInt() != 0);
         } else if (key == "radar_theme") {
             int v = value.toInt();
             if (v >= 0 && v <= 2) radarThemeIdx = (uint8_t)v;
@@ -163,6 +168,7 @@ void save() {
     f.printf("only_helicopters=%d\n", onlyHelicoptersOn ? 1 : 0);
     f.printf("language=%d\n", languageIdx);
     f.printf("units_mode=%d\n", unitsModeVal);
+    f.printf("airport_code_iata=%d\n", iataAirportCodesOn ? 1 : 0);
     f.printf("radar_theme=%d\n", radarThemeIdx);
     f.printf("crt_phosphor=%d\n", crtPhosphorOn ? 1 : 0);
     f.printf("radar_pulse=%d\n", radarPulseOn ? 1 : 0);
@@ -306,6 +312,13 @@ void setUnitsMode(uint8_t mode) {
         unitsModeVal = mode;
         save();
     }
+}
+
+bool useIataAirportCodes() { return iataAirportCodesOn; }
+
+void setUseIataAirportCodes(bool on) {
+    iataAirportCodesOn = on;
+    save();
 }
 
 uint8_t radarThemeIndex() { return radarThemeIdx; }

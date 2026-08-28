@@ -56,7 +56,18 @@ void run(TFT_eSPI& tft) {
             drawButton(tft, modeRects[i], I18n::t(labels[i]), i == current);
         }
 
-        Rect backBtn = rowRect(MODE_COUNT);
+        // Flughafencode-Format fuer die Routenanzeige im Detail-Panel
+        // (siehe aircraft_details.cpp/SettingsStore::useIataAirportCodes())
+        // - eigene Zeile, kein Teil der obigen 3-Wege-Auswahl, da
+        // unabhaengig vom Einheiten-Modus. "ICAO"/"IATA" bleiben
+        // unuebersetzt (internationale Standard-Abkuerzungen), nur der
+        // Praefix-Text kommt aus I18n.
+        Rect airportCodeBtn = rowRect(MODE_COUNT);
+        bool useIata = SettingsStore::useIataAirportCodes();
+        String airportCodeLabel = String(I18n::t(StringId::UNITS_AIRPORT_CODE_FORMAT)) + (useIata ? "IATA" : "ICAO");
+        drawButton(tft, airportCodeBtn, airportCodeLabel);
+
+        Rect backBtn = rowRect(MODE_COUNT + 1);
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
         TouchInput::Point tap;
@@ -74,6 +85,10 @@ void run(TFT_eSPI& tft) {
                 SettingsStore::setUnitsMode(i);
                 handled = true;
             }
+        }
+        if (!handled && airportCodeBtn.contains(tap.x, tap.y)) {
+            SettingsStore::setUseIataAirportCodes(!useIata);
+            handled = true;
         }
         if (!handled && backBtn.contains(tap.x, tap.y)) {
             done = true;

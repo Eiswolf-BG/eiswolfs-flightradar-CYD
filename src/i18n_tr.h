@@ -299,6 +299,7 @@ static const char* const I18N_TR[] = {
     "Araçlar",
     "Yeni: \"Otomatik\" yanındaki \"GPS\" düğmesi, bağlı bir GPS modülünün okunmasını açar/kapatır. Açıkken konumun (ör. araba kullanırken) hareketini canlı olarak takip eder, sadece IP üzerinden tahmini olarak belirlenmez. Bağlantı: GPS modülü TX'i GPIO22'ye, GPS modülü RX'i GPIO27'ye (genellikle kullanılmaz), 3,3V ve GND, 9600 baud (NMEA). Bağlı modül yoksa düğmenin bir etkisi olmaz.",
     "Ekranı 180° döndür: ",
+    "Havalimanı kodları: ",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

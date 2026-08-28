@@ -1009,7 +1009,16 @@ namespace {
         } else if (details.loading) {
             routeLine = String(I18n::t(StringId::DETAIL_ROUTE)) + I18n::t(StringId::DETAIL_LOADING_DOTS);
         } else if (details.routeOrigin[0] && details.routeDest[0]) {
-            routeLine = String(I18n::t(StringId::DETAIL_ROUTE)) + details.routeOrigin + " -> " + details.routeDest;
+            // IATA-Anzeige (Menue > Land/Region > Einheiten) nur, wenn die
+            // Lookup-Kette fuer BEIDE Flughaefen einen IATA-Code geliefert
+            // hat (siehe routeOriginIata/routeDestIata in
+            // aircraft_details.h) - sonst sauberer Rueckfall auf ICAO,
+            // statt einen halb-ICAO/halb-IATA-Mix oder Leerstring zu zeigen.
+            bool useIata = SettingsStore::useIataAirportCodes() &&
+                           details.routeOriginIata[0] && details.routeDestIata[0];
+            const char* origin = useIata ? details.routeOriginIata : details.routeOrigin;
+            const char* dest = useIata ? details.routeDestIata : details.routeDest;
+            routeLine = String(I18n::t(StringId::DETAIL_ROUTE)) + origin + " -> " + dest;
         } else {
             routeLine = String(I18n::t(StringId::DETAIL_ROUTE)) + I18n::t(StringId::DETAIL_UNKNOWN);
         }

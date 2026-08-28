@@ -152,6 +152,18 @@ void update() {
         }
     };
 
+    // Gleiches "ORIG-DEST"-Aufsplitten wie applyRouteCodes() oben, nur fuer
+    // die IATA-Variante (siehe routeOriginIata/routeDestIata in
+    // aircraft_details.h) - eigene Funktion statt Parameter an
+    // applyRouteCodes(), da die Ziel-Puffer eine andere Groesse haben.
+    auto applyRouteCodesIata = [&](const String& codes) {
+        int dash = codes.indexOf('-');
+        if (dash > 0 && dash < (int)codes.length() - 1) {
+            strncpy(result.routeOriginIata, codes.substring(0, dash).c_str(), sizeof(result.routeOriginIata) - 1);
+            strncpy(result.routeDestIata, codes.substring(dash + 1).c_str(), sizeof(result.routeDestIata) - 1);
+        }
+    };
+
     if (trimmedCallsign.length() >= 2) {
         // 1. VRS-Standing-Data-Mirror.
         client.setTimeout(4000);
@@ -162,6 +174,12 @@ void update() {
             if (!deserializeJson(doc3, body3)) {
                 const char* codes = doc3["airport_codes"] | "";
                 applyRouteCodes(String(codes));
+                // Diese Quelle liefert die IATA-Variante gleich im selben
+                // Aufruf mit ("_airport_codes_iata") - kein zusaetzlicher
+                // API-Call noetig, siehe routeOriginIata/routeDestIata in
+                // aircraft_details.h.
+                const char* codesIata = doc3["_airport_codes_iata"] | "";
+                applyRouteCodesIata(String(codesIata));
             }
         }
 
@@ -191,6 +209,15 @@ void update() {
                 if (originIcao[0] && destIcao[0]) {
                     strncpy(result.routeOrigin, originIcao, sizeof(result.routeOrigin) - 1);
                     strncpy(result.routeDest, destIcao, sizeof(result.routeDest) - 1);
+                    // Auch diese Quelle liefert IATA-Codes im selben JSON
+                    // mit ("iata_code" statt "icao_code") - kein
+                    // zusaetzlicher API-Call noetig.
+                    const char* originIata = doc5["response"]["flightroute"]["origin"]["iata_code"] | "";
+                    const char* destIata = doc5["response"]["flightroute"]["destination"]["iata_code"] | "";
+                    if (originIata[0] && destIata[0]) {
+                        strncpy(result.routeOriginIata, originIata, sizeof(result.routeOriginIata) - 1);
+                        strncpy(result.routeDestIata, destIata, sizeof(result.routeDestIata) - 1);
+                    }
                 }
             }
         }

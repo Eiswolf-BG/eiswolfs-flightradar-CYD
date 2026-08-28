@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "4.0.2";
+    constexpr const char* APP_VERSION = "4.0.4";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -58,10 +58,20 @@ namespace Config {
     constexpr uint8_t RANGE_STEP_COUNT = 4;
     constexpr uint8_t DEFAULT_RANGE_INDEX = 1;
 
-    constexpr const char* ADSB_API_HOST = "opendata.adsb.fi";
+    // adsb.lol statt adsb.fi (seit v4.0.2-Nachfolger) - adsb.fi lieferte an
+    // das Geraet trotz gueltigem HTTP 200 und validem JSON konstant leere
+    // Flugzeuglisten, vermutlich Cloudflare-Bot-Management/TLS-Fingerprinting
+    // gegen den ESP32-Client (per curl vom selben Netzwerk kamen jederzeit
+    // volle Daten). adsb.lol hat identisches URL-/JSON-Schema (nur "/v2/..."
+    // statt "/api/v3/...", Feldnamen unveraendert), daher direkt austauschbar.
+    constexpr const char* ADSB_API_HOST = "api.adsb.lol";
     constexpr uint16_t ADSB_API_PORT = 443;
     constexpr uint32_t FETCH_INTERVAL_MS = 8000;
     constexpr uint32_t HTTP_TIMEOUT_MS = 6000;
+    // Eigener, grosszuegigerer Timeout nur fuer die ADS-B-Abfrage, getrennt
+    // von HTTP_TIMEOUT_MS (das weiterhin fuer hexdb.io/Wetter/etc. gilt) -
+    // die Antwort bei 100km Radius kann ueber 100KB gross werden.
+    constexpr uint32_t ADSB_HTTP_TIMEOUT_MS = 15000;
 
     // Wetter-Icon im Header (siehe weather.cpp) - deutlich seltener
     // abgefragt als die ADS-B-Daten, das Wetter aendert sich nicht

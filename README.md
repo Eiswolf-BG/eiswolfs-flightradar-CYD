@@ -36,7 +36,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 
 ## Features
 - **Live radar screen** – circular radar view, sized to the full screen width, with a rotating green sweep line; each aircraft marker's heading line ends in a small arrowhead, so its direction of travel is unambiguous at a glance. Twinkling background stars fill the space outside the radar circle.
-- **Real ADS-B data** via the free [adsb.fi](https://adsb.fi) API, refreshed every 8 seconds
+- **Real ADS-B data** via the free [adsb.lol](https://adsb.lol) API, refreshed every 8 seconds
 - **Color-coded aircraft** by altitude (green `<10k ft`, yellow `10-30k ft`, red `>30k ft`) with an on-screen legend
 - **Tap an aircraft** to open a detail panel: callsign, airline, aircraft model (via [hexdb.io](https://hexdb.io)), flight route (origin/destination airport, resolved via a chain of three free lookup services for better coverage), altitude/speed/distance/heading/bearing in both metric and aviation units, estimated seat count, plus a "QR" button that shows a full-screen QR code linking to that flight's live-tracking page on FlightAware
 - **Bearing indicator** – with an aircraft selected, a dotted line plus a heading-in-degrees label points from the radar center to the compass edge, showing exactly which direction to look to spot it in the sky (not to be confused with the aircraft's own heading arrow)
@@ -57,6 +57,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **6 languages** (English, German, French, Turkish, Spanish, Italian), selectable on first boot or anytime from the menu
 - **Adjustable brightness** (10-100% in 10% steps, Menu → System → "Brightness") with a live preview as you tap
 - **Metric/Imperial units** (Menu → Region → "Units") consistently applied across the radar range button, range ring labels, aircraft list, nearest-airport distance, and stats
+- **IATA or ICAO airport codes** (same "Units" screen) – choose whether the route shown in the aircraft detail panel (origin/destination) uses 3-letter IATA codes (e.g. "FRA") or 4-letter ICAO codes (e.g. "EDDF"); falls back to ICAO automatically if no IATA code is available for a given airport
 - **Firmware version** is shown directly on the "Check for updates" button (Menu → System)
 - **Backup & Reset** (Menu → System → "Backup & Reset") – back up or restore your settings, or fully reset the device (wipes all on-device data and re-runs first-time setup) - handy for testing or handing the device to someone else
 - **Screen timeout with slider** (Menu → System → "Screen Timeout") – set how long until the display turns off after a period of no touches, from 1 to 15 minutes or "Never", using a drag slider instead of tapping through values one minute at a time
@@ -241,7 +242,7 @@ See the dedicated section above: [WiFi Manager](#-wifi-manager-up-to-3-saved-net
 ---
 
 **Technical notes for the curious:**
-- Flight data is re-fetched from [adsb.fi](https://adsb.fi) every **8 seconds**.
+- Flight data is re-fetched from [adsb.lol](https://adsb.lol) every **8 seconds**.
 - Altitude color coding is fixed: **green** < 10,000 ft, **yellow** 10,000–30,000 ft, **red** > 30,000 ft.
 - Radar radius is switchable between **10 / 25 / 50 / 100 km**.
 
@@ -259,7 +260,7 @@ See the dedicated section above: [WiFi Manager](#-wifi-manager-up-to-3-saved-net
 | RGB LED (active-low) | R=4, G=16, B=17 |
 
 ## Data sources
-- Aircraft positions: [adsb.fi](https://adsb.fi) (free, no API key)
+- Aircraft positions: [adsb.lol](https://adsb.lol) (free, no API key)
 - Aircraft model lookups: [hexdb.io](https://hexdb.io) (free, community-maintained, rate-limited)
 - Location: [ip-api.com](https://ip-api.com) (free IP geolocation)
 

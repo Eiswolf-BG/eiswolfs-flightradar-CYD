@@ -79,6 +79,16 @@ namespace SettingsStore {
     uint8_t unitsMode();
     void setUnitsMode(uint8_t mode);
 
+    // Flughafencode-Format fuer die Routenanzeige im Detail-Panel (Menue >
+    // Land/Region > Einheiten) - AUS (ICAO, z.B. "EDDF") per Default, AN
+    // zeigt stattdessen den bei Aviation-Enthusiasten gelaeufigeren
+    // IATA-Code (z.B. "FRA"). Rein kosmetisch: nutzt IATA-Codes, die die
+    // bestehende Routen-Lookup-Kette (aircraft_details.cpp) ohnehin schon
+    // mitliefert, kein zusaetzlicher API-Call. Faellt sauber auf ICAO
+    // zurueck, wenn fuer einen Flughafen kein IATA-Code bekannt ist.
+    bool useIataAirportCodes();
+    void setUseIataAirportCodes(bool on);
+
     // Radar-Farbschema (Menue > System > Radar-Darstellung): 0=Gruen
     // (Standard), 1=Amber, 2=Blau - betrifft nur den Radar-Screen (Sweep-
     // Linie, Panel-Rahmen/Text, niedrig fliegende Flugzeuge), siehe

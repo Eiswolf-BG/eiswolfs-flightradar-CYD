@@ -19,6 +19,18 @@ namespace AircraftDetails {
         // callsign is known or no route was found in any of the three.
         char routeOrigin[8] = {0};
         char routeDest[8] = {0};
+
+        // Same route, but as IATA codes (e.g. "IAH"/"FRA") - for the
+        // optional IATA display mode (Menue > Land/Region > Einheiten,
+        // SettingsStore::useIataAirportCodes()). Two of the three route
+        // sources above already carry IATA codes in their response
+        // alongside the ICAO ones, so no extra API call is needed - see
+        // aircraft_details.cpp. Empty if the source that answered didn't
+        // provide one (e.g. hexdb.io's route endpoint never does) or one
+        // of the two airports genuinely has no IATA code - the UI falls
+        // back to routeOrigin/routeDest (ICAO) in that case.
+        char routeOriginIata[4] = {0};
+        char routeDestIata[4] = {0};
     };
 
     // Called from Core 1 (touch selection): marks that details should be

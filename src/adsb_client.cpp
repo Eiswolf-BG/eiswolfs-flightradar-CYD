@@ -34,21 +34,23 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
 
     if (!clientConfigured) {
         persistentClient.setInsecure();
-        persistentClient.setTimeout(Config::HTTP_TIMEOUT_MS);
+        persistentClient.setTimeout(Config::ADSB_HTTP_TIMEOUT_MS);
         clientConfigured = true;
     }
 
     HTTPClient http;
     char url[160];
     snprintf(url, sizeof(url),
-             "https://%s/api/v3/lat/%.5f/lon/%.5f/dist/%.0f",
+             "https://%s/v2/lat/%.5f/lon/%.5f/dist/%.0f",
              Config::ADSB_API_HOST, homeLat, homeLon, radiusKm);
 
-    http.setTimeout(Config::HTTP_TIMEOUT_MS);
+    http.setTimeout(Config::ADSB_HTTP_TIMEOUT_MS);
     if (!http.begin(persistentClient, url)) {
         return result;
     }
     http.setReuse(true);
+    http.setUserAgent("EiswolfsFlightradarCYD/1.0 (+https://github.com/Eiswolf-BG/eiswolfs-flightradar-CYD)");
+    http.addHeader("Accept", "application/json");
 
     int code = http.GET();
     result.httpCode = code;

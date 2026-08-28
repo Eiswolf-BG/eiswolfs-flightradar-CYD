@@ -487,6 +487,13 @@ enum class StringId : uint16_t {
     // angehaengt, gleicher Grund wie oben.
     MENU_DISPLAY_ROTATE,
 
+    // Zeile im Einheiten-Screen (Menue > Land/Region > Einheiten), schaltet
+    // die Flughafencodes in der Routenanzeige des Detail-Panels zwischen
+    // ICAO und IATA um - siehe SettingsStore::useIataAirportCodes() und
+    // radar_screen.cpp. "ICAO"/"IATA" selbst sind international einheitliche
+    // Abkuerzungen und werden NICHT uebersetzt, nur dieser Praefix.
+    UNITS_AIRPORT_CODE_FORMAT,
+
     COUNT
 };
 

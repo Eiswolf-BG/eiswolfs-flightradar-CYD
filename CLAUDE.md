@@ -32,8 +32,18 @@ vorausgesetzt werden.
 - TFT_eSPI (Display), XPT2046_Touchscreen (Touch), ArduinoJson, TinyGPSPlus
 - Dual-Core-Design: Netzwerk (WLAN, ADS-B-Polling) auf Core 0, Display/Touch
   auf Core 1 — die UI blockiert nie durch Netzwerk-Requests.
-- Daten: [adsb.fi](https://adsb.fi) (Flugzeugpositionen), [hexdb.io](https://hexdb.io)
-  (Modell-Lookups), [ip-api.com](https://ip-api.com) (IP-Geolocation)
+- Daten: [adsb.lol](https://adsb.lol) (Flugzeugpositionen, `api.adsb.lol`),
+  [hexdb.io](https://hexdb.io) (Modell-Lookups), [ip-api.com](https://ip-api.com)
+  (IP-Geolocation)
+  - Bis vor Kurzem wurde adsb.fi genutzt - Wechsel zu adsb.lol, weil adsb.fi
+    dem ESP32-Client trotz gueltigem HTTP 200 und validem JSON dauerhaft
+    leere Flugzeuglisten lieferte (curl von demselben Netzwerk aus lieferte
+    jederzeit volle Daten) - vermutlich Cloudflare-Bot-Management/TLS-
+    Fingerprinting gegen den mbedTLS-Client des ESP32. adsb.lol hat
+    identisches URL-/JSON-Schema (nur `/v2/...` statt `/api/v3/...`,
+    Feldnamen unveraendert) und war ohne Parser-Anpassung nutzbar. Falls das
+    Thema nochmal auftaucht: siehe `Config::ADSB_API_HOST`/
+    `Config::ADSB_HTTP_TIMEOUT_MS` in `config.h` sowie `adsb_client.cpp`.
 
 ## ⚠️ WICHTIGSTE FALLE: Der eigene Font ist grundlinien-verankert
 
@@ -167,6 +177,13 @@ mit Foto vom echten Display), bevor der Code als fertig gilt.
   Warnungen UND Errors prüfen (nicht nur "compiles").
 - Immer least-invasive Änderungen bevorzugen — bestehende Funktionen/Namen
   nicht ohne Grund umbenennen.
+- Commits enthalten KEINEN "Co-Authored-By: Claude"-Trailer (siehe
+  `.claude/settings.json`, `"includeCoAuthoredBy": false`). Grund: das
+  hatte frueher dazu gefuehrt, dass Claude selbst als GitHub-Contributor
+  im oeffentlichen Repo auftauchte - liess sich nur durch eine aufwaendige
+  Git-History-Neuschreibung wieder entfernen. Bitte bei jedem Commit
+  beachten, auch wenn `.claude/settings.json` aus irgendeinem Grund mal
+  fehlen sollte.
 
 ## Sprache: Projekt-Außendarstellung immer Englisch
 
