@@ -16,6 +16,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <cstring>
+#include <atomic>
 
 namespace NetTask {
 
@@ -33,6 +34,17 @@ namespace {
     // fest Config::FETCH_RETRY_DELAY_MS gewartet, um bei kurzen WLAN-
     // Aussetzern keine Anfragen-Flut auszuloesen.
     uint32_t currentIntervalMs = Config::FETCH_INTERVAL_MS;
+
+    // Von NetTask (Core 0) geschrieben, von pause() (Core 1, siehe unten)
+    // gelesen - std::atomic statt eines ungeschuetzten bool, gleiches
+    // Muster wie beim Heartbeat-Race-Fix in led_alert.cpp. true, solange
+    // NetTask NICHT mitten in einer ADS-B-Netzwerkoperation steckt (also
+    // "sicher" fuer eine Suspendierung) - wird NUR um AdsbClient::fetch()
+    // herum kurzzeitig auf false gesetzt, sonst bleibt es true (inkl.
+    // WifiMgr/Weather/OTA-Hintergrundcheck/50ms-Delay). pause() unten
+    // wartet aktiv auf true, bevor es wirklich suspendiert - siehe
+    // net_task.h fuer die ausfuehrliche Begruendung.
+    std::atomic<bool> netTaskIdle{true};
 
     Aircraft tempTable[Config::MAX_TRACKED_AIRCRAFT];
 
@@ -93,6 +105,10 @@ namespace {
                         rangeKm = Config::RANGE_STEPS_KM[Config::RANGE_STEP_COUNT - 1];
                     }
 
+                    // Ab hier bis zum Ende der Ergebnisverarbeitung unten
+                    // NICHT idle - siehe Kommentar bei netTaskIdle oben.
+                    netTaskIdle.store(false, std::memory_order_release);
+
                     auto result = AdsbClient::fetch(lat, lon, rangeKm,
                                                      tempTable, Config::MAX_TRACKED_AIRCRAFT);
 
@@ -144,6 +160,8 @@ namespace {
                         Serial.printf("[NetTask] Abfrage fehlgeschlagen (HTTP %d), naechster Versuch in %lums\n",
                                       result.httpCode, (unsigned long)currentIntervalMs);
                     }
+
+                    netTaskIdle.store(true, std::memory_order_release);
                 }
             }
 
@@ -164,8 +182,29 @@ void begin() {
     );
 }
 
-void pause() {
-    if (taskHandle) vTaskSuspend(taskHandle);
+bool pause(uint32_t timeoutMs) {
+    if (!taskHandle) return true;
+
+    // Aktiv warten, bis NetTask sich selbst als idle meldet (siehe
+    // netTaskIdle oben), STATT sofort zu suspendieren - ein vTaskSuspend()
+    // mitten in einer laufenden ADS-B-Netzwerkoperation wuerde erst am
+    // naechsten Yield-/Blockierpunkt greifen (bis zu
+    // Config::ADSB_HTTP_TIMEOUT_MS = 15s spaeter), waehrenddessen liefe ein
+    // gleichzeitiger OTA-Download auf Core 1 tatsaechlich parallel dazu und
+    // koennte um Heap-/TLS-Ressourcen konkurrieren. Laeuft im Aufrufer-
+    // Kontext (Core 1, z.B. menu_screen.cpp), daher normales delay() statt
+    // vTaskDelay - blockiert absichtlich die UI, da der OTA-Screen ohnehin
+    // "Suche nach Update..." anzeigt und auf eine Antwort wartet.
+    uint32_t start = millis();
+    while (!netTaskIdle.load(std::memory_order_acquire)) {
+        if (millis() - start >= timeoutMs) {
+            return false;
+        }
+        delay(20);
+    }
+
+    vTaskSuspend(taskHandle);
+    return true;
 }
 
 void resume() {

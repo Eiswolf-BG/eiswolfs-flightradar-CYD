@@ -573,7 +573,14 @@ namespace {
         // HTTPS-Aufruf herum, nicht um die anschliessende Bestaetigungs-
         // Anzeige, damit ADS-B/WebUI/Wetter nicht laenger als noetig
         // stillstehen, waehrend der Nutzer in Ruhe die Bestaetigung liest.
-        NetTask::pause();
+        // pause() wartet jetzt aktiv, bis NetTask wirklich sicher
+        // pausierbar ist (nicht mitten in einer ADS-B-Anfrage) - kommt es
+        // dabei zum Timeout, GAR NICHT erst mit der Update-Pruefung
+        // fortfahren (sonst genau das urspruengliche Haenger-Risiko).
+        if (!NetTask::pause()) {
+            infoScreen(tft, I18n::t(StringId::OTA_NETWORK_BUSY), "", TFT_RED, I18n::t(StringId::OK));
+            return;
+        }
         OtaUpdate::CheckInfo info = OtaUpdate::checkForUpdate();
         NetTask::resume();
 
@@ -597,7 +604,11 @@ namespace {
         // Gleicher Grund wie oben bei checkForUpdate() - waehrend des
         // eigentlichen Downloads/Flashens darf NetTask nicht gleichzeitig
         // um die WLAN-Funk-/TLS-Ressourcen konkurrieren.
-        NetTask::pause();
+        if (!NetTask::pause()) {
+            otaProgressTft = nullptr;
+            infoScreen(tft, I18n::t(StringId::OTA_NETWORK_BUSY), "", TFT_RED, I18n::t(StringId::OK));
+            return;
+        }
         bool ok = OtaUpdate::performUpdate(info.downloadUrl, drawOtaProgress);
         NetTask::resume();
         otaProgressTft = nullptr;

@@ -309,6 +309,7 @@ static const char* const I18N_EN[] = {
     "Airline filter",
     "Lists",
     "Display Filters",
+    "Network busy, please try again.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

@@ -308,6 +308,7 @@ static const char* const I18N_TR[] = {
     "Havayolu filtresi",
     "Listeler",
     "Görüntü Filtreleri",
+    "Ağ meşgul, lütfen tekrar deneyin.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

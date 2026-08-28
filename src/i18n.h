@@ -526,6 +526,13 @@ enum class StringId : uint16_t {
     MENU_CATEGORY_LISTS,
     MENU_CATEGORY_FILTERS,
 
+    // Zeigt sich im OTA-Screen (menu_screen.cpp::runOtaUpdateScreen()),
+    // wenn NetTask::pause() innerhalb ihres Timeouts nicht in einen sicher
+    // pausierbaren Zustand kommt (siehe net_task.h/.cpp) - verhindert, dass
+    // der OTA-Vorgang trotzdem startet und bei 0% haengen bleibt, weil eine
+    // ADS-B-Anfrage noch aktiv war/ist.
+    OTA_NETWORK_BUSY,
+
     COUNT
 };
 

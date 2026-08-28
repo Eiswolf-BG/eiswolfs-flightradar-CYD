@@ -308,6 +308,7 @@ static const char* const I18N_IT[] = {
     "Filtro compagnia",
     "Elenchi",
     "Filtri di visualizzazione",
+    "Rete occupata, riprova.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,
