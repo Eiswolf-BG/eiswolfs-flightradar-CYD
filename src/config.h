@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "4.0.4";
+    constexpr const char* APP_VERSION = "4.1.0";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -66,7 +66,21 @@ namespace Config {
     // statt "/api/v3/...", Feldnamen unveraendert), daher direkt austauschbar.
     constexpr const char* ADSB_API_HOST = "api.adsb.lol";
     constexpr uint16_t ADSB_API_PORT = 443;
-    constexpr uint32_t FETCH_INTERVAL_MS = 8000;
+    // TESTWEISE von 8000 auf 10000 erhoeht (siehe Absprache mit Karl) - nach
+    // vereinzelten HTTP 429 von adsb.lol etwas serverfreundlicher, aber
+    // bewusst nicht weiter als 10s, damit der Radar noch reaktionsschnell
+    // bleibt (Trade-off dokumentiert, siehe Bericht an Alex).
+    constexpr uint32_t FETCH_INTERVAL_MS = 10000;
+    // TESTWEISE - Obergrenze fuers exponentielle Backoff nach HTTP 429
+    // (siehe net_task.cpp), damit sich das Intervall nicht unbegrenzt
+    // aufschaukelt.
+    constexpr uint32_t FETCH_BACKOFF_MAX_MS = 3UL * 60UL * 1000UL;
+    // TESTWEISE - moderate feste Wartezeit nach EINEM fehlgeschlagenen
+    // Request (Timeout/SSL-Fehler, kein 429) vor dem naechsten Versuch, statt
+    // sofort wieder im FETCH_INTERVAL_MS-Takt weiterzumachen (siehe
+    // net_task.cpp) - verhindert eine Anfragen-Flut bei kurzen WLAN-
+    // Aussetzern.
+    constexpr uint32_t FETCH_RETRY_DELAY_MS = 18000;
     constexpr uint32_t HTTP_TIMEOUT_MS = 6000;
     // Eigener, grosszuegigerer Timeout nur fuer die ADS-B-Abfrage, getrennt
     // von HTTP_TIMEOUT_MS (das weiterhin fuer hexdb.io/Wetter/etc. gilt) -

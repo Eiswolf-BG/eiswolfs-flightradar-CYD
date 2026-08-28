@@ -209,6 +209,31 @@ für nach außen sichtbare Texte.
 Keine feste Liste hier gepflegt, da sie erfahrungsgemäß schnell veraltet -
 offene Ideen/Bugs bitte direkt als GitHub Issues im Repo tracken statt hier
 in der CLAUDE.md.
+
+## Bekannte Probleme (technisch, noch ungelöst)
+
+Anders als die "offenen Punkte" oben: das hier ist keine Feature-Idee,
+sondern ein bereits mehrfach reproduzierter, noch ungelöster technischer
+Defekt - bewusst hier festgehalten, damit künftige Sessions ihn nicht für
+behoben halten oder denselben gescheiterten Lösungsansatz wiederholen.
+
+- **Intermittierendes `IncompleteInput` beim ADS-B-JSON-Parsen bei 100km
+  Radius** (`adsb_client.cpp::fetch()`): Bei großen, gefilterten Antworten
+  (~85-95KB, ~130-150 Flugzeuge) schlägt `deserializeJson()` gelegentlich
+  mit `IncompleteInput` bzw. `NoMemory` fehl, abhängig von der aktuellen
+  Heap-Fragmentierung - bei 10/25/50km tritt es praktisch nicht auf. Der
+  ArduinoJson-Feldfilter (`DeserializationOption::Filter`, nur die 12
+  tatsächlich benötigten Felder) ist bereits aktiv, reicht aber allein
+  nicht aus. Ein Versuch, ein einziges wiederverwendetes `JsonDocument`
+  statt eines lokalen pro Aufruf zu nutzen (um Alloziier-/Freigabe-
+  Fragmentierung zu vermeiden), wurde getestet und wieder zurückgerollt:
+  er hielt dauerhaft ~45KB Heap belegt und brachte dadurch die TLS-
+  Handshakes (RSA/BIGNUM-Operationen von mbedTLS brauchen selbst
+  substanziellen zusammenhängenden Speicher) reihenweise zum Scheitern -
+  schwerwiegender als das ursprüngliche Problem. Aktueller Code-Stand ist
+  bewusst wieder auf lokales, pro Aufruf freigegebenes `JsonDocument`
+  zurückgesetzt. Kein Fix vorhanden, Stand: v4.1.0.
+
 ## Standard-Workflow: Push & Release
 
 WICHTIG - wann dieser Workflow startet: Der komplette Release-Workflow

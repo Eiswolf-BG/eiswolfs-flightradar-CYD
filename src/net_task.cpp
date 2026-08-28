@@ -23,6 +23,17 @@ namespace {
     TaskHandle_t taskHandle = nullptr;
     uint32_t lastFetchMs = 0;
 
+    // TESTWEISE - adaptives ADS-B-Abfrageintervall (siehe Absprache mit
+    // Karl, Reaktion auf vereinzelte HTTP 429 von adsb.lol): startet bei
+    // Config::FETCH_INTERVAL_MS, verdoppelt sich nach einem 429 (oder
+    // uebernimmt dessen Retry-After-Wert), gedeckelt bei
+    // Config::FETCH_BACKOFF_MAX_MS, und kehrt nach jeder erfolgreichen
+    // Abfrage schrittweise (nicht abrupt) zum Grundintervall zurueck. Bei
+    // einem einzelnen sonstigen Fehlschlag (Timeout/SSL) wird stattdessen
+    // fest Config::FETCH_RETRY_DELAY_MS gewartet, um bei kurzen WLAN-
+    // Aussetzern keine Anfragen-Flut auszuloesen.
+    uint32_t currentIntervalMs = Config::FETCH_INTERVAL_MS;
+
     Aircraft tempTable[Config::MAX_TRACKED_AIRCRAFT];
 
     bool webServerStarted = false;
@@ -53,7 +64,7 @@ namespace {
             // flight_logbook.cpp::enforceAutoOff() fuer den Hintergrund).
             FlightLogbook::enforceAutoOff();
 
-            if (millis() - lastFetchMs >= Config::FETCH_INTERVAL_MS) {
+            if (millis() - lastFetchMs >= currentIntervalMs) {
                 lastFetchMs = millis();
 
                 if (WifiMgr::getState() == WifiMgr::State::Connected) {
@@ -101,8 +112,37 @@ namespace {
                         if (SettingsStore::ledHeartbeatEnabled()) {
                             LedAlert::pulseHeartbeat(millis());
                         }
+
+                        // TESTWEISE - nach Erfolg schrittweise (nicht
+                        // abrupt) zum Grundintervall zurueckkehren, falls
+                        // zuvor wegen 429/Fehlern hochskaliert wurde -
+                        // halbiert bei jedem weiteren Erfolg die
+                        // verbleibende Differenz zum Grundintervall.
+                        if (currentIntervalMs > Config::FETCH_INTERVAL_MS) {
+                            uint32_t excess = currentIntervalMs - Config::FETCH_INTERVAL_MS;
+                            currentIntervalMs = (excess < 1000)
+                                ? Config::FETCH_INTERVAL_MS
+                                : Config::FETCH_INTERVAL_MS + excess / 2;
+                        }
+                    } else if (result.httpCode == 429) {
+                        // TESTWEISE - exponentielles Backoff nach HTTP 429:
+                        // Retry-After-Header bevorzugen, falls vorhanden,
+                        // sonst Intervall verdoppeln - jeweils gedeckelt bei
+                        // FETCH_BACKOFF_MAX_MS.
+                        uint32_t suggested = (result.retryAfterSec >= 0)
+                            ? (uint32_t)result.retryAfterSec * 1000UL
+                            : currentIntervalMs * 2;
+                        currentIntervalMs = min(max(suggested, Config::FETCH_INTERVAL_MS),
+                                                 Config::FETCH_BACKOFF_MAX_MS);
+                        Serial.printf("[NetTask] HTTP 429 - naechste Abfrage in %lums (retryAfterSec=%d)\n",
+                                      (unsigned long)currentIntervalMs, result.retryAfterSec);
                     } else {
-                        Serial.printf("[NetTask] Abfrage fehlgeschlagen (HTTP %d)\n", result.httpCode);
+                        // TESTWEISE - einzelner sonstiger Fehlschlag
+                        // (Timeout/SSL/...): feste moderate Wartezeit statt
+                        // sofort wieder im Grundintervall weiterzumachen.
+                        currentIntervalMs = max(currentIntervalMs, Config::FETCH_RETRY_DELAY_MS);
+                        Serial.printf("[NetTask] Abfrage fehlgeschlagen (HTTP %d), naechster Versuch in %lums\n",
+                                      result.httpCode, (unsigned long)currentIntervalMs);
                     }
                 }
             }

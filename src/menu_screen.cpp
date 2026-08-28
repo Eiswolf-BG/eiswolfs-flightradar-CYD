@@ -649,12 +649,12 @@ namespace {
     enum class Page {
         Main, Region, System, Flight, BackupReset,
         SystemDisplay, SystemTools,
-        FlightStatsLogbook, FlightLed, FlightTools
+        FlightLists, FlightStatsLogbook, FlightLed, FlightFilters, FlightTools
     };
 }
 
-void run(TFT_eSPI& tft) {
-    Page page = Page::Main;
+void run(TFT_eSPI& tft, bool startAtFilters) {
+    Page page = startAtFilters ? Page::FlightFilters : Page::Main;
     bool done = false;
     MenuStars::reset();
 
@@ -817,11 +817,14 @@ void run(TFT_eSPI& tft) {
             // (Helligkeit, Timeout, Nachtmodus, Invertieren, Radar-
             // Farbschema) - vorher einzelne Zeilen auf der flachen System-
             // Liste, jetzt hier zusammengefasst (siehe Page::System oben).
-            Rect brightnessBtn = subMenuRowRect(0, 7);
-            Rect timeoutBtn    = subMenuRowRect(1, 7);
-            Rect nightDimBtn   = subMenuRowRect(2, 7);
-            Rect invertBtn     = subMenuRowRect(3, 7);
-            Rect radarThemeBtn = subMenuRowRect(4, 7);
+            // "Radar-Darstellung" (RadarThemeScreen, enthaelt u.a. den
+            // Radar-Puls/CRT-Phosphor-Effekt-Schalter) ganz nach oben, vor
+            // "Helligkeit" (Alex' Wunsch nach besserer Auffindbarkeit).
+            Rect radarThemeBtn = subMenuRowRect(0, 7);
+            Rect brightnessBtn = subMenuRowRect(1, 7);
+            Rect timeoutBtn    = subMenuRowRect(2, 7);
+            Rect nightDimBtn   = subMenuRowRect(3, 7);
+            Rect invertBtn     = subMenuRowRect(4, 7);
             // Fuer Tischmontage (GitHub-Meldung: Radarkreise "waschen" von
             // oben betrachtet aus, wegen der eingeschraenkten vertikalen
             // Blickwinkel des TFT-Panels) - dreht Bild UND Touch-Mapping um
@@ -830,6 +833,7 @@ void run(TFT_eSPI& tft) {
             Rect rotateBtn     = subMenuRowRect(5, 7);
             Rect backBtn       = subMenuRowRect(6, 7);
 
+            drawButton(tft, radarThemeBtn, I18n::t(StringId::MENU_RADAR_THEME));
             drawButton(tft, brightnessBtn, brightnessLabel(SettingsStore::brightnessPercent()));
             drawButton(tft, timeoutBtn, screenTimeoutLabel(SettingsStore::screenTimeoutMinutes()));
             drawButton(tft, nightDimBtn, I18n::t(StringId::MENU_NIGHT_DIMMING) + onOff(SettingsStore::nightDimmingEnabled()));
@@ -837,7 +841,6 @@ void run(TFT_eSPI& tft) {
                                       ? I18n::t(StringId::MENU_DISPLAY_INVERTED)
                                       : I18n::t(StringId::MENU_DISPLAY_NORMAL);
             drawButton(tft, invertBtn, invertLabel);
-            drawButton(tft, radarThemeBtn, I18n::t(StringId::MENU_RADAR_THEME));
             drawButton(tft, rotateBtn, I18n::t(StringId::MENU_DISPLAY_ROTATE) + onOff(SettingsStore::displayRotated180()));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
@@ -996,24 +999,61 @@ void run(TFT_eSPI& tft) {
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_FLIGHT));
 
-            // Kompakte Kategorie-Seite (6 grosse Buttons statt vorher 15
-            // einzelne Zeilen) - Flugzeugliste und Beobachtungsliste bleiben
-            // bewusst eigene, direkt erreichbare Buttons (meistgenutzte
-            // Funktionen), die restlichen Punkte stecken in drei
-            // thematischen Untermenues (siehe Page::FlightStatsLogbook/
-            // Page::FlightLed/Page::FlightTools unten).
-            Rect aircraftListBtn = subMenuRowRect(0, 6);
-            Rect watchlistBtn    = subMenuRowRect(1, 6);
-            Rect statsLogbookBtn = subMenuRowRect(2, 6);
-            Rect ledBtn          = subMenuRowRect(3, 6);
+            // Kompakte Kategorie-Seite (6 grosse Buttons) - Flugzeugliste
+            // und Beobachtungsliste stecken jetzt in einem eigenen
+            // "Listen"-Untermenue (vorher direkt hier als Buttons), die
+            // reinen Sichtbarkeitsfilter in einem eigenen "Anzeigefilter"-
+            // Untermenue (vorher Teil von "Werkzeuge") - Alex' Wunsch nach
+            // klarerer Trennung. "Werkzeuge" bleibt bestehen, enthaelt aber
+            // nur noch Standort-Presets und Beobachtungsalarm (siehe
+            // Page::FlightLists/Page::FlightFilters/Page::FlightTools unten).
+            Rect listsBtn        = subMenuRowRect(0, 6);
+            Rect statsLogbookBtn = subMenuRowRect(1, 6);
+            Rect ledBtn          = subMenuRowRect(2, 6);
+            Rect filtersBtn      = subMenuRowRect(3, 6);
             Rect toolsBtn        = subMenuRowRect(4, 6);
             Rect backBtn         = subMenuRowRect(5, 6);
 
-            drawButton(tft, aircraftListBtn, I18n::t(StringId::MENU_AIRCRAFT_LIST));
-            drawButton(tft, watchlistBtn, I18n::t(StringId::MENU_WATCHLIST));
+            drawButton(tft, listsBtn, I18n::t(StringId::MENU_CATEGORY_LISTS));
             drawButton(tft, statsLogbookBtn, I18n::t(StringId::MENU_CATEGORY_STATS_LOGBOOK));
             drawButton(tft, ledBtn, I18n::t(StringId::MENU_CATEGORY_LED));
+            drawButton(tft, filtersBtn, I18n::t(StringId::MENU_CATEGORY_FILTERS));
             drawButton(tft, toolsBtn, I18n::t(StringId::MENU_CATEGORY_TOOLS));
+            drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
+
+            TouchInput::Point tap;
+            while (true) {
+                if (TouchInput::wasTapped(tap)) break;
+                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                MenuStars::update(tft);
+                delay(20);
+            }
+
+            if (listsBtn.contains(tap.x, tap.y)) {
+                page = Page::FlightLists;
+            } else if (statsLogbookBtn.contains(tap.x, tap.y)) {
+                page = Page::FlightStatsLogbook;
+            } else if (ledBtn.contains(tap.x, tap.y)) {
+                page = Page::FlightLed;
+            } else if (filtersBtn.contains(tap.x, tap.y)) {
+                page = Page::FlightFilters;
+            } else if (toolsBtn.contains(tap.x, tap.y)) {
+                page = Page::FlightTools;
+            } else if (backBtn.contains(tap.x, tap.y)) {
+                page = Page::Main;
+            }
+
+        } else if (page == Page::FlightLists) {
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setCursor(10, 14);
+            tft.println(I18n::t(StringId::MENU_CATEGORY_LISTS));
+
+            Rect aircraftListBtn = subMenuRowRect(0, 3);
+            Rect watchlistBtn    = subMenuRowRect(1, 3);
+            Rect backBtn         = subMenuRowRect(2, 3);
+
+            drawButton(tft, aircraftListBtn, I18n::t(StringId::MENU_AIRCRAFT_LIST));
+            drawButton(tft, watchlistBtn, I18n::t(StringId::MENU_WATCHLIST));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -1033,14 +1073,8 @@ void run(TFT_eSPI& tft) {
                 }
             } else if (watchlistBtn.contains(tap.x, tap.y)) {
                 AircraftWatchlistScreen::run(tft);
-            } else if (statsLogbookBtn.contains(tap.x, tap.y)) {
-                page = Page::FlightStatsLogbook;
-            } else if (ledBtn.contains(tap.x, tap.y)) {
-                page = Page::FlightLed;
-            } else if (toolsBtn.contains(tap.x, tap.y)) {
-                page = Page::FlightTools;
             } else if (backBtn.contains(tap.x, tap.y)) {
-                page = Page::Main;
+                page = Page::Flight;
             }
 
         } else if (page == Page::FlightStatsLogbook) {
@@ -1126,19 +1160,17 @@ void run(TFT_eSPI& tft) {
                 page = Page::Flight;
             }
 
-        } else { // Page::FlightTools
+        } else if (page == Page::FlightFilters) {
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.setCursor(10, 14);
-            tft.println(I18n::t(StringId::MENU_CATEGORY_TOOLS));
+            tft.println(I18n::t(StringId::MENU_CATEGORY_FILTERS));
 
-            Rect locationBtn       = subMenuRowRect(0, 6);
-            Rect airlineBtn        = subMenuRowRect(1, 6);
-            Rect groundBtn         = subMenuRowRect(2, 6);
-            Rect helicoptersBtn    = subMenuRowRect(3, 6);
-            Rect watchlistAlertBtn = subMenuRowRect(4, 6);
-            Rect backBtn           = subMenuRowRect(5, 6);
+            Rect airlineBtn        = subMenuRowRect(0, 5);
+            Rect groundBtn         = subMenuRowRect(1, 5);
+            Rect helicoptersBtn    = subMenuRowRect(2, 5);
+            Rect lowAltitudeBtn    = subMenuRowRect(3, 5);
+            Rect backBtn           = subMenuRowRect(4, 5);
 
-            drawButton(tft, locationBtn, I18n::t(StringId::MENU_LOCATION_PRESETS));
             drawButton(tft, airlineBtn, I18n::t(StringId::MENU_AIRLINE_FILTER));
             // Label jetzt "Bodenfahrzeuge anzeigen" statt "...ausblenden" -
             // Alex' Meldung: "ausblenden: AN" liest sich unlogisch (klingt,
@@ -1151,6 +1183,39 @@ void run(TFT_eSPI& tft) {
             // wie es hier angezeigt wird, ist gedreht.
             drawButton(tft, groundBtn, I18n::t(StringId::MENU_HIDE_GROUND) + onOff(!SettingsStore::hideGroundVehicles()));
             drawButton(tft, helicoptersBtn, I18n::t(StringId::MENU_ONLY_HELICOPTERS) + onOff(SettingsStore::onlyHelicopters()));
+            drawButton(tft, lowAltitudeBtn, I18n::t(StringId::MENU_ONLY_LOW_ALTITUDE) + onOff(SettingsStore::onlyLowAltitude()));
+            drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
+
+            TouchInput::Point tap;
+            while (true) {
+                if (TouchInput::wasTapped(tap)) break;
+                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                MenuStars::update(tft);
+                delay(20);
+            }
+
+            if (airlineBtn.contains(tap.x, tap.y)) {
+                AirlineFilterScreen::run(tft);
+            } else if (groundBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setHideGroundVehicles(!SettingsStore::hideGroundVehicles());
+            } else if (helicoptersBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setOnlyHelicopters(!SettingsStore::onlyHelicopters());
+            } else if (lowAltitudeBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setOnlyLowAltitude(!SettingsStore::onlyLowAltitude());
+            } else if (backBtn.contains(tap.x, tap.y)) {
+                page = Page::Flight;
+            }
+
+        } else { // Page::FlightTools
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setCursor(10, 14);
+            tft.println(I18n::t(StringId::MENU_CATEGORY_TOOLS));
+
+            Rect locationBtn       = subMenuRowRect(0, 3);
+            Rect watchlistAlertBtn = subMenuRowRect(1, 3);
+            Rect backBtn           = subMenuRowRect(2, 3);
+
+            drawButton(tft, locationBtn, I18n::t(StringId::MENU_LOCATION_PRESETS));
             drawButton(tft, watchlistAlertBtn, I18n::t(StringId::MENU_WATCHLIST_ALERT) + onOff(SettingsStore::watchlistAlertEnabled()));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
@@ -1164,12 +1229,6 @@ void run(TFT_eSPI& tft) {
 
             if (locationBtn.contains(tap.x, tap.y)) {
                 LocationPresetsScreen::run(tft);
-            } else if (airlineBtn.contains(tap.x, tap.y)) {
-                AirlineFilterScreen::run(tft);
-            } else if (groundBtn.contains(tap.x, tap.y)) {
-                SettingsStore::setHideGroundVehicles(!SettingsStore::hideGroundVehicles());
-            } else if (helicoptersBtn.contains(tap.x, tap.y)) {
-                SettingsStore::setOnlyHelicopters(!SettingsStore::onlyHelicopters());
             } else if (watchlistAlertBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setWatchlistAlertEnabled(!SettingsStore::watchlistAlertEnabled());
             } else if (backBtn.contains(tap.x, tap.y)) {

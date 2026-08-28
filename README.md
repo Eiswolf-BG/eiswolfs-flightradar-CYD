@@ -57,7 +57,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **6 languages** (English, German, French, Turkish, Spanish, Italian), selectable on first boot or anytime from the menu
 - **Adjustable brightness** (10-100% in 10% steps, Menu → System → "Brightness") with a live preview as you tap
 - **Metric/Imperial units** (Menu → Region → "Units") consistently applied across the radar range button, range ring labels, aircraft list, nearest-airport distance, and stats
-- **IATA or ICAO airport codes** (same "Units" screen) – choose whether the route shown in the aircraft detail panel (origin/destination) uses 3-letter IATA codes (e.g. "FRA") or 4-letter ICAO codes (e.g. "EDDF"); falls back to ICAO automatically if no IATA code is available for a given airport
+- **IATA or ICAO airport codes** (same "Units" screen, or tap the route line directly in the aircraft detail panel) – choose whether the route shown in the aircraft detail panel (origin/destination) uses 3-letter IATA codes (e.g. "FRA") or 4-letter ICAO codes (e.g. "EDDF"); falls back to ICAO automatically if no IATA code is available for a given airport
 - **Firmware version** is shown directly on the "Check for updates" button (Menu → System)
 - **Backup & Reset** (Menu → System → "Backup & Reset") – back up or restore your settings, or fully reset the device (wipes all on-device data and re-runs first-time setup) - handy for testing or handing the device to someone else
 - **Screen timeout with slider** (Menu → System → "Screen Timeout") – set how long until the display turns off after a period of no touches, from 1 to 15 minutes or "Never", using a drag slider instead of tapping through values one minute at a time
@@ -77,8 +77,10 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Short weather forecast** – the Weather Info screen also shows a short forecast (temperature and conditions) 3 hours ahead, and now scrolls automatically if the combined text (including a long METAR report) doesn't fit on one screen
 - **Bearing to selected aircraft** – the detail panel now also shows a compass direction (e.g. "NE") alongside the numeric bearing, so you know which way to look without doing the math yourself
 - **Quick watchlist add** – a "+"/"-" button in the aircraft detail panel, right next to the "QR" button, adds the currently shown aircraft to the [Watchlist](#-watchlist) with a single tap instead of typing its callsign manually
-- **Show helicopters only** – a new toggle under **Menu → Flight Options** filters the radar, aircraft list, and web live map down to helicopters (see [Show helicopters only](#-show-helicopters-only-onoff) below)
-- **Reorganized menus** – the Flight Options and System menus are now grouped into a handful of large category buttons (Stats & Logbook, LED Alerts, Tools, Display) instead of long lists, making it easier to find your way around
+- **Show helicopters only** – a toggle under **Menu → Flight Options → Display Filters** filters the radar, aircraft list, and web live map down to helicopters (see [Show helicopters only](#-show-helicopters-only-onoff) below)
+- **Show low-altitude aircraft only** – a toggle in the same **Display Filters** menu shows only aircraft currently below the green altitude threshold (see [Show low-altitude aircraft only](#-show-low-altitude-aircraft-only-onoff) below)
+- **Empty-sky filter hint** – when the radar shows no aircraft because a filter (helicopters only, low-altitude only, airline filter) is hiding everything, the "empty sky" message now names which filter is active and is tappable, jumping straight to the Display Filters menu instead of leaving you guessing whether something's technically wrong
+- **Reorganized menus** – the Flight Options menu is now grouped into category buttons: **Lists** (Aircraft List, Watchlist), **Stats & Logbook**, **LED Alerts**, **Display Filters** (airline filter, ground vehicles, helicopters only, low-altitude only), and **Tools** (Location Presets, Watchlist Alert); the System menu keeps its own Display/Tools categories
 - **Optional GPS module support** – a new "GPS" button in [Location Presets](#-location-presets) turns reading from a connected GPS module on/off, so your location can follow your movement live instead of only being estimated via IP
 - **Rotate screen (180°)** – a new switch under **Menu → System → Display** flips the screen and touch input upside down, useful for table-mount setups where the panel's limited vertical viewing angle otherwise washes out the radar circles when looked at from above
 
@@ -235,6 +237,9 @@ Helicopters (ADS-B emitter category "A7") get their own marker too - a filled ci
 
 ### 🚁 Show helicopters only (ON/OFF)
 Filters the radar, the [Aircraft list](#-aircraft-list), and the Live Radar web page down to helicopters only (ADS-B emitter category "A7"), hiding all other aircraft. Off by default. Handy if you're specifically interested in rotorcraft traffic (medevac, police, sightseeing tours) rather than the usual fixed-wing airliners passing overhead.
+
+### 🛬 Show low-altitude aircraft only (ON/OFF)
+Filters the radar down to aircraft currently below the green altitude threshold (the same cutoff used for the green marker color, see [Color-coded aircraft](#color-coded-aircraft) above). Ground vehicles are never included by this filter, regardless of the separate "Show ground vehicles" setting. Off by default. Found in **Menu → Flight Options → Display Filters**.
 
 ### 📶 WiFi Manager
 See the dedicated section above: [WiFi Manager](#-wifi-manager-up-to-3-saved-networks) – save up to 3 WiFi networks at once.

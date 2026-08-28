@@ -5,8 +5,12 @@
 namespace MenuScreen {
     // Blockierend: einfaches Menue (Kalibrierung, Anzeige-Invertierung,
     // WLAN-Verwaltung, Alarm-Toggles, Statistik, Logbuch-Dateien).
-    // Kehrt zurueck, sobald "Zurueck" angetippt wird.
-    void run(TFT_eSPI& tft);
+    // Kehrt zurueck, sobald "Zurueck" angetippt wird. startAtFilters=true
+    // springt direkt in die "Anzeigefilter"-Unterseite (Flugoptionen >
+    // Anzeigefilter) statt beim Hauptmenue zu beginnen - fuer den
+    // antippbaren Filter-Hinweis im "Leerer Himmel"-Text (siehe
+    // radar_screen.cpp::handleTap()).
+    void run(TFT_eSPI& tft, bool startAtFilters = false);
 
     // Oeffentliche Huelle um das interne infoScreen() (siehe menu_screen.cpp)
     // - ein dauerhaft stehenbleibender, bei Bedarf automatisch scrollbarer

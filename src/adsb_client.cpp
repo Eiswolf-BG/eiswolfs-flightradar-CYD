@@ -51,9 +51,22 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
     http.setReuse(true);
     http.setUserAgent("EiswolfsFlightradarCYD/1.0 (+https://github.com/Eiswolf-BG/eiswolfs-flightradar-CYD)");
     http.addHeader("Accept", "application/json");
+    // TESTWEISE - Backoff-Logik in net_task.cpp respektiert einen vom
+    // Server mitgeschickten "Retry-After"-Header bei HTTP 429, statt nur
+    // selbst zu schaetzen (siehe Absprache mit Karl). Muss VOR GET()
+    // registriert werden, sonst liefert http.header() dafuer nichts.
+    const char* collectedHeaders[] = {"Retry-After"};
+    http.collectHeaders(collectedHeaders, 1);
 
     int code = http.GET();
     result.httpCode = code;
+
+    if (code == 429) {
+        String retryAfter = http.header("Retry-After");
+        if (retryAfter.length()) {
+            result.retryAfterSec = retryAfter.toInt();
+        }
+    }
 
     if (code != HTTP_CODE_OK) {
         http.end();
@@ -74,6 +87,11 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
     filterAc["squawk"]   = true;
     filterAc["category"] = true;
 
+    // Lokales, pro Aufruf freigegebenes JsonDocument (siehe CLAUDE.md,
+    // Abschnitt "Bekannte Probleme" - eine dauerhaft wiederverwendete
+    // Variante wurde ausprobiert und wieder zurueckgerollt, da sie ~45KB
+    // Heap permanent blockierte und dadurch TLS-Handshakes zum Scheitern
+    // brachte).
     JsonDocument doc;
     DeserializationError err = deserializeJson(
         doc, http.getStream(), DeserializationOption::Filter(filter));

@@ -300,6 +300,14 @@ static const char* const I18N_FR[] = {
     "Nouveau : le bouton \"GPS\" à côté de \"Auto\" active/désactive la lecture d'un module GPS connecté. Activé, ta position suit tes déplacements en direct (par ex. en voiture) au lieu d'être seulement estimée par IP. Câblage : TX du module GPS sur GPIO22, RX du module GPS sur GPIO27 (généralement inutilisé), 3,3V et GND, 9600 bauds (NMEA). Sans module connecté, le bouton n'a simplement aucun effet.",
     "Tourner l'écran (180°) : ",
     "Codes aéroport : ",
+    "Basse altitude uniquement : ",
+    " - Filtre actif : ",
+    "Hélicoptères",
+    "Basse altitude",
+    "Véhicules au sol masqués",
+    "Filtre compagnie",
+    "Listes",
+    "Filtres d'affichage",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

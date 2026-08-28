@@ -70,6 +70,14 @@ namespace SettingsStore {
     bool onlyHelicopters();
     void setOnlyHelicopters(bool on);
 
+    // Filter "nur niedrig fliegende Flugzeuge" (Menue > Flugoptionen >
+    // Tools) - zeigt nur Flugzeuge unterhalb der gruenen Hoehenschwelle
+    // (Config::COLOR_LOW_ALT_THRESHOLD_FT), Bodenfahrzeuge ausgenommen
+    // (siehe radar_screen.cpp). Gleiches Speicher-/Getter-/Setter-Muster
+    // wie onlyHelicopters() oben.
+    bool onlyLowAltitude();
+    void setOnlyLowAltitude(bool on);
+
     // Sprache der Benutzeroberflaeche: 0=EN,1=DE,2=FR,3=TR,4=ES,5=IT.
     uint8_t language();
     void setLanguage(uint8_t lang);

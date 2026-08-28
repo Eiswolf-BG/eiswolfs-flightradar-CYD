@@ -494,6 +494,38 @@ enum class StringId : uint16_t {
     // Abkuerzungen und werden NICHT uebersetzt, nur dieser Praefix.
     UNITS_AIRPORT_CODE_FORMAT,
 
+    // Zeile in Menue > Flugoptionen > Tools (gleiche Stelle wie
+    // MENU_ONLY_HELICOPTERS), schaltet den Filter "nur niedrig fliegende
+    // Flugzeuge" (< Config::COLOR_LOW_ALT_THRESHOLD_FT, dieselbe Schwelle
+    // wie die gruene Hoehen-Einfaerbung) um - siehe
+    // SettingsStore::onlyLowAltitude() und radar_screen.cpp. Text wird wie
+    // bei MENU_ONLY_HELICOPTERS mit onOff() kombiniert, daher ohne AN/AUS
+    // im String selbst.
+    MENU_ONLY_LOW_ALTITUDE,
+
+    // "Leerer Himmel"-Hinweiszeile im Radarscreen (siehe RADAR_EMPTY_SKY_PREFIX
+    // oben): haengt sich an dieselbe Zeile an, wenn aircraftCount==0 UND
+    // mindestens ein Filter (Nur Helikopter/Nur Niedrigflieger/
+    // Bodenfahrzeuge ausblenden/Airline-Filter) aktiv ist - macht sichtbar,
+    // dass der leere Radar am Filter liegen koennte statt an einem
+    // technischen Problem (Alex' Meldung: das hatte zu einer langen,
+    // unnoetigen Fehlersuche gefuehrt). Kurzer Prefix + kommaseparierte
+    // Liste der unten stehenden Kurznamen, siehe radar_screen.cpp.
+    RADAR_FILTER_ACTIVE_PREFIX,
+    RADAR_FILTER_NAME_HELICOPTERS,
+    RADAR_FILTER_NAME_LOW_ALTITUDE,
+    RADAR_FILTER_NAME_GROUND_HIDDEN,
+    RADAR_FILTER_NAME_AIRLINE,
+
+    // Menue-Umbau (Flugoptionen-Kategorie-Seite, siehe menu_screen.cpp):
+    // "Werkzeuge" (MENU_CATEGORY_TOOLS) enthaelt jetzt nur noch Standort-
+    // Presets und Beobachtungsalarm - Flugzeugliste/Beobachtungsliste
+    // wanderten in ein neues "Listen"-Untermenue, die reinen
+    // Sichtbarkeitsfilter (Airline/Bodenfahrzeuge/Helikopter/Niedrigflieger)
+    // in ein neues "Anzeigefilter"-Untermenue. Beide neuen Kategorie-Titel:
+    MENU_CATEGORY_LISTS,
+    MENU_CATEGORY_FILTERS,
+
     COUNT
 };
 

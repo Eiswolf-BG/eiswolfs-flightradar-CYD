@@ -28,6 +28,7 @@ namespace {
     bool screensaverOn = false;
     bool hideGroundVehiclesOn = true;
     bool onlyHelicoptersOn = false;
+    bool onlyLowAltitudeOn = false;
     uint8_t languageIdx = 0;
     uint8_t unitsModeVal = 0;
     // AUS per Default (ICAO) - IATA-Anzeige ist ein bewusstes Opt-in ueber
@@ -37,7 +38,11 @@ namespace {
     // Zwei unabhaengige, ankreuzbare Radar-Extras (radar_theme_screen.cpp) -
     // AUS per Default, siehe Kommentar in settings_store.h.
     bool crtPhosphorOn = false;
-    bool radarPulseOn = false;
+    // TESTWEISE - Default auf AN geaendert (siehe Absprache mit Karl).
+    // Betrifft nur frische/zurueckgesetzte Geraete ohne gespeicherten Wert -
+    // bestehende Geraete behalten ihren in den Preferences gespeicherten
+    // Wert, der in applyKeyValue() unten weiterhin Vorrang hat.
+    bool radarPulseOn = true;
     char lastSeenVersionBuf[16] = {0};
 
     // MUSS auf SD persistiert werden (nicht nur im RAM halten): wird kurz
@@ -87,6 +92,8 @@ namespace {
             hideGroundVehiclesOn = (value.toInt() != 0);
         } else if (key == "only_helicopters") {
             onlyHelicoptersOn = (value.toInt() != 0);
+        } else if (key == "only_low_altitude") {
+            onlyLowAltitudeOn = (value.toInt() != 0);
         } else if (key == "language") {
             int v = value.toInt();
             if (v >= 0 && v <= 5) languageIdx = (uint8_t)v;
@@ -166,6 +173,7 @@ void save() {
     f.printf("screensaver=%d\n", screensaverOn ? 1 : 0);
     f.printf("hide_ground_vehicles=%d\n", hideGroundVehiclesOn ? 1 : 0);
     f.printf("only_helicopters=%d\n", onlyHelicoptersOn ? 1 : 0);
+    f.printf("only_low_altitude=%d\n", onlyLowAltitudeOn ? 1 : 0);
     f.printf("language=%d\n", languageIdx);
     f.printf("units_mode=%d\n", unitsModeVal);
     f.printf("airport_code_iata=%d\n", iataAirportCodesOn ? 1 : 0);
@@ -293,6 +301,13 @@ bool onlyHelicopters() { return onlyHelicoptersOn; }
 
 void setOnlyHelicopters(bool on) {
     onlyHelicoptersOn = on;
+    save();
+}
+
+bool onlyLowAltitude() { return onlyLowAltitudeOn; }
+
+void setOnlyLowAltitude(bool on) {
+    onlyLowAltitudeOn = on;
     save();
 }
 

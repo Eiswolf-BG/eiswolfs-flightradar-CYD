@@ -17,6 +17,7 @@
 #include "i18n.h"
 #include "touch_input.h"
 #include "menu_stars.h"
+#include "menu_screen.h"
 #include <qrcode.h>
 #include <math.h>
 #include <time.h>
@@ -127,6 +128,13 @@ namespace {
     }
 
     char selectedHex[7] = {0};
+
+    // Zeigt "Leerer Himmel"-Zeile gerade einen Filter-Hinweis an (siehe
+    // render())? Von handleTap() geprueft, um die Zeile nur dann antippbar
+    // zu machen und direkt ins "Anzeigefilter"-Menue springen zu lassen -
+    // sonst wuerde ein Tap auf die normale "Leerer Himmel"-Zeile (ohne
+    // aktiven Filter) unerwartet das Menue oeffnen.
+    bool infoTextHasFilterHint = false;
 
     uint32_t lastEmptyTapMs = 0;
     int16_t lastEmptyTapX = -1000;
@@ -815,6 +823,20 @@ namespace {
         return {(int16_t)(qr.x - 4 - 38), qr.y, 38, 24};
     }
 
+    // Trefferflaeche der Route-Zeile im Detail-Panel (Herkunft/Ziel) - macht
+    // sie antippbar, um ICAO/IATA-Flughafencodes direkt umzuschalten
+    // (SettingsStore::useIataAirportCodes()), als schnellerer Weg neben dem
+    // Menuepfad Land/Region > Einheiten, der Alex zu verschachtelt war.
+    // Beide Wege schalten dieselbe gespeicherte Einstellung um. Geometrie
+    // folgt exakt dem festen Zeilen-Layout in drawDetailPanel(): Callsign
+    // bei panelTop+26 (+30 Abstand danach), dann Airline/Modell/Typ je
+    // LINE_H=22 vor der Route-Zeile.
+    Rect routeRowRect(int16_t panelTop) {
+        constexpr int16_t LINE_H = 22;
+        int16_t routeY = (int16_t)(panelTop + 26 + 30 + LINE_H * 3);
+        return {0, (int16_t)(routeY - 14), Config::SCREEN_WIDTH, LINE_H};
+    }
+
     // Zeichnet eine Detail-Panel-Zeile NEU, wenn sich ihr Text geaendert
     // hat (oder das Panel komplett neu aufgebaut wird) - merkt sich dabei
     // auch, ob der Text zu breit fuer die verfuegbare Breite ist
@@ -1023,6 +1045,16 @@ namespace {
             routeLine = String(I18n::t(StringId::DETAIL_ROUTE)) + I18n::t(StringId::DETAIL_UNKNOWN);
         }
         updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.route, routeLine, forceFull);
+        // Dezente Umrandung zeigt, dass diese Zeile antippbar ist (siehe
+        // routeRowRect()/handleTap() - ICAO/IATA-Umschaltung). Jeden
+        // Frame neu gezeichnet statt nur bei Textaenderung, da
+        // updateMarqueeLine() bei unveraendertem Text (z.B. "unbekannt")
+        // gar nichts zeichnet und die Umrandung sonst nach einem Toggle
+        // verschwinden wuerde.
+        {
+            Rect routeRow = routeRowRect(panelTop);
+            gfx.drawRoundRect(routeRow.x + 3, routeRow.y + 1, routeRow.w - 6, routeRow.h - 2, 4, themeBaseColor(gfx));
+        }
         y += LINE_H;
 
         char buf[48];
@@ -1382,6 +1414,15 @@ void render(TFT_eSPI& tft, int16_t top) {
 
         if (SettingsStore::onlyHelicopters() && !(a.category[0] == 'A' && a.category[1] == '7')) continue;
 
+        // "Nur niedrig fliegende Flugzeuge" - dieselbe Schwelle wie die
+        // gruene Hoehen-Einfaerbung (Config::COLOR_LOW_ALT_THRESHOLD_FT,
+        // siehe colorForAltitude()). Bodenfahrzeuge (Kategorie "C")
+        // bewusst IMMER ausgeschlossen, wenn dieser Filter aktiv ist -
+        // unabhaengig vom separaten hideGroundVehicles()-Schalter, da es
+        // sich nicht um "niedrig fliegende Flugzeuge" handelt.
+        if (SettingsStore::onlyLowAltitude() &&
+            (a.category[0] == 'C' || a.altBaroFt >= Config::COLOR_LOW_ALT_THRESHOLD_FT)) continue;
+
         if (AirlineFilter::isHidden(a.callsign)) continue;
 
         visibleCount++;
@@ -1685,7 +1726,37 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             snprintf(buf, sizeof(buf), "%lumin", minutes);
         }
         infoText = String(I18n::t(StringId::RADAR_EMPTY_SKY_PREFIX)) + buf;
+
+        // Filter-Hinweis: macht sichtbar, wenn der leere Radar an einem
+        // aktiven Filter liegen koennte statt an einem technischen Problem
+        // (Alex' Meldung: das fuehrte zu einer langen, unnoetigen
+        // Fehlersuche). Haengt sich an dieselbe Lauftext-Zeile an (scrollt
+        // bei Bedarf wie der Rest der Info-Zeile) statt eine eigene zweite
+        // Zeile einzufuehren - konsistent mit dem bestehenden Marquee-
+        // Muster, keine Layout-Aenderung noetig.
+        // hideGroundVehicles() bewusst NICHT in dieser Liste - ist werks-
+        // seitig standardmaessig AN, wuerde also bei den meisten Nutzern
+        // praktisch immer auftauchen und den Hinweis unnoetig
+        // "geschwaetzig" machen, obwohl es nur der Normalzustand ist (Alex'
+        // Rueckmeldung). Nur die Filter, die man eher vergisst.
+        String activeFilters;
+        if (SettingsStore::onlyHelicopters()) {
+            activeFilters += I18n::t(StringId::RADAR_FILTER_NAME_HELICOPTERS);
+        }
+        if (SettingsStore::onlyLowAltitude()) {
+            if (activeFilters.length()) activeFilters += ", ";
+            activeFilters += I18n::t(StringId::RADAR_FILTER_NAME_LOW_ALTITUDE);
+        }
+        if (AirlineFilter::count() > 0) {
+            if (activeFilters.length()) activeFilters += ", ";
+            activeFilters += I18n::t(StringId::RADAR_FILTER_NAME_AIRLINE);
+        }
+        infoTextHasFilterHint = activeFilters.length() > 0;
+        if (infoTextHasFilterHint) {
+            infoText += String(I18n::t(StringId::RADAR_FILTER_ACTIVE_PREFIX)) + activeFilters;
+        }
     } else {
+        infoTextHasFilterHint = false;
         kind = InfoMsgKind::TapForDetails;
         // Anzahl sichtbarer Flugzeuge der Hinweiszeile voranstellen (z.B.
         // "5 Flugzeuge - Für mehr Details ein Flugzeug antippen") - auf
@@ -1741,6 +1812,12 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
             return true;
         }
 
+        Rect routeRow = routeRowRect(panelTop);
+        if (routeRow.contains(x, y)) {
+            SettingsStore::setUseIataAirportCodes(!SettingsStore::useIataAirportCodes());
+            return true;
+        }
+
         for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) {
             if (!hitPoints[i].valid) continue;
             int16_t dx = x - hitPoints[i].x;
@@ -1760,6 +1837,26 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
         uint8_t idx = (SettingsStore::rangeIndex() + 1) % Config::RANGE_STEP_COUNT;
         SettingsStore::setRangeIndex(idx);
         return true;
+    }
+
+    // Antippbarer Filter-Hinweis in der "Leerer Himmel"-Zeile (siehe
+    // render()) - nur aktiv, wenn dort gerade tatsaechlich ein Filter-
+    // Hinweis angezeigt wird (infoTextHasFilterHint), sonst wuerde ein Tap
+    // auf die normale "Leerer Himmel"-Zeile ungewollt das Menue oeffnen.
+    // Springt direkt ins "Anzeigefilter"-Menue, damit sich der Filter ohne
+    // eigene Navigation sofort abstellen laesst (Alex' Wunsch nach der
+    // langen Fehlersuche). Gleiches Muster wie runFlightQrScreen()/
+    // AircraftWatchlistScreen::run() oben: blockierender Vollbild-Aufruf
+    // direkt aus handleTap(), danach Panel/Kopfzeile ueber
+    // headerRedrawNeeded neu aufbauen lassen.
+    if (infoTextHasFilterHint) {
+        Rect infoTextRow = {0, L.infoTop, (int16_t)(L.rangeBtn.x - 2), (int16_t)(L.rangeBtn.h + 8)};
+        if (infoTextRow.contains(x, y)) {
+            MenuScreen::run(tft, true);
+            lastPanel.valid = false;
+            headerRedrawNeeded = true;
+            return true;
+        }
     }
 
     for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) {
