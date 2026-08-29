@@ -249,11 +249,10 @@ void layoutHeaderOnce() {
 }
 
 void drawMenuButton() {
-    // Folgt jetzt dem auf dem Radar-Screen gewaehlten Farbschema (Menue >
-    // System > Radar-Farbschema) statt fest Gruen zu bleiben - der Button
-    // gehoert visuell zum Radar-Screen (er ist nur dort dauerhaft sichtbar),
-    // alle anderen Screens/Buttons im Projekt bleiben bewusst weiterhin
-    // gruen, siehe Kommentar bei RadarScreen::themeColor().
+    // Folgt dem gewaehlten Radar-Farbschema (Menue > System > Radar-
+    // Darstellung) - mittlerweile wie JEDER Button im Projekt, siehe
+    // ui_theme.h. RadarScreen::themeColor() bleibt als bestehender,
+    // duenner Wrapper um UiTheme::accentColor() erhalten.
     uint16_t color = RadarScreen::themeColor(tft);
     tft.fillRoundRect(menuBtn.x, menuBtn.y, menuBtn.w, menuBtn.h, 4, TFT_BLACK);
     tft.drawRoundRect(menuBtn.x, menuBtn.y, menuBtn.w, menuBtn.h, 4, color);
@@ -276,12 +275,14 @@ void drawMenuButton() {
 
 // Direktzugriff auf RadarThemeScreen (siehe modesBtn oben) - im selben
 // Stil wie drawMenuButton() (fillRoundRect/drawRoundRect + MC_DATUM-
-// zentrierter Text), nur in Gelb statt Gruen. Sitzt jetzt in der
-// Icon-Zeile (zweites Viertel, siehe modesBtn oben), deshalb keine
-// dynamische x-Berechnung relativ zur Uhr mehr noetig - modesBtn.x ist
-// ein fester Wert wie bei menuBtn/weatherIconRect.
+// zentrierter Text), inzwischen auch in derselben Farbe (frueher fest
+// Gelb, unabhaengig vom Farbthema - Alex' ausdruecklicher Wunsch, das an
+// den Rest der UI anzugleichen). Sitzt in der Icon-Zeile (zweites
+// Viertel, siehe modesBtn oben), deshalb keine dynamische x-Berechnung
+// relativ zur Uhr mehr noetig - modesBtn.x ist ein fester Wert wie bei
+// menuBtn/weatherIconRect.
 void drawModesButton() {
-    uint16_t color = TFT_YELLOW;
+    uint16_t color = RadarScreen::themeColor(tft);
     tft.fillRoundRect(modesBtn.x, modesBtn.y, modesBtn.w, modesBtn.h, 4, TFT_BLACK);
     tft.drawRoundRect(modesBtn.x, modesBtn.y, modesBtn.w, modesBtn.h, 4, color);
     tft.setTextDatum(MC_DATUM);
