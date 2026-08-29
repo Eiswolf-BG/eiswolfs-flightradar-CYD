@@ -79,11 +79,12 @@ namespace {
     // andere Anzahl Eintraege, ein fester Konstanten-Satz pro Seite haette
     // hier nur unnoetig viel fast identischen Code bedeutet.
     // startY optional ueberschreibbar (Default weiterhin ROW_START_Y) - fuer
-    // Seiten mit einem zusaetzlichen "?"-Info-Button oben rechts im Header
-    // (siehe Page::FlightFilters), der bei ROW_START_Y=18 mit der ersten
-    // Zeile ueberlappt (Info-Button reicht bis y=26). Bewusst NUR ueber
-    // einen Parameter loesbar statt ROW_START_Y selbst zu erhoehen, da
-    // dieser Wert von ALLEN subMenuRowRect()-Seiten gemeinsam genutzt wird.
+    // Seiten mit einem zusaetzlichen "?"-Info-Button oben rechts im Header,
+    // der bei ROW_START_Y=18 mit der ersten Zeile ueberlappen wuerde.
+    // Aktuell von keiner Seite mehr genutzt (der bisher einzige Anwendungs-
+    // fall, Page::FlightFilters, hat seinen "?"-Button inzwischen direkt in
+    // die ISS-Marker-Zeile verlegt, siehe drawRowInfoButton()) - Parameter
+    // bleibt fuer kuenftige Seiten mit demselben Bedarf erhalten.
     Rect subMenuRowRect(uint8_t index, uint8_t count, int16_t gap = 10, int16_t startY = ROW_START_Y) {
         int16_t endY = Config::SCREEN_HEIGHT - 10;
         int16_t rowH = (int16_t)((endY - startY - (int16_t)(count - 1) * gap) / count);
@@ -102,6 +103,27 @@ namespace {
         tft.setTextColor(fg, bg);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
+    }
+
+    // Kleiner "?"-Info-Button rechts INNERHALB einer normalen Zeile (statt
+    // wie sonst oben rechts im Seiten-Header) - gleiches Prinzip/gleiche
+    // Groesse wie die neuen "?"-Buttons in radar_theme_screen.cpp (dort
+    // bewusst dupliziert statt geteilt, siehe CLAUDE.md "jeder Screen
+    // unabhaengig lauffaehig"). Bislang nur fuer die ISS-Marker-Zeile
+    // gebraucht (siehe Page::FlightFilters), aber generisch genug fuer
+    // jede subMenuRowRect()-Zeile.
+    constexpr int16_t ROW_INFO_BTN_SIZE = 20;
+    constexpr int16_t ROW_INFO_BTN_PAD = 6;
+
+    Rect rowInfoBtnRect(const Rect& row) {
+        return {(int16_t)(row.x + row.w - ROW_INFO_BTN_SIZE - ROW_INFO_BTN_PAD),
+                (int16_t)(row.y + (row.h - ROW_INFO_BTN_SIZE) / 2),
+                ROW_INFO_BTN_SIZE, ROW_INFO_BTN_SIZE};
+    }
+
+    void drawRowInfoButton(TFT_eSPI& tft, const Rect& row) {
+        Rect btn = rowInfoBtnRect(row);
+        drawButton(tft, btn, "?");
     }
 
     // Zweizeilige Variante von drawButton() - fuer den zusammengelegten
@@ -1183,30 +1205,23 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             }
 
         } else if (page == Page::FlightFilters) {
-            // Kleiner "?"-Info-Button oben rechts, gleiches Muster wie bei
-            // Airline-Filter/Watchlist/Standort-Presets - diese Seite hatte
-            // vorher keinen, da die vier reinen Filter-Schalter durch ihr
-            // eigenes AN/AUS-Label selbsterklaerend sind. Erklaert hier NUR
-            // den ISS-Marker-Schalter (kein "Filter" im eigentlichen Sinne,
-            // daher zusaetzlicher Erklaerungsbedarf).
-            Rect infoBtn = {(int16_t)(Config::SCREEN_WIDTH - 40), 2, 30, 24};
-            drawButton(tft, infoBtn, "?");
-
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_FILTERS));
 
-            // Reihen starten hier tiefer als das sonstige ROW_START_Y=18
-            // (siehe subMenuRowRect()) - der "?"-Info-Button oben rechts
-            // reicht bis y=26 (y=2, Hoehe 24) und ueberlappte bei 18 sichtbar
-            // mit der ersten Zeile. 34 laesst ca. 8px Abstand zum Button.
-            constexpr int16_t FILTERS_ROW_START_Y = 34;
-            Rect airlineBtn        = subMenuRowRect(0, 6, 10, FILTERS_ROW_START_Y);
-            Rect groundBtn         = subMenuRowRect(1, 6, 10, FILTERS_ROW_START_Y);
-            Rect helicoptersBtn    = subMenuRowRect(2, 6, 10, FILTERS_ROW_START_Y);
-            Rect lowAltitudeBtn    = subMenuRowRect(3, 6, 10, FILTERS_ROW_START_Y);
-            Rect issMarkerBtn      = subMenuRowRect(4, 6, 10, FILTERS_ROW_START_Y);
-            Rect backBtn           = subMenuRowRect(5, 6, 10, FILTERS_ROW_START_Y);
+            // Kein Seiten-Header-"?"-Button mehr (frueher oben rechts, siehe
+            // Git-Historie) - der ISS-Marker-Hilfetext haengt jetzt direkt an
+            // der ISS-Marker-Zeile selbst (drawRowInfoButton() unten), analog
+            // zu den neuen "?"-Buttons in radar_theme_screen.cpp. Zeilen
+            // starten deshalb wieder beim normalen ROW_START_Y=18 (Default-
+            // Parameter von subMenuRowRect()) statt der bisherigen, wegen des
+            // Header-Buttons nach unten verschobenen 34.
+            Rect airlineBtn        = subMenuRowRect(0, 6);
+            Rect groundBtn         = subMenuRowRect(1, 6);
+            Rect helicoptersBtn    = subMenuRowRect(2, 6);
+            Rect lowAltitudeBtn    = subMenuRowRect(3, 6);
+            Rect issMarkerBtn      = subMenuRowRect(4, 6);
+            Rect backBtn           = subMenuRowRect(5, 6);
 
             drawButton(tft, airlineBtn, I18n::t(StringId::MENU_AIRLINE_FILTER));
             // Label jetzt "Bodenfahrzeuge anzeigen" statt "...ausblenden" -
@@ -1225,6 +1240,7 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             // Flugzeuge aus), aber thematisch am ehesten hier passend - "was
             // wird zusaetzlich auf dem Radar angezeigt". Siehe iss_tracker.h.
             drawButton(tft, issMarkerBtn, I18n::t(StringId::MENU_ISS_MARKER) + onOff(SettingsStore::issMarkerEnabled()));
+            drawRowInfoButton(tft, issMarkerBtn);
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -1235,7 +1251,11 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
                 delay(20);
             }
 
-            if (infoBtn.contains(tap.x, tap.y)) {
+            // "?"-Info-Button zuerst pruefen (kleine Flaeche innerhalb der
+            // ISS-Marker-Zeile) - sonst wuerde ein Tap darauf faelschlich als
+            // Tap auf die ganze Zeile (Schalter umlegen) gewertet, gleiches
+            // Prinzip wie in radar_theme_screen.cpp.
+            if (rowInfoBtnRect(issMarkerBtn).contains(tap.x, tap.y)) {
                 infoScreen(tft, I18n::t(StringId::ISS_MARKER_INFO_TITLE), I18n::t(StringId::ISS_MARKER_INFO_BODY),
                            TFT_GREEN, I18n::t(StringId::OK));
             } else if (airlineBtn.contains(tap.x, tap.y)) {
