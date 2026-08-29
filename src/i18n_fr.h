@@ -338,6 +338,22 @@ static const char* const I18N_FR[] = {
     "Un anneau lumineux se dilate depuis le centre du radar et s'estompe à chaque nouvelle mise à jour des données.",
     "À propos de Radar classique",
     "Active plusieurs effets d'écran radar classique à la fois : une traînée derrière le faisceau, des rayons de grille supplémentaires, ainsi qu'un anneau sonar et un bref bruit de signal dès qu'un nouvel avion apparaît pour la première fois sur le radar.",
+
+    "Militaire/Gouv.",
+    "À propos de la détection vols militaires/gouv.",
+    "Marque d'un anneau orange les avions dont le code squawk correspond à l'une des plages militaires/gouvernementales/spéciales documentées publiquement (par ex. certains codes réservés au NORAD aux États-Unis). Il s'agit d'une estimation au mieux, sans garantie d'exhaustivité ni d'exactitude - pas une source officielle, fortement dépendante de la région et de l'espace aérien, et ne constitue pas une identification fiable.",
+
+    "Autre SSID / masqué",
+    "Nom du réseau (SSID) :",
+    "Suivant",
+
+    "Luminosité auto",
+    "À propos de Luminosité auto",
+    "Ajuste automatiquement la luminosité de l'écran à l'aide du capteur de lumière intégré, au lieu de la valeur réglée manuellement - lissé pour éviter le scintillement en cas de variations de lumière. L'étalonnage exact est une estimation non vérifiée sur un appareil réel ; si la luminosité semble trop extrême ou trop lente, merci de le signaler.",
+
+    "Effet de pluie",
+    "À propos de l'effet de pluie",
+    "Visible uniquement lorsque les données météo indiquent effectivement de la pluie ou un orage. Les gouttes se déplacent dans la direction réelle du vent - selon le vent, cela peut donner l'impression qu'il pleut vers le haut sur le radar (par ex. avec un vent du sud). C'est physiquement correct, pas un bug.",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

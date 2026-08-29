@@ -10,8 +10,10 @@ namespace RadarScreen {
 
     // Aktuelle Radar-Grundfarbe (Menue > System > Radar-Farbschema) - fuer
     // main.cpp, damit der persistente "Menu"-Header-Button dem gewaehlten
-    // Farbschema folgt statt immer fest gruen zu bleiben. Bewusst nur fuer
-    // diesen einen Button freigegeben, alle anderen Screens bleiben gruen.
+    // Farbschema folgt. Reiner Wrapper um UiTheme::accentColor() (siehe
+    // ui_theme.h) - dort liegt mittlerweile die eigentliche, projektweit
+    // genutzte Zuordnung, dieser hier bleibt fuer main.cpp als bestehender
+    // Aufrufer erhalten.
     uint16_t themeColor(TFT_eSPI& gfx);
 
     // Erzwingt beim naechsten render()-Aufruf einen kompletten Neuaufbau des

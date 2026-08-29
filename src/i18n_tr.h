@@ -338,6 +338,22 @@ static const char* const I18N_TR[] = {
     "Her yeni veri güncellemesinde radar merkezinden dışa doğru genişleyen parlak bir halka belirir ve sönerek kaybolur.",
     "Klasik Radar Hakkında",
     "Aynı anda birkaç klasik radar ekranı efektini etkinleştirir: tarama çizgisinin arkasında bir kuyruk izi, ek ızgara çizgileri, ayrıca radara ilk kez yeni bir uçak göründüğünde bir sonar halkası ve kısa bir sinyal paraziti.",
+
+    "Askeri/Resmi",
+    "Askeri/Resmi Uçuş Tespiti Hakkında",
+    "Squawk kodu, kamuya açık şekilde belgelenmiş birkaç askeri/resmi/özel uçuş aralığından birine giren uçakları turuncu bir halkayla işaretler (örn. ABD'de belirli NORAD'a ayrılmış kodlar). Bu, tamlık veya doğruluk garantisi olmayan bir tahmindir - resmi bir kaynak değildir, büyük ölçüde bölgeye ve hava sahasına bağlıdır ve güvenilir bir kimlik tespiti yöntemi değildir.",
+
+    "Diğer/Gizli SSID",
+    "Ağ adı (SSID):",
+    "İleri",
+
+    "Otomatik Parlaklık",
+    "Otomatik Parlaklık Hakkında",
+    "Manuel olarak ayarlanan değer yerine dahili ışık sensörünü kullanarak ekran parlaklığını otomatik ayarlar - ışık dalgalanmalarında titremeyi önlemek için yumuşatılmıştır. Kesin kalibrasyon bir tahmindir ve gerçek cihazda doğrulanmamıştır; parlaklık çok aşırı veya çok yavaş hissettiriyorsa lütfen bildirin.",
+
+    "Yağmur Efekti",
+    "Yağmur Efekti Hakkında",
+    "Yalnızca hava durumu verileri gerçekten yağmur veya fırtına gösterdiğinde görünür. Damlalar gerçek rüzgar yönünde hareket eder - rüzgara bağlı olarak radarda yukarı doğru yağıyormuş gibi görünebilir (örn. güneyden esen rüzgarda). Bu fiziksel olarak doğrudur, hata değildir.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

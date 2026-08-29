@@ -1,4 +1,5 @@
 #include "radar_logo.h"
+#include "ui_theme.h"
 #include <math.h>
 
 namespace RadarLogo {
@@ -9,7 +10,7 @@ namespace {
     }
 
     void drawRadarReticle(TFT_eSPI& tft, int16_t cx, int16_t cy, float scale) {
-        uint16_t dim = 0x0320;
+        uint16_t dim = UiTheme::accentColorDimmed(tft, 0.4f);
         int16_t r1 = sc(80, scale), r2 = sc(54, scale), r3 = sc(29, scale);
         tft.drawCircle(cx, cy, r1, dim);
         tft.drawCircle(cx, cy, r2, dim);
@@ -101,16 +102,16 @@ namespace {
 void draw(TFT_eSPI& tft, int16_t cx, int16_t cy, float scale) {
     drawRadarReticle(tft, cx, cy, scale);
 
-    uint16_t dimGreen = 0x0320;
+    uint16_t dimAccent = UiTheme::accentColorDimmed(tft, 0.4f);
     auto mx = [&](float dx) { return (int16_t)(cx + sc(dx, scale)); };
     auto my = [&](float dy) { return (int16_t)(cy + sc(dy, scale)); };
 
-    drawMiniJet(tft, mx(-45), my(-39), dimGreen, 25.0f, scale);
-    drawMiniJet(tft, mx(50), my(-14), dimGreen, 160.0f, scale);
-    drawMiniHeli(tft, mx(-35), my(41), dimGreen, 250.0f, scale);
-    drawMiniHeli(tft, mx(45), my(-59), dimGreen, 100.0f, scale);
+    drawMiniJet(tft, mx(-45), my(-39), dimAccent, 25.0f, scale);
+    drawMiniJet(tft, mx(50), my(-14), dimAccent, 160.0f, scale);
+    drawMiniHeli(tft, mx(-35), my(41), dimAccent, 250.0f, scale);
+    drawMiniHeli(tft, mx(45), my(-59), dimAccent, 100.0f, scale);
 
-    drawAirplane(tft, cx, cy, scale, TFT_GREEN);
+    drawAirplane(tft, cx, cy, scale, UiTheme::accentColor(tft));
 }
 
 }

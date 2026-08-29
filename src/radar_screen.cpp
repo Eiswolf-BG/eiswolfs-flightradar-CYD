@@ -20,6 +20,8 @@
 #include "menu_stars.h"
 #include "menu_screen.h"
 #include "iss_tracker.h"
+#include "weather.h"
+#include "ui_theme.h"
 #include <qrcode.h>
 #include <math.h>
 #include <time.h>
@@ -82,6 +84,13 @@ namespace {
         float distanceKm;
         bool isEmergency;
         bool isWatched;
+        // Militaer-/Behoerdenflug-Erkennung (isMilitaryGovSquawk()) bzw.
+        // Rufzeichen-Praefix (isNotableCallsign()) - oranger Ring, siehe
+        // tick()-Redraw-Block unten (gleiches Fortlauf-Prinzip wie
+        // isEmergency/isWatched, sonst wuerde der Ring nur einen einzigen
+        // render()-Aufruf lang sichtbar bleiben und dann durch den
+        // naechsten tick()-Sweep-Restore wieder verschwinden).
+        bool isNotable;
         bool isGroundVehicle;
         bool isRotorcraft;
         bool isHeavy;
@@ -323,6 +332,54 @@ namespace {
         return false;
     }
 
+    // "Militaer-/Behoerdenflug-Erkennung" (SettingsStore::
+    // militarySquawkDetectionEnabled(), Menue > System > Radar-Darstellung,
+    // AUS per Default) - Bereiche recherchiert (WebSearch, siehe Chat-
+    // Verlauf) primaer aus der oeffentlich einsehbaren Wikipedia-Seite
+    // "List of transponder codes" sowie einschlaegigen Flugsicherungs-/
+    // Hobbyisten-Quellen. AUSDRUECKLICH Best-Effort, NICHT offiziell/
+    // vollstaendig/weltweit gueltig - stark US-/NORAD-lastig, da dort am
+    // besten oeffentlich dokumentiert:
+    //   4400-4477: USA - SR-71/U-2/B-57/Hoehenfluege >FL600, NORAD/ADIZ,
+    //              Bundes-Strafverfolgungsbehoerden (FAA Order JO 7110.67)
+    //   5000:      NORAD (USA/Kanada) bzw. Australien - militaerische
+    //              Einsaetze
+    //   5400:      NORAD (USA/Kanada)
+    //   6000:      Australien - Militaerfluege im Luftraum G
+    //   6100:      NORAD (USA/Kanada)
+    //   6400:      NORAD (USA/Kanada)
+    //   7501-7577: USA - reserviert fuer die Continental NORAD Region (CONR)
+    // Bewusst NICHT enthalten: 7500/7600/7700 (echte Notfall-Squawks, siehe
+    // Config::EMERGENCY_SQUAWKS/isEmergencySquawk() oben) - beide Bereiche
+    // ueberschneiden sich nicht. Der Hilfetext (MILITARY_SQUAWK_INFO_BODY)
+    // kommuniziert die Best-Effort-Natur explizit an den Nutzer.
+    struct SquawkRange { uint16_t lo, hi; };
+    constexpr SquawkRange MILITARY_SQUAWK_RANGES[] = {
+        {4400, 4477},
+        {5000, 5000},
+        {5400, 5400},
+        {6000, 6000},
+        {6100, 6100},
+        {6400, 6400},
+        {7501, 7577},
+    };
+    constexpr uint8_t MILITARY_SQUAWK_RANGE_COUNT =
+        sizeof(MILITARY_SQUAWK_RANGES) / sizeof(MILITARY_SQUAWK_RANGES[0]);
+
+    bool isMilitaryGovSquawk(const char* squawk) {
+        if (!squawk[0]) return false;
+        // Squawk-Code ist ein 4-stelliger String mit Ziffern 0-7 - fuer den
+        // Bereichsvergleich reicht die normale Dezimalinterpretation (die
+        // Bereichsgrenzen oben nutzen dieselbe 4-stellige Anzeige-Schreib-
+        // weise wie Config::EMERGENCY_SQUAWKS, kein echtes Oktalsystem
+        // noetig, da nie eine Ziffer > 7 vorkommt).
+        uint16_t val = (uint16_t)atoi(squawk);
+        for (uint8_t i = 0; i < MILITARY_SQUAWK_RANGE_COUNT; i++) {
+            if (val >= MILITARY_SQUAWK_RANGES[i].lo && val <= MILITARY_SQUAWK_RANGES[i].hi) return true;
+        }
+        return false;
+    }
+
     bool isHeavyCategory(const char* category) {
         return category[0] == 'A' && category[1] == '5';
     }
@@ -447,6 +504,47 @@ namespace {
         // Alle Slots belegt - ein einzelner verpasster Effekt ist unkritisch.
     }
 
+    // Animierter Regen-Effekt (testweise IMMER aktiv, kein Schalter - Alex'
+    // ausdruecklicher Wunsch, ueber ein Ein/Aus wird erst nach diesem Test
+    // entschieden) - mehrere kurze, schraege Linien ("Tropfen"), die
+    // kontinuierlich als parallele Sehnen ueber den Radarkreis wandern.
+    // Neigungswinkel = Weather::currentWindDirectionDeg() (0=Nord, im
+    // Uhrzeigersinn - gleiche Konvention wie die Sweep-Linie). Nur aktiv,
+    // wenn Weather::current() Regen/Gewitter zeigt.
+    struct RainDrop {
+        float x = 0, y = 0;
+        float vx = 0, vy = 0; // Einheitsvektor der Bewegungsrichtung
+        bool active = false;
+        // Fuer sauberes Loeschen im naechsten Tick, gleiches Erase/Redraw-
+        // Prinzip wie Sonar-Ping/Radar-Puls oben.
+        bool hasPrev = false;
+        int16_t prevX1 = 0, prevY1 = 0, prevX2 = 0, prevY2 = 0;
+    };
+    // Bewusst wenige Tropfen ("nicht zu viele", Alex' Wunsch) - klar
+    // erkennbare Einzellinien statt dichtem Gewusel.
+    constexpr uint8_t MAX_RAINDROPS = 8;
+    RainDrop rainDrops[MAX_RAINDROPS];
+    constexpr float RAIN_DROP_SPEED_PX_PER_SEC = 70.0f;
+    constexpr int16_t RAIN_DROP_LENGTH = 7;
+
+    // Setzt einen Tropfen an einer zufaelligen Position auf dem Kreisrand
+    // neu, gestreut um die Windrichtung-Bearing (±70 Grad) - Bewegung
+    // verlaeuft als parallele Sehne quer durch den Kreis in Richtung
+    // "windDirDeg + 180". Alle Tropfen bewegen sich parallel (gleicher
+    // Bewegungsvektor), nur der Startpunkt auf dem Rand variiert - das
+    // ergibt sichtbar "fallenden" Regen statt zufaellig verstreuter Linien.
+    void spawnRainDrop(RainDrop& d, const Layout& L, float windDirDeg) {
+        double entrySpreadDeg = (double)random(-70, 71);
+        double entryAngleRad = ((double)windDirDeg + entrySpreadDeg) * DEG_TO_RAD;
+        d.x = L.cx + (float)(L.radius * sin(entryAngleRad));
+        d.y = L.cy - (float)(L.radius * cos(entryAngleRad));
+        double travelRad = ((double)windDirDeg + 180.0) * DEG_TO_RAD;
+        d.vx = (float)sin(travelRad);
+        d.vy = -(float)cos(travelRad);
+        d.active = true;
+        d.hasPrev = false;
+    }
+
     // "Bekannt seit"-Tracking fuer den Sonar-Ping, UNABHAENGIG von
     // phosphorEntries[] oben: phosphorEntries wird bei JEDEM render()-
     // Durchlauf, in dem ein Flugzeug nicht mehr in der Snapshot-Liste
@@ -555,19 +653,24 @@ namespace {
 
     // Radar-Farbschema (Menue > System > Radar-Farbschema, siehe
     // radar_theme_screen.cpp / SettingsStore::radarThemeIndex()) - retro
-    // Phosphor-Radarschirm-Optik (Gruen/Amber/Blau). Betrifft NUR den
-    // "Grundton" dieses Screens: Sweep-Linie, Panel-Rahmen/Text, Buttons und
-    // die niedrigste Hoehenstufe (siehe colorForAltitude() unten). Die
-    // gelbe/rote Hoehenstufe (mittlere/hohe Flughoehe = Warnfarben) sowie
-    // ALLE anderen Bildschirme im Projekt bleiben bewusst immer gruen -
-    // Warnfarben sollen ueberall gleich bleiben, unabhaengig vom gewaehlten
-    // Radar-Farbschema.
+    // Phosphor-Radarschirm-Optik (Gruen/Amber/Blau). Frueher NUR fuer den
+    // Radar-Screen selbst gedacht, mittlerweile per UiTheme::accentColor()
+    // (ui_theme.h/.cpp) auf das GESAMTE Projekt ausgeweitet (Alex'
+    // ausdruecklicher Wunsch) - alle Menues/Buttons/Rahmen/Schriften folgen
+    // jetzt demselben Farbschema. themeBaseColor() bleibt als duenner
+    // Wrapper bestehen (viele Aufrufer hier in dieser Datei), delegiert
+    // aber an dieselbe zentrale Funktion, damit es nur EINE Stelle mit der
+    // eigentlichen Gruen/Amber/Blau-Zuordnung gibt.
+    //
+    // AUSGENOMMEN bleibt weiterhin die niedrigste Hoehenstufe in
+    // colorForAltitude() unten - die ist jetzt bewusst IMMER TFT_GREEN,
+    // unabhaengig vom Thema (frueher folgte sie themeBaseColor(), siehe
+    // Git-Historie - auf Alex' ausdruecklichen Wunsch zurueckgestellt,
+    // damit die drei Hoehenfarben als Gruppe immer eindeutig bleiben und
+    // nicht mit dem UI-Thema verwechselt werden). Gelb/Rot (mittlere/hohe
+    // Flughoehe) waren ohnehin nie themenabhaengig.
     uint16_t themeBaseColor(TFT_eSPI& gfx) {
-        switch (SettingsStore::radarThemeIndex()) {
-            case 1: return gfx.color565(255, 176, 0);  // Amber
-            case 2: return gfx.color565(0, 200, 255);  // Blau
-            default: return TFT_GREEN;                  // Gruen (Standard)
-        }
+        return UiTheme::accentColor(gfx);
     }
 
     // Gedaempfte Variante von themeBaseColor() fuer die Nachtdimmung -
@@ -651,8 +754,13 @@ namespace {
 
     uint16_t colorForAltitude(TFT_eSPI& gfx, int32_t altFt) {
         bool dim = nightDimActiveNow();
+        // Niedrigste Hoehenstufe ist bewusst IMMER Gruen, unabhaengig vom
+        // gewaehlten Radar-Farbschema (siehe Kommentar bei themeBaseColor()
+        // oben) - Alex' ausdruecklicher Wunsch, damit die drei Hoehenfarben
+        // als Gruppe eindeutig bleiben und nicht mit dem UI-Thema
+        // verwechselt werden.
         if (altFt < Config::COLOR_LOW_ALT_THRESHOLD_FT)
-            return dim ? themeDimColor(gfx) : themeBaseColor(gfx);
+            return dim ? gfx.color565(0, 160, 0) : TFT_GREEN;
         if (altFt < Config::COLOR_MID_ALT_THRESHOLD_FT)
             return dim ? gfx.color565(160, 160, 0) : TFT_YELLOW;
         return TFT_RED;
@@ -1823,8 +1931,15 @@ void render(TFT_eSPI& tft, int16_t top) {
         bool isWatched = SettingsStore::watchlistAlertEnabled() &&
                           (AircraftWatchlist::isWatched(a.callsign) || SquawkWatchlist::isWatched(a.squawk));
         // Niedrigste Prioritaet der drei Ring-Markierungen (siehe unten) -
-        // rein informativ, kein Alarm wie Notfall/Beobachtungsliste.
-        bool isNotable = isNotableCallsign(a.callsign);
+        // rein informativ, kein Alarm wie Notfall/Beobachtungsliste. Deckt
+        // jetzt zwei unabhaengige Kriterien ab: Militaer-/Regierungs-
+        // Rufzeichen-Praefixe (isNotableCallsign(), aktuell immer false,
+        // siehe dortiger Kommentar) UND die neue, per Schalter aktivierbare
+        // Squawk-basierte Militaer-/Behoerdenflug-Erkennung
+        // (isMilitaryGovSquawk(), SettingsStore::
+        // militarySquawkDetectionEnabled()).
+        bool isNotable = isNotableCallsign(a.callsign) ||
+                          (SettingsStore::militarySquawkDetectionEnabled() && isMilitaryGovSquawk(a.squawk));
 
         if (isSelected) {
             tft.drawCircle(pt.x, pt.y, 9, TFT_WHITE);
@@ -1864,6 +1979,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         hitPoints[i].distanceKm = a.distanceKm;
         hitPoints[i].isEmergency = isEmergency;
         hitPoints[i].isWatched = isWatched;
+        hitPoints[i].isNotable = isNotable;
         hitPoints[i].isGroundVehicle = isGroundVehicle;
         hitPoints[i].isRotorcraft = isRotorcraft;
         hitPoints[i].isHeavy = isHeavy;
@@ -2020,6 +2136,15 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
                 tft.drawPixel(staticNoises[i].prevPointsX[p], staticNoises[i].prevPointsY[p], TFT_BLACK);
             }
         }
+        // Alte Regentropfen-Linien ebenfalls loeschen - laeuft UNABHAENGIG
+        // vom aktuellen Wetterstatus (haengt nur von hasPrev ab), damit ein
+        // Tropfen, der noch sichtbar war, als der Regen gerade aufgehoert
+        // hat, sauber verschwindet statt stehen zu bleiben.
+        for (uint8_t i = 0; i < MAX_RAINDROPS; i++) {
+            if (!rainDrops[i].hasPrev) continue;
+            tft.drawLine(rainDrops[i].prevX1, rainDrops[i].prevY1,
+                         rainDrops[i].prevX2, rainDrops[i].prevY2, TFT_BLACK);
+        }
         drawStaticBackground(tft, L, rangeKm);
         tft.fillCircle(L.cx, L.cy, 3, TFT_WHITE);
     }
@@ -2143,6 +2268,68 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
         staticNoises[i].prevPointCount = count;
     }
 
+    // Animierter Regen-Effekt (SettingsStore::rainEffectEnabled(), Menue >
+    // System > Radar-Darstellung, AN per Default) - nur aktiv, wenn der
+    // Schalter an ist UND Weather::current() Regen/Gewitter zeigt UND eine
+    // Windrichtung bekannt ist (sonst bleibt rainDrops[] einfach untaetig/
+    // inaktiv - der Erase-Block oben raeumt dann noch sichtbare Tropfen von
+    // einem vorherigen "es regnet"-Zustand sauber weg, auch wenn der
+    // Schalter waehrenddessen ausgeschaltet wird). Jeder Tropfen wird
+    // einzeln auf den Radar-Kreis geclippt (Distanz-Check beider Linien-
+    // Endpunkte zum Zentrum, gleiches Prinzip wie Sonar-Ping/Signal-
+    // Rauschen oben) - ein Tropfen nahe am Kreisrand darf keine Pixel
+    // ausserhalb malen.
+    {
+        Weather::Condition cond = Weather::current();
+        float windDir = Weather::currentWindDirectionDeg();
+        bool rainy = SettingsStore::rainEffectEnabled() &&
+                     (cond == Weather::Condition::Rain || cond == Weather::Condition::Thunderstorm) && windDir >= 0.0f;
+        float step = RAIN_DROP_SPEED_PX_PER_SEC * (deltaMs / 1000.0f);
+        uint16_t dropColor = scaleColorBrightness(TFT_SKYBLUE, 0.45f);
+
+        for (uint8_t i = 0; i < MAX_RAINDROPS; i++) {
+            RainDrop& d = rainDrops[i];
+            if (!rainy) {
+                d.active = false;
+                d.hasPrev = false;
+                continue;
+            }
+            if (!d.active) {
+                spawnRainDrop(d, L, windDir);
+            }
+
+            d.x += d.vx * step;
+            d.y += d.vy * step;
+
+            float dx = d.x - L.cx;
+            float dy = d.y - L.cy;
+            if (dx * dx + dy * dy > (float)L.radius * (float)L.radius) {
+                // Kreis verlassen - sofort an neuer Randposition neu starten,
+                // damit staendig eine aehnliche Tropfenzahl sichtbar bleibt.
+                spawnRainDrop(d, L, windDir);
+            }
+
+            int16_t x1 = (int16_t)d.x;
+            int16_t y1 = (int16_t)d.y;
+            int16_t x2 = (int16_t)(d.x - d.vx * RAIN_DROP_LENGTH);
+            int16_t y2 = (int16_t)(d.y - d.vy * RAIN_DROP_LENGTH);
+
+            auto inBounds = [&](int16_t px, int16_t py) {
+                int32_t ddx = px - L.cx;
+                int32_t ddy = py - L.cy;
+                return ddx * ddx + ddy * ddy <= (int32_t)L.radius * L.radius &&
+                       py >= top && py < L.infoTop && px >= 0 && px < Config::SCREEN_WIDTH;
+            };
+            if (inBounds(x1, y1) && inBounds(x2, y2)) {
+                tft.drawLine(x1, y1, x2, y2, dropColor);
+                d.prevX1 = x1; d.prevY1 = y1; d.prevX2 = x2; d.prevY2 = y2;
+                d.hasPrev = true;
+            } else {
+                d.hasPrev = false;
+            }
+        }
+    }
+
     for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) {
         if (!hitPoints[i].valid) continue;
         HitPoint& hp = hitPoints[i];
@@ -2179,7 +2366,7 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             } else {
                 drawAircraftMarker(tft, hp.x, hp.y, hp.headingDeg, TFT_BLACK);
             }
-            if (hp.isEmergency || hp.isWatched) {
+            if (hp.isEmergency || hp.isWatched || hp.isNotable) {
                 tft.drawCircle(hp.x, hp.y, 12, TFT_BLACK);
             }
             tft.setTextColor(TFT_BLACK);
@@ -2204,6 +2391,8 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             tft.drawCircle(hp.x, hp.y, 12, TFT_RED);
         } else if (hp.isWatched) {
             tft.drawCircle(hp.x, hp.y, 12, TFT_CYAN);
+        } else if (hp.isNotable) {
+            tft.drawCircle(hp.x, hp.y, 12, TFT_ORANGE);
         }
 
         tft.setTextColor(hp.color);

@@ -4,6 +4,7 @@
 #include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
+#include "ui_theme.h"
 
 namespace TimeoutScreen {
 
@@ -17,9 +18,9 @@ namespace {
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label) {
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, UiTheme::accentColor(tft));
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
     }
@@ -119,7 +120,7 @@ void run(TFT_eSPI& tft) {
 
     auto redraw = [&]() {
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::TIMEOUT_SCREEN_TITLE));
 
@@ -135,12 +136,12 @@ void run(TFT_eSPI& tft) {
                            (int16_t)(TRACK_H / 2), TFT_DARKGREY);
         if (thumbX > TRACK_X) {
             tft.fillRoundRect(TRACK_X, (int16_t)(TRACK_Y - TRACK_H / 2), (int16_t)(thumbX - TRACK_X),
-                               TRACK_H, (int16_t)(TRACK_H / 2), TFT_GREEN);
+                               TRACK_H, (int16_t)(TRACK_H / 2), UiTheme::accentColor(tft));
         }
-        tft.fillCircle(thumbX, TRACK_Y, THUMB_R, TFT_GREEN);
+        tft.fillCircle(thumbX, TRACK_Y, THUMB_R, UiTheme::accentColor(tft));
         tft.drawCircle(thumbX, TRACK_Y, THUMB_R, TFT_BLACK);
 
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setTextDatum(TL_DATUM);
         tft.drawString(String(Config::SCREEN_TIMEOUT_MIN_MINUTES) + " min", TRACK_X,
                         (int16_t)(TRACK_Y + THUMB_R + 6));
@@ -152,7 +153,7 @@ void run(TFT_eSPI& tft) {
         drawButton(tft, screensaverBtn,
                    String(I18n::t(StringId::MENU_SCREENSAVER)) + onOff(SettingsStore::screensaverEnabled()));
 
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         layoutWrapped(tft, 10, DESC_Y, DESC_MAX_WIDTH, DESC_LINE_H,
                       I18n::t(StringId::TIMEOUT_SCREENSAVER_DESC), true);
 

@@ -3,6 +3,7 @@
 #include "radar_logo.h"
 #include "i18n.h"
 #include <math.h>
+#include "ui_theme.h"
 
 namespace SplashScreen {
 
@@ -32,7 +33,7 @@ namespace {
 void playBootSequence(TFT_eSPI& tft) {
     tft.fillScreen(TFT_BLACK);
     tft.setTextDatum(TL_DATUM);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setTextSize(1);
 
     for (uint8_t i = 0; i < BOOT_LINE_COUNT; i++) {
@@ -55,7 +56,7 @@ void begin(TFT_eSPI& tft) {
 
     tft.setTextDatum(MC_DATUM);
 
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setTextSize(2);
     tft.drawString("Eiswolfs", cx, 28);
     tft.drawString("Flightradar", cx, 60);

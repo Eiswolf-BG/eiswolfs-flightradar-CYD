@@ -4,6 +4,7 @@
 #include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
+#include "ui_theme.h"
 
 namespace AirlineFilterScreen {
 
@@ -16,7 +17,7 @@ namespace {
     };
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, bool danger = false) {
-        uint16_t accent = danger ? TFT_RED : TFT_GREEN;
+        uint16_t accent = danger ? TFT_RED : UiTheme::accentColor(tft);
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
         tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, accent);
         tft.setTextDatum(MC_DATUM);
@@ -62,14 +63,14 @@ namespace {
 
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::AIRLINE_ADD_TITLE));
 
             tft.fillRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_BLACK);
-            tft.drawRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_GREEN);
+            tft.drawRect(8, 40, Config::SCREEN_WIDTH - 16, 34, UiTheme::accentColor(tft));
             tft.setTextSize(2);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(14, 66);
             tft.print(buf);
             tft.setTextSize(1);
@@ -130,10 +131,10 @@ void run(TFT_eSPI& tft) {
     MenuStars::reset();
     while (!done) {
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::AIRLINE_FILTER_TITLE));
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 26);
         tft.println(I18n::t(StringId::AIRLINE_FILTER_DESC1));
         tft.setCursor(10, 38);
@@ -152,9 +153,9 @@ void run(TFT_eSPI& tft) {
             removeRects[i] = removeRect;
 
             tft.fillRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_BLACK);
-            tft.drawRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_GREEN);
+            tft.drawRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, UiTheme::accentColor(tft));
             tft.setTextDatum(MC_DATUM);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.drawString(AirlineFilter::icaoAt(i), rowRect.x + rowRect.w / 2, rowRect.y + rowRect.h / 2);
             tft.setTextDatum(TL_DATUM);
             drawButton(tft, removeRect, "X", true);

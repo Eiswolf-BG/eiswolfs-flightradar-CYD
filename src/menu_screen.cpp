@@ -25,6 +25,7 @@
 #include "config.h"
 #include "changelog.h"
 #include <time.h>
+#include "ui_theme.h"
 
 namespace MenuScreen {
 
@@ -94,7 +95,7 @@ namespace {
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label,
                      bool active = false, bool danger = false) {
-        uint16_t accent = danger ? TFT_RED : TFT_GREEN;
+        uint16_t accent = danger ? TFT_RED : UiTheme::accentColor(tft);
         uint16_t bg = active ? accent : TFT_BLACK;
         uint16_t fg = active ? TFT_BLACK : accent;
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, bg);
@@ -134,9 +135,9 @@ namespace {
     // relevante Inhalt).
     void drawButtonTwoLines(TFT_eSPI& tft, const Rect& r, const String& line1, const String& line2) {
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, UiTheme::accentColor(tft));
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         constexpr int16_t LINE_GAP = 14;
         tft.drawString(line1, r.x + r.w / 2, r.y + r.h / 2 - LINE_GAP / 2);
         tft.drawString(line2, r.x + r.w / 2, r.y + r.h / 2 + LINE_GAP / 2);
@@ -282,7 +283,7 @@ namespace {
     // folgenreiche Aktionen, die dieselbe deutliche Bestaetigung verdienen.
     // accentColor (Default TFT_RED fuer die beiden bestehenden, wirklich
     // destruktiven Aufrufer) faerbt Rahmen und Titel - der OTA-Aufrufer
-    // uebergibt TFT_GREEN, da ein Update zwar bestaetigt werden sollte,
+    // uebergibt UiTheme::accentColor(tft), da ein Update zwar bestaetigt werden sollte,
     // aber keine "gefaehrliche" Loesch-Aktion wie Werksreset/Flugbuch ist.
     // title/body stehen VOR dem Aufruf per I18n::t() fest (statt StringIds
     // entgegenzunehmen), damit auch dynamisch zusammengesetzte Texte (z.B.
@@ -374,7 +375,7 @@ namespace {
             tft.setTextSize(1);
             tft.setTextDatum(TL_DATUM);
 
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             layoutWrapped(tft, BOX_X + 10, VIEW_TOP, TEXT_MAX_WIDTH, LINE_H, body, scrollY, VIEW_TOP, viewBottom, true);
 
             drawButton(tft, okBtn, I18n::t(StringId::OK));
@@ -501,7 +502,7 @@ namespace {
             tft.setTextSize(1);
             tft.setTextDatum(TL_DATUM);
 
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             layoutWrapped(tft, BOX_X + 10, VIEW_TOP, TEXT_MAX_WIDTH, LINE_H, body, scrollY, VIEW_TOP, viewBottom, true);
 
             drawButton(tft, okBtn, buttonLabel);
@@ -563,7 +564,7 @@ namespace {
         t.fillRect(0, (int16_t)(cy - BAND_H / 2), Config::SCREEN_WIDTH, BAND_H, TFT_BLACK);
 
         t.setTextDatum(MC_DATUM);
-        t.setTextColor(TFT_GREEN, TFT_BLACK);
+        t.setTextColor(UiTheme::accentColor(t), TFT_BLACK);
         t.setTextSize(1);
         t.drawString(I18n::t(StringId::OTA_INSTALLING_PREFIX), Config::SCREEN_WIDTH / 2, (int16_t)(cy - 14));
 
@@ -591,7 +592,7 @@ namespace {
         MenuStars::reset();
         tft.fillScreen(TFT_BLACK);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.drawString(I18n::t(StringId::OTA_CHECKING), Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
         tft.setTextDatum(TL_DATUM);
 
@@ -619,12 +620,12 @@ namespace {
         }
         if (info.result == OtaUpdate::CheckResult::UpToDate) {
             String upToDateTitle = String(I18n::t(StringId::OTA_UP_TO_DATE_PREFIX)) + info.latestVersion;
-            infoScreen(tft, upToDateTitle, "", TFT_GREEN, I18n::t(StringId::OK));
+            infoScreen(tft, upToDateTitle, "", UiTheme::accentColor(tft), I18n::t(StringId::OK));
             return;
         }
 
         String title = String(I18n::t(StringId::OTA_UPDATE_AVAILABLE_PREFIX)) + info.latestVersion;
-        bool confirmed = confirmWarningScreen(tft, title, I18n::t(StringId::OTA_CONFIRM_BODY), TFT_GREEN);
+        bool confirmed = confirmWarningScreen(tft, title, I18n::t(StringId::OTA_CONFIRM_BODY), UiTheme::accentColor(tft));
         if (!confirmed) return;
 
         otaProgressTft = &tft;
@@ -663,7 +664,7 @@ namespace {
             // Meldung). Der Button zeigt jetzt einfach durchgehend nur noch
             // "Jetzt neu starten".
             infoScreen(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), I18n::t(StringId::OTA_SUCCESS_BODY),
-                       TFT_GREEN, I18n::t(StringId::OTA_RESTART_BUTTON));
+                       UiTheme::accentColor(tft), I18n::t(StringId::OTA_RESTART_BUTTON));
             // Setzt das Flag, das main.cpp::showWhatsNewIfNeeded() beim
             // naechsten Boot ausliest - siehe settings_store.h fuer die
             // Begruendung (Changelog-Screen soll NUR nach einem echten
@@ -702,7 +703,7 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
         tft.fillScreen(TFT_BLACK);
 
         if (page == Page::Main) {
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_SETTINGS));
 
@@ -752,7 +753,7 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             }
 
         } else if (page == Page::Region) {
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_REGION));
 
@@ -786,7 +787,7 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             }
 
         } else if (page == Page::System) {
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_SYSTEM));
 
@@ -849,7 +850,7 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             }
 
         } else if (page == Page::SystemDisplay) {
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_DISPLAY));
 
@@ -920,7 +921,7 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             }
 
         } else if (page == Page::SystemTools) {
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_SYSTEM_TOOLS));
 
@@ -958,7 +959,7 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             }
 
         } else if (page == Page::BackupReset) {
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_BACKUP_RESET));
 
@@ -1035,7 +1036,7 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             }
 
         } else if (page == Page::Flight) {
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_FLIGHT));
 
@@ -1084,7 +1085,7 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             }
 
         } else if (page == Page::FlightLists) {
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_LISTS));
 
@@ -1122,7 +1123,7 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             }
 
         } else if (page == Page::FlightStatsLogbook) {
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_STATS_LOGBOOK));
 
@@ -1172,7 +1173,7 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             }
 
         } else if (page == Page::FlightLed) {
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_LED));
 
@@ -1205,7 +1206,7 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             }
 
         } else if (page == Page::FlightFilters) {
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_FILTERS));
 
@@ -1257,7 +1258,7 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             // Prinzip wie in radar_theme_screen.cpp.
             if (rowInfoBtnRect(issMarkerBtn).contains(tap.x, tap.y)) {
                 infoScreen(tft, I18n::t(StringId::ISS_MARKER_INFO_TITLE), I18n::t(StringId::ISS_MARKER_INFO_BODY),
-                           TFT_GREEN, I18n::t(StringId::OK));
+                           UiTheme::accentColor(tft), I18n::t(StringId::OK));
             } else if (airlineBtn.contains(tap.x, tap.y)) {
                 AirlineFilterScreen::run(tft);
             } else if (groundBtn.contains(tap.x, tap.y)) {
@@ -1273,7 +1274,7 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             }
 
         } else { // Page::FlightTools
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_TOOLS));
 

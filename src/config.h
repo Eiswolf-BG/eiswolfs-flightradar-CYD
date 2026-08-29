@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "4.4.0";
+    constexpr const char* APP_VERSION = "4.5.0";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -14,6 +14,32 @@ namespace Config {
     constexpr uint8_t BRIGHTNESS_MIN_PERCENT = 10;
     constexpr uint8_t BRIGHTNESS_MAX_PERCENT = 100;
     constexpr uint8_t BRIGHTNESS_STEP_PERCENT = 10;
+
+    // Auto-Helligkeit (Menue > System > Anzeige > Helligkeit, siehe
+    // auto_brightness.h/.cpp, SettingsStore::autoBrightnessEnabled(), AUS
+    // per Default) - der eingebaute Lichtsensor (LDR) des CYD-Boards
+    // (ESP32-2432S028) sitzt laut oeffentlicher Pinout-Dokumentation
+    // (Mischianti, RandomNerdTutorials) an GPIO34 (ADC1_CH6, eingangs-
+    // only, unabhaengig von WiFi nutzbar - ADC2 waere das nicht). Kein
+    // eigener Hardware-Zugriff meinerseits zur Verifikation moeglich.
+    constexpr uint8_t LDR_PIN = 34;
+
+    // ADC-Rohwertbereich (12-Bit, 0-4095), der auf BRIGHTNESS_MIN_PERCENT..
+    // BRIGHTNESS_MAX_PERCENT abgebildet wird - AUSDRUECKLICH Schaetzwerte
+    // ohne Kalibrierung am echten Geraet (siehe LDR_PIN-Kommentar oben).
+    // Laut denselben Quellen streut der verbaute LDR-Widerstand je nach
+    // Fertigungslos spuerbar - diese Werte muessen bei Bedarf am echten
+    // Geraet nachjustiert werden (z.B. Serial-Logging des Rohwerts bei
+    // "ganz dunkel" und "hell beleuchtet", dann hier eintragen).
+    constexpr uint16_t AUTO_BRIGHTNESS_ADC_MIN = 200;
+    constexpr uint16_t AUTO_BRIGHTNESS_ADC_MAX = 3200;
+
+    // Glaettungsfaktor fuer den exponentiellen gleitenden Mittelwert des
+    // LDR-Rohwerts (0.0 = friert ein, 1.0 = keine Glaettung/jeder Messwert
+    // wirkt sofort voll) - klein gewaehlt, damit kurzes Abdecken/Vorbei-
+    // laufen vor dem Sensor oder einzelne verrauschte Messwerte nicht
+    // sofort ein sichtbares Helligkeits-Flackern ausloesen.
+    constexpr float AUTO_BRIGHTNESS_SMOOTHING = 0.15f;
 
     // Bildschirm-Timeout (Menue > System > Bildschirm-Timeout), in Minuten,
     // per Schieberegler einstellbar (siehe timeout_screen.cpp) - danach

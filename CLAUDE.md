@@ -101,14 +101,38 @@ mit Foto vom echten Display), bevor der Code als fertig gilt.
 
 ## UI-Konventionen (bitte einhalten für neue Screens)
 
-- **Farbschema:** Schwarzer Hintergrund, grüner Rahmen/Text
-  (`TFT_BLACK`/`TFT_GREEN`), aktive/ausgewählte Einträge invertiert (grün
-  gefüllt, schwarzer Text). Destruktive Aktionen (Abbrechen/Löschen) in Rot
-  (`TFT_RED`).
+- **Farbschema:** Schwarzer Hintergrund (`TFT_BLACK`), Rahmen/Text/Buttons
+  in der projektweiten UI-Akzentfarbe `UiTheme::accentColor(tft)`
+  (`src/ui_theme.h/.cpp` - Grün/Amber/Blau, folgt Menü > System > Radar-
+  Darstellung, `SettingsStore::radarThemeIndex()`), aktive/ausgewählte
+  Einträge invertiert (Akzentfarbe gefüllt, schwarzer Text). Destruktive
+  Aktionen (Abbrechen/Löschen) in Rot (`TFT_RED`). Neue Screens: immer
+  `UiTheme::accentColor(tft)` statt fest verdrahtetem `TFT_GREEN`
+  verwenden, `#include "ui_theme.h"` nicht vergessen.
+  **Ausnahmen** (bleiben literal, NICHT themenabhängig, da sie eine eigene
+  Bedeutung tragen): Flugzeug-Höhenfarben (Grün <3000m/Gelb 3000-9100m/Rot
+  >9100m, `colorForAltitude()` in `radar_screen.cpp` und
+  `aircraft_list_screen.cpp`), Status-Ringe (Notfall-Rot, Beobachtungs-
+  Cyan, Militär-/Behörden-Orange), sowie einfache Erfolg/Fehler-Anzeigen
+  (z.B. Backup/Restore-Rückmeldung: Grün=erfolgreich/Rot=fehlgeschlagen).
 - Jeder Screen hat i.d.R. eine lokale `struct Rect` mit `contains(x,y)` und
   eine `drawButton()`-Hilfsfunktion (Copy-Paste-Muster aus den bestehenden
   Screens, kein gemeinsames Rect/Button-Modul — das ist bewusst so, um
   jeden Screen unabhängig lauffähig zu halten).
+- **Jeder neue Ein/Aus-Schalter (Toggle-Button) bekommt automatisch einen
+  "?"-Info-Button direkt in derselben Button-Zeile**, der in 1-2 Sätzen
+  erklärt, was der Schalter bewirkt - nach dem Muster, das bei
+  CRT-Phosphor/Radar-Puls/Klassik-Radar/Militär-Behördenflug-Erkennung
+  (`radar_theme_screen.cpp`) und beim ISS-Marker (`menu_screen.cpp`,
+  Anzeigefilter-Seite) bereits umgesetzt ist: kleiner Button (20×20px),
+  rechts in der Zeile, mit ausreichend Abstand zum Zeilenrahmen (siehe
+  `rowInfoBtnRect()`/`drawRowInfoButton()` in den beiden genannten
+  Dateien, dort bewusst dupliziert statt geteilt). Öffnet den kurzen
+  Infotext über `MenuScreen::showInfoScreen()`. Gilt für ALLE
+  zukünftigen Toggle-Buttons, nicht nur für ausgewählte - auch ohne
+  expliziten Auftrag im jeweiligen Prompt. Neue StringIds für Label +
+  Infotext-Titel + Infotext-Body dafür immer in allen 6 Sprachen
+  ergänzen (siehe i18n-Abschnitt oben).
 - **Sterne-Animation** (`src/menu_stars.h/.cpp`): Läuft im Hintergrund auf
   JEDEM schwarzen Menü-/Splash-Screen. Neue Screens sollten
   `MenuStars::reset()` einmal beim Betreten aufrufen und

@@ -8,6 +8,7 @@
 #include "config.h"
 #include "i18n.h"
 #include "units.h"
+#include "ui_theme.h"
 
 namespace LocationPresetsScreen {
 
@@ -21,7 +22,7 @@ namespace {
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label,
                      bool active = false, bool danger = false) {
-        uint16_t accent = danger ? TFT_RED : TFT_GREEN;
+        uint16_t accent = danger ? TFT_RED : UiTheme::accentColor(tft);
         uint16_t bg = active ? accent : TFT_BLACK;
         uint16_t fg = active ? TFT_BLACK : accent;
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, bg);
@@ -63,14 +64,14 @@ namespace {
 
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(title);
 
             tft.fillRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_BLACK);
-            tft.drawRect(8, 40, Config::SCREEN_WIDTH - 16, 34, TFT_GREEN);
+            tft.drawRect(8, 40, Config::SCREEN_WIDTH - 16, 34, UiTheme::accentColor(tft));
             tft.setTextSize(2);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(14, 66);
             tft.print(buf);
             tft.setTextSize(1);
@@ -139,7 +140,7 @@ namespace {
         // tatsaechliche Hoehe per getCursorY() zu messen - selbes Muster wie
         // in address_search_screen.cpp::runAddressKeyboard().
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::LOCATION_NAME_PROMPT));
         tft.setTextColor(TFT_CYAN, TFT_BLACK);
@@ -173,16 +174,16 @@ namespace {
 
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::LOCATION_NAME_PROMPT));
             tft.setTextColor(TFT_CYAN, TFT_BLACK);
             tft.println(I18n::t(StringId::LOCATION_NAME_HINT));
 
             tft.fillRect(8, fieldY, Config::SCREEN_WIDTH - 16, FIELD_H, TFT_BLACK);
-            tft.drawRect(8, fieldY, Config::SCREEN_WIDTH - 16, FIELD_H, TFT_GREEN);
+            tft.drawRect(8, fieldY, Config::SCREEN_WIDTH - 16, FIELD_H, UiTheme::accentColor(tft));
             tft.setTextSize(2);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(14, (int16_t)(fieldY + 26));
             tft.print(buf);
             tft.setTextSize(1);
@@ -272,7 +273,7 @@ namespace {
     bool addPresetFlow(TFT_eSPI& tft) {
         MenuStars::reset();
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::LOCATION_ADD_CHOICE_TITLE));
 
@@ -406,7 +407,7 @@ namespace {
         constexpr int16_t MARQUEE_CLEAR_TOP = 20;
         constexpr int16_t MARQUEE_CLEAR_H = 26;
         tft.fillRect(x, y - MARQUEE_CLEAR_TOP, w, MARQUEE_CLEAR_H, TFT_BLACK);
-        tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
         // Groessere Schrift fuer den Nearest-Airport-Marquee (auf Wunsch
         // vergroessert von Size 1 auf Size 2) - nach dem Zeichnen wieder auf
         // Size 1 zurueckstellen, damit nachfolgender Code (z.B. der
@@ -471,10 +472,10 @@ namespace {
     // Warteschleife erneut aufgerufen, um den naechsten Scroll-Schritt zu
     // zeichnen.
     void drawRowMarquee(TFT_eSPI& tft, const Rect& r, RowMarquee& m, bool active) {
-        uint16_t bg = active ? TFT_GREEN : TFT_BLACK;
-        uint16_t fg = active ? TFT_BLACK : TFT_GREEN;
+        uint16_t bg = active ? UiTheme::accentColor(tft) : TFT_BLACK;
+        uint16_t fg = active ? TFT_BLACK : UiTheme::accentColor(tft);
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, bg);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, UiTheme::accentColor(tft));
 
         constexpr int16_t PAD = 8;
         int16_t maxWidth = (int16_t)(r.w - 2 * PAD);
@@ -536,11 +537,11 @@ namespace {
 
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::LOCATION_INFO_TITLE));
 
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             int16_t y = VIEW_TOP;
             y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA1), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
             y += 8;
@@ -596,7 +597,7 @@ void run(TFT_eSPI& tft) {
     MenuStars::reset();
     while (!done) {
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::LOCATION_TITLE));
 
@@ -645,7 +646,7 @@ void run(TFT_eSPI& tft) {
             // verschwindet der Punkt wieder - der volle gruene Knopf allein
             // signalisiert dann "GPS aktiv und funktioniert".
             tft.fillCircle((int16_t)(gpsToggleRect.x + gpsToggleRect.w - 8), (int16_t)(gpsToggleRect.y + 8), 3, TFT_BLACK);
-            tft.drawCircle((int16_t)(gpsToggleRect.x + gpsToggleRect.w - 8), (int16_t)(gpsToggleRect.y + 8), 3, TFT_GREEN);
+            tft.drawCircle((int16_t)(gpsToggleRect.x + gpsToggleRect.w - 8), (int16_t)(gpsToggleRect.y + 8), 3, UiTheme::accentColor(tft));
         }
         y += ROW_H + ROW_GAP;
 
@@ -688,9 +689,9 @@ void run(TFT_eSPI& tft) {
                 drawButton(tft, removeRect, "X", false, true);
             } else {
                 tft.fillRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_BLACK);
-                tft.drawRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_DARKGREEN);
+                tft.drawRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, UiTheme::accentColorDimmed(tft, 0.5f));
                 tft.setTextDatum(MC_DATUM);
-                tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+                tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
                 String label = presetWord + " " + String(i + 1) + " " + I18n::t(StringId::LOCATION_PRESET_EMPTY);
                 tft.drawString(label, rowRect.x + rowRect.w / 2, rowRect.y + rowRect.h / 2);
                 tft.setTextDatum(TL_DATUM);
@@ -734,7 +735,7 @@ void run(TFT_eSPI& tft) {
                 String line = String(I18n::t(StringId::LOCATION_NEAREST_AIRPORT_PREFIX)) + buf;
                 setupMarquee(tft, line, AIRPORT_LINE_W);
                 drawMarquee(tft, AIRPORT_LINE_X, airportLineY, AIRPORT_LINE_W, 20);
-                tft.drawRoundRect(airportRect.x, airportRect.y, airportRect.w, airportRect.h, 4, TFT_DARKGREEN);
+                tft.drawRoundRect(airportRect.x, airportRect.y, airportRect.w, airportRect.h, 4, UiTheme::accentColorDimmed(tft, 0.5f));
             } else {
                 airportMarquee.text = "";
             }

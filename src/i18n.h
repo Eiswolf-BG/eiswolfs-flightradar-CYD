@@ -601,6 +601,56 @@ enum class StringId : uint16_t {
     RADAR_CLASSIC_INFO_TITLE,
     RADAR_CLASSIC_INFO_BODY,
 
+    // Vierter Schalter auf der "Radar-Darstellung"-Seite (System > Radar-
+    // Darstellung, radar_theme_screen.cpp, SettingsStore::
+    // militarySquawkDetectionEnabled(), AUS per Default) - markiert
+    // Flugzeuge mit Squawk-Codes aus bekannten Militaer-/Behoerden-/
+    // Sonderflug-Bereichen (siehe MILITARY_SQUAWK_RANGES in
+    // radar_screen.cpp) mit einem oranger Ring, rein visuell, kein Alarm.
+    // MILITARY_SQUAWK_INFO_BODY kommuniziert explizit die Best-Effort-Natur
+    // (keine offizielle/vollstaendige/weltweit gueltige Quelle) - Alex'
+    // ausdruecklicher Wunsch, damit das nicht als verlaessliche
+    // Militaer-Erkennung missverstanden wird.
+    MENU_MILITARY_SQUAWK,
+    MILITARY_SQUAWK_INFO_TITLE,
+    MILITARY_SQUAWK_INFO_BODY,
+
+    // Manuelle SSID-Eingabe fuer versteckte/nicht ausgestrahlte WLAN-
+    // Netzwerke (wifi_setup_screen.cpp) - zusaetzlicher Button auf der
+    // Scan-Ergebnisliste, fuehrt zur selben QWERTY-Texttastatur, die sonst
+    // fuer die Passwort-Eingabe genutzt wird (siehe activeTextBuf/
+    // switchActiveText() dort). Erreichbar sowohl beim Ersteinrichtungs-
+    // Assistenten als auch ueber "WLAN-Netzwerk hinzufuegen" in den
+    // bestehenden WLAN-Einstellungen (WifiManageScreen ruft intern
+    // WifiSetupScreen::run() auf, kein zweiter Eingabeweg noetig).
+    WIFI_MANUAL_SSID,
+    WIFI_ENTER_SSID_LABEL,
+    WIFI_NEXT,
+
+    // "Auto-Helligkeit" (Menue > System > Anzeige > Helligkeit, siehe
+    // brightness_screen.cpp, SettingsStore::autoBrightnessEnabled(), AUS
+    // per Default) - nutzt den eingebauten Lichtsensor (LDR an
+    // Config::LDR_PIN) statt der manuellen Prozent-Einstellung, siehe
+    // auto_brightness.h. AUTO_BRIGHTNESS_INFO_BODY weist explizit auf die
+    // unkalibrierten ADC-Schwellwerte hin (siehe Config::
+    // AUTO_BRIGHTNESS_ADC_MIN/MAX-Kommentar) - kein Hardware-Zugriff
+    // meinerseits zur Verifikation/Kalibrierung moeglich.
+    MENU_AUTO_BRIGHTNESS,
+    AUTO_BRIGHTNESS_INFO_TITLE,
+    AUTO_BRIGHTNESS_INFO_BODY,
+
+    // Fuenfter Schalter auf der "Radar-Darstellung"-Seite (System > Radar-
+    // Darstellung, radar_theme_screen.cpp, SettingsStore::
+    // rainEffectEnabled(), AN per Default) - animierter Regen-Effekt, siehe
+    // radar_screen.cpp. RAIN_EFFECT_INFO_BODY erklaert explizit, dass die
+    // Tropfen der TATSAECHLICHEN Windrichtung folgen und das je nach
+    // Windrichtung wie "nach oben regnen" aussehen kann (physikalisch
+    // korrekt, kein Fehler) - Alex' ausdruecklicher Wunsch, damit das nicht
+    // verwirrt.
+    MENU_RAIN_EFFECT,
+    RAIN_EFFECT_INFO_TITLE,
+    RAIN_EFFECT_INFO_BODY,
+
     COUNT
 };
 

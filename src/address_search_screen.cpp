@@ -10,6 +10,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <cstring>
+#include "ui_theme.h"
 
 namespace AddressSearchScreen {
 
@@ -23,7 +24,7 @@ namespace {
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label,
                      bool active = false, bool danger = false) {
-        uint16_t accent = danger ? TFT_RED : TFT_GREEN;
+        uint16_t accent = danger ? TFT_RED : UiTheme::accentColor(tft);
         uint16_t bg = active ? accent : TFT_BLACK;
         uint16_t fg = active ? TFT_BLACK : accent;
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, bg);
@@ -144,7 +145,7 @@ namespace {
         // (78) anzunehmen. redraw() unten zeichnet denselben Kopf bei jedem
         // Aufruf identisch neu.
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::ADDRESS_SEARCH_TITLE));
         tft.setTextColor(TFT_CYAN, TFT_BLACK);
@@ -188,16 +189,16 @@ namespace {
 
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::ADDRESS_SEARCH_TITLE));
             tft.setTextColor(TFT_CYAN, TFT_BLACK);
             tft.println(I18n::t(StringId::ADDRESS_SEARCH_HINT));
 
             tft.fillRect(8, fieldY, Config::SCREEN_WIDTH - 16, FIELD_H, TFT_BLACK);
-            tft.drawRect(8, fieldY, Config::SCREEN_WIDTH - 16, FIELD_H, TFT_GREEN);
+            tft.drawRect(8, fieldY, Config::SCREEN_WIDTH - 16, FIELD_H, UiTheme::accentColor(tft));
             tft.setTextSize(2);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(14, (int16_t)(fieldY + 26));
             tft.print(visibleTail(tft, buf, (int16_t)(Config::SCREEN_WIDTH - 28)));
             tft.setTextSize(1);
@@ -315,7 +316,7 @@ namespace {
         // tatsaechliche Hoehe per getCursorY() zu messen - selbes Muster wie
         // in runAddressKeyboard() oben.
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::LOCATION_NAME_PROMPT));
         tft.setTextColor(TFT_CYAN, TFT_BLACK);
@@ -348,16 +349,16 @@ namespace {
 
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::LOCATION_NAME_PROMPT));
             tft.setTextColor(TFT_CYAN, TFT_BLACK);
             tft.println(I18n::t(StringId::LOCATION_NAME_HINT));
 
             tft.fillRect(8, fieldY, Config::SCREEN_WIDTH - 16, FIELD_H, TFT_BLACK);
-            tft.drawRect(8, fieldY, Config::SCREEN_WIDTH - 16, FIELD_H, TFT_GREEN);
+            tft.drawRect(8, fieldY, Config::SCREEN_WIDTH - 16, FIELD_H, UiTheme::accentColor(tft));
             tft.setTextSize(2);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(14, (int16_t)(fieldY + 26));
             tft.print(buf);
             tft.setTextSize(1);
@@ -544,7 +545,7 @@ namespace {
 
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::ADDRESS_SEARCH_CONFIRM_TITLE));
 
@@ -589,7 +590,7 @@ bool run(TFT_eSPI& tft) {
 
         tft.fillScreen(TFT_BLACK);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.drawString(I18n::t(StringId::ADDRESS_SEARCH_SEARCHING), Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
         tft.setTextDatum(TL_DATUM);
 

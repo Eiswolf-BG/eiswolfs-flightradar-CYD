@@ -12,6 +12,7 @@ namespace Weather {
 
 namespace {
     Condition currentCondition = Condition::Unknown;
+    float currentWindDirDeg = -1.0f;
     uint32_t lastFetchMs = 0;
     double lastLat = 0;
     double lastLon = 0;
@@ -185,6 +186,12 @@ namespace {
         if (wmoCode < 0) return;
 
         currentCondition = conditionFromWmoCode(wmoCode);
+        // "winddirection" ist Teil derselben current_weather-Antwort - siehe
+        // currentWindDirectionDeg()-Kommentar in weather.h. | -1.0f als
+        // Default, falls das Feld ausnahmsweise fehlen sollte (aendert dann
+        // nichts an einem vorherigen gueltigen Wert).
+        float windDir = doc["current_weather"]["winddirection"] | -1.0f;
+        if (windDir >= 0.0f) currentWindDirDeg = windDir;
 
         // Kurzvorhersage aus dem "hourly"-Teil derselben Antwort - dank
         // start_hour/end_hour oben enthaelt jedes der beiden Arrays hoechstens
@@ -250,6 +257,8 @@ void update() {
 }
 
 Condition current() { return currentCondition; }
+
+float currentWindDirectionDeg() { return currentWindDirDeg; }
 
 Metar currentMetar() { return currentMetarData; }
 

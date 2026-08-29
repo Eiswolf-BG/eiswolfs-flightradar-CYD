@@ -4,6 +4,7 @@
 #include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
+#include "ui_theme.h"
 
 namespace StatsHistoryScreen {
 
@@ -16,7 +17,7 @@ namespace {
     };
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, bool danger = false) {
-        uint16_t accent = danger ? TFT_RED : TFT_GREEN;
+        uint16_t accent = danger ? TFT_RED : UiTheme::accentColor(tft);
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
         tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, accent);
         tft.setTextDatum(MC_DATUM);
@@ -89,11 +90,11 @@ namespace {
 
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::STATS_HISTORY_INFO_TITLE));
 
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             int16_t y = VIEW_TOP;
             layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::STATS_HISTORY_INFO_PARA1), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
 
@@ -130,10 +131,10 @@ namespace {
 
 void run(TFT_eSPI& tft) {
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setCursor(10, 14);
     tft.println(I18n::t(StringId::STATS_HISTORY_TITLE));
-    tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
     tft.setCursor(10, 30);
     tft.print(I18n::t(StringId::LOADING));
 
@@ -158,17 +159,17 @@ void run(TFT_eSPI& tft) {
     MenuStars::reset();
     while (!done) {
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::STATS_HISTORY_TITLE));
         drawButton(tft, infoBtn, "?");
 
         if (barCount == 0) {
-            tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
             tft.setCursor(10, 40);
             tft.println(I18n::t(StringId::STATS_HISTORY_EMPTY));
         } else {
-            tft.drawFastHLine(10, CHART_BOTTOM, (int16_t)(Config::SCREEN_WIDTH - 20), TFT_DARKGREEN);
+            tft.drawFastHLine(10, CHART_BOTTOM, (int16_t)(Config::SCREEN_WIDTH - 20), UiTheme::accentColorDimmed(tft, 0.5f));
 
             int16_t barW = (int16_t)((Config::SCREEN_WIDTH - 20 - (barCount - 1) * 6) / barCount);
             int16_t x = 10;
@@ -177,7 +178,7 @@ void run(TFT_eSPI& tft) {
                 uint32_t dayCount = days[i].count;
 
                 if (dayCount == 0) {
-                    tft.drawFastHLine(x, CHART_BOTTOM, barW, TFT_DARKGREEN);
+                    tft.drawFastHLine(x, CHART_BOTTOM, barW, UiTheme::accentColorDimmed(tft, 0.5f));
                 } else {
                     int16_t barH = (maxCount > 0)
                         ? (int16_t)((uint32_t)USABLE_BAR_HEIGHT * dayCount / maxCount)
@@ -185,10 +186,10 @@ void run(TFT_eSPI& tft) {
                     if (barH < 2) barH = 2;
                     int16_t barTop = CHART_BOTTOM - barH;
 
-                    tft.fillRoundRect(x, barTop, barW, barH, 2, TFT_GREEN);
+                    tft.fillRoundRect(x, barTop, barW, barH, 2, UiTheme::accentColor(tft));
 
                     tft.setTextDatum(BC_DATUM);
-                    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+                    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
                     tft.drawString(String(dayCount), x + barW / 2, barTop - 2);
                     tft.setTextDatum(TL_DATUM);
                 }
@@ -197,7 +198,7 @@ void run(TFT_eSPI& tft) {
                 size_t dateLen = strlen(date);
                 String dayLabel = dateLen >= 2 ? String(date + dateLen - 2) : String(date);
                 tft.setTextDatum(TC_DATUM);
-                tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+                tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
                 tft.drawString(dayLabel, x + barW / 2, DAY_LABEL_Y);
                 tft.setTextDatum(TL_DATUM);
 

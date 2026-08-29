@@ -55,7 +55,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Dual-core design** – all networking (WiFi, ADS-B polling, aircraft detail lookups) runs on Core 0, while the display and touch input run on Core 1, so the UI never freezes during a network request
 - Data (airline names, aircraft-type seat estimates) loaded from CSV files on the SD card, auto-seeded on first boot
 - **6 languages** (English, German, French, Turkish, Spanish, Italian), selectable on first boot or anytime from the menu
-- **Adjustable brightness** (10-100% in 10% steps, Menu → System → "Brightness") with a live preview as you tap
+- **Adjustable brightness** (10-100% in 10% steps, Menu → System → "Brightness") with a live preview as you tap, plus an optional **Auto-Brightness** toggle right on the same screen that uses the device's built-in light sensor instead, smoothed to avoid flickering
 - **Metric/Imperial units** (Menu → Region → "Units") consistently applied across the radar range button, range ring labels, aircraft list, nearest-airport distance, and stats
 - **IATA or ICAO airport codes** (same "Units" screen, or tap the route line directly in the aircraft detail panel) – choose whether the route shown in the aircraft detail panel (origin/destination) uses 3-letter IATA codes (e.g. "FRA") or 4-letter ICAO codes (e.g. "EDDF"); falls back to ICAO automatically if no IATA code is available for a given airport
 - **Firmware version** is shown directly on the "Check for updates" button (Menu → System)
@@ -71,7 +71,7 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Live flight tracking QR code** – a "QR" button in the aircraft detail panel shows a full-screen QR code linking straight to that flight's FlightAware live-tracking page, so you can pull it up on your phone in one scan
 - **Most-seen aircraft ranking** – a "Top" button on the Statistics screen shows the 5 aircraft logged most often across your whole flight logbook (see [Most-Seen Aircraft](#-most-seen-aircraft) below)
 - **METAR flight-weather report** – the Weather Info screen now also shows the raw METAR text for the nearest airport, right below the usual weather explanation (see [Weather Icon](#-weather-icon) below)
-- **Radar Display** – choose between Green, Amber, or Blue for the radar screen (sweep line, panel border/text, buttons) under **Menu → System → "Radar Display"**, plus three independent, combinable extras: a CRT-Phosphor glow effect that fades *every* aircraft marker color (not just low-altitude/green ones) in and out as the sweep passes them, a Radar Pulse animation - an expanding ring from the radar center on every fresh data update, and Classic Radar mode - a comet-tail sweep, extra grid spokes, and a sonar-ping ring plus a brief burst of signal noise whenever a new aircraft first appears; a small "?" help button next to each of the three explains it right on the device
+- **Radar Display** – choose between Green, Amber, or Blue under **Menu → System → "Radar Display"**; the chosen color now applies system-wide (all menus, buttons, borders and text), not just the radar screen - aircraft altitude colors and alert/status colors are unaffected, they always keep their own meaning. Plus five independent, combinable extras: a CRT-Phosphor glow effect that fades *every* aircraft marker color (not just low-altitude/green ones) in and out as the sweep passes them, a Radar Pulse animation - an expanding ring from the radar center on every fresh data update, Classic Radar mode - a comet-tail sweep, extra grid spokes, a sonar-ping ring and a brief burst of signal noise whenever a new aircraft first appears, a best-effort Military/Government flight detection based on known squawk-code ranges (orange ring around the marker, no alert), and an animated Rain effect that shows falling drops over the radar circle - matching the actual wind direction - whenever the weather data detects rain or a thunderstorm; a small "?" help button next to each explains it right on the device
 - **OTA update changelog** – after a firmware update installs successfully, the confirmation screen now shows a short, scrollable list of what changed in that version
 - **Sunrise/sunset times** – the Weather Info screen now also shows today's sunrise and sunset time for your currently active location, right below the METAR report
 - **Short weather forecast** – the Weather Info screen also shows a short forecast (temperature and conditions) 3 hours ahead, and now scrolls automatically if the combined text (including a long METAR report) doesn't fit on one screen
@@ -141,6 +141,12 @@ currently see.
 
 Any saved network can be removed again at any time via the red "X", freeing up a
 slot for a new one.
+
+**Hidden networks:** if your WiFi network doesn't broadcast its name, it won't
+show up in the scan list. An "Other/Hidden SSID" button on that same list lets
+you type the network name manually using the same on-screen keyboard used for
+passwords, then continue straight to the password step as usual - available
+both during first-time setup and when adding a network later.
 
 ### 🌙 Night Dimming
 Between sunset and sunrise at your active location, the backlight automatically dims to a softer brightness level - still perfectly readable, but easier on the eyes if the device sits in a bedroom or living room around the clock. The dimming window follows the real sunrise/sunset time (calculated from your location and the current date), not a fixed clock window, so it automatically shifts earlier in winter and later in summer. Until the location or time of day is known (e.g. briefly after boot), it falls back to a fixed 10pm-6am window. This is separate from the inactivity screen timeout (**Menu → System → "Screen Timeout"**), which turns the display fully off after a period of no touch input, regardless of time of day - handy if you just want the flight logbook running in the background without needing the screen. Tapping the screen wakes it back up to your configured brightness (or the soft night level above, if it's still night).

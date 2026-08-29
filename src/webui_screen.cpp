@@ -5,6 +5,7 @@
 #include "i18n.h"
 #include <WiFi.h>
 #include <qrcode.h>
+#include "ui_theme.h"
 
 namespace WebUiScreen {
 
@@ -18,9 +19,9 @@ namespace {
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label) {
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, UiTheme::accentColor(tft));
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
     }
@@ -123,11 +124,11 @@ void run(TFT_eSPI& tft) {
 
     auto redraw = [&]() {
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::WEBUI_TITLE));
 
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         int16_t y = VIEW_TOP;
         y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::WEBUI_INFO_PARA1), scrollY, VIEW_TOP, viewBottom, true);
         if (!wifiConnected) {

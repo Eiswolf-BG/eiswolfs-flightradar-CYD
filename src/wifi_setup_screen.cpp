@@ -4,6 +4,7 @@
 #include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
+#include "ui_theme.h"
 
 namespace WifiSetupScreen {
 
@@ -66,18 +67,47 @@ namespace {
     constexpr int16_t KEY_GAP   = 3;
     constexpr int16_t SIDE_MARGIN = 4;
 
-    enum class Stage { Scanning, PickSsid, EnterPassword, Connecting, Done };
+    // EnterSsid: manuelle SSID-Eingabe fuer versteckte/nicht ausgestrahlte
+    // Netzwerke (Alex' Wunsch) - nutzt DIESELBE Tastatur wie EnterPassword
+    // (siehe activeTextBuf/switchActiveText() unten), nur mit anderem
+    // Zielpuffer (manualSsidBuf statt passwordBuf) und anderer Beschriftung/
+    // anderem Folgeschritt (fuehrt zu EnterPassword statt direkt zu
+    // verbinden).
+    enum class Stage { Scanning, PickSsid, EnterSsid, EnterPassword, Connecting, Done };
     Stage stage = Stage::Scanning;
 
     constexpr uint8_t MAX_LIST = 16;
-    constexpr uint8_t VISIBLE_ITEMS = 7;
+    // Von 7 auf 6 reduziert, um unten Platz fuer den neuen "Andere/
+    // versteckte SSID"-Button zu schaffen, ohne mit dem Scroll-Pfeil
+    // (downBtn, siehe unten) zu kollidieren - bei 7 reichte downBtn bereits
+    // bis y=294, nur noch 26px Rest bis zum Bildschirmrand (320).
+    constexpr uint8_t VISIBLE_ITEMS = 6;
     String ssidList[MAX_LIST];
     uint8_t ssidCount = 0;
     int8_t selectedIndex = -1;
     uint8_t scrollOffset = 0;
 
+    // Tatsaechliche SSID, mit der am Ende verbunden/gespeichert wird -
+    // entweder aus der Scan-Liste uebernommen (ssidList[selectedIndex]) oder
+    // manuell eingetippt (manualSsidBuf) - EIN gemeinsamer String statt
+    // Sonderfall-Logik weiter unten (Alex' ausdruecklicher Wunsch: "kein
+    // Sonderfall in der Speicherlogik noetig, nur der Eingabeweg
+    // unterscheidet sich").
+    String pendingSsid;
+
     char passwordBuf[64] = {0};
     uint8_t passwordLen = 0;
+    // Max. SSID-Laenge lt. 802.11-Standard: 32 Bytes + Nullterminator.
+    char manualSsidBuf[33] = {0};
+    uint8_t manualSsidLen = 0;
+
+    // Zeigt auf den GERADE aktiven Eingabepuffer fuer die gemeinsam genutzte
+    // Tastatur (handleRowTap()/renderRow() unten) - passwordBuf waehrend
+    // Stage::EnterPassword, manualSsidBuf waehrend Stage::EnterSsid. Per
+    // switchActiveText() umgeschaltet, siehe dort.
+    char* activeTextBuf = passwordBuf;
+    uint8_t* activeTextLen = &passwordLen;
+    size_t activeTextMaxLen = sizeof(passwordBuf) - 1;
 
     enum class ShiftState { Off, OneShot, Locked };
     ShiftState shiftState = ShiftState::Off;
@@ -91,11 +121,20 @@ namespace {
 
     Rect cancelBtn = {Config::SCREEN_WIDTH - 34, 4, 30, 24};
 
+    // "Andere/versteckte SSID"-Button unterhalb der Netzwerkliste (siehe
+    // PickSsid-Stage) - feste Position, unabhaengig von ssidCount, direkt
+    // unter dem tiefstmoeglichen Scroll-Pfeil (downBtn bei VISIBLE_ITEMS=6
+    // reicht bis y=260, siehe dort) mit 6px Abstand, damit auch bei voller
+    // Liste keine Ueberlappung entsteht.
+    constexpr int16_t MANUAL_SSID_BTN_Y = 266;
+    constexpr int16_t MANUAL_SSID_BTN_H = 32;
+    Rect manualSsidBtn = {10, MANUAL_SSID_BTN_Y, (int16_t)(Config::SCREEN_WIDTH - 20), MANUAL_SSID_BTN_H};
+
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, bool highlighted = false) {
-        uint16_t bg = highlighted ? TFT_GREEN : TFT_BLACK;
-        uint16_t fg = highlighted ? TFT_BLACK : TFT_GREEN;
+        uint16_t bg = highlighted ? UiTheme::accentColor(tft) : TFT_BLACK;
+        uint16_t fg = highlighted ? TFT_BLACK : UiTheme::accentColor(tft);
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, bg);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, UiTheme::accentColor(tft));
         tft.setTextDatum(MC_DATUM);
         tft.setTextColor(fg, bg);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
@@ -128,10 +167,10 @@ namespace {
             const KeyDef& k = row[i];
             switch (k.type) {
                 case KeyType::Char:
-                    if (passwordLen < sizeof(passwordBuf) - 1) {
+                    if (*activeTextLen < activeTextMaxLen) {
                         bool upper = (shiftState != ShiftState::Off);
-                        passwordBuf[passwordLen++] = upper ? (char)toupper(k.ch) : k.ch;
-                        passwordBuf[passwordLen] = 0;
+                        activeTextBuf[(*activeTextLen)++] = upper ? (char)toupper(k.ch) : k.ch;
+                        activeTextBuf[*activeTextLen] = 0;
                         if (shiftState == ShiftState::OneShot) shiftState = ShiftState::Off;
                     }
                     break;
@@ -149,9 +188,9 @@ namespace {
                     break;
                 }
                 case KeyType::Backspace:
-                    if (passwordLen > 0) {
-                        passwordLen--;
-                        passwordBuf[passwordLen] = 0;
+                    if (*activeTextLen > 0) {
+                        (*activeTextLen)--;
+                        activeTextBuf[*activeTextLen] = 0;
                     }
                     break;
                 case KeyType::TogglePage:
@@ -175,11 +214,32 @@ namespace {
         }
     }
 
+    // Setzt BEIDE Texteingabe-Puffer zurueck (auch wenn nur einer davon
+    // gerade aktiv ist - kostet praktisch nichts, verhindert aber, dass
+    // beim naechsten Wechsel zwischen SSID-/Passwort-Eingabe alte Reste
+    // vom vorherigen Versuch stehen bleiben) und laesst activeText* danach
+    // auf passwordBuf zeigen (Standardfall: Passwort-Eingabe fuer ein aus
+    // der Liste gewaehltes Netzwerk). Fuer die manuelle SSID-Eingabe direkt
+    // danach switchActiveText() aufrufen, siehe dort.
     void resetKeyboardState() {
         passwordLen = 0;
         passwordBuf[0] = 0;
+        manualSsidLen = 0;
+        manualSsidBuf[0] = 0;
         shiftState = ShiftState::Off;
         page = 0;
+        activeTextBuf = passwordBuf;
+        activeTextLen = &passwordLen;
+        activeTextMaxLen = sizeof(passwordBuf) - 1;
+    }
+
+    // Schaltet die gemeinsam genutzte Tastatur (handleRowTap()/renderRow())
+    // auf einen anderen Zielpuffer um - aktuell nur fuer den Wechsel zur
+    // manuellen SSID-Eingabe gebraucht (siehe PickSsid-Tap-Handler unten).
+    void switchActiveText(char* buf, uint8_t* len, size_t maxLen) {
+        activeTextBuf = buf;
+        activeTextLen = len;
+        activeTextMaxLen = maxLen;
     }
 
     void drawCancelButton(TFT_eSPI& tft) {
@@ -201,7 +261,7 @@ namespace {
         lastScanDotMs = now;
         scanDotPhase = (uint8_t)((scanDotPhase + 1) % 4);
         tft.fillRect(10, 26, 40, 12, TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 26);
         for (uint8_t i = 0; i < scanDotPhase; i++) tft.print(".");
     }
@@ -215,6 +275,7 @@ bool run(TFT_eSPI& tft) {
     ssidCount = 0;
     selectedIndex = -1;
     scrollOffset = 0;
+    pendingSsid = "";
     resetKeyboardState();
     needsRedraw = true;
     scanDotPhase = 0;
@@ -223,7 +284,7 @@ bool run(TFT_eSPI& tft) {
     WifiMgr::beginScan();
 
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setTextSize(1);
     tft.setCursor(10, 14);
     tft.println(I18n::t(StringId::WIFI_SCANNING));
@@ -246,7 +307,7 @@ bool run(TFT_eSPI& tft) {
 
             tft.fillScreen(TFT_BLACK);
             tft.setCursor(10, 14);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.println(ssidCount == 0 ? I18n::t(StringId::WIFI_NO_NETWORKS) : I18n::t(StringId::WIFI_SELECT));
             drawCancelButton(tft);
 
@@ -265,11 +326,11 @@ bool run(TFT_eSPI& tft) {
             WifiMgr::update();
             if (WifiMgr::getState() == WifiMgr::State::Connected) {
                 connectSucceeded = true;
-                WifiMgr::addNetwork(ssidList[selectedIndex].c_str(), passwordBuf);
+                WifiMgr::addNetwork(pendingSsid.c_str(), passwordBuf);
                 stage = Stage::Done;
                 tft.fillScreen(TFT_BLACK);
                 tft.setCursor(10, 14);
-                tft.setTextColor(TFT_GREEN, TFT_BLACK);
+                tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
                 tft.println(I18n::t(StringId::WIFI_CONNECTED_BANG));
                 delay(900);
                 return true;
@@ -279,7 +340,7 @@ bool run(TFT_eSPI& tft) {
                 tft.setCursor(10, 14);
                 tft.setTextColor(TFT_RED, TFT_BLACK);
                 tft.println(I18n::t(StringId::WIFI_CONNECTION_FAILED));
-                tft.setTextColor(TFT_GREEN, TFT_BLACK);
+                tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
                 tft.setCursor(10, 30);
                 tft.println(I18n::t(StringId::WIFI_BACK_TO_LIST_MSG));
                 delay(1400);
@@ -297,6 +358,7 @@ bool run(TFT_eSPI& tft) {
                     Rect r = {10, (int16_t)(34 + row * 34), (int16_t)(Config::SCREEN_WIDTH - 20), 30};
                     if (r.contains(tap.x, tap.y)) {
                         selectedIndex = idx;
+                        pendingSsid = ssidList[idx];
                         resetKeyboardState();
                         stage = Stage::EnterPassword;
                         needsRedraw = true;
@@ -318,9 +380,21 @@ bool run(TFT_eSPI& tft) {
                     if (downBtn.contains(tap.x, tap.y) && scrollOffset + VISIBLE_ITEMS < ssidCount) { scrollOffset++; needsRedraw = true; }
                 }
             }
+            // "Andere/versteckte SSID"-Button - IMMER sichtbar/antippbar,
+            // auch wenn ssidCount==0 (der Sinn hinter versteckten Netzwerken
+            // ist ja gerade, dass sie im Scan gar nicht erst auftauchen).
+            // Fuehrt zur selben Tastatur wie die Passwort-Eingabe, nur mit
+            // manualSsidBuf als Ziel (switchActiveText()) und Stage::EnterSsid
+            // statt Stage::EnterPassword als naechstem Schritt.
+            if (manualSsidBtn.contains(tap.x, tap.y)) {
+                resetKeyboardState();
+                switchActiveText(manualSsidBuf, &manualSsidLen, sizeof(manualSsidBuf) - 1);
+                stage = Stage::EnterSsid;
+                needsRedraw = true;
+            }
         }
 
-        if (tapped && stage == Stage::EnterPassword) {
+        if (tapped && (stage == Stage::EnterSsid || stage == Stage::EnterPassword)) {
             int16_t rowY0 = KB_TOP;
             int16_t rowY1 = KB_TOP + (ROW_H + ROW_GAP);
             int16_t rowY2 = KB_TOP + 2 * (ROW_H + ROW_GAP);
@@ -338,34 +412,46 @@ bool run(TFT_eSPI& tft) {
             }
 
             if (!handled) {
-                Rect spaceBtn   = {SIDE_MARGIN, rowYFn, 150, ROW_H};
-                Rect connectBtn = {SIDE_MARGIN + 154, rowYFn, Config::SCREEN_WIDTH - 2*SIDE_MARGIN - 154, ROW_H};
-                Rect backBtn    = {SIDE_MARGIN, (int16_t)(rowYFn + ROW_H + ROW_GAP), (int16_t)(Config::SCREEN_WIDTH - 2*SIDE_MARGIN), 28};
+                Rect spaceBtn    = {SIDE_MARGIN, rowYFn, 150, ROW_H};
+                Rect submitBtn   = {SIDE_MARGIN + 154, rowYFn, Config::SCREEN_WIDTH - 2*SIDE_MARGIN - 154, ROW_H};
+                Rect backBtn     = {SIDE_MARGIN, (int16_t)(rowYFn + ROW_H + ROW_GAP), (int16_t)(Config::SCREEN_WIDTH - 2*SIDE_MARGIN), 28};
 
                 if (spaceBtn.contains(tap.x, tap.y)) {
-                    if (passwordLen < sizeof(passwordBuf) - 1) {
-                        passwordBuf[passwordLen++] = ' ';
-                        passwordBuf[passwordLen] = 0;
+                    if (*activeTextLen < activeTextMaxLen) {
+                        activeTextBuf[(*activeTextLen)++] = ' ';
+                        activeTextBuf[*activeTextLen] = 0;
                     }
-                } else if (connectBtn.contains(tap.x, tap.y)) {
-                    if (WifiMgr::networkCount() >= Config::MAX_WIFI_NETWORKS) {
+                } else if (submitBtn.contains(tap.x, tap.y)) {
+                    if (stage == Stage::EnterSsid) {
+                        // Leere SSID ergibt keinen Sinn - Tap wird einfach
+                        // ignoriert (kein Fehlertext noetig, der Nutzer
+                        // sieht ja direkt, dass sich nichts tut).
+                        if (manualSsidLen > 0) {
+                            pendingSsid = String(manualSsidBuf);
+                            resetKeyboardState();
+                            stage = Stage::EnterPassword;
+                            needsRedraw = true;
+                        }
+                    } else {
+                        if (WifiMgr::networkCount() >= Config::MAX_WIFI_NETWORKS) {
+                            tft.fillScreen(TFT_BLACK);
+                            tft.setCursor(10, 14);
+                            tft.setTextColor(TFT_RED, TFT_BLACK);
+                            tft.println(I18n::t(StringId::WIFI_ALREADY_3));
+                            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+                            tft.setCursor(10, 30);
+                            tft.println(I18n::t(StringId::WIFI_REMOVE_ONE_FIRST));
+                            delay(1600);
+                            skipped = true;
+                            break;
+                        }
+                        WifiMgr::connectTo(pendingSsid.c_str(), passwordBuf);
+                        stage = Stage::Connecting;
                         tft.fillScreen(TFT_BLACK);
                         tft.setCursor(10, 14);
-                        tft.setTextColor(TFT_RED, TFT_BLACK);
-                        tft.println(I18n::t(StringId::WIFI_ALREADY_3));
-                        tft.setTextColor(TFT_GREEN, TFT_BLACK);
-                        tft.setCursor(10, 30);
-                        tft.println(I18n::t(StringId::WIFI_REMOVE_ONE_FIRST));
-                        delay(1600);
-                        skipped = true;
-                        break;
+                        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+                        tft.println(I18n::t(StringId::WIFI_CONNECTING));
                     }
-                    WifiMgr::connectTo(ssidList[selectedIndex].c_str(), passwordBuf);
-                    stage = Stage::Connecting;
-                    tft.fillScreen(TFT_BLACK);
-                    tft.setCursor(10, 14);
-                    tft.setTextColor(TFT_GREEN, TFT_BLACK);
-                    tft.println(I18n::t(StringId::WIFI_CONNECTING));
                 } else if (backBtn.contains(tap.x, tap.y)) {
                     stage = Stage::PickSsid;
                     needsRedraw = true;
@@ -396,20 +482,26 @@ bool run(TFT_eSPI& tft) {
                 drawButton(tft, upBtn, "^");
                 drawButton(tft, downBtn, "v");
             }
+            drawButton(tft, manualSsidBtn, I18n::t(StringId::WIFI_MANUAL_SSID));
             drawCancelButton(tft);
-        } else if (stage == Stage::EnterPassword) {
+        } else if (stage == Stage::EnterSsid || stage == Stage::EnterPassword) {
+            bool isSsidStage = (stage == Stage::EnterSsid);
             tft.fillRect(0, 0, Config::SCREEN_WIDTH, KB_TOP - 4, TFT_BLACK);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
-            tft.printf("%s%s", I18n::t(StringId::WIFI_LABEL_PREFIX), ssidList[selectedIndex].c_str());
-            tft.setCursor(10, 22);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.println(I18n::t(StringId::WIFI_PASSWORD_LABEL));
+            if (isSsidStage) {
+                tft.println(I18n::t(StringId::WIFI_ENTER_SSID_LABEL));
+            } else {
+                tft.printf("%s%s", I18n::t(StringId::WIFI_LABEL_PREFIX), pendingSsid.c_str());
+                tft.setCursor(10, 22);
+                tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+                tft.println(I18n::t(StringId::WIFI_PASSWORD_LABEL));
+            }
             tft.fillRect(8, 38, Config::SCREEN_WIDTH - 16, 22, TFT_BLACK);
-            tft.drawRect(8, 38, Config::SCREEN_WIDTH - 16, 22, TFT_GREEN);
+            tft.drawRect(8, 38, Config::SCREEN_WIDTH - 16, 22, UiTheme::accentColor(tft));
             tft.setCursor(12, 56);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.print(passwordBuf);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+            tft.print(activeTextBuf);
 
             int16_t rowY0 = KB_TOP;
             int16_t rowY1 = KB_TOP + (ROW_H + ROW_GAP);
@@ -426,11 +518,11 @@ bool run(TFT_eSPI& tft) {
                 renderRow(tft, ROW_SYMBOLS_C, rowY2);
             }
 
-            Rect spaceBtn   = {SIDE_MARGIN, rowYFn, 150, ROW_H};
-            Rect connectBtn = {SIDE_MARGIN + 154, rowYFn, Config::SCREEN_WIDTH - 2*SIDE_MARGIN - 154, ROW_H};
-            Rect backBtn    = {SIDE_MARGIN, (int16_t)(rowYFn + ROW_H + ROW_GAP), (int16_t)(Config::SCREEN_WIDTH - 2*SIDE_MARGIN), 28};
+            Rect spaceBtn  = {SIDE_MARGIN, rowYFn, 150, ROW_H};
+            Rect submitBtn = {SIDE_MARGIN + 154, rowYFn, Config::SCREEN_WIDTH - 2*SIDE_MARGIN - 154, ROW_H};
+            Rect backBtn   = {SIDE_MARGIN, (int16_t)(rowYFn + ROW_H + ROW_GAP), (int16_t)(Config::SCREEN_WIDTH - 2*SIDE_MARGIN), 28};
             drawButton(tft, spaceBtn, I18n::t(StringId::WIFI_SPACE));
-            drawButton(tft, connectBtn, I18n::t(StringId::WIFI_CONNECT));
+            drawButton(tft, submitBtn, isSsidStage ? I18n::t(StringId::WIFI_NEXT) : I18n::t(StringId::WIFI_CONNECT));
             drawButton(tft, backBtn, I18n::t(StringId::WIFI_BACK_TO_LIST_BTN));
         }
 

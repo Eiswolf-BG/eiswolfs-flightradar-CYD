@@ -5,6 +5,7 @@
 #include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
+#include "ui_theme.h"
 
 namespace FirstRunLocationScreen {
 
@@ -17,9 +18,9 @@ namespace {
     };
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label) {
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, UiTheme::accentColor(tft));
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
     }
@@ -51,7 +52,7 @@ namespace {
 void run(TFT_eSPI& tft) {
     MenuStars::reset();
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setCursor(10, 14);
     tft.println(I18n::t(StringId::FIRST_RUN_LOCATION_TITLE));
 

@@ -338,6 +338,22 @@ static const char* const I18N_DE[] = {
     "Bei jedem neuen Datenupdate expandiert ein heller Ring vom Radar-Zentrum aus nach außen und fadet dabei aus.",
     "Über Klassik-Radar",
     "Aktiviert mehrere klassische Radarschirm-Effekte gleichzeitig: ein Kometenschweif hinter der Sweep-Linie, zusätzliche Rasterspeichen, sowie ein Sonar-Ping-Ring und kurzes Signal-Rauschen, sobald ein neues Flugzeug zum ersten Mal auf dem Radar erscheint.",
+
+    "Militär/Behörden",
+    "Über Militär-/Behördenflug-Erkennung",
+    "Markiert Flugzeuge mit einem orangen Ring, deren Squawk-Code in einen von mehreren öffentlich dokumentierten Militär-/Behörden-/Sonderflug-Bereichen fällt (z.B. bestimmte NORAD-reservierte Codes in den USA). Das ist eine Best-Effort-Einschätzung ohne Garantie auf Vollständigkeit oder Korrektheit - keine offizielle Quelle, stark regions- und luftraumabhängig, und kein Ersatz für eine verlässliche Identifikation.",
+
+    "Andere/versteckte SSID",
+    "Netzwerkname (SSID):",
+    "Weiter",
+
+    "Auto-Helligkeit",
+    "Über Auto-Helligkeit",
+    "Passt die Bildschirmhelligkeit automatisch anhand des eingebauten Lichtsensors an, statt den manuell eingestellten Wert zu nutzen - mit Glättung gegen Flackern bei schwankendem Licht. Die genaue Kalibrierung ist ein Schätzwert und wurde nicht am echten Gerät abgeglichen; falls die Helligkeit zu extrem oder zu träge wirkt, bitte Rückmeldung geben.",
+
+    "Regen-Effekt",
+    "Über den Regen-Effekt",
+    "Nur sichtbar, wenn die Wetterdaten tatsächlich Regen oder Gewitter zeigen. Die Tropfen bewegen sich in die tatsächliche Windrichtung - je nach Wind kann es deshalb so aussehen, als würde es auf dem Radar nach oben regnen (z.B. bei Wind aus Süden). Das ist physikalisch korrekt und kein Fehler.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

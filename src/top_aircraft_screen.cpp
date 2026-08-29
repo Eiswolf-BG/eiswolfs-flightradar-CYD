@@ -4,6 +4,7 @@
 #include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
+#include "ui_theme.h"
 
 // "Meistgesehene Flugzeuge"-Rangliste - erreichbar ueber den kleinen "Top"-
 // Button oben rechts im Statistik-Screen (siehe stats_screen.cpp). Einfache
@@ -21,9 +22,9 @@ namespace {
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label) {
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, UiTheme::accentColor(tft));
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
     }
@@ -35,10 +36,10 @@ namespace {
 
 void run(TFT_eSPI& tft) {
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setCursor(10, 14);
     tft.println(I18n::t(StringId::TOP_AIRCRAFT_TITLE));
-    tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
     tft.setCursor(10, ROW_TOP);
     tft.print(I18n::t(StringId::LOADING));
 
@@ -49,12 +50,12 @@ void run(TFT_eSPI& tft) {
 
     MenuStars::reset();
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setCursor(10, 14);
     tft.println(I18n::t(StringId::TOP_AIRCRAFT_TITLE));
 
     if (count == 0) {
-        tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
         tft.setCursor(10, ROW_TOP);
         tft.print(I18n::t(StringId::TOP_AIRCRAFT_EMPTY));
     } else {
@@ -62,11 +63,11 @@ void run(TFT_eSPI& tft) {
             int16_t y = ROW_TOP + i * ROW_H;
             String label = top[i].reg[0] ? String(top[i].reg) : String(top[i].hex);
 
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, y);
             tft.print(String(i + 1) + ". " + label);
 
-            tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
             tft.setCursor(20, y + 16);
             tft.print(String(top[i].sightings) + I18n::t(StringId::TOP_AIRCRAFT_SIGHTINGS_SUFFIX));
         }

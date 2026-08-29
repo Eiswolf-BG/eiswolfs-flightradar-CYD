@@ -339,6 +339,22 @@ static const char* const I18N_EN[] = {
     "A bright ring expands outward from the radar center and fades out with every fresh data update.",
     "About Classic Radar",
     "Enables several classic radar screen effects at once: a comet tail behind the sweep line, extra grid spokes, plus a sonar-ping ring and a brief burst of signal noise whenever a new aircraft first appears on the radar.",
+
+    "Military/Govt",
+    "About Military/Government Flight Detection",
+    "Marks aircraft with an orange ring whose squawk code falls into one of several publicly documented military/government/special-flight ranges (e.g. certain NORAD-reserved codes in the US). This is a best-effort guess with no guarantee of completeness or accuracy - not an official source, highly region- and airspace-dependent, and not a reliable identification method.",
+
+    "Other/Hidden SSID",
+    "Network name (SSID):",
+    "Next",
+
+    "Auto Brightness",
+    "About Auto Brightness",
+    "Automatically adjusts screen brightness using the built-in light sensor instead of the manually set value - smoothed to avoid flickering when the light level fluctuates. The exact calibration is an estimate and hasn't been verified on real hardware; if the brightness feels too extreme or too sluggish, please report back.",
+
+    "Rain Effect",
+    "About the Rain Effect",
+    "Only visible when the weather data actually shows rain or a thunderstorm. The drops move in the actual wind direction - depending on the wind, this can make it look like it's raining upward on the radar (e.g. with wind from the south). That's physically correct, not a bug.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

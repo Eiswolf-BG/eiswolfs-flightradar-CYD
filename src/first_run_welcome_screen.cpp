@@ -4,6 +4,7 @@
 #include "config.h"
 #include "sd_storage.h"
 #include <math.h>
+#include "ui_theme.h"
 
 namespace FirstRunWelcomeScreen {
 
@@ -147,7 +148,7 @@ namespace {
     // instead, so the exact same shape results for any cy (see comment
     // above drawRadarReticle).
     void drawAirplane(TFT_eSPI& tft, int16_t cx, int16_t cy) {
-        uint16_t color = TFT_GREEN;
+        uint16_t color = UiTheme::accentColor(tft);
 
         tft.drawTriangle((int16_t)(cx + 15), (int16_t)(cy - 32),
                           (int16_t)(cx - 15), (int16_t)(cy + 26),
@@ -186,7 +187,7 @@ namespace {
     // stars").
     void drawButtonFrame(TFT_eSPI& tft, const Rect& r) {
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 8, TFT_BLACK);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 8, TFT_GREEN);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 8, UiTheme::accentColor(tft));
     }
 
     // MC_DATUM centers based on the font metrics, but the built-in
@@ -245,9 +246,9 @@ namespace {
         for (uint8_t i = 0; i < 3; i++) {
             int16_t dx = (int16_t)(startX + i * SPACING);
             if (i < litCount) {
-                tft.fillCircle(dx, cy, 4, TFT_GREEN);
+                tft.fillCircle(dx, cy, 4, UiTheme::accentColor(tft));
             } else {
-                tft.drawCircle(dx, cy, 4, TFT_GREEN);
+                tft.drawCircle(dx, cy, 4, UiTheme::accentColor(tft));
             }
         }
     }
@@ -289,7 +290,7 @@ namespace {
 void run(TFT_eSPI& tft) {
     MenuStars::reset();
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
 
     // Title: bigger (size 2), bold, centered - "the headline and logo are
     // more important", so much more prominent than the previous small
@@ -327,7 +328,7 @@ void run(TFT_eSPI& tft) {
     drawRadarGroup(tft, (int16_t)(Config::SCREEN_WIDTH / 2), cy);
 
     drawButtonFrame(tft, startBtn);
-    drawStartText(tft, startBtn, TFT_GREEN);
+    drawStartText(tft, startBtn, UiTheme::accentColor(tft));
 
     while (true) {
         TouchInput::Point tap;

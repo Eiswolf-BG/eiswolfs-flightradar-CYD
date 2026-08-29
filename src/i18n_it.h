@@ -338,6 +338,22 @@ static const char* const I18N_IT[] = {
     "Un anello luminoso si espande dal centro del radar verso l'esterno e si affievolisce a ogni nuovo aggiornamento dei dati.",
     "Info su Radar classico",
     "Attiva più effetti radar classici contemporaneamente: una scia cometa dietro la linea di scansione, razze aggiuntive della griglia, oltre a un anello sonar e un breve disturbo del segnale ogni volta che un nuovo aereo appare per la prima volta sul radar.",
+
+    "Militare/Governo",
+    "Info su Rilevamento voli militari/governativi",
+    "Contrassegna con un anello arancione gli aerei il cui codice squawk rientra in uno dei diversi intervalli militari/governativi/voli speciali documentati pubblicamente (ad es. alcuni codici riservati al NORAD negli USA). Si tratta di una stima best-effort senza garanzia di completezza o correttezza - non è una fonte ufficiale, dipende fortemente dalla regione e dallo spazio aereo, e non è un metodo di identificazione affidabile.",
+
+    "Altro SSID/nascosto",
+    "Nome rete (SSID):",
+    "Avanti",
+
+    "Luminosità automatica",
+    "Info su Luminosità automatica",
+    "Regola automaticamente la luminosità dello schermo usando il sensore di luce integrato, invece del valore impostato manualmente - con attenuazione per evitare sfarfallii in caso di luce variabile. La calibrazione esatta è una stima non verificata su un dispositivo reale; se la luminosità sembra troppo estrema o troppo lenta, segnalalo pure.",
+
+    "Effetto pioggia",
+    "Info su Effetto pioggia",
+    "Visibile solo quando i dati meteo mostrano effettivamente pioggia o temporale. Le gocce si muovono nella direzione reale del vento - a seconda del vento, questo può far sembrare che sul radar piova verso l'alto (ad es. con vento da sud). È fisicamente corretto, non un errore.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

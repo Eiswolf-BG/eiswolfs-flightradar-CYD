@@ -31,6 +31,17 @@ namespace Weather {
     // Lesen ist unkritisch).
     Condition current();
 
+    // Windrichtung in Grad (meteorologische Konvention: Richtung, AUS der
+    // der Wind weht, 0=Nord, im Uhrzeigersinn) - Teil derselben Open-Meteo-
+    // "current_weather"-Antwort wie current() oben (fetchNow() in
+    // weather.cpp). Aktuell von keinem Aufrufer genutzt (ein testweise
+    // gebauter Regenfront-Layer auf dem Radar wurde wieder entfernt, da er
+    // keinen Mehrwert zum bestehenden Header-Wetter-Icon brachte) - bewusst
+    // als Rohdaten-Zugriff fuer spaetere Zwecke stehen gelassen. -1 = noch
+    // keine erfolgreiche Abfrage. Wie current() nur vom NetTask
+    // geschrieben, vom UI-Thread gelesen - kein Lock noetig.
+    float currentWindDirectionDeg();
+
     // Roher METAR-Text (Flugwetterbericht) fuer den naechstgelegenen
     // Flughafen (per AirportLookup::findNearest() zum aktuell aktiven
     // Standort ermittelt) - ergaenzt die einfache Icon-Wetteranzeige um die

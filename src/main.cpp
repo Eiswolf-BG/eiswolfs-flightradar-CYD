@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include <time.h>
 #include <qrcode.h>
+#include "ui_theme.h"
 
 #include "config.h"
 #include "aircraft.h"
@@ -45,6 +46,7 @@
 #include "ui_font.h"
 #include "changelog.h"
 #include "ota_update.h"
+#include "auto_brightness.h"
 #include <math.h>
 
 TFT_eSPI tft = TFT_eSPI();
@@ -84,9 +86,18 @@ uint32_t lastScreensaverClockMs = 0;
 
 // Wandelt die Nutzer-Helligkeit (Menue > System > Helligkeit, 10-100%) in
 // einen PWM-Wert 0-255 um - ersetzt das bisher fest verdrahtete
-// BACKLIGHT_FULL als "normale" Helligkeit ueberall unten.
+// BACKLIGHT_FULL als "normale" Helligkeit ueberall unten. Bei aktiver
+// Auto-Helligkeit (SettingsStore::autoBrightnessEnabled()) wird der
+// gespeicherte manuelle Prozentwert durch den zuletzt vom Lichtsensor
+// abgeleiteten, geglaetteten Wert ersetzt (siehe auto_brightness.h) - ALLE
+// Aufrufer dieser Funktion (Nachtmodus, Ruhebildschirm-Dimmung, normaler
+// Boot-Wert) profitieren dadurch automatisch mit, ohne selbst etwas ueber
+// Auto-Helligkeit wissen zu muessen.
 uint8_t normalBacklightPwm() {
-    return (uint8_t)((uint16_t)SettingsStore::brightnessPercent() * 255 / 100);
+    uint8_t percent = SettingsStore::autoBrightnessEnabled()
+        ? AutoBrightness::currentPercent()
+        : SettingsStore::brightnessPercent();
+    return (uint8_t)((uint16_t)percent * 255 / 100);
 }
 
 // Nachtmodus-Helligkeit RELATIV zur normalen Helligkeit (siehe
@@ -291,8 +302,8 @@ void drawEyeFilterIcon() {
     int16_t cx = (int16_t)(eyeIconRect.x + eyeIconRect.w / 2);
     int16_t cy = (int16_t)(eyeIconRect.y + eyeIconRect.h / 2);
     tft.fillRect(eyeIconRect.x, eyeIconRect.y, eyeIconRect.w, eyeIconRect.h, TFT_BLACK);
-    tft.drawCircle(cx, cy, 6, TFT_GREEN);
-    tft.fillCircle(cx, cy, 2, TFT_GREEN);
+    tft.drawCircle(cx, cy, 6, UiTheme::accentColor(tft));
+    tft.fillCircle(cx, cy, 2, UiTheme::accentColor(tft));
 }
 
 // Kleine, mit einfachen TFT_eSPI-Grundformen gezeichnete Wolke (kein
@@ -458,7 +469,7 @@ void showWeatherInfo(TFT_eSPI& tftRef) {
         body += String(I18n::t(StringId::WEATHER_FORECAST_PREFIX)) + tempBuf + ", " + conditionLabel(forecast.condition);
     }
 
-    MenuScreen::showInfoScreen(tftRef, I18n::t(StringId::WEATHER_INFO_TITLE), body, TFT_GREEN, I18n::t(StringId::BACK));
+    MenuScreen::showInfoScreen(tftRef, I18n::t(StringId::WEATHER_INFO_TITLE), body, UiTheme::accentColor(tft), I18n::t(StringId::BACK));
 }
 
 void drawWifiIcon(int16_t rightX, int16_t rowTop, int16_t rowH, int8_t rssi) {
@@ -477,7 +488,7 @@ void drawWifiIcon(int16_t rightX, int16_t rowTop, int16_t rowH, int8_t rssi) {
 
     for (uint8_t i = 0; i < BAR_COUNT; i++) {
         int16_t barH = 3 + i * 2;
-        uint16_t color = (i < level) ? TFT_GREEN : TFT_DARKGREY;
+        uint16_t color = (i < level) ? UiTheme::accentColor(tft) : TFT_DARKGREY;
         tft.fillRect(x, baseline - barH, BAR_W, barH, color);
         x += BAR_W + BAR_GAP;
     }
@@ -611,7 +622,7 @@ void drawScreensaverClock() {
         constexpr int16_t CLOCK_BAND_H = 44;
         tft.fillRect(0, (int16_t)(SCREENSAVER_CLOCK_CY - CLOCK_BAND_H / 2), Config::SCREEN_WIDTH, CLOCK_BAND_H, TFT_BLACK);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
         tft.setTextSize(3);
         tft.drawString(timeBuf, Config::SCREEN_WIDTH / 2, SCREENSAVER_CLOCK_CY);
         tft.setTextSize(1);
@@ -626,7 +637,7 @@ void drawScreensaverClock() {
         constexpr int16_t DATE_BAND_H = 20;
         tft.fillRect(0, (int16_t)(SCREENSAVER_DATE_CY - DATE_BAND_H / 2), Config::SCREEN_WIDTH, DATE_BAND_H, TFT_BLACK);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
         tft.setTextSize(2);
         tft.drawString(dateBuf, Config::SCREEN_WIDTH / 2, SCREENSAVER_DATE_CY);
         tft.setTextSize(1);
@@ -653,11 +664,11 @@ void updateWifiIcon() {
 // Einstiegspunkt definiert wird. Gleiches Zeichen-/Ablaufmuster wie
 // radar_screen.cpp::runFlightQrScreen() (dort
 // fuer den Live-Tracking-Link eines konkreten Fluges), hier aber ohne
-// dynamischen Inhalt - Titel und Ziel-URL sind fest. Bewusst fest TFT_GREEN
-// statt RadarScreen::themeColor() - alle anderen Vollbild-Screens in
-// main.cpp (z.B. showWeatherInfo()) bleiben ebenfalls fest gruen, nur der
-// persistente Menu-Header-Button folgt dem gewaehlten Farbschema (siehe
-// Kommentar bei RadarScreen::themeColor() in radar_screen.h).
+// dynamischen Inhalt - Titel und Ziel-URL sind fest. Folgt wie mittlerweile
+// JEDER Screen im Projekt dem gewaehlten Radar-Farbschema (siehe
+// ui_theme.h) - frueher war das nur dem persistenten Menu-Header-Button
+// vorbehalten, alle anderen Screens blieben fest gruen; das wurde auf
+// Alex' ausdruecklichen Wunsch aufgehoben.
 void runGithubQrScreen(TFT_eSPI& tftRef) {
     MenuStars::reset();
     tftRef.setTextSize(1);
@@ -863,6 +874,34 @@ void updateNightDimming() {
     }
 }
 
+// Letzter tatsaechlich angewendeter Auto-Helligkeits-Prozentwert - anders
+// als updateNightDimming() oben (das nur bei einem Tag/Nacht-UEBERGANG neu
+// schreibt) muss hier bei JEDEM 1-Sekunden-Takt ein frischer Sensorwert
+// verglichen werden, da sich Umgebungshelligkeit kontinuierlich aendern
+// kann. -1 sorgt dafuer, dass der allererste Aufruf immer ein ledcWrite()
+// ausloest (0 waere ein gueltiger Prozentwert und koennte den allerersten
+// Vergleich faelschlich als "keine Aenderung" werten).
+int16_t lastAppliedAutoBrightnessPercent = -1;
+
+// Regelmaessige Anwendung der Auto-Helligkeit (Menue > System > Anzeige >
+// Helligkeit > "Auto-Helligkeit") - macht nichts, wenn das Feature aus ist
+// oder der Bildschirm gerade durch den Inaktivitaets-Timeout abgedunkelt
+// ist (screenDimmed hat Vorrang, gleiches Prinzip wie updateNightDimming()
+// oben). Respektiert den aktuellen Nachtmodus-Status (nightDimActive), statt
+// ihn zu ueberschreiben - beide Dimm-Mechanismen komponieren so sauber
+// miteinander (nightDimBacklightPwm() rechnet ohnehin relativ zu
+// normalBacklightPwm(), das bereits den Auto-Helligkeits-Wert kennt).
+void updateAutoBrightnessBacklight() {
+    if (screenDimmed) return;
+    if (!SettingsStore::autoBrightnessEnabled()) return;
+
+    AutoBrightness::update();
+    uint8_t percent = AutoBrightness::currentPercent();
+    if ((int16_t)percent == lastAppliedAutoBrightnessPercent) return;
+    lastAppliedAutoBrightnessPercent = percent;
+    ledcWrite(BACKLIGHT_PWM_CHANNEL, nightDimActive ? nightDimBacklightPwm() : normalBacklightPwm());
+}
+
 void haltWithSdRequiredScreen() {
     tft.invertDisplay(true);
 
@@ -871,14 +910,14 @@ void haltWithSdRequiredScreen() {
     int16_t cx = Config::SCREEN_WIDTH / 2;
     int16_t cy = Config::SCREEN_HEIGHT / 2;
 
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setTextSize(2);
     tft.drawString(I18n::t(StringId::SD_REQUIRED_LINE1), cx, cy - 40);
     tft.drawString(I18n::t(StringId::SD_REQUIRED_LINE2), cx, cy - 10);
     tft.drawString(I18n::t(StringId::SD_REQUIRED_LINE3), cx, cy + 20);
 
     tft.setTextSize(1);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.drawString(I18n::t(StringId::SD_REQUIRED_HINT), cx, cy + 60);
     tft.setTextDatum(TL_DATUM);
 
@@ -959,7 +998,7 @@ void showWhatsNewIfNeeded(TFT_eSPI& tftRef) {
 
     String body = String(I18n::t(StringId::OTA_CHANGELOG_LABEL)) + "\n" + Config::changelogLatest();
     MenuScreen::showInfoScreen(tftRef, I18n::t(StringId::OTA_UPDATE_SUCCESS), body,
-                                TFT_GREEN, I18n::t(StringId::OK));
+                                UiTheme::accentColor(tft), I18n::t(StringId::OK));
 }
 
 void setup() {
@@ -971,6 +1010,14 @@ void setup() {
     tft.setFreeFont(&UiFont11pt);
     tft.invertDisplay(true);
     tft.fillScreen(TFT_BLACK);
+
+    // VOR dem ersten ledcWrite()/normalBacklightPwm()-Aufruf unten - sonst
+    // waere AutoBrightness::currentPercent() noch 0 (kein Messwert), falls
+    // Auto-Helligkeit aus einer frueheren Sitzung bereits aktiviert
+    // gespeichert ist (SettingsStore::load() ist an dieser Stelle zwar noch
+    // nicht gelaufen, das ist aber egal - begin() nimmt so oder so bereits
+    // einen ersten Messwert, unabhaengig vom Schalterzustand).
+    AutoBrightness::begin();
 
     ledcSetup(BACKLIGHT_PWM_CHANNEL, 5000, 8);
     ledcAttachPin(TFT_BL, BACKLIGHT_PWM_CHANNEL);
@@ -1317,6 +1364,7 @@ void loop() {
             lastStatusLineMs = nowMs;
             updateStatusLine();
             updateNightDimming();
+            updateAutoBrightnessBacklight();
         }
     }
 

@@ -5,6 +5,7 @@
 #include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
+#include "ui_theme.h"
 
 namespace WifiManageScreen {
 
@@ -17,7 +18,7 @@ namespace {
     };
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, bool danger = false) {
-        uint16_t accent = danger ? TFT_RED : TFT_GREEN;
+        uint16_t accent = danger ? TFT_RED : UiTheme::accentColor(tft);
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
         tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, accent);
         tft.setTextDatum(MC_DATUM);
@@ -85,11 +86,11 @@ namespace {
 
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::WIFI_INFO_TITLE));
 
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             int16_t y = VIEW_TOP;
             y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::WIFI_INFO_PARA1), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
             y += 8;
@@ -137,7 +138,7 @@ void run(TFT_eSPI& tft) {
     MenuStars::reset();
     while (!done) {
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::WIFI_NETWORKS_TITLE));
 
@@ -161,9 +162,9 @@ void run(TFT_eSPI& tft) {
                 drawButton(tft, removeRect, "X", true);
             } else {
                 tft.fillRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_BLACK);
-                tft.drawRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, TFT_DARKGREEN);
+                tft.drawRoundRect(rowRect.x, rowRect.y, rowRect.w, rowRect.h, 4, UiTheme::accentColorDimmed(tft, 0.5f));
                 tft.setTextDatum(MC_DATUM);
-                tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+                tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
                 tft.drawString(I18n::t(StringId::WIFI_EMPTY_SLOT), rowRect.x + rowRect.w / 2, rowRect.y + rowRect.h / 2);
                 tft.setTextDatum(TL_DATUM);
             }

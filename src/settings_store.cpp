@@ -13,6 +13,7 @@ namespace {
     // ueber Menue > System > Anzeige, siehe settings_store.h.
     bool rotated180 = false;
     uint8_t brightnessPct = Config::BRIGHTNESS_MAX_PERCENT;
+    bool autoBrightnessOn = false;
     bool emergencyAlertOn = true;
     bool proximityAlertOn = true;
     bool watchlistAlertOn = true;
@@ -45,6 +46,8 @@ namespace {
     bool radarPulseOn = true;
     bool issMarkerOn = true;
     bool classicRadarOn = false;
+    bool militarySquawkDetectionOn = false;
+    bool rainEffectOn = true;
     char lastSeenVersionBuf[16] = {0};
 
     // MUSS auf SD persistiert werden (nicht nur im RAM halten): wird kurz
@@ -68,6 +71,8 @@ namespace {
             if (v >= Config::BRIGHTNESS_MIN_PERCENT && v <= Config::BRIGHTNESS_MAX_PERCENT) {
                 brightnessPct = (uint8_t)v;
             }
+        } else if (key == "auto_brightness") {
+            autoBrightnessOn = (value.toInt() != 0);
         } else if (key == "emergency_alert") {
             emergencyAlertOn = (value.toInt() != 0);
         } else if (key == "proximity_alert") {
@@ -115,6 +120,10 @@ namespace {
             issMarkerOn = (value.toInt() != 0);
         } else if (key == "classic_radar") {
             classicRadarOn = (value.toInt() != 0);
+        } else if (key == "military_squawk_detection") {
+            militarySquawkDetectionOn = (value.toInt() != 0);
+        } else if (key == "rain_effect") {
+            rainEffectOn = (value.toInt() != 0);
         } else if (key == "last_seen_version") {
             strncpy(lastSeenVersionBuf, value.c_str(), sizeof(lastSeenVersionBuf) - 1);
             lastSeenVersionBuf[sizeof(lastSeenVersionBuf) - 1] = 0;
@@ -167,6 +176,7 @@ void save() {
     f.printf("invert=%d\n", inverted ? 1 : 0);
     f.printf("rotate_180=%d\n", rotated180 ? 1 : 0);
     f.printf("brightness_percent=%d\n", brightnessPct);
+    f.printf("auto_brightness=%d\n", autoBrightnessOn ? 1 : 0);
     f.printf("emergency_alert=%d\n", emergencyAlertOn ? 1 : 0);
     f.printf("proximity_alert=%d\n", proximityAlertOn ? 1 : 0);
     f.printf("watchlist_alert=%d\n", watchlistAlertOn ? 1 : 0);
@@ -188,6 +198,8 @@ void save() {
     f.printf("radar_pulse=%d\n", radarPulseOn ? 1 : 0);
     f.printf("iss_marker=%d\n", issMarkerOn ? 1 : 0);
     f.printf("classic_radar=%d\n", classicRadarOn ? 1 : 0);
+    f.printf("military_squawk_detection=%d\n", militarySquawkDetectionOn ? 1 : 0);
+    f.printf("rain_effect=%d\n", rainEffectOn ? 1 : 0);
     f.printf("last_seen_version=%s\n", lastSeenVersionBuf);
     f.printf("ota_just_installed=%d\n", otaJustInstalledFlag ? 1 : 0);
     f.close();
@@ -223,6 +235,13 @@ void setBrightnessPercent(uint8_t percent) {
         brightnessPct = percent;
         save();
     }
+}
+
+bool autoBrightnessEnabled() { return autoBrightnessOn; }
+
+void setAutoBrightnessEnabled(bool on) {
+    autoBrightnessOn = on;
+    save();
 }
 
 bool emergencyAlertEnabled() { return emergencyAlertOn; }
@@ -371,6 +390,20 @@ bool classicRadarEnabled() { return classicRadarOn; }
 
 void setClassicRadarEnabled(bool on) {
     classicRadarOn = on;
+    save();
+}
+
+bool militarySquawkDetectionEnabled() { return militarySquawkDetectionOn; }
+
+void setMilitarySquawkDetectionEnabled(bool on) {
+    militarySquawkDetectionOn = on;
+    save();
+}
+
+bool rainEffectEnabled() { return rainEffectOn; }
+
+void setRainEffectEnabled(bool on) {
+    rainEffectOn = on;
     save();
 }
 

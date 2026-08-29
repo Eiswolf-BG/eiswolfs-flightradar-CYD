@@ -5,6 +5,7 @@
 #include "config.h"
 #include "i18n.h"
 #include <WiFi.h>
+#include "ui_theme.h"
 
 namespace LogbookFilesScreen {
 
@@ -17,7 +18,7 @@ namespace {
     };
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, bool danger = false) {
-        uint16_t accent = danger ? TFT_RED : TFT_GREEN;
+        uint16_t accent = danger ? TFT_RED : UiTheme::accentColor(tft);
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
         tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, accent);
         tft.setTextDatum(MC_DATUM);
@@ -97,11 +98,11 @@ namespace {
 
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::LOGFILES_INFO_TITLE));
 
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             int16_t y = VIEW_TOP;
             y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOGFILES_INFO_PARA1), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
             y += 8;
@@ -113,7 +114,7 @@ namespace {
                     tft.print(urlLine);
                 }
             } else {
-                tft.setTextColor(TFT_GREEN, TFT_BLACK);
+                tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
                 layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOGFILES_INFO_PARA2), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
             }
 
@@ -150,10 +151,10 @@ namespace {
 
 void run(TFT_eSPI& tft) {
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setCursor(10, 14);
     tft.println(I18n::t(StringId::LOGFILES_TITLE));
-    tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
     tft.setCursor(10, ROWS_START_Y);
     tft.print(I18n::t(StringId::LOADING));
 
@@ -167,7 +168,7 @@ void run(TFT_eSPI& tft) {
     MenuStars::reset();
     while (!done) {
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::LOGFILES_TITLE));
         drawButton(tft, infoBtn, "?");
@@ -177,14 +178,14 @@ void run(TFT_eSPI& tft) {
         uint8_t startIdx = (count > VISIBLE_ROWS) ? (count - VISIBLE_ROWS) : 0;
 
         if (count == 0) {
-            tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
             tft.setCursor(10, ROWS_START_Y);
             tft.println(I18n::t(StringId::LOGFILES_EMPTY));
         } else {
             int16_t y = ROWS_START_Y;
 
             if (count > VISIBLE_ROWS) {
-                tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+                tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
                 tft.setCursor(10, y);
                 tft.print(String(I18n::t(StringId::LOGFILES_SHOWING_PREFIX)) + VISIBLE_ROWS +
                           I18n::t(StringId::LOGFILES_OF) + count + I18n::t(StringId::LOGFILES_DAYS_SUFFIX));
@@ -192,10 +193,10 @@ void run(TFT_eSPI& tft) {
             }
 
             for (uint8_t i = startIdx; i < count; i++) {
-                tft.setTextColor(TFT_GREEN, TFT_BLACK);
+                tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
                 tft.setCursor(10, y);
                 tft.print(days[i].date);
-                tft.setTextColor(TFT_GREEN, TFT_BLACK);
+                tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
                 tft.setCursor(110, y);
                 tft.print(String(days[i].count) + I18n::t(StringId::LOGFILES_AIRCRAFT_SUFFIX));
 

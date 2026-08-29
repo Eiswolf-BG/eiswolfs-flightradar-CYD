@@ -3,6 +3,7 @@
 #include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
+#include "ui_theme.h"
 
 namespace CalibrationScreen {
 
@@ -25,9 +26,9 @@ namespace {
         uint16_t dim = 0x0320;
         tft.drawCircle(x, y, 16, dim);
         tft.drawCircle(x, y, 10, dim);
-        tft.drawFastHLine((int16_t)(x - 18), y, 36, TFT_GREEN);
-        tft.drawFastVLine(x, (int16_t)(y - 18), 36, TFT_GREEN);
-        tft.fillCircle(x, y, 3, TFT_GREEN);
+        tft.drawFastHLine((int16_t)(x - 18), y, 36, UiTheme::accentColor(tft));
+        tft.drawFastVLine(x, (int16_t)(y - 18), 36, UiTheme::accentColor(tft));
+        tft.fillCircle(x, y, 3, UiTheme::accentColor(tft));
     }
 
     RawAvg waitForTap(TFT_eSPI& tft) {
@@ -74,7 +75,7 @@ void run(TFT_eSPI& tft) {
 
     for (uint8_t i = 0; i < 4; i++) {
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setTextSize(1);
         tft.setTextDatum(MC_DATUM);
         tft.drawString(I18n::t(StringId::CALIB_TITLE), W / 2, H / 2 - 12);
@@ -99,7 +100,7 @@ void run(TFT_eSPI& tft) {
     TouchInput::saveCalibration();
 
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setCursor(10, 14);
     tft.println(I18n::t(StringId::CALIB_SAVED));
     delay(800);

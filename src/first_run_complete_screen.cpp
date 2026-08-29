@@ -3,6 +3,7 @@
 #include "menu_stars.h"
 #include "config.h"
 #include "i18n.h"
+#include "ui_theme.h"
 
 namespace FirstRunCompleteScreen {
 
@@ -43,7 +44,7 @@ namespace {
     // screens look consistent.
     void drawButtonFrame(TFT_eSPI& tft, const Rect& r) {
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 8, TFT_BLACK);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 8, TFT_GREEN);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 8, UiTheme::accentColor(tft));
     }
 
     // Big, bold (1px-offset technique, same as the "Start" text on the
@@ -52,7 +53,7 @@ namespace {
     void drawCountdownText(TFT_eSPI& tft, const Rect& r, const String& text) {
         tft.fillRect((int16_t)(r.x + 2), (int16_t)(r.y + 2), (int16_t)(r.w - 4), (int16_t)(r.h - 4), TFT_BLACK);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setTextSize(3);
         int16_t cx = r.x + r.w / 2;
         int16_t cy = r.y + r.h / 2;
@@ -66,7 +67,7 @@ namespace {
 void run(TFT_eSPI& tft) {
     MenuStars::reset();
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setCursor(10, 14);
     tft.println(I18n::t(StringId::FIRST_RUN_COMPLETE_TITLE));
 
@@ -89,7 +90,7 @@ void run(TFT_eSPI& tft) {
     // (drawCountdownText() only redraws inside the button, so it never
     // overwrites this text).
     tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setTextSize(1);
     tft.drawString(I18n::t(StringId::FIRST_RUN_COMPLETE_TAP_TO_SKIP),
                     (int16_t)(Config::SCREEN_WIDTH / 2), (int16_t)(startBtn.y + startBtn.h + 12));

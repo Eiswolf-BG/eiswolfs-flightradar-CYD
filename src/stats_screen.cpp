@@ -7,6 +7,7 @@
 #include "units.h"
 #include "location_manager.h"
 #include "top_aircraft_screen.h"
+#include "ui_theme.h"
 
 namespace StatsScreen {
 
@@ -19,7 +20,7 @@ namespace {
     };
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, bool danger = false) {
-        uint16_t accent = danger ? TFT_RED : TFT_GREEN;
+        uint16_t accent = danger ? TFT_RED : UiTheme::accentColor(tft);
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
         tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, accent);
         tft.setTextDatum(MC_DATUM);
@@ -29,10 +30,10 @@ namespace {
     }
 
     void drawStatRow(TFT_eSPI& tft, int16_t labelY, const String& label, const String& value) {
-        tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
         tft.setCursor(10, labelY);
         tft.print(label);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, labelY + 20);
         tft.print(value);
     }
@@ -49,10 +50,10 @@ namespace {
 
 void run(TFT_eSPI& tft) {
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setCursor(10, 14);
     tft.println(I18n::t(StringId::STATS_TITLE));
-    tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
     tft.setCursor(10, ROW1_Y);
     tft.print(I18n::t(StringId::LOADING));
 
@@ -77,7 +78,7 @@ void run(TFT_eSPI& tft) {
 
     auto redraw = [&]() {
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::STATS_TITLE));
 
@@ -86,7 +87,7 @@ void run(TFT_eSPI& tft) {
         drawStatRow(tft, ROW3_Y, I18n::t(StringId::STATS_DAYS), String(allTimeDays));
 
         if (justReset) {
-            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, ROW4_Y);
             tft.print(I18n::t(StringId::STATS_RESET_DONE));
         } else if (allTimeDays > 0) {
@@ -101,7 +102,7 @@ void run(TFT_eSPI& tft) {
         uint32_t upM = (upSec % 3600) / 60;
         char upBuf[8];
         snprintf(upBuf, sizeof(upBuf), "%luh %lum", (unsigned long)upH, (unsigned long)upM);
-        tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
         tft.setCursor(10, UPTIME_Y);
         tft.print(String(I18n::t(StringId::STATS_UPTIME_PREFIX)) + upBuf);
 

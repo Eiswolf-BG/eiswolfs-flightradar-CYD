@@ -338,6 +338,22 @@ static const char* const I18N_ES[] = {
     "Un anillo brillante se expande desde el centro del radar y se desvanece con cada nueva actualización de datos.",
     "Sobre Radar clásico",
     "Activa varios efectos clásicos de pantalla de radar a la vez: una estela detrás de la línea de barrido, radios de cuadrícula adicionales, además de un anillo de sonar y un breve ruido de señal cada vez que una nueva aeronave aparece por primera vez en el radar.",
+
+    "Militar/Gobierno",
+    "Sobre la detección de vuelos militares/gubernamentales",
+    "Marca con un anillo naranja las aeronaves cuyo código squawk cae dentro de uno de varios rangos militares/gubernamentales/de vuelo especial documentados públicamente (p. ej. ciertos códigos reservados para NORAD en EE. UU.). Es una estimación best-effort sin garantía de exhaustividad ni exactitud - no es una fuente oficial, depende en gran medida de la región y del espacio aéreo, y no es un método fiable de identificación.",
+
+    "Otro SSID/oculto",
+    "Nombre de red (SSID):",
+    "Siguiente",
+
+    "Brillo automático",
+    "Sobre Brillo automático",
+    "Ajusta automáticamente el brillo de la pantalla usando el sensor de luz integrado, en lugar del valor ajustado manualmente - suavizado para evitar parpadeos con luz fluctuante. La calibración exacta es una estimación no verificada en un dispositivo real; si el brillo resulta demasiado extremo o demasiado lento, por favor avisa.",
+
+    "Efecto de lluvia",
+    "Sobre el Efecto de lluvia",
+    "Solo visible cuando los datos meteorológicos muestran realmente lluvia o tormenta. Las gotas se mueven en la dirección real del viento - según el viento, esto puede hacer que parezca que llueve hacia arriba en el radar (p. ej. con viento del sur). Esto es físicamente correcto, no un error.",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

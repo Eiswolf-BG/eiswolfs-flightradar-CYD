@@ -4,6 +4,7 @@
 #include "menu_stars.h"
 #include "i18n.h"
 #include "config.h"
+#include "ui_theme.h"
 
 namespace FirstRunLanguageScreen {
 
@@ -25,9 +26,9 @@ namespace {
     }
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label) {
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, UiTheme::accentColor(tft));
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
     }
@@ -35,7 +36,7 @@ namespace {
 
 void run(TFT_eSPI& tft) {
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setTextDatum(MC_DATUM);
     tft.drawString("Language / Sprache", Config::SCREEN_WIDTH / 2, 24);
     tft.setTextDatum(TL_DATUM);

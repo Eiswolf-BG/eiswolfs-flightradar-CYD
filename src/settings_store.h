@@ -23,6 +23,16 @@ namespace SettingsStore {
     uint8_t brightnessPercent();
     void setBrightnessPercent(uint8_t percent);
 
+    // Auto-Helligkeit (Menue > System > Anzeige > Helligkeit, siehe
+    // auto_brightness.h) - AUS per Default. Bei AN ersetzt der eingebaute
+    // Lichtsensor (LDR an Config::LDR_PIN) die manuelle Prozent-Einstellung
+    // (brightnessPercent() oben bleibt dabei unveraendert gespeichert, wird
+    // nur voruebergehend nicht angewendet - beim Ausschalten springt die
+    // Helligkeit sofort wieder auf den zuletzt manuell eingestellten Wert
+    // zurueck, siehe main.cpp::normalBacklightPwm()).
+    bool autoBrightnessEnabled();
+    void setAutoBrightnessEnabled(bool on);
+
     bool emergencyAlertEnabled();
     void setEmergencyAlertEnabled(bool on);
 
@@ -123,6 +133,28 @@ namespace SettingsStore {
     // bleiben unveraendert). Rein kosmetisch, siehe radar_screen.cpp.
     bool classicRadarEnabled();
     void setClassicRadarEnabled(bool on);
+
+    // "Militaer-/Behoerdenflug-Erkennung" (System > Radar-Darstellung) - AUS
+    // per Default. Bei AN: Flugzeuge, deren aktueller Squawk-Code in einen
+    // der bekannten, oeffentlich dokumentierten Militaer-/Behoerden-/
+    // Sonderflug-Bereiche faellt (siehe MILITARY_SQUAWK_RANGES in
+    // radar_screen.cpp), bekommen einen oranger Ring um den Marker - rein
+    // visuell, kein Alarm/Ton. AUSDRUECKLICH Best-Effort ohne Garantie auf
+    // Vollstaendigkeit/Korrektheit, siehe Hilfetext (StringId::
+    // MILITARY_SQUAWK_INFO_BODY).
+    bool militarySquawkDetectionEnabled();
+    void setMilitarySquawkDetectionEnabled(bool on);
+
+    // Animierter Regen-Effekt (System > Radar-Darstellung) - AN per Default
+    // (wird ohnehin nur sichtbar, wenn die Wetterdaten tatsaechlich Regen/
+    // Gewitter zeigen, siehe radar_screen.cpp). Kurze, schraege Linien
+    // ("Tropfen"), die als parallele Sehnen ueber den Radarkreis wandern -
+    // Neigungswinkel folgt der tatsaechlichen Windrichtung (Weather::
+    // currentWindDirectionDeg()), auch wenn das je nach Windrichtung wie
+    // "nach oben regnen" aussehen kann (physikalisch korrekt, siehe
+    // Hilfetext StringId::RAIN_EFFECT_INFO_BODY).
+    bool rainEffectEnabled();
+    void setRainEffectEnabled(bool on);
 
     // ISS-Marker-Bonusfeature (siehe iss_tracker.h) - AN per Default. Bei
     // AUS unterbleibt sowohl die periodische Positionsabfrage (kein

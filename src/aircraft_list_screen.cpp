@@ -13,6 +13,7 @@
 #include "location_manager.h"
 #include <algorithm>
 #include <cstring>
+#include "ui_theme.h"
 
 namespace AircraftListScreen {
 
@@ -26,9 +27,9 @@ namespace {
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label) {
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, UiTheme::accentColor(tft));
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
     }
@@ -117,7 +118,7 @@ bool run(TFT_eSPI& tft) {
         }
 
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::AIRCRAFT_LIST_TITLE));
 
@@ -158,7 +159,7 @@ bool run(TFT_eSPI& tft) {
                 int16_t midY = r.y + r.h / 2;
 
                 const char* label = a.callsign[0] ? a.callsign : a.hex;
-                tft.setTextColor(TFT_GREEN, TFT_BLACK);
+                tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
                 tft.setTextDatum(ML_DATUM);
                 tft.drawString(label, r.x + 6, midY);
 
@@ -177,7 +178,7 @@ bool run(TFT_eSPI& tft) {
                 } else {
                     snprintf(buf, sizeof(buf), "%.0fnm", Units::kmToNm(a.distanceKm));
                 }
-                tft.setTextColor(TFT_GREEN, TFT_BLACK);
+                tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
                 tft.setTextDatum(MR_DATUM);
                 tft.drawString(buf, r.x + r.w - 6, midY);
 

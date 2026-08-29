@@ -4,6 +4,7 @@
 #include "menu_stars.h"
 #include "i18n.h"
 #include "config.h"
+#include "ui_theme.h"
 
 namespace LanguageScreen {
 
@@ -16,10 +17,10 @@ namespace {
     };
 
     void drawButton(TFT_eSPI& tft, const Rect& r, const String& label, bool active = false) {
-        uint16_t bg = active ? TFT_GREEN : TFT_BLACK;
-        uint16_t fg = active ? TFT_BLACK : TFT_GREEN;
+        uint16_t bg = active ? UiTheme::accentColor(tft) : TFT_BLACK;
+        uint16_t fg = active ? TFT_BLACK : UiTheme::accentColor(tft);
         tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, bg);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, TFT_GREEN);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, UiTheme::accentColor(tft));
         tft.setTextDatum(MC_DATUM);
         tft.setTextColor(fg, bg);
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
@@ -41,7 +42,7 @@ void run(TFT_eSPI& tft) {
     MenuStars::reset();
     while (!done) {
         tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::LANGUAGE_TITLE));
 
