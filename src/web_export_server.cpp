@@ -4,6 +4,7 @@
 #include "sd_mutex.h"
 #include "airline_filter.h"
 #include "aircraft_watchlist.h"
+#include "squawk_watchlist.h"
 #include "aircraft_table.h"
 #include "settings_store.h"
 #include "location_manager.h"
@@ -29,6 +30,35 @@ namespace {
     // oder liest diese Variable.
     uint32_t lastRadarJsonRequestMs = 0;
     constexpr uint32_t RADAR_UI_ACTIVE_WINDOW_MS = 20000; // > 8s Poll-Intervall der Seite, mit Puffer
+
+    // Web-Pendant zu UiTheme::accentColor() (siehe ui_theme.h/.cpp auf dem
+    // Geraet) - Alex' Wunsch, das WebUI-Farbthema (Gruen/Amber/Blau)
+    // automatisch mit dem Geraet zu synchronisieren, statt fest gruen zu
+    // bleiben. Drei Werte pro Thema statt nur einer Akzentfarbe: "accent"
+    // (Haupttext/Rahmen/Links), "accentBorder" (dezente Trennlinien/
+    // Kreis-Rahmen, dunklere Abstufung) und "accentMuted" (Sekundaertext
+    // wie #radarStatus/Footer) - dieselbe Abstufungslogik wie
+    // UiTheme::accentColorDimmed() auf dem Geraet, hier aber als eigene,
+    // fest hinterlegte Hex-Werte statt einer Laufzeit-Berechnung (spart
+    // Code auf beiden Seiten: Server UND die Client-JS-Kopie unten in
+    // appendRadarSection() muessen dieselben drei Werte kennen, siehe
+    // dortiges THEME_PALETTES). Das Sternenfunkeln (siehe
+    // appendStarBackground()) zerlegt "accent" client-seitig per
+    // hexToRgb() in einzelne Kanaele, um die Helligkeit pro Stern zu
+    // skalieren, statt eine feste Farbe zu verwenden.
+    struct WebTheme {
+        const char* accent;
+        const char* accentBorder;
+        const char* accentMuted;
+    };
+
+    WebTheme currentWebTheme() {
+        switch (SettingsStore::radarThemeIndex()) {
+            case 1: return {"#ffb000", "#3a2c1a", "#a08a5a"};  // Amber
+            case 2: return {"#00c8ff", "#1a2c3a", "#6a90a0"};  // Blau
+            default: return {"#39ff14", "#1f3a2b", "#7a9a86"}; // Gruen (Standard)
+        }
+    }
 
     // Nur reine Dateinamen/Labels aus Formularfeldern akzeptieren - kein
     // "/" und kein ".." - damit ueber die WebUI kein Ausbruch aus dem
@@ -97,10 +127,20 @@ namespace {
         html += "var resizeTimer=null;";
         html += "window.addEventListener('resize',function(){clearTimeout(resizeTimer);resizeTimer=setTimeout(function(){resize();initStars();},150);});";
         html += "resize();initStars();";
+        // Sternenfarbe folgt jetzt der CSS-Variable "--accent" (siehe
+        // htmlHeader()) statt fest Gruen - hexToRgb() einmal PRO FRAME (nicht
+        // pro Stern) aufgeloest, damit ein Themenwechsel waehrend die Seite
+        // offen ist (poll() aendert --accent live, siehe appendRadarSection())
+        // automatisch beim naechsten requestAnimationFrame-Tick greift, ohne
+        // dass dieses eigenstaendige Skript selbst etwas davon "mitbekommen"
+        // muss.
+        html += "function hexToRgb(hex){var v=parseInt(hex.replace('#',''),16);return [(v>>16)&255,(v>>8)&255,v&255];}";
         html += "function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);";
+        html += "var accentHex=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();";
+        html += "var rgb=hexToRgb(accentHex||'#39ff14');";
         html += "for(var i=0;i<stars.length;i++){var s=stars[i];s.phase=(s.phase+s.speed)%256;";
         html += "var bright=s.phase<128?s.phase*2:(255-s.phase)*2;";
-        html += "ctx.fillStyle='rgb(0,'+bright+',0)';ctx.fillRect(s.x,s.y,2,2);}";
+        html += "ctx.fillStyle='rgb('+Math.round(rgb[0]*bright/255)+','+Math.round(rgb[1]*bright/255)+','+Math.round(rgb[2]*bright/255)+')';ctx.fillRect(s.x,s.y,2,2);}";
         html += "requestAnimationFrame(draw);}";
         html += "draw();";
         html += "})();</script>";
@@ -108,32 +148,46 @@ namespace {
 
     String htmlHeader(const String& title) {
         String html;
+        WebTheme wt = currentWebTheme();
         html += "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">";
         html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
         html += "<title>" + title + "</title>";
         html += "<style>";
-        html += "body{background-color:#0a0f0d;color:#39ff14;font-family:'Courier New',Courier,monospace;padding:20px;}";
-        html += "h1{font-size:20px;}h2{font-size:16px;margin-top:24px;border-top:1px solid #1f3a2b;padding-top:12px;}";
+        // CSS-Variablen statt fest verdrahtetem Gruen - Alex' Wunsch,
+        // dieselbe systemweite Farbthema-Logik wie auf dem Geraet selbst
+        // (siehe ui_theme.h) auch fuer das WebUI zu haben. Server-seitig
+        // beim Seitenaufbau mit dem AKTUELLEN Thema vorbefuellt (kein
+        // "erst gruen, dann Nachladen" beim ersten Rendern), die Startseite
+        // (appendRadarSection()) aktualisiert diese Variablen zusaetzlich
+        // per JS live, falls sich das Geraete-Thema aendert, waehrend die
+        // Seite bereits offen ist.
+        html += ":root{--accent:" + String(wt.accent) + ";--accent-border:" + String(wt.accentBorder) +
+                ";--accent-muted:" + String(wt.accentMuted) + ";}";
+        html += "body{background-color:#0a0f0d;color:var(--accent);font-family:'Courier New',Courier,monospace;padding:20px;}";
+        html += "h1{font-size:20px;}h2{font-size:16px;margin-top:24px;border-top:1px solid var(--accent-border);padding-top:12px;}";
         html += "table{border-collapse:collapse;margin-top:10px;width:100%;}";
-        html += "td,th{padding:4px 12px;text-align:left;border-bottom:1px solid #1f3a2b;}";
-        html += "a{color:#39ff14;}";
+        html += "td,th{padding:4px 12px;text-align:left;border-bottom:1px solid var(--accent-border);}";
+        html += "a{color:var(--accent);}";
         html += "form{display:inline;}";
         html += "button{background:#0a0f0d;color:#ff3b3b;border:1px solid #ff3b3b;border-radius:4px;padding:3px 10px;font-family:inherit;cursor:pointer;}";
         html += "button:hover{background:#ff3b3b;color:#0a0f0d;}";
-        html += ".dl{color:#39ff14;text-decoration:none;border:1px solid #39ff14;border-radius:4px;padding:3px 10px;margin-right:6px;display:inline-block;}";
-        // Gruen statt Rot fuer "Hinzufuegen"-Buttons - die roten button{}-Regeln
-        // oben bleiben fuer alle destruktiven "Entfernen/Loeschen"-Buttons
-        // unveraendert, .addbtn ist ausschliesslich fuer die neuen Listen-
-        // Formulare (siehe handleLists()) gedacht.
-        html += ".addbtn{background:#0a0f0d;color:#39ff14;border:1px solid #39ff14;border-radius:4px;padding:3px 10px;font-family:inherit;cursor:pointer;}";
-        html += ".addbtn:hover{background:#39ff14;color:#0a0f0d;}";
-        html += "input[type=text]{background:#0a0f0d;color:#39ff14;border:1px solid #39ff14;border-radius:4px;padding:5px 8px;font-family:inherit;}";
-        html += "nav{margin-bottom:10px;}nav a{color:#39ff14;margin-right:16px;}";
-        html += "#radarCanvas{width:100%;max-width:400px;height:auto;background:#05100a;border:1px solid #1f3a2b;border-radius:8px;display:block;cursor:pointer;}";
-        html += "#radarStatus{font-size:12px;color:#7a9a86;margin-top:4px;}";
+        html += "button:disabled{opacity:.5;cursor:default;background:#0a0f0d;color:#ff3b3b;}";
+        html += ".dl{color:var(--accent);text-decoration:none;border:1px solid var(--accent);border-radius:4px;padding:3px 10px;margin-right:6px;display:inline-block;}";
+        // Bewusst weiterhin die Akzentfarbe (nicht Rot) fuer "Hinzufuegen"-
+        // Buttons - die roten button{}-Regeln oben bleiben fuer alle
+        // destruktiven "Entfernen/Loeschen"-Buttons unveraendert (Rot ist
+        // eine feste Alarmfarbe, folgt NICHT dem Thema, genau wie am
+        // Geraete-Display), .addbtn ist ausschliesslich fuer die neuen
+        // Listen-Formulare (siehe handleLists()) gedacht.
+        html += ".addbtn{background:#0a0f0d;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:3px 10px;font-family:inherit;cursor:pointer;}";
+        html += ".addbtn:hover{background:var(--accent);color:#0a0f0d;}";
+        html += "input[type=text]{background:#0a0f0d;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:5px 8px;font-family:inherit;}";
+        html += "nav{margin-bottom:10px;}nav a{color:var(--accent);margin-right:16px;}";
+        html += "#radarCanvas{width:100%;max-width:400px;height:auto;background:#05100a;border:1px solid var(--accent-border);border-radius:8px;display:block;cursor:pointer;}";
+        html += "#radarStatus{font-size:12px;color:var(--accent-muted);margin-top:4px;}";
         html += "#radarControls{font-size:12px;margin-bottom:8px;}";
-        html += "#radarControls select{background:#0a0f0d;color:#39ff14;border:1px solid #39ff14;border-radius:4px;padding:2px 6px;font-family:inherit;}";
-        html += "#acInfo{display:none;max-width:400px;margin-top:8px;padding:8px 10px;border:1px solid #39ff14;border-radius:6px;font-size:13px;line-height:1.7;}";
+        html += "#radarControls select{background:#0a0f0d;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:2px 6px;font-family:inherit;}";
+        html += "#acInfo{display:none;max-width:400px;margin-top:8px;padding:8px 10px;border:1px solid var(--accent);border-radius:6px;font-size:13px;line-height:1.7;}";
         html += "#acInfo a{color:#ff3b3b;text-decoration:none;border:1px solid #ff3b3b;border-radius:4px;padding:2px 8px;display:inline-block;margin-top:4px;}";
         // Sofortige optische Rueckmeldung beim Antippen/Klicken - reine
         // CSS-":active"-Pseudoklasse, greift also schon beim Antippen
@@ -197,6 +251,15 @@ namespace {
             html += ">" + String(labelValue, 0) + (metric ? " km</option>" : " nm</option>");
         }
         html += "</select></div>";
+        // Live mitzaehlende "zuletzt aktualisiert"-Anzeige (Alex' Wunsch) -
+        // eigenes Element ueber dem Canvas statt in #radarStatus verbaut
+        // (das zeigt weiterhin nur Flugzeuganzahl/Reichweite nach jedem
+        // erfolgreichen Abruf) - so bleiben "Ergebnis des letzten Abrufs"
+        // und "wie lange ist das her" zwei getrennte, unabhaengig lesbare
+        // Informationen. Aktualisiert sich per eigenem 1s-Intervall
+        // (updateFreshness() unten), NICHT nur einmalig beim Laden - direkt
+        // erkennbar, ob die Verbindung gerade frisch ist oder hakt.
+        html += "<div id=\"radarFreshness\" style=\"font-size:12px;color:var(--accent-muted);margin-bottom:6px;\">Waiting for first update...</div>";
         html += "<canvas id=\"radarCanvas\" width=\"360\" height=\"360\"></canvas>";
         html += "<p id=\"radarStatus\">Loading...</p>";
         html += "<div id=\"acInfo\"></div>";
@@ -208,6 +271,20 @@ namespace {
         html += "var rangeSel=document.getElementById('radarRange');";
         html += "var W=canvas.width,H=canvas.height,cx=W/2,cy=H/2,R=Math.min(W,H)/2-24;";
         html += "var lastData={range_km:" + String(deviceRangeKm, 0) + ",aircraft:[]};";
+        html += "var lastUpdateMs=null;"; // fuer die "zuletzt aktualisiert"-Anzeige, siehe updateFreshness() unten
+        // Client-seitige Kopie derselben 3 Farbthemen wie WebTheme/
+        // currentWebTheme() in C++ (siehe dortiger Kommentar) - noetig, damit
+        // ein Themenwechsel am Geraet WAEHREND die Seite offen ist (poll()
+        // liefert dann ein geaendertes data.theme_index) sofort live per JS
+        // uebernommen werden kann, ohne die Seite neu laden zu muessen. Bei
+        // Aenderung an einer der drei Farben bitte BEIDE Stellen synchron
+        // halten.
+        html += "var THEME_PALETTES=[['#39ff14','#1f3a2b','#7a9a86'],['#ffb000','#3a2c1a','#a08a5a'],['#00c8ff','#1a2c3a','#6a90a0']];";
+        html += "var lastThemeIndex=" + String(SettingsStore::radarThemeIndex()) + ";";
+        html += "function applyTheme(idx){var p=THEME_PALETTES[idx]||THEME_PALETTES[0];var s=document.documentElement.style;";
+        html += "s.setProperty('--accent',p[0]);s.setProperty('--accent-border',p[1]);s.setProperty('--accent-muted',p[2]);}";
+        html += "function hexToRgb(hex){var v=parseInt(hex.replace('#',''),16);return [(v>>16)&255,(v>>8)&255,v&255];}";
+        html += "function cssVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}";
         html += "var markers=[];";
         html += "var selectedHex=null;";
         // Alle sichtbaren Distanz-/Reichweitenangaben (Ringe, Statuszeile,
@@ -230,25 +307,34 @@ namespace {
         html += "do{x=4+Math.random()*(W-8);y=4+Math.random()*(H-8);tries++;}";
         html += "while(((x-cx)*(x-cx)+(y-cy)*(y-cy))<minDistSq&&tries<25);";
         html += "stars.push({x:x,y:y,phase:Math.random()*255,speed:1+Math.random()*2});}})();";
-        html += "function drawStars(){for(var i=0;i<stars.length;i++){var s=stars[i];";
+        html += "function drawStars(accentRgb){for(var i=0;i<stars.length;i++){var s=stars[i];";
         html += "s.phase=(s.phase+s.speed)%256;";
         html += "var bright=Math.round(s.phase<128?s.phase*2:(255-s.phase)*2);";
-        html += "ctx.fillStyle='rgb(0,'+bright+',0)';ctx.fillRect(s.x,s.y,1,1);}}";
+        html += "ctx.fillStyle='rgb('+Math.round(accentRgb[0]*bright/255)+','+Math.round(accentRgb[1]*bright/255)+','+Math.round(accentRgb[2]*bright/255)+')';ctx.fillRect(s.x,s.y,1,1);}}";
 
+        // altColor() bildet die Flughoehe ab (Notfall-/Warnfarben) - bleibt
+        // AUSDRUECKLICH themenunabhaengig, exakt wie colorForAltitude() am
+        // Geraete-Display (radar_screen.cpp) - NICHT anfassen/umfaerben.
         html += "function altColor(ft){if(ft<3000)return '#ff4d4d';if(ft<10000)return '#ffb84d';if(ft<25000)return '#ffe14d';if(ft<35000)return '#39ff14';return '#4dd2ff';}";
 
         html += "function draw(data){";
         html += "lastData=data;";
+        // Aktuelle Thema-Farben EINMAL pro draw()-Aufruf (nicht pro Stern/
+        // Element) aus den CSS-Variablen gelesen - draw() laeuft sowohl bei
+        // jedem poll() (8s) als auch bei jedem lokalen 150ms-Redraw, liest
+        // die evtl. von applyTheme() geaenderten Werte also automatisch mit,
+        // ohne dass draw() selbst etwas ueber Themenwechsel wissen muss.
+        html += "var accentColor=cssVar('--accent')||'#39ff14';var borderColor=cssVar('--accent-border')||'#1f3a2b';var accentRgb=hexToRgb(accentColor);";
         html += "ctx.clearRect(0,0,W,H);";
-        html += "drawStars();";
-        html += "ctx.strokeStyle='#1f3a2b';ctx.fillStyle='#39ff14';ctx.font='10px monospace';ctx.textAlign='left';";
+        html += "drawStars(accentRgb);";
+        html += "ctx.strokeStyle=borderColor;ctx.fillStyle=accentColor;ctx.font='10px monospace';ctx.textAlign='left';";
         html += "for(var ring=1;ring<=3;ring++){var r=R*ring/3;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();";
         html += "ctx.fillText(fmtRange(data.range_km*ring/3),cx+4,cy-r+10);}";
-        html += "ctx.strokeStyle='#12261a';ctx.beginPath();ctx.moveTo(cx-R,cy);ctx.lineTo(cx+R,cy);ctx.moveTo(cx,cy-R);ctx.lineTo(cx,cy+R);ctx.stroke();";
+        html += "ctx.strokeStyle=borderColor;ctx.beginPath();ctx.moveTo(cx-R,cy);ctx.lineTo(cx+R,cy);ctx.moveTo(cx,cy-R);ctx.lineTo(cx,cy+R);ctx.stroke();";
         // Alle vier Himmelsrichtungen (N/E/S/W), genau wie
         // drawStaticBackground() in radar_screen.cpp - vorher stand hier nur
         // "N", was auf Nachfrage ergaenzt wurde.
-        html += "ctx.fillStyle='#39ff14';ctx.textAlign='center';ctx.fillText('N',cx,cy-R-8);";
+        html += "ctx.fillStyle=accentColor;ctx.textAlign='center';ctx.fillText('N',cx,cy-R-8);";
         html += "ctx.fillText('S',cx,cy+R+16);";
         html += "ctx.textAlign='left';ctx.fillText('E',cx+R+4,cy+3);";
         html += "ctx.textAlign='right';ctx.fillText('W',cx-R-4,cy+3);";
@@ -349,11 +435,49 @@ namespace {
         html += "draw(lastData);";
         html += "});";
 
+        // "Zuletzt aktualisiert vor Xs"-Anzeige (#radarFreshness, siehe
+        // appendRadarSection() oben) - zaehlt per eigenem 1s-Intervall LIVE
+        // mit, statt nur einmalig beim Laden gesetzt zu werden, und setzt
+        // sich bei jedem ERFOLGREICHEN poll() zurueck (siehe dort). Sowie
+        // der Verbindungsstatus-Punkt/-Text im Footer (#connDot/#connText,
+        // siehe handleRoot()) - beide haengen am selben poll()-Erfolg/
+        // Fehlschlag, daher hier gemeinsam verdrahtet statt zwei getrennter
+        // Mechanismen.
+        html += "var freshEl=document.getElementById('radarFreshness');";
+        html += "function updateFreshness(){if(!freshEl)return;if(lastUpdateMs===null){freshEl.textContent='Waiting for first update...';return;}";
+        html += "var s=Math.round((Date.now()-lastUpdateMs)/1000);freshEl.textContent='Updated '+(s<=1?'just now':s+'s ago');}";
+        // WICHTIG: #connDot/#connText liegen im Footer, der im HTML ERST
+        // NACH diesem <script>-Block folgt (Logbuch-Tabelle dazwischen) -
+        // document.getElementById() darf deshalb NICHT einmalig beim Parsen
+        // dieses Scripts aufgerufen werden (die Elemente existieren zu dem
+        // Zeitpunkt noch gar nicht im DOM, das Ergebnis waere dauerhaft
+        // null) - stattdessen bei JEDEM updateConnStatus()-Aufruf frisch
+        // nachschlagen.
+        html += "function updateConnStatus(ok){var connDot=document.getElementById('connDot'),connText=document.getElementById('connText');if(!connDot||!connText)return;";
+        html += "connDot.style.background=ok?cssVar('--accent'):'#ff3b3b';connText.textContent=ok?'Connected':'No connection';}";
+        // Watchlist-/Squawk-Wachposten-Badge (#watchBadge im Footer, siehe
+        // handleRoot()) - zeigt/versteckt sich je nachdem, ob mindestens ein
+        // Flugzeug im AKTUELLSTEN poll()-Ergebnis a.watched===true hat.
+        // Gleiches Nachschlage-Muster wie updateConnStatus() (Element liegt
+        // ebenfalls im spaeter folgenden Footer, nicht einmalig cachen).
+        html += "function updateWatchBadge(aircraft){var el=document.getElementById('watchBadge');if(!el)return;";
+        html += "var any=(aircraft||[]).some(function(a){return a.watched;});el.style.display=any?'inline':'none';}";
+        html += "setInterval(updateFreshness,1000);";
+
         html += "if(rangeSel){rangeSel.addEventListener('change',poll);}";
         html += "function poll(){";
         html += "var url='/radar.json';";
         html += "if(rangeSel&&rangeSel.value){url+='?range_km='+rangeSel.value;}";
-        html += "fetch(url).then(function(r){return r.json();}).then(function(data){draw(data);refreshSelectedInfo();}).catch(function(){status.textContent='Connection lost - retrying...';});";
+        html += "fetch(url).then(function(r){return r.json();}).then(function(data){";
+        // Themenwechsel am Geraet (waehrend die Seite offen ist) live
+        // uebernehmen - vergleicht data.theme_index gegen den zuletzt
+        // bekannten Wert, ruft applyTheme() nur bei tatsaechlicher Aenderung
+        // auf (unnoetiges Neusetzen der CSS-Variablen bei jedem Poll waere
+        // harmlos, aber unnoetig).
+        html += "if(data.theme_index!==undefined&&data.theme_index!==lastThemeIndex){lastThemeIndex=data.theme_index;applyTheme(data.theme_index);}";
+        html += "draw(data);refreshSelectedInfo();updateWatchBadge(data.aircraft);";
+        html += "lastUpdateMs=Date.now();updateFreshness();updateConnStatus(true);";
+        html += "}).catch(function(){status.textContent='Connection lost - retrying...';updateConnStatus(false);});";
         html += "}";
         html += "poll();";
         // Vorher alle 3s - staerker gedrosselt auf 8s (genau der Takt, in
@@ -397,18 +521,99 @@ namespace {
         if (dayCount == 0) {
             html += "<p>No logbook entries yet.</p>";
         } else {
-            html += "<p><a class=\"dl\" href=\"/export.csv\">Download merged CSV (all days)</a></p>";
-            html += "<table><tr><th>Date</th><th>Aircraft</th><th></th><th></th></tr>";
+            // Sofortige optische Rueckmeldung bei Delete/Download (Alex'
+            // Meldung: SD-Kartenzugriff dauert spuerbar, ohne Rueckmeldung
+            // klickt man verwirrt mehrfach nach - Mehrfachklicks auf Delete
+            // koennten sogar mehrfache Loesch-Anfragen ausloesen). Gleiches
+            // Grundprinzip wie die bestehende "#acInfo a:active"-Regel oben
+            // (siehe dortiger Kommentar) - hier zusaetzlich per JS, weil ein
+            // rein CSS-basiertes ":active" verschwindet, sobald man den
+            // Finger/die Maustaste loslaesst, aber die eigentliche Wartezeit
+            // (SD-Zugriff bzw. Download-Vorbereitung) laenger dauert als der
+            // Tap selbst.
+            // prepareDelete(): deaktiviert den Button SOFORT und aendert den
+            // Text - der anschliessende 303-Redirect von /logbook/delete
+            // (siehe handleLogbookDelete()) laedt die Seite ohnehin komplett
+            // neu, das "Deaktiviert"-Aussehen bleibt also automatisch bis
+            // zur aktualisierten Liste bestehen, kein weiterer Code noetig.
+            // prepareDownload(): der Download selbst (Content-Disposition:
+            // attachment, siehe handleCsvDownload()) verlaesst die Seite
+            // NICHT - der Text wird deshalb per Timeout wieder zurueckgesetzt,
+            // da es keine verlaessliche "Download fertig"-Callback-Methode
+            // fuer einen einfachen <a>-Klick gibt.
+            html += "<script>";
+            html += "function prepareDelete(f){var b=f.querySelector('button');b.disabled=true;b.textContent='Deleting...';return true;}";
+            html += "function prepareDownload(a){if(a.dataset.busy)return false;a.dataset.busy='1';";
+            html += "var orig=a.textContent;a.textContent='Preparing...';a.style.opacity='.6';";
+            html += "setTimeout(function(){a.textContent=orig;a.style.opacity='';delete a.dataset.busy;},1500);return true;}";
+            // Suchfeld + sortierbare Spaltenkoepfe (Alex' Wunsch, "sobald die
+            // Liste mit der Zeit laenger wird") - rein clientseitig auf der
+            // bereits server-gerenderten Tabelle (kein zusaetzlicher
+            // Netzwerk-/SD-Zugriff fuers Filtern/Sortieren noetig, die
+            // komplette Liste steht ja schon im DOM). sortLog() liest/
+            // schreibt data-sort-col/-dir am <table>-Element, um bei
+            // wiederholtem Klick auf dieselbe Spalte zwischen auf-/
+            // absteigend umzuschalten. Zahlen (Aircraft-Spalte) werden
+            // numerisch verglichen, alles andere (Datum) als String -
+            // reicht fuer die "JJJJ-MM-TT"-Formate von FlightLogbook, auch
+            // mit dem "_2"-Suffix bei mehreren Sitzungen am selben Tag.
+            html += "<input type=\"text\" id=\"logSearch\" placeholder=\"Filter by date...\" style=\"margin-bottom:8px;width:100%;max-width:300px;box-sizing:border-box;\">";
+            html += "<script>";
+            html += "function sortLog(col){var t=document.getElementById('logTable');var tbody=t.tBodies[0];";
+            html += "var rows=Array.prototype.slice.call(tbody.rows);";
+            html += "var asc=t.dataset.sortCol==String(col)?t.dataset.sortDir!=='asc':true;";
+            html += "rows.sort(function(a,b){var av=a.cells[col].textContent.trim(),bv=b.cells[col].textContent.trim();";
+            html += "var an=parseFloat(av),bn=parseFloat(bv);";
+            html += "var cmp=(!isNaN(an)&&!isNaN(bn))?(an-bn):av.localeCompare(bv);return asc?cmp:-cmp;});";
+            html += "rows.forEach(function(r){tbody.appendChild(r);});";
+            html += "t.dataset.sortCol=col;t.dataset.sortDir=asc?'asc':'desc';}";
+            html += "document.getElementById('logSearch').addEventListener('input',function(){";
+            html += "var q=this.value.toLowerCase();var t=document.getElementById('logTable');";
+            html += "Array.prototype.forEach.call(t.tBodies[0].rows,function(r){";
+            html += "r.style.display=r.cells[0].textContent.toLowerCase().indexOf(q)>=0?'':'none';});});";
+            html += "</script>";
+            html += "<p><a class=\"dl\" href=\"/export.csv\" onclick=\"return prepareDownload(this);\">Download merged CSV (all days)</a></p>";
+            html += "<table id=\"logTable\"><tr>";
+            html += "<th onclick=\"sortLog(0);\" style=\"cursor:pointer;\">Date &#8645;</th>";
+            html += "<th onclick=\"sortLog(1);\" style=\"cursor:pointer;\">Aircraft &#8645;</th>";
+            html += "<th></th><th></th></tr>";
             for (uint8_t i = 0; i < dayCount; i++) {
                 String date = String(days[i].date);
                 html += "<tr><td>" + date + "</td><td>" + String(days[i].count) + "</td>";
-                html += "<td><a class=\"dl\" href=\"/csv?date=" + date + "\">Download</a></td>";
-                html += "<td><form method=\"POST\" action=\"/logbook/delete\">";
+                html += "<td><a class=\"dl\" href=\"/csv?date=" + date + "\" onclick=\"return prepareDownload(this);\">Download</a></td>";
+                html += "<td><form method=\"POST\" action=\"/logbook/delete\" onsubmit=\"return prepareDelete(this);\">";
                 html += "<input type=\"hidden\" name=\"date\" value=\"" + date + "\">";
                 html += "<button type=\"submit\">Delete</button></form></td></tr>";
             }
             html += "</table>";
         }
+
+        // Dezenter Footer (Alex' Wunsch): Firmware-Version - dieselbe
+        // Config::APP_VERSION, die auch der OTA-Update-Check auf dem Geraet
+        // selbst vergleicht (siehe menu_screen.cpp) - server-seitig fest in
+        // die Seite eingebettet (aendert sich waehrend eine Seite offen ist
+        // ohnehin nicht, kein JS/Fetch dafuer noetig), sowie ein LIVE
+        // Verbindungsstatus-Punkt+Text (#connDot/#connText), der an
+        // denselben poll()-Erfolg/Fehlschlag haengt wie die "zuletzt
+        // aktualisiert"-Anzeige oben (siehe updateConnStatus() in
+        // appendRadarSection()). Start-Zustand grau/"Checking...", bis der
+        // allererste poll() durchgelaufen ist.
+        html += "<footer style=\"margin-top:24px;padding-top:10px;border-top:1px solid var(--accent-border);font-size:11px;color:var(--accent-muted);\">";
+        html += "Eiswolfs Flightradar v" + String(Config::APP_VERSION) + " &middot; ";
+        html += "<span id=\"connDot\" style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent-muted);margin-right:4px;\"></span>";
+        html += "<span id=\"connText\">Checking...</span>";
+        // Watchlist-/Squawk-Wachposten-Badge (Alex' Wunsch) - zeigt an, ob
+        // GERADE (im aktuellsten poll()-Ergebnis) mindestens ein Flugzeug
+        // sichtbar ist, das entweder auf der Rufzeichen-Watchlist steht oder
+        // einem hinterlegten Wach-Squawk entspricht (a.watched deckt beides
+        // ab, siehe handleRadarJson() - dort jetzt auch SquawkWatchlist mit
+        // eingerechnet, vorher fehlte das). Bewusst Cyan (#00e5ff) statt der
+        // Thema-Akzentfarbe - dieselbe feste, NICHT themenabhaengige Farbe
+        // wie der Beobachtungs-Ring um den Marker selbst im Radar-Canvas
+        // (semantischer Alarm-/Status-Ton, kein UI-Chrome). Standardmaessig
+        // versteckt, erscheint nur bei tatsaechlichem Treffer.
+        html += " &middot; <span id=\"watchBadge\" style=\"display:none;color:#00e5ff;\">&#9679; Watchlist match</span>";
+        html += "</footer>";
 
         html += "</div></body></html>";
         server.send(200, "text/html", html);
@@ -620,6 +825,14 @@ namespace {
 
         JsonDocument doc;
         doc["range_km"] = rangeKm;
+        // Fuer das WebUI-Farbthema (Alex' Wunsch) - dieselbe SettingsStore::
+        // radarThemeIndex(), aus der auch WebTheme::currentWebTheme() beim
+        // Seitenaufbau die :root-CSS-Variablen ableitet (siehe htmlHeader()).
+        // Hier zusaetzlich im laufenden Poll mitgeschickt, damit ein
+        // Themenwechsel am Geraet auch bei bereits offener Seite live
+        // uebernommen wird (siehe applyTheme() in appendRadarSection()),
+        // ohne dass die Seite neu geladen werden muss.
+        doc["theme_index"] = SettingsStore::radarThemeIndex();
         JsonArray arr = doc["aircraft"].to<JsonArray>();
 
         AircraftTable::lock();
@@ -639,7 +852,12 @@ namespace {
 
             bool isHeavy = isHeavyCategoryWeb(a.category);
             bool isEmergency = emergencyOn && isEmergencySquawkWeb(a.squawk);
-            bool isWatched = watchOn && AircraftWatchlist::isWatched(a.callsign);
+            // Deckt jetzt beide Watchlist-Mechanismen ab, genau wie am
+            // Geraete-Display (radar_screen.cpp) - vorher fehlte hier die
+            // Squawk-Wachliste komplett, ein Flugzeug, das nur ueber seinen
+            // Squawk-Code (nicht das Rufzeichen) beobachtet wird, waere im
+            // WebUI faelschlich als "nicht beobachtet" erschienen.
+            bool isWatched = watchOn && (AircraftWatchlist::isWatched(a.callsign) || SquawkWatchlist::isWatched(a.squawk));
             // "notable" (oranger Ring) ist fuer auffaellige Rufzeichen
             // (Militaer/Regierung) reserviert - Heavy-Flugzeuge bekommen
             // stattdessen die eigene Markerform (siehe "heavy" oben). Es

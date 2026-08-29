@@ -5,6 +5,7 @@
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
 #include <ArduinoJson.h>
+#include <atomic>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
@@ -45,7 +46,14 @@ namespace {
     // Button sofort auch die Badges (Menue-Button, "System"-Kachel,
     // Ruhebildschirm) den aktuellen Stand zeigen, ohne auf den naechsten
     // Hintergrund-Check warten zu muessen.
-    bool lastUpdateAvailable = false;
+    // std::atomic statt einfachem bool: wird von checkForUpdate() aus dem
+    // Hintergrund-Check (net_task.cpp::pollBackground(), Core 0) geschrieben
+    // und von isUpdateAvailable() u.a. aus LedAlert::update() (Core 1, siehe
+    // radar_screen.cpp::updateProximityAlert()) gelesen - echter Cross-Core-
+    // Zugriff. memory_order_relaxed genuegt, da es sich um ein reines
+    // Zustandsflag ohne Abhaengigkeit zu anderem Speicher handelt (gleiches
+    // Prinzip wie heartbeatStartMs in led_alert.cpp).
+    std::atomic<bool> lastUpdateAvailable{false};
     char lastAvailableVersion[16] = {0};
     uint32_t lastBackgroundCheckMs = 0;
 
@@ -57,11 +65,11 @@ namespace {
     // einen bereits bekannten Update-Hinweis verschwinden lassen).
     void applyResult(const CheckInfo& info) {
         if (info.result == CheckResult::UpdateAvailable) {
-            lastUpdateAvailable = true;
+            lastUpdateAvailable.store(true, std::memory_order_relaxed);
             strncpy(lastAvailableVersion, info.latestVersion, sizeof(lastAvailableVersion) - 1);
             lastAvailableVersion[sizeof(lastAvailableVersion) - 1] = 0;
         } else if (info.result == CheckResult::UpToDate) {
-            lastUpdateAvailable = false;
+            lastUpdateAvailable.store(false, std::memory_order_relaxed);
             lastAvailableVersion[0] = 0;
         }
     }
@@ -171,7 +179,7 @@ void pollBackground() {
 }
 
 bool isUpdateAvailable() {
-    return lastUpdateAvailable;
+    return lastUpdateAvailable.load(std::memory_order_relaxed);
 }
 
 const char* availableVersion() {

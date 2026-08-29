@@ -14,7 +14,12 @@ namespace LedAlert {
     };
 
     void begin();
-    bool update(Mode mode, uint32_t nowMs);
+
+    // updateAvailable: wenn true, blinkt die LED zusaetzlich zum normalen
+    // mode dreimal kurz MAGENTA, alle 10 Sekunden wiederholt (Hinweis auf
+    // ein verfuegbares OTA-Update, siehe OtaUpdate::isUpdateAvailable()) -
+    // wie der Heartbeat-Weiss-Blitz NIEMALS waehrend Mode::EmergencyRed.
+    bool update(Mode mode, uint32_t nowMs, bool updateAvailable = false);
 
     void pulseHeartbeat(uint32_t nowMs);
 

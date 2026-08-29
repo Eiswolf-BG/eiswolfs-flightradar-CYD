@@ -1,4 +1,5 @@
 #include "led_alert.h"
+#include "settings_store.h"
 #include <atomic>
 
 namespace LedAlert {
@@ -46,10 +47,62 @@ namespace {
     // ausserhalb des Pulsfensters.
     std::atomic<uint32_t> heartbeatStartMs{static_cast<uint32_t>(0 - (HEARTBEAT_PULSE_MS + 1))};
 
+    // Update-Verfuegbar-Signal: dreimal kurz MAGENTA blinken, alle 10
+    // Sekunden wiederholt, solange OtaUpdate::isUpdateAvailable() true
+    // liefert. Anders als beim Heartbeat wird das "verfuegbar?"-Flag NICHT
+    // hier im LED-Modul selbst gecacht - der Aufrufer (radar_screen.cpp::
+    // updateProximityAlert(), Core 1) uebergibt es direkt als Parameter an
+    // update(), gelesen ueber OtaUpdate::isUpdateAvailable() (das intern
+    // bereits ein std::atomic<bool> ist, da es von Core 0 - Hintergrund-
+    // Update-Pruefung in net_task.cpp - gesetzt und hier auf Core 1 gelesen
+    // wird). Dadurch braucht dieses Modul selbst keinen weiteren Cross-
+    // Core-Zustand: nowMs/updateAvailable kommen beide bereits fertig
+    // synchronisiert von Core 1 aus rein, genau wie mode auch.
+    constexpr uint32_t UPDATE_BLINK_ON_MS  = 120;
+    constexpr uint32_t UPDATE_BLINK_OFF_MS = 120;
+    constexpr uint32_t UPDATE_BLINK_SLOT_MS = UPDATE_BLINK_ON_MS + UPDATE_BLINK_OFF_MS;
+    constexpr uint8_t  UPDATE_BLINK_COUNT  = 3;
+    constexpr uint32_t UPDATE_CYCLE_MS     = 10000;
+
+    // Rein rechnerisch aus nowMs abgeleitet (kein eigener Zustand, kein
+    // Race moeglich) - dreht sich im UPDATE_CYCLE_MS-Takt, blinkt in den
+    // ersten UPDATE_BLINK_COUNT Slots des Zyklus, danach Pause bis zum
+    // naechsten Zyklus.
+    bool updateBlinkOn(uint32_t nowMs) {
+        uint32_t phase = nowMs % UPDATE_CYCLE_MS;
+        uint32_t burstEnd = UPDATE_BLINK_COUNT * UPDATE_BLINK_SLOT_MS;
+        if (phase >= burstEnd) return false;
+        return (phase % UPDATE_BLINK_SLOT_MS) < UPDATE_BLINK_ON_MS;
+    }
+
     void setAllOff() {
         digitalWrite(PIN_RED, HIGH);
         digitalWrite(PIN_GREEN, HIGH);
         digitalWrite(PIN_BLUE, HIGH);
+    }
+
+    // Heartbeat (mode==Off) und Naeherungsalarm (Mode::ProximityGreen)
+    // folgen jetzt dem gewaehlten Systemthema (SettingsStore::
+    // radarThemeIndex(), dieselbe zentrale Quelle wie UiTheme::
+    // accentColor() fuer die restliche UI) statt fest Gruen zu sein. Die
+    // LED hat aber nur drei reine An/Aus-Kanaele (kein PWM, siehe
+    // digitalWrite() ueberall in dieser Datei) - eine echte RGB565-Farbe wie
+    // bei UiTheme::accentColor() laesst sich hier nicht abbilden. Amber wird
+    // deshalb als bestmoegliche Zwei-Kanal-Annaeherung ueber Rot+Gruen
+    // gemeinsam dargestellt (reines Gelb auf einer Standard-RGB-LED, kommt
+    // dem "Amber" der restlichen UI so nahe wie mit drei diskreten Kanaelen
+    // ueberhaupt moeglich), Blau ueber den Blau-Kanal allein. Wichtig fuer
+    // Watchlist-Alarm (siehe update() unten): DORT wird bewusst NICHT diese
+    // Funktion verwendet, sondern fest Cyan (Gruen+Blau) - sonst waere der
+    // Watchlist-Alarm bei aktivem Blau-Thema (nur Blau-Kanal) farblich nicht
+    // vom Naeherungsalarm zu unterscheiden.
+    void themeLedChannels(bool& r, bool& g, bool& b) {
+        r = false; g = false; b = false;
+        switch (SettingsStore::radarThemeIndex()) {
+            case 1: r = true; g = true; break;  // Amber (Naeherung: Rot+Gruen)
+            case 2: b = true; break;             // Blau
+            default: g = true; break;            // Gruen (Standard)
+        }
     }
 }
 
@@ -68,7 +121,7 @@ void pulseHeartbeat(uint32_t nowMs) {
     heartbeatStartMs.store(nowMs, std::memory_order_relaxed);
 }
 
-bool update(Mode mode, uint32_t nowMs) {
+bool update(Mode mode, uint32_t nowMs, bool updateAvailable) {
     if (!initialized) begin();
 
     // "Gerade aktiv?" wird rein rechnerisch aus dem atomar gelesenen
@@ -79,11 +132,31 @@ bool update(Mode mode, uint32_t nowMs) {
     uint32_t hbStart = heartbeatStartMs.load(std::memory_order_relaxed);
     bool heartbeatInWindow = (nowMs - hbStart) < HEARTBEAT_PULSE_MS;
 
+    // Wie beim Heartbeat: Notfall-Alarm hat absolute Prioritaet, das
+    // Update-Blinken wird bei EmergencyRed komplett unterdrueckt (kein
+    // updateBlinkOn()-Aufruf noetig, einfach per && kurzgeschlossen).
+    bool updateBlinkActive = updateAvailable && mode != Mode::EmergencyRed && updateBlinkOn(nowMs);
+
     if (mode == Mode::Off) {
         if (heartbeatInWindow) {
-            digitalWrite(PIN_GREEN, LOW);
-            digitalWrite(PIN_RED, HIGH);
-            digitalWrite(PIN_BLUE, HIGH);
+            bool r, g, b;
+            themeLedChannels(r, g, b);
+            digitalWrite(PIN_RED,   r ? LOW : HIGH);
+            digitalWrite(PIN_GREEN, g ? LOW : HIGH);
+            digitalWrite(PIN_BLUE,  b ? LOW : HIGH);
+            blinkState = false;
+            lastMode = mode;
+            return true;
+        }
+
+        // MAGENTA (Rot+Blau) fuer das Update-Signal - Heartbeat hat bei
+        // gleichzeitigem Zusammentreffen Vorrang (kuerzeres, selteneres
+        // Signal, siehe Kommentar bei UPDATE_BLINK_* oben), daher erst HIER
+        // nach der Heartbeat-Pruefung ausgewertet.
+        if (updateBlinkActive) {
+            digitalWrite(PIN_RED, LOW);
+            digitalWrite(PIN_BLUE, LOW);
+            digitalWrite(PIN_GREEN, HIGH);
             blinkState = false;
             lastMode = mode;
             return true;
@@ -102,9 +175,23 @@ bool update(Mode mode, uint32_t nowMs) {
     }
 
     uint32_t interval = (mode == Mode::EmergencyRed) ? RED_BLINK_INTERVAL_MS : GREEN_BLINK_INTERVAL_MS;
-    uint8_t pin = (mode == Mode::EmergencyRed) ? PIN_RED
-                : (mode == Mode::WatchlistBlue) ? PIN_BLUE
-                : PIN_GREEN;
+
+    // Notfall bleibt fest Rot, Watchlist bleibt fest CYAN (Gruen+Blau) -
+    // beide UNABHAENGIG vom Systemthema, wie von Alex ausdruecklich
+    // gewuenscht (Watchlist muss sich auch bei aktivem Blau-Thema klar vom
+    // dann ebenfalls blauen Naeherungsalarm unterscheiden). Nur
+    // ProximityGreen folgt dem Thema (siehe themeLedChannels() oben) - der
+    // Enum-Wert heisst weiterhin "WatchlistBlue" (nur interner Name, siehe
+    // led_alert.h), die tatsaechliche LED-Farbe ist jetzt aber Cyan.
+    bool chR = false, chG = false, chB = false;
+    if (mode == Mode::EmergencyRed) {
+        chR = true;
+    } else if (mode == Mode::WatchlistBlue) {
+        chG = true;
+        chB = true;
+    } else {
+        themeLedChannels(chR, chG, chB);
+    }
 
     // Blink-Takt IMMER berechnen, auch waehrend eines Heartbeat-Ueberlagerung
     // (siehe unten) - so bleibt der zurueckgegebene blinkState (synchronisiert
@@ -132,9 +219,22 @@ bool update(Mode mode, uint32_t nowMs) {
         return blinkState;
     }
 
-    digitalWrite(PIN_RED,   (pin == PIN_RED   && blinkState) ? LOW : HIGH);
-    digitalWrite(PIN_GREEN, (pin == PIN_GREEN && blinkState) ? LOW : HIGH);
-    digitalWrite(PIN_BLUE,  (pin == PIN_BLUE  && blinkState) ? LOW : HIGH);
+    // Update-Ueberlagerung: gleiches Prinzip wie der Heartbeat-Weiss-Blitz
+    // (siehe oben) - zusaetzlich zu ProximityGreen/WatchlistBlue, NIEMALS
+    // bei EmergencyRed (bereits in updateBlinkActive per && ausgeschlossen).
+    // MAGENTA (Rot+Blau an, Gruen aus) statt Weiss, damit sich das Update-
+    // Signal optisch klar vom Heartbeat unterscheidet - beide sollen bei
+    // einem Blick auf die LED nicht verwechselbar sein.
+    if (updateBlinkActive) {
+        digitalWrite(PIN_RED, LOW);
+        digitalWrite(PIN_GREEN, HIGH);
+        digitalWrite(PIN_BLUE, LOW);
+        return blinkState;
+    }
+
+    digitalWrite(PIN_RED,   (chR && blinkState) ? LOW : HIGH);
+    digitalWrite(PIN_GREEN, (chG && blinkState) ? LOW : HIGH);
+    digitalWrite(PIN_BLUE,  (chB && blinkState) ? LOW : HIGH);
 
     return blinkState;
 }

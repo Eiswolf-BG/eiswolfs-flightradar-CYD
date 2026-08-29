@@ -8,6 +8,7 @@
 #include "units.h"
 #include "settings_store.h"
 #include "led_alert.h"
+#include "ota_update.h"
 #include "location_manager.h"
 #include "sun_times.h"
 #include "world_map.h"
@@ -74,6 +75,12 @@ namespace {
     // DETAIL_PANEL_H).
     constexpr int16_t DETAIL_PANEL_H = 286;
 
+    // Flugzeugtyp-Silhouette nach ICAO-Typcode - Deklaration bewusst hier
+    // vorgezogen (die eigentliche Zuordnungstabelle/classifyTypeSilhouette()
+    // stehen weiter unten bei isHeavyCategory()), da HitPoint (gleich
+    // darunter) diesen Typ bereits als Feld braucht.
+    enum class TypeSilhouette { Unknown, Airliner, PrivateJet, Turboprop };
+
     struct HitPoint {
         int16_t x, y;
         bool valid;
@@ -94,6 +101,9 @@ namespace {
         bool isGroundVehicle;
         bool isRotorcraft;
         bool isHeavy;
+        // Nur relevant, wenn keiner der drei Faelle oben zutrifft (siehe
+        // drawTypedMarker()) - Flugzeugtyp-Silhouette aus dem ICAO-Typcode.
+        TypeSilhouette typeSilhouette;
         // Fuer den CRT-Phosphor-Effekt (siehe crtPhosphorColor() unten) -
         // bearingDeg wird fuer die Sweep-Treffer-Erkennung in tick()
         // gebraucht, crtFadeEligible ist jetzt fuer JEDE Kategorie true
@@ -323,9 +333,10 @@ namespace {
     // dieses Feature wurde nie tatsaechlich spezifiziert/geliefert (mehrfach
     // in verschiedenen Aenderungswuenschen referenziert, aber die
     // eigentliche Praefixliste kam nie an). "Heavy"-Flugzeuge (ADS-B-
-    // Emitter-Kategorie "A5", siehe isHeavyCategory() unten) haben bereits
-    // ihre eigene Markerform (drawHeavyMarker()) und sind NICHT von diesem
-    // Ring betroffen. Sobald eine echte Praefixliste geliefert wird, hier
+    // Emitter-Kategorie "A5", siehe isHeavyCategory() unten) bekommen bereits
+    // eine groessere/fettere Version ihrer Typ-Silhouette (siehe
+    // drawTypedMarker()) und sind NICHT von diesem Ring betroffen. Sobald
+    // eine echte Praefixliste geliefert wird, hier
     // den Vergleich analog zu isEmergencySquawk() ergaenzen.
     bool isNotableCallsign(const char* callsign) {
         (void)callsign;
@@ -382,6 +393,141 @@ namespace {
 
     bool isHeavyCategory(const char* category) {
         return category[0] == 'A' && category[1] == '5';
+    }
+
+    // Flugzeugtyp-Silhouette nach ICAO-Typcode (Aircraft::typeCode, kommt
+    // direkt aus dem "t"-Feld von adsb.lol, siehe adsb_client.cpp - wird
+    // schon seit Projektbeginn abgefragt/gespeichert, aber bisher nirgends
+    // fuer die Radar-Darstellung ausgewertet). Grobe Kategorisierung in
+    // Airliner/Privatjet/Turboprop fuer ein eigenes Symbol statt der
+    // generischen Pfeilform (siehe drawAirlinerMarker()/
+    // drawPrivateJetMarker()/drawTurbopropMarker() und drawTypedMarker()
+    // unten). AUSDRUECKLICH Best-Effort, gleiches Prinzip wie die Militaer-/
+    // Behoerdenflug-Erkennung (isMilitaryGovSquawk() oben): die Liste deckt
+    // die gaengigsten Linienflugzeug-/Business-Jet-/Turboprop-Familien ab
+    // (aus oeffentlich bekannten ICAO-Typcode-Referenzen), erhebt aber
+    // keinen Anspruch auf Vollstaendigkeit - ein unbekannter/neuer Typcode
+    // liefert einfach Unknown und faellt in render()/tick() auf die
+    // bisherige generische Pfeilform zurueck (kein Symbol-Zwang). Kostet nur
+    // wenige hundert Bytes Flash (kleine Praefix-Tabelle, keine RAM-
+    // Belastung), bei aktuell 72% Flash-Auslastung also unkritisch.
+    // (TypeSilhouette selbst ist bereits weiter oben bei HitPoint deklariert.)
+    struct TypePrefixEntry {
+        const char* prefix;
+        TypeSilhouette cls;
+    };
+
+    // Praefix-Vergleich statt exaktem Vergleich, da eine Herstellerfamilie
+    // meist einen gemeinsamen Wortstamm teilt (z.B. alle Boeing-
+    // Linienflugzeuge 707-787 beginnen mit "B7", alle Airbus A300-A380 mit
+    // "A3") - deutlich kompakter als jede einzelne Variante aufzufuehren.
+    // Die Praefixe in dieser Tabelle ueberschneiden sich bewusst NICHT
+    // ueber Kategorie-Grenzen hinweg (z.B. Beechcraft-Turboprops "BE20"/
+    // "BE30"/"B350" vs. der Beechjet-Privatjet "BE40" - unterscheiden sich
+    // bereits an Position 3, kein Ueberlappungsrisiko), die Reihenfolge in
+    // der Tabelle ist daher nicht sicherheitsrelevant.
+    constexpr TypePrefixEntry TYPE_SILHOUETTE_TABLE[] = {
+        // -- Privatjets --
+        {"LJ",   TypeSilhouette::PrivateJet},   // Learjet
+        {"C25",  TypeSilhouette::PrivateJet},   // Citation CJ1/CJ2/CJ3/CJ4
+        {"C5",   TypeSilhouette::PrivateJet},   // Citation 500er-Reihe
+        {"C6",   TypeSilhouette::PrivateJet},   // Citation 600er-Reihe
+        {"C7",   TypeSilhouette::PrivateJet},   // Citation 700er-Reihe
+        {"GLF",  TypeSilhouette::PrivateJet},   // Gulfstream GLF2-GLF6
+        {"G280", TypeSilhouette::PrivateJet},
+        {"G650", TypeSilhouette::PrivateJet},
+        {"H25",  TypeSilhouette::PrivateJet},   // Hawker
+        {"BE40", TypeSilhouette::PrivateJet},   // Beechjet 400 / Hawker 400
+        {"FA7",  TypeSilhouette::PrivateJet},   // Falcon 7X
+        {"FA8",  TypeSilhouette::PrivateJet},   // Falcon 8X
+        {"F900", TypeSilhouette::PrivateJet},   // Falcon 900
+        {"F2TH", TypeSilhouette::PrivateJet},   // Falcon 2000
+        {"CL30", TypeSilhouette::PrivateJet},   // Challenger 300/350
+        {"CL60", TypeSilhouette::PrivateJet},   // Challenger 600/604/605/650
+        {"GLEX", TypeSilhouette::PrivateJet},   // Global Express
+        {"GL5T", TypeSilhouette::PrivateJet},
+        {"GL6T", TypeSilhouette::PrivateJet},
+        {"E50P", TypeSilhouette::PrivateJet},   // Embraer Phenom 100
+        {"E55P", TypeSilhouette::PrivateJet},   // Embraer Phenom 300
+        {"PC24", TypeSilhouette::PrivateJet},   // Pilatus PC-24 (Jet, siehe PC12 unten)
+
+        // -- Turboprops --
+        {"AT4",  TypeSilhouette::Turboprop},    // ATR 42
+        {"AT7",  TypeSilhouette::Turboprop},    // ATR 72
+        {"DH8",  TypeSilhouette::Turboprop},    // Dash 8 / Q400
+        {"SF34", TypeSilhouette::Turboprop},    // Saab 340
+        {"SB20", TypeSilhouette::Turboprop},    // Saab 2000
+        {"BE20", TypeSilhouette::Turboprop},    // King Air 200
+        {"BE30", TypeSilhouette::Turboprop},    // King Air 300
+        {"BE9L", TypeSilhouette::Turboprop},    // King Air 90
+        {"B350", TypeSilhouette::Turboprop},    // King Air 350
+        {"C208", TypeSilhouette::Turboprop},    // Cessna Caravan
+        {"PC12", TypeSilhouette::Turboprop},    // Pilatus PC-12 (Turboprop, siehe PC24 oben)
+        {"DHC6", TypeSilhouette::Turboprop},    // De Havilland Twin Otter
+        {"SW4",  TypeSilhouette::Turboprop},    // Fairchild Metroliner
+        {"F50",  TypeSilhouette::Turboprop},    // Fokker 50
+        {"L410", TypeSilhouette::Turboprop},    // Let L-410
+
+        // -- Airliner --
+        {"A3",   TypeSilhouette::Airliner},     // Airbus A300-A380
+        {"B7",   TypeSilhouette::Airliner},     // Boeing 707-787
+        {"MD",   TypeSilhouette::Airliner},     // McDonnell Douglas MD-80/-90
+        {"CRJ",  TypeSilhouette::Airliner},     // Bombardier CRJ
+        {"E1",   TypeSilhouette::Airliner},     // Embraer E170/175/190/195
+        {"E29",  TypeSilhouette::Airliner},     // Embraer E190-E2/E195-E2
+        {"SU9",  TypeSilhouette::Airliner},     // Sukhoi Superjet 100
+        {"BCS",  TypeSilhouette::Airliner},     // Airbus A220 (ex-Bombardier CSeries)
+    };
+    constexpr uint8_t TYPE_SILHOUETTE_COUNT =
+        sizeof(TYPE_SILHOUETTE_TABLE) / sizeof(TYPE_SILHOUETTE_TABLE[0]);
+
+    // Airbus "Neo"-Familie (New Engine Option) - A319neo/A320neo/A321neo
+    // haben eigene ICAO-Typcodes A19N/A20N/A21N (NICHT A319/A320/A321 wie
+    // die klassische Generation, siehe TYPE_SILHOUETTE_TABLE-Praefix "A3"
+    // oben) - reines Praefix-Matching kann dieses Suffix-Muster nicht
+    // abbilden (Befund: fehlten bisher komplett, dadurch faelschlich
+    // Unknown/Pfeilform trotz 122 Vorkommen allein im 13.08.-Flugbuch).
+    // Deshalb ein eigener, generalisierter Check statt sechs fest
+    // eingetragener Einzelcodes: "A" + zwei Ziffern (1x/2x/3x, der
+    // realistische Airbus-Einstrahlbereich) + "N" - deckt automatisch auch
+    // noch nicht existierende kuenftige Neo-Varianten derselben Systematik
+    // ab (z.B. ein hypothetisches "A22N"), ohne beliebige andere
+    // vierstellige "...N"-Codes zu treffen (kein bekannter Turboprop-/
+    // Privatjet-/Helikopter-Code in dieser Tabelle endet auf "N").
+    bool isAirbusNeoCode(const char* t) {
+        return t[0] == 'A' && t[1] >= '1' && t[1] <= '3' &&
+               t[2] >= '0' && t[2] <= '9' && t[3] == 'N' && t[4] == '\0';
+    }
+
+    // Boeing 737-MAX-Familie - B37M/B38M/B39M (Ziffer = Baureihe -7/-8/-9,
+    // Suffix "M" fuer "MAX", analog zur Neo-Systematik oben - die
+    // klassische 737-Generation nutzt weiterhin B737/B738/B739, gedeckt
+    // durch den bestehenden Praefix "B7"). "B3" + eine Ziffer + "M" deckt
+    // ebenfalls kuenftige Baureihen derselben Systematik ab, ohne z.B. den
+    // Turboprop "B350" (King Air 350, siehe TYPE_SILHOUETTE_TABLE oben) zu
+    // treffen - der endet auf "0", nicht auf "M".
+    bool isBoeingMaxCode(const char* t) {
+        return t[0] == 'B' && t[1] == '3' && t[2] >= '0' && t[2] <= '9' &&
+               t[3] == 'M' && t[4] == '\0';
+    }
+
+    TypeSilhouette classifyTypeSilhouette(const char* typeCode) {
+        if (!typeCode[0]) return TypeSilhouette::Unknown;
+        size_t len = strlen(typeCode);
+        // Neo/MAX-Sondercheck zuerst - beide sind eindeutig 4-stellige
+        // Codes mit eigenem Suffix-Muster, ueberschneiden sich nicht mit
+        // der Praefix-Tabelle unten (siehe Kommentare bei den beiden
+        // Funktionen oben).
+        if (len == 4 && (isAirbusNeoCode(typeCode) || isBoeingMaxCode(typeCode))) {
+            return TypeSilhouette::Airliner;
+        }
+        for (uint8_t i = 0; i < TYPE_SILHOUETTE_COUNT; i++) {
+            size_t plen = strlen(TYPE_SILHOUETTE_TABLE[i].prefix);
+            if (len >= plen && strncmp(typeCode, TYPE_SILHOUETTE_TABLE[i].prefix, plen) == 0) {
+                return TYPE_SILHOUETTE_TABLE[i].cls;
+            }
+        }
+        return TypeSilhouette::Unknown;
     }
 
     float sweepAngleDeg = 0.0f;
@@ -851,34 +997,68 @@ namespace {
         }
     }
 
-    // kurzer Kursstrich in Flugrichtung (headingDeg) MIT Pfeilspitze am Ende -
-    // eine reine Linie ohne Spitze war nicht eindeutig lesbar (nicht erkennbar,
-    // welches Ende "vorne" ist). Die Spitze besteht aus zwei kurzen Strichen,
-    // die knapp vor der Linienspitze schraeg nach aussen abzweigen (klassisches
-    // Chevron-/Pfeilkopf-Symbol, wie bei ATC-Radardarstellungen ueblich).
-    void drawAircraftMarker(TFT_eSPI& gfx, int16_t x, int16_t y, float headingDeg, uint16_t color) {
-        gfx.fillCircle(x, y, 5, color);
+    // Zeichnet eine Linie "fett" durch zusaetzliche, um je 1px versetzte
+    // Parallel-Linien (halfWidth Stufen auf JEDER Seite der Mittellinie,
+    // also insgesamt (2*halfWidth+1) Linien, effektive Breite ca.
+    // (2*halfWidth+1)px) - bewusst NICHT TFT_eSPI::drawWideLine() (das
+    // arbeitet mit Anti-Aliasing/Hintergrundmischung, was beim bestehenden
+    // Loesch-per-TFT_BLACK-Ueberschreiben-Muster dieser Datei helle
+    // Restpixel haette hinterlassen koennen, siehe tick()) - stattdessen
+    // dieselbe einfache, AA-freie drawLine()-Technik wie ueberall sonst in
+    // dieser Datei, nur additiv mehrfach versetzt. Fuer ALLE Typ-
+    // Silhouetten genutzt (siehe drawTypedMarker() unten, halfWidth=1 im
+    // Normalfall, halfWidth=2 bei "Heavy") - Alex' Wunsch nach spuerbar
+    // kraeftigeren Linien ("von 1px auf 2px") galt fuer alle Kategorien,
+    // nicht nur Heavy.
+    void drawThickLine(TFT_eSPI& gfx, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color,
+                        uint8_t halfWidth) {
+        gfx.drawLine(x1, y1, x2, y2, color);
+        if (halfWidth == 0) return;
+        float ldx = (float)(x2 - x1);
+        float ldy = (float)(y2 - y1);
+        float len = sqrtf(ldx * ldx + ldy * ldy);
+        if (len < 0.5f) return;
+        float ux = -ldy / len;
+        float uy = ldx / len;
+        for (uint8_t i = 1; i <= halfWidth; i++) {
+            int16_t ox = (int16_t)lroundf(ux * i);
+            int16_t oy = (int16_t)lroundf(uy * i);
+            if (ox == 0 && oy == 0) continue;
+            gfx.drawLine((int16_t)(x1 + ox), (int16_t)(y1 + oy), (int16_t)(x2 + ox), (int16_t)(y2 + oy), color);
+            gfx.drawLine((int16_t)(x1 - ox), (int16_t)(y1 - oy), (int16_t)(x2 - ox), (int16_t)(y2 - oy), color);
+        }
+    }
 
+    // Generische Flugzeug-Silhouette - Fallback, wenn der ICAO-Typcode
+    // unbekannt/nicht zuordenbar ist (classifyTypeSilhouette() liefert
+    // Unknown, siehe drawTypedMarker() unten). Gleicher Aufbau wie
+    // drawAirlinerMarker() (Rumpflinie + durchgehender Tragflaechenstrich),
+    // bewusst NEUTRAL gehalten, da der genaue Typ ja nicht bekannt ist -
+    // ersetzt die fruehere Kreis+Pfeilkopf-Form, die laut Karls Analyse bei
+    // der kleinen Displaygroesse selbst wie ein Blob wirkte (keine
+    // Kreisfuellung mehr, konsequent nur noch Linien wie bei den anderen
+    // Typ-Silhouetten). Masse (Stand nach Alex' "deutlich groesser/
+    // kraeftiger"-Wunsch): normal 9/7/8px (Nase/Heck/Fluegel), halfWidth=1
+    // (~3px Linienstaerke); heavy=true (Heavy-Kategorie mit unbekanntem
+    // Typcode) 12/9/10px, halfWidth=2 (~5px Linienstaerke).
+    void drawAircraftMarker(TFT_eSPI& gfx, int16_t x, int16_t y, float headingDeg, uint16_t color, bool heavy) {
         double rad = headingDeg * PI / 180.0;
-        int16_t dx = (int16_t)(sin(rad) * 10);
-        int16_t dy = (int16_t)(-cos(rad) * 10);
-        int16_t tipX = x + dx;
-        int16_t tipY = y + dy;
-        gfx.drawLine(x, y, tipX, tipY, color);
+        int16_t noseLen = heavy ? 12 : 9;
+        int16_t tailLen = heavy ? 9 : 7;
+        int16_t wingLen = heavy ? 10 : 8;
+        uint8_t halfWidth = heavy ? 2 : 1;
+        int16_t noseX = x + (int16_t)(sin(rad) * noseLen);
+        int16_t noseY = y - (int16_t)(cos(rad) * noseLen);
+        int16_t tailX = x - (int16_t)(sin(rad) * tailLen);
+        int16_t tailY = y + (int16_t)(cos(rad) * tailLen);
+        drawThickLine(gfx, tailX, tailY, noseX, noseY, color, halfWidth);
 
-        // Pfeilspitze: zwei kurze Striche von der Spitze aus, je 150 Grad
-        // zur Kurslinie zurueckgeklappt (also leicht "nach hinten" zeigend,
-        // wie bei einem Pfeilkopf "^" ueblich).
-        constexpr double WING_ANGLE_RAD = 150.0 * PI / 180.0;
-        constexpr int16_t WING_LEN = 4;
-        double wing1 = rad + WING_ANGLE_RAD;
-        double wing2 = rad - WING_ANGLE_RAD;
-        int16_t w1x = tipX + (int16_t)(sin(wing1) * WING_LEN);
-        int16_t w1y = tipY + (int16_t)(-cos(wing1) * WING_LEN);
-        int16_t w2x = tipX + (int16_t)(sin(wing2) * WING_LEN);
-        int16_t w2y = tipY + (int16_t)(-cos(wing2) * WING_LEN);
-        gfx.drawLine(tipX, tipY, w1x, w1y, color);
-        gfx.drawLine(tipX, tipY, w2x, w2y, color);
+        double wingRad = rad + PI / 2.0;
+        int16_t w1x = x + (int16_t)(sin(wingRad) * wingLen);
+        int16_t w1y = y - (int16_t)(cos(wingRad) * wingLen);
+        int16_t w2x = x - (int16_t)(sin(wingRad) * wingLen);
+        int16_t w2y = y + (int16_t)(cos(wingRad) * wingLen);
+        drawThickLine(gfx, w1x, w1y, w2x, w2y, color, halfWidth);
     }
 
     // Eigener Marker fuer Bodenfahrzeuge (ADS-B-Kategorie "C*") - ein
@@ -903,35 +1083,127 @@ namespace {
         gfx.drawLine(x, (int16_t)(y - ROTOR_LEN), x, (int16_t)(y + ROTOR_LEN), color);
     }
 
-    // Eigener Marker fuer "Heavy"-Flugzeuge (ADS-B-Emitter-Kategorie "A5" -
-    // Flugzeuge ueber 136t Starthoechstgewicht, z.B. A380/B747/B777/A330).
-    // Gleicher Aufbau wie drawAircraftMarker() (Kreis + Kurslinie mit
-    // Pfeilkopf), aber mit groesserem Kreis und einem zusaetzlichen duennen
-    // Aussenring - auf den ersten Blick als "groesser/schwerer" erkennbar,
-    // ohne eine komplett neue Formsprache einzufuehren. Die Farbe bleibt wie
-    // gewohnt die Hoehenfarbe (colorForAltitude()) - die Form transportiert
-    // "Heavy", nicht einen Alarm-/Auffaelligkeitszustand (siehe isNotable).
-    void drawHeavyMarker(TFT_eSPI& gfx, int16_t x, int16_t y, float headingDeg, uint16_t color) {
-        gfx.fillCircle(x, y, 6, color);
-        gfx.drawCircle(x, y, 8, color);
-
+    // Airliner-Silhouette (siehe classifyTypeSilhouette() oben) - gerade
+    // Rumpflinie (Bug/Heck) plus ein durchgehender Tragflaechenstrich
+    // mittig, quer zur Flugrichtung. Ersetzt drawAircraftMarker() NUR, wenn
+    // der Typcode einer Kategorie zugeordnet werden konnte (siehe
+    // drawTypedMarker() unten). Masse (Stand nach Alex' "deutlich groesser/
+    // kraeftiger"-Wunsch, vorher 7/5/6px bei 1px Linienstaerke): normal
+    // 9/7/8px (Nase/Heck/Fluegel), halfWidth=1 (~3px Linienstaerke) - das
+    // entspricht +29%/+40%/+33% gegenueber der vorherigen Groesse. heavy=true
+    // (ADS-B-Emitter-Kategorie "A5", siehe isHeavyCategory()) 12/9/10px,
+    // halfWidth=2 (~5px Linienstaerke) - ersetzt den frueheren separaten
+    // Kreis-Marker drawHeavyMarker(), der laut Alex' Wunsch ("Alles oder
+    // nichts", kein Kreis/Blob mehr) komplett entfallen ist.
+    void drawAirlinerMarker(TFT_eSPI& gfx, int16_t x, int16_t y, float headingDeg, uint16_t color, bool heavy) {
         double rad = headingDeg * PI / 180.0;
-        int16_t dx = (int16_t)(sin(rad) * 10);
-        int16_t dy = (int16_t)(-cos(rad) * 10);
-        int16_t tipX = x + dx;
-        int16_t tipY = y + dy;
-        gfx.drawLine(x, y, tipX, tipY, color);
+        int16_t noseLen = heavy ? 12 : 9;
+        int16_t tailLen = heavy ? 9 : 7;
+        int16_t wingLen = heavy ? 10 : 8;
+        uint8_t halfWidth = heavy ? 2 : 1;
+        int16_t noseX = x + (int16_t)(sin(rad) * noseLen);
+        int16_t noseY = y - (int16_t)(cos(rad) * noseLen);
+        int16_t tailX = x - (int16_t)(sin(rad) * tailLen);
+        int16_t tailY = y + (int16_t)(cos(rad) * tailLen);
+        drawThickLine(gfx, tailX, tailY, noseX, noseY, color, halfWidth);
 
-        constexpr double WING_ANGLE_RAD = 150.0 * PI / 180.0;
-        constexpr int16_t WING_LEN = 4;
-        double wing1 = rad + WING_ANGLE_RAD;
-        double wing2 = rad - WING_ANGLE_RAD;
-        int16_t w1x = tipX + (int16_t)(sin(wing1) * WING_LEN);
-        int16_t w1y = tipY + (int16_t)(-cos(wing1) * WING_LEN);
-        int16_t w2x = tipX + (int16_t)(sin(wing2) * WING_LEN);
-        int16_t w2y = tipY + (int16_t)(-cos(wing2) * WING_LEN);
-        gfx.drawLine(tipX, tipY, w1x, w1y, color);
-        gfx.drawLine(tipX, tipY, w2x, w2y, color);
+        double wingRad = rad + PI / 2.0;
+        int16_t w1x = x + (int16_t)(sin(wingRad) * wingLen);
+        int16_t w1y = y - (int16_t)(cos(wingRad) * wingLen);
+        int16_t w2x = x - (int16_t)(sin(wingRad) * wingLen);
+        int16_t w2y = y + (int16_t)(cos(wingRad) * wingLen);
+        drawThickLine(gfx, w1x, w1y, w2x, w2y, color, halfWidth);
+    }
+
+    // Privatjet-Silhouette - gleicher Aufbau wie drawAirlinerMarker(), aber
+    // kompakter/kuerzer proportioniert (kleinere Rumpf-/Tragflaechenlaenge),
+    // wie von Alex gewuenscht. Masse: normal 7/5/6px (vorher 5/3/4px,
+    // +40%/+67%/+50%), halfWidth=1 - bleibt damit bewusst durchgehend
+    // kleiner als der neue Airliner-Normalwert (9/7/8px), die relative
+    // Groessenordnung zwischen den Kategorien bleibt erhalten. heavy=true
+    // 10/7/8px, halfWidth=2 (in der Praxis selten, da echte Privatjets kaum
+    // je die "A5"-Heavy-Gewichtsklasse erreichen - der Vollstaendigkeit
+    // halber trotzdem unterstuetzt, damit auch hier nie auf den alten
+    // Kreis-Marker zurueckgefallen wird).
+    void drawPrivateJetMarker(TFT_eSPI& gfx, int16_t x, int16_t y, float headingDeg, uint16_t color, bool heavy) {
+        double rad = headingDeg * PI / 180.0;
+        int16_t noseLen = heavy ? 10 : 7;
+        int16_t tailLen = heavy ? 7 : 5;
+        int16_t wingLen = heavy ? 8 : 6;
+        uint8_t halfWidth = heavy ? 2 : 1;
+        int16_t noseX = x + (int16_t)(sin(rad) * noseLen);
+        int16_t noseY = y - (int16_t)(cos(rad) * noseLen);
+        int16_t tailX = x - (int16_t)(sin(rad) * tailLen);
+        int16_t tailY = y + (int16_t)(cos(rad) * tailLen);
+        drawThickLine(gfx, tailX, tailY, noseX, noseY, color, halfWidth);
+
+        double wingRad = rad + PI / 2.0;
+        int16_t w1x = x + (int16_t)(sin(wingRad) * wingLen);
+        int16_t w1y = y - (int16_t)(cos(wingRad) * wingLen);
+        int16_t w2x = x - (int16_t)(sin(wingRad) * wingLen);
+        int16_t w2y = y + (int16_t)(cos(wingRad) * wingLen);
+        drawThickLine(gfx, w1x, w1y, w2x, w2y, color, halfWidth);
+    }
+
+    // Turboprop-Silhouette - gleicher Aufbau wie drawAirlinerMarker()
+    // (gleiche Rumpf-/Tragflaechenlaenge: normal 9/7/8px, heavy 12/9/10px),
+    // zusaetzlich zwei kleine Punkte auf den Tragflaechen (Triebwerke) -
+    // typisch fuer zweimotorige Turboprops wie ATR/Dash 8/Saab 340.
+    // heavy=true (in der Praxis selten - grosse Turboprops wie die C-130
+    // erreichen zwar Heavy-Gewicht, sind aber kaum je per ADS-B im zivilen
+    // Luftraum sichtbar; der Vollstaendigkeit halber trotzdem unterstuetzt).
+    void drawTurbopropMarker(TFT_eSPI& gfx, int16_t x, int16_t y, float headingDeg, uint16_t color, bool heavy) {
+        double rad = headingDeg * PI / 180.0;
+        int16_t noseLen = heavy ? 12 : 9;
+        int16_t tailLen = heavy ? 9 : 7;
+        int16_t wingLen = heavy ? 10 : 8;
+        uint8_t halfWidth = heavy ? 2 : 1;
+        int16_t noseX = x + (int16_t)(sin(rad) * noseLen);
+        int16_t noseY = y - (int16_t)(cos(rad) * noseLen);
+        int16_t tailX = x - (int16_t)(sin(rad) * tailLen);
+        int16_t tailY = y + (int16_t)(cos(rad) * tailLen);
+        drawThickLine(gfx, tailX, tailY, noseX, noseY, color, halfWidth);
+
+        double wingRad = rad + PI / 2.0;
+        int16_t w1x = x + (int16_t)(sin(wingRad) * wingLen);
+        int16_t w1y = y - (int16_t)(cos(wingRad) * wingLen);
+        int16_t w2x = x - (int16_t)(sin(wingRad) * wingLen);
+        int16_t w2y = y + (int16_t)(cos(wingRad) * wingLen);
+        drawThickLine(gfx, w1x, w1y, w2x, w2y, color, halfWidth);
+
+        // Triebwerks-Punkte: normal Radius 2 (vorher 1), heavy Radius 3 -
+        // proportional zur groesseren Fluegelspannweite mitskaliert.
+        int16_t engineOffset = heavy ? 7 : 5;
+        uint8_t engineRadius = heavy ? 3 : 2;
+        int16_t e1x = x + (int16_t)(sin(wingRad) * engineOffset);
+        int16_t e1y = y - (int16_t)(cos(wingRad) * engineOffset);
+        int16_t e2x = x - (int16_t)(sin(wingRad) * engineOffset);
+        int16_t e2y = y + (int16_t)(cos(wingRad) * engineOffset);
+        gfx.fillCircle(e1x, e1y, engineRadius, color);
+        gfx.fillCircle(e2x, e2y, engineRadius, color);
+    }
+
+    // Dispatcher fuer den generischen Marker-Zweig in render()/tick() (dort
+    // je dreifach fuer Zeichnen/Loeschen/Neuzeichnen aufgerufen, siehe
+    // hp.isGroundVehicle/isRotorcraft-Ketten) - kapselt die Fallunterscheidung
+    // an einer einzigen Stelle, damit dort nicht dreimal derselbe
+    // Silhouette-switch dupliziert werden muss. Unknown faellt auf die
+    // generische Fluzeug-Silhouette zurueck (drawAircraftMarker() oben,
+    // KEIN Kreis mehr). "heavy" (ADS-B-Emitter-Kategorie "A5") wird an ALLE
+    // vier Formen durchgereicht (siehe dortige heavy-Parameter) - es gibt
+    // dadurch keinen eigenen Kreis-Marker fuer Heavy-Flugzeuge mehr, jede
+    // Kategorie bekommt konsequent eine groessere/fettere Version ihrer
+    // eigenen Silhouette (Alex' Wunsch: "Alles oder nichts", kein Kreis/Blob
+    // mehr bei irgendeinem Flugzeug-Marker - nur Rotorcraft/Bodenfahrzeug
+    // bleiben eigenstaendige, bereits silhouettenartige Formen).
+    void drawTypedMarker(TFT_eSPI& gfx, int16_t x, int16_t y, float headingDeg, uint16_t color,
+                          TypeSilhouette sil, bool heavy) {
+        switch (sil) {
+            case TypeSilhouette::Airliner:   drawAirlinerMarker(gfx, x, y, headingDeg, color, heavy); break;
+            case TypeSilhouette::PrivateJet: drawPrivateJetMarker(gfx, x, y, headingDeg, color, heavy); break;
+            case TypeSilhouette::Turboprop:  drawTurbopropMarker(gfx, x, y, headingDeg, color, heavy); break;
+            default:                         drawAircraftMarker(gfx, x, y, headingDeg, color, heavy); break;
+        }
     }
 
     // Marker fuer die ISS (Bonus-Feature, siehe iss_tracker.h) - ein
@@ -1887,11 +2159,16 @@ void render(TFT_eSPI& tft, int16_t top) {
         // ADS-B-Emitter-Kategorie "A7" = Rotorcraft (Hubschrauber) - eigenes
         // Symbol statt des Pfeilkopf-Markers, siehe drawHelicopterMarker().
         bool isRotorcraft = a.category[0] == 'A' && a.category[1] == '7';
-        // ADS-B-Emitter-Kategorie "A5" = "Heavy" - eigene Markerform (siehe
-        // drawHeavyMarker()), unabhaengig vom oranger-Ring-Status (isNotable
-        // unten), der jetzt ausschliesslich fuer Militaer-/Regierungs-
-        // Rufzeichen reserviert ist.
+        // ADS-B-Emitter-Kategorie "A5" = "Heavy" - bekommt dieselbe Typ-
+        // Silhouette wie sonst auch, nur groesser/fetter (siehe
+        // drawTypedMarker()/heavy-Parameter), unabhaengig vom oranger-Ring-
+        // Status (isNotable unten), der jetzt ausschliesslich fuer Militaer-/
+        // Regierungs-Rufzeichen reserviert ist.
         bool isHeavy = isHeavyCategory(a.category);
+        // Nur relevant fuer den generischen Marker-Fall unten (siehe
+        // drawTypedMarker()) - Bodenfahrzeug/Rotorcraft behalten wie
+        // gehabt Vorrang vor der Typcode-Silhouette.
+        TypeSilhouette typeSilhouette = classifyTypeSilhouette(a.typeCode);
         // Der CRT-Phosphor-Effekt betrifft jetzt ALLE Marker-Kategorien
         // gleichermassen (Alex' ausdruecklicher Wunsch - vorher waren nur
         // niedrig fliegende, gruene Flugzeuge betroffen, siehe Kommentar bei
@@ -1951,10 +2228,8 @@ void render(TFT_eSPI& tft, int16_t top) {
             drawGroundVehicleMarker(tft, pt.x, pt.y, color);
         } else if (isRotorcraft) {
             drawHelicopterMarker(tft, pt.x, pt.y, color);
-        } else if (isHeavy) {
-            drawHeavyMarker(tft, pt.x, pt.y, a.headingDeg, color);
         } else {
-            drawAircraftMarker(tft, pt.x, pt.y, a.headingDeg, color);
+            drawTypedMarker(tft, pt.x, pt.y, a.headingDeg, color, typeSilhouette, isHeavy);
         }
 
         if (isEmergency) {
@@ -1983,6 +2258,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         hitPoints[i].isGroundVehicle = isGroundVehicle;
         hitPoints[i].isRotorcraft = isRotorcraft;
         hitPoints[i].isHeavy = isHeavy;
+        hitPoints[i].typeSilhouette = typeSilhouette;
         hitPoints[i].bearingDeg = a.bearingDeg;
         hitPoints[i].crtFadeEligible = crtFadeEligible;
         hitPoints[i].baseColor = ownColor;
@@ -2361,10 +2637,8 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
                 drawGroundVehicleMarker(tft, hp.x, hp.y, TFT_BLACK);
             } else if (hp.isRotorcraft) {
                 drawHelicopterMarker(tft, hp.x, hp.y, TFT_BLACK);
-            } else if (hp.isHeavy) {
-                drawHeavyMarker(tft, hp.x, hp.y, hp.headingDeg, TFT_BLACK);
             } else {
-                drawAircraftMarker(tft, hp.x, hp.y, hp.headingDeg, TFT_BLACK);
+                drawTypedMarker(tft, hp.x, hp.y, hp.headingDeg, TFT_BLACK, hp.typeSilhouette, hp.isHeavy);
             }
             if (hp.isEmergency || hp.isWatched || hp.isNotable) {
                 tft.drawCircle(hp.x, hp.y, 12, TFT_BLACK);
@@ -2381,10 +2655,8 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             drawGroundVehicleMarker(tft, hp.x, hp.y, hp.color);
         } else if (hp.isRotorcraft) {
             drawHelicopterMarker(tft, hp.x, hp.y, hp.color);
-        } else if (hp.isHeavy) {
-            drawHeavyMarker(tft, hp.x, hp.y, hp.headingDeg, hp.color);
         } else {
-            drawAircraftMarker(tft, hp.x, hp.y, hp.headingDeg, hp.color);
+            drawTypedMarker(tft, hp.x, hp.y, hp.headingDeg, hp.color, hp.typeSilhouette, hp.isHeavy);
         }
 
         if (hp.isEmergency) {
@@ -2661,7 +2933,11 @@ void updateProximityAlert(uint32_t nowMs) {
                          : anyClose    ? LedAlert::Mode::ProximityGreen
                                        : LedAlert::Mode::Off;
 
-    ledBlinkOn = LedAlert::update(mode, nowMs);
+    // Update-Verfuegbar-Signal (dreimal kurz Magenta, alle 10s) laeuft
+    // unabhaengig von proximityOn/emergencyOn/watchlistOn immer mit, sofern
+    // OtaUpdate::isUpdateAvailable() true liefert - LedAlert::update()
+    // unterdrueckt es selbst automatisch waehrend mode == EmergencyRed.
+    ledBlinkOn = LedAlert::update(mode, nowMs, OtaUpdate::isUpdateAvailable());
 }
 
 EmergencyInfo checkEmergency() {
