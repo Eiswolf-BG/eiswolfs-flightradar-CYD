@@ -9,6 +9,7 @@
 #include "location_presets_screen.h"
 #include "airline_filter_screen.h"
 #include "aircraft_watchlist_screen.h"
+#include "squawk_watchlist_screen.h"
 #include "aircraft_list_screen.h"
 #include "brightness_screen.h"
 #include "timeout_screen.h"
@@ -77,10 +78,16 @@ namespace {
     // Wunsch, analog zum Hauptmenue) - jede dieser Unterseiten hat eine
     // andere Anzahl Eintraege, ein fester Konstanten-Satz pro Seite haette
     // hier nur unnoetig viel fast identischen Code bedeutet.
-    Rect subMenuRowRect(uint8_t index, uint8_t count, int16_t gap = 10) {
+    // startY optional ueberschreibbar (Default weiterhin ROW_START_Y) - fuer
+    // Seiten mit einem zusaetzlichen "?"-Info-Button oben rechts im Header
+    // (siehe Page::FlightFilters), der bei ROW_START_Y=18 mit der ersten
+    // Zeile ueberlappt (Info-Button reicht bis y=26). Bewusst NUR ueber
+    // einen Parameter loesbar statt ROW_START_Y selbst zu erhoehen, da
+    // dieser Wert von ALLEN subMenuRowRect()-Seiten gemeinsam genutzt wird.
+    Rect subMenuRowRect(uint8_t index, uint8_t count, int16_t gap = 10, int16_t startY = ROW_START_Y) {
         int16_t endY = Config::SCREEN_HEIGHT - 10;
-        int16_t rowH = (int16_t)((endY - ROW_START_Y - (int16_t)(count - 1) * gap) / count);
-        return {10, (int16_t)(ROW_START_Y + index * (rowH + gap)),
+        int16_t rowH = (int16_t)((endY - startY - (int16_t)(count - 1) * gap) / count);
+        return {10, (int16_t)(startY + index * (rowH + gap)),
                 (int16_t)(Config::SCREEN_WIDTH - 20), rowH};
     }
 
@@ -1059,12 +1066,14 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_LISTS));
 
-            Rect aircraftListBtn = subMenuRowRect(0, 3);
-            Rect watchlistBtn    = subMenuRowRect(1, 3);
-            Rect backBtn         = subMenuRowRect(2, 3);
+            Rect aircraftListBtn = subMenuRowRect(0, 4);
+            Rect watchlistBtn    = subMenuRowRect(1, 4);
+            Rect squawkWatchBtn  = subMenuRowRect(2, 4);
+            Rect backBtn         = subMenuRowRect(3, 4);
 
             drawButton(tft, aircraftListBtn, I18n::t(StringId::MENU_AIRCRAFT_LIST));
             drawButton(tft, watchlistBtn, I18n::t(StringId::MENU_WATCHLIST));
+            drawButton(tft, squawkWatchBtn, I18n::t(StringId::MENU_SQUAWK_WATCHLIST));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -1084,6 +1093,8 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
                 }
             } else if (watchlistBtn.contains(tap.x, tap.y)) {
                 AircraftWatchlistScreen::run(tft);
+            } else if (squawkWatchBtn.contains(tap.x, tap.y)) {
+                SquawkWatchlistScreen::run(tft);
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::Flight;
             }
@@ -1172,15 +1183,30 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             }
 
         } else if (page == Page::FlightFilters) {
+            // Kleiner "?"-Info-Button oben rechts, gleiches Muster wie bei
+            // Airline-Filter/Watchlist/Standort-Presets - diese Seite hatte
+            // vorher keinen, da die vier reinen Filter-Schalter durch ihr
+            // eigenes AN/AUS-Label selbsterklaerend sind. Erklaert hier NUR
+            // den ISS-Marker-Schalter (kein "Filter" im eigentlichen Sinne,
+            // daher zusaetzlicher Erklaerungsbedarf).
+            Rect infoBtn = {(int16_t)(Config::SCREEN_WIDTH - 40), 2, 30, 24};
+            drawButton(tft, infoBtn, "?");
+
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_FILTERS));
 
-            Rect airlineBtn        = subMenuRowRect(0, 5);
-            Rect groundBtn         = subMenuRowRect(1, 5);
-            Rect helicoptersBtn    = subMenuRowRect(2, 5);
-            Rect lowAltitudeBtn    = subMenuRowRect(3, 5);
-            Rect backBtn           = subMenuRowRect(4, 5);
+            // Reihen starten hier tiefer als das sonstige ROW_START_Y=18
+            // (siehe subMenuRowRect()) - der "?"-Info-Button oben rechts
+            // reicht bis y=26 (y=2, Hoehe 24) und ueberlappte bei 18 sichtbar
+            // mit der ersten Zeile. 34 laesst ca. 8px Abstand zum Button.
+            constexpr int16_t FILTERS_ROW_START_Y = 34;
+            Rect airlineBtn        = subMenuRowRect(0, 6, 10, FILTERS_ROW_START_Y);
+            Rect groundBtn         = subMenuRowRect(1, 6, 10, FILTERS_ROW_START_Y);
+            Rect helicoptersBtn    = subMenuRowRect(2, 6, 10, FILTERS_ROW_START_Y);
+            Rect lowAltitudeBtn    = subMenuRowRect(3, 6, 10, FILTERS_ROW_START_Y);
+            Rect issMarkerBtn      = subMenuRowRect(4, 6, 10, FILTERS_ROW_START_Y);
+            Rect backBtn           = subMenuRowRect(5, 6, 10, FILTERS_ROW_START_Y);
 
             drawButton(tft, airlineBtn, I18n::t(StringId::MENU_AIRLINE_FILTER));
             // Label jetzt "Bodenfahrzeuge anzeigen" statt "...ausblenden" -
@@ -1195,6 +1221,10 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             drawButton(tft, groundBtn, I18n::t(StringId::MENU_HIDE_GROUND) + onOff(!SettingsStore::hideGroundVehicles()));
             drawButton(tft, helicoptersBtn, I18n::t(StringId::MENU_ONLY_HELICOPTERS) + onOff(SettingsStore::onlyHelicopters()));
             drawButton(tft, lowAltitudeBtn, I18n::t(StringId::MENU_ONLY_LOW_ALTITUDE) + onOff(SettingsStore::onlyLowAltitude()));
+            // Kein Sichtbarkeitsfilter im engeren Sinne (blendet keine
+            // Flugzeuge aus), aber thematisch am ehesten hier passend - "was
+            // wird zusaetzlich auf dem Radar angezeigt". Siehe iss_tracker.h.
+            drawButton(tft, issMarkerBtn, I18n::t(StringId::MENU_ISS_MARKER) + onOff(SettingsStore::issMarkerEnabled()));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -1205,7 +1235,10 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
                 delay(20);
             }
 
-            if (airlineBtn.contains(tap.x, tap.y)) {
+            if (infoBtn.contains(tap.x, tap.y)) {
+                infoScreen(tft, I18n::t(StringId::ISS_MARKER_INFO_TITLE), I18n::t(StringId::ISS_MARKER_INFO_BODY),
+                           TFT_GREEN, I18n::t(StringId::OK));
+            } else if (airlineBtn.contains(tap.x, tap.y)) {
                 AirlineFilterScreen::run(tft);
             } else if (groundBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setHideGroundVehicles(!SettingsStore::hideGroundVehicles());
@@ -1213,6 +1246,8 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
                 SettingsStore::setOnlyHelicopters(!SettingsStore::onlyHelicopters());
             } else if (lowAltitudeBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setOnlyLowAltitude(!SettingsStore::onlyLowAltitude());
+            } else if (issMarkerBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setIssMarkerEnabled(!SettingsStore::issMarkerEnabled());
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::Flight;
             }

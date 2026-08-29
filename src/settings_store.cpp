@@ -43,6 +43,9 @@ namespace {
     // bestehende Geraete behalten ihren in den Preferences gespeicherten
     // Wert, der in applyKeyValue() unten weiterhin Vorrang hat.
     bool radarPulseOn = true;
+    bool issMarkerOn = true;
+    bool nostalgicModeOn = false;
+    bool trailOn = false;
     char lastSeenVersionBuf[16] = {0};
 
     // MUSS auf SD persistiert werden (nicht nur im RAM halten): wird kurz
@@ -109,6 +112,12 @@ namespace {
             crtPhosphorOn = (value.toInt() != 0);
         } else if (key == "radar_pulse") {
             radarPulseOn = (value.toInt() != 0);
+        } else if (key == "iss_marker") {
+            issMarkerOn = (value.toInt() != 0);
+        } else if (key == "nostalgic_mode") {
+            nostalgicModeOn = (value.toInt() != 0);
+        } else if (key == "trail_enabled") {
+            trailOn = (value.toInt() != 0);
         } else if (key == "last_seen_version") {
             strncpy(lastSeenVersionBuf, value.c_str(), sizeof(lastSeenVersionBuf) - 1);
             lastSeenVersionBuf[sizeof(lastSeenVersionBuf) - 1] = 0;
@@ -180,6 +189,9 @@ void save() {
     f.printf("radar_theme=%d\n", radarThemeIdx);
     f.printf("crt_phosphor=%d\n", crtPhosphorOn ? 1 : 0);
     f.printf("radar_pulse=%d\n", radarPulseOn ? 1 : 0);
+    f.printf("iss_marker=%d\n", issMarkerOn ? 1 : 0);
+    f.printf("nostalgic_mode=%d\n", nostalgicModeOn ? 1 : 0);
+    f.printf("trail_enabled=%d\n", trailOn ? 1 : 0);
     f.printf("last_seen_version=%s\n", lastSeenVersionBuf);
     f.printf("ota_just_installed=%d\n", otaJustInstalledFlag ? 1 : 0);
     f.close();
@@ -356,6 +368,27 @@ bool radarPulseEnabled() { return radarPulseOn; }
 
 void setRadarPulseEnabled(bool on) {
     radarPulseOn = on;
+    save();
+}
+
+bool issMarkerEnabled() { return issMarkerOn; }
+
+void setIssMarkerEnabled(bool on) {
+    issMarkerOn = on;
+    save();
+}
+
+bool nostalgicModeEnabled() { return nostalgicModeOn; }
+
+void setNostalgicModeEnabled(bool on) {
+    nostalgicModeOn = on;
+    save();
+}
+
+bool trailEnabled() { return trailOn; }
+
+void setTrailEnabled(bool on) {
+    trailOn = on;
     save();
 }
 

@@ -12,6 +12,7 @@
 #include "web_export_server.h"
 #include "weather.h"
 #include "ota_update.h"
+#include "iss_tracker.h"
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -65,6 +66,12 @@ namespace {
 
             AircraftDetails::update();
             Weather::update();
+            // Bonus-Feature (siehe iss_tracker.h) - kuemmert sich intern
+            // um ihr eigenes, deutlich selteneres Intervall
+            // (Config::ISS_FETCH_INTERVAL_MS), gleiches Muster wie
+            // Weather::update() oben. Nur HTTP (kein TLS), daher unkritisch
+            // fuer die ADS-B-Speicher-/Verbindungsproblematik.
+            IssTracker::update();
             // Kuemmert sich intern um ihr eigenes, deutlich selteneres
             // Intervall (Config::OTA_BACKGROUND_CHECK_INTERVAL_MS, siehe
             // ota_update.cpp) - hier einfach jede Schleife mit aufrufen,

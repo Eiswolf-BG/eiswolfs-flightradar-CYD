@@ -1,6 +1,7 @@
 #include "splash_screen.h"
 #include "menu_stars.h"
 #include "radar_logo.h"
+#include "i18n.h"
 #include <math.h>
 
 namespace SplashScreen {
@@ -12,6 +13,35 @@ namespace {
     constexpr int16_t STATUS_LINE_H = 18;
     constexpr int16_t STATUS_START_Y = 260;
     constexpr uint8_t MAX_STATUS_LINES = 3;
+
+    // Reiner Flavour-Text (kein echter Statuswert wie bei den SPLASH_*-
+    // Strings oben) - Reihenfolge muss zur Reihenfolge von BOOT_SEQ_1..6 in
+    // i18n.h passen.
+    constexpr StringId BOOT_LINES[] = {
+        StringId::BOOT_SEQ_1, StringId::BOOT_SEQ_2, StringId::BOOT_SEQ_3,
+        StringId::BOOT_SEQ_4, StringId::BOOT_SEQ_5, StringId::BOOT_SEQ_6,
+    };
+    constexpr uint8_t BOOT_LINE_COUNT = sizeof(BOOT_LINES) / sizeof(BOOT_LINES[0]);
+    constexpr uint32_t BOOT_LINE_DELAY_MS = 350;
+    constexpr uint32_t BOOT_FINAL_PAUSE_MS = 300;
+    constexpr int16_t BOOT_START_X = 14;
+    constexpr int16_t BOOT_START_Y = 40;
+    constexpr int16_t BOOT_LINE_H = 22;
+}
+
+void playBootSequence(TFT_eSPI& tft) {
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.setTextSize(1);
+
+    for (uint8_t i = 0; i < BOOT_LINE_COUNT; i++) {
+        int16_t y = BOOT_START_Y + i * BOOT_LINE_H;
+        String line = String("> ") + I18n::t(BOOT_LINES[i]);
+        tft.drawString(line, BOOT_START_X, y);
+        delay(BOOT_LINE_DELAY_MS);
+    }
+    delay(BOOT_FINAL_PAUSE_MS);
 }
 
 void begin(TFT_eSPI& tft) {

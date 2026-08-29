@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "4.1.0";
+    constexpr const char* APP_VERSION = "4.2.0";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -92,6 +92,12 @@ namespace Config {
     // minuetlich und die kostenlose Open-Meteo-API soll nicht unnoetig oft
     // belastet werden.
     constexpr uint32_t WEATHER_FETCH_INTERVAL_MS = 600000; // 10 Minuten
+
+    // ISS-Positions-Bonusfeature (siehe iss_tracker.h) - Open-Notify liefert
+    // ohnehin nur eine grob gerundete Momentaufnahme, ein kuerzeres
+    // Intervall als hier haette keinen praktischen Mehrwert (die ISS
+    // bewegt sich vorhersagbar, ~7,66 km/s).
+    constexpr uint32_t ISS_FETCH_INTERVAL_MS = 20000; // 20 Sekunden
 
     // Intervall fuer die automatische Hintergrund-Pruefung auf neue
     // Firmware-Updates (siehe OtaUpdate::pollBackground(), aufgerufen aus

@@ -503,14 +503,19 @@ enum class StringId : uint16_t {
     // im String selbst.
     MENU_ONLY_LOW_ALTITUDE,
 
-    // "Leerer Himmel"-Hinweiszeile im Radarscreen (siehe RADAR_EMPTY_SKY_PREFIX
-    // oben): haengt sich an dieselbe Zeile an, wenn aircraftCount==0 UND
-    // mindestens ein Filter (Nur Helikopter/Nur Niedrigflieger/
-    // Bodenfahrzeuge ausblenden/Airline-Filter) aktiv ist - macht sichtbar,
-    // dass der leere Radar am Filter liegen koennte statt an einem
-    // technischen Problem (Alex' Meldung: das hatte zu einer langen,
-    // unnoetigen Fehlersuche gefuehrt). Kurzer Prefix + kommaseparierte
-    // Liste der unten stehenden Kurznamen, siehe radar_screen.cpp.
+    // Filter-Hinweis in der unteren Info-Zeile des Radarscreens: erscheint
+    // IMMER (unabhaengig von aircraftCount/"Leerer Himmel", haengt sich an
+    // die jeweils aktive Info-Zeile an - "Leerer Himmel" ODER "X Flugzeuge
+    // - ..."), sobald mindestens ein Filter (Nur Helikopter/Nur
+    // Niedrigflieger/Airline-Filter) aktiv ist - macht sichtbar, dass
+    // Flugzeuge unsichtbar bleiben KOENNTEN, auch wenn gerade welche
+    // sichtbar sind (Alex' Meldung: vorher verschwand der Hinweis, sobald
+    // trotz aktivem Filter zufaellig ein Flugzeug sichtbar war). Das Wort
+    // RADAR_FILTER_HINT_WORD ("Hinweis") wird ROT hervorgehoben, der Rest
+    // (RADAR_FILTER_ACTIVE_PREFIX + Filternamen) in normaler Farbe -
+    // radar_screen.cpp::drawInfoMarquee() zeichnet dafuer die Zeile in
+    // farbigen Abschnitten statt als ein einzelner tft.print()-Aufruf.
+    RADAR_FILTER_HINT_WORD,
     RADAR_FILTER_ACTIVE_PREFIX,
     RADAR_FILTER_NAME_HELICOPTERS,
     RADAR_FILTER_NAME_LOW_ALTITUDE,
@@ -532,6 +537,60 @@ enum class StringId : uint16_t {
     // der OTA-Vorgang trotzdem startet und bei 0% haengen bleibt, weil eine
     // ADS-B-Anfrage noch aktiv war/ist.
     OTA_NETWORK_BUSY,
+
+    // Squawk-Wachliste (siehe squawk_watchlist.h/.cpp,
+    // squawk_watchlist_screen.cpp) - wie die Rufzeichen-Beobachtungsliste
+    // (AircraftWatchlist), aber fuer benutzerdefinierte Squawk-Codes statt
+    // Rufzeichen. Loest denselben Mode::WatchlistBlue-Alarm aus wie ein
+    // Beobachtungslisten-Treffer (siehe radar_screen.cpp::
+    // updateProximityAlert()) - kein eigener Alarm-Modus, da inhaltlich
+    // dieselbe Bedeutung ("ein Flugzeug, das mich interessiert, ist da").
+    // Notfall-Squawks (7500/7600/7700) bleiben unveraendert dem separaten,
+    // fest codierten EmergencyRed-Mechanismus vorbehalten (siehe
+    // isEmergencySquawk() in radar_screen.cpp) - diese Liste ist ein
+    // zusaetzlicher, rein benutzerdefinierter Mechanismus, kein Ersatz.
+    MENU_SQUAWK_WATCHLIST,
+    SQUAWK_WATCH_TITLE,
+    SQUAWK_WATCH_DESC1,
+    SQUAWK_WATCH_DESC2,
+    SQUAWK_WATCH_ADD,
+    SQUAWK_WATCH_ADD_TITLE,
+    SQUAWK_WATCH_EMPTY,
+    SQUAWK_WATCH_INFO_TITLE,
+    SQUAWK_WATCH_INFO_PARA1,
+    SQUAWK_WATCH_INFO_PARA2,
+
+    // ISS-Marker-Bonusfeature (siehe iss_tracker.h, SettingsStore::
+    // issMarkerEnabled()) - Schalter lebt in Menue > Flugoptionen >
+    // Anzeigefilter (Page::FlightFilters in menu_screen.cpp), zusammen mit
+    // einem neuen "?"-Info-Button auf derselben Seite (die vorher keinen
+    // hatte), der genau diesen kurzen Erklaertext zeigt.
+    MENU_ISS_MARKER,
+    ISS_MARKER_INFO_TITLE,
+    ISS_MARKER_INFO_BODY,
+
+    // "Nostalgisch"-Modus (System > Anzeige, siehe
+    // SettingsStore::nostalgicModeEnabled()) - subtiles Bildrauschen am
+    // Rand + Ecken-Vignette um den Radarkreis, siehe radar_screen.cpp.
+    MENU_NOSTALGIC_MODE,
+
+    // Terminal-Stil-Boot-Sequenz, immer aktiv (kein Schalter), spielt vor
+    // dem eigentlichen Splash-Screen ab (siehe SplashScreen::
+    // playBootSequence() in splash_screen.cpp) - rein kosmetischer
+    // Flavour-Text im Stil eines alten Radarsystems, keine echten
+    // Statusmeldungen (die bestehenden SPLASH_*-Strings oben bleiben
+    // unveraendert die tatsaechlichen Boot-Status-Anzeigen).
+    BOOT_SEQ_1,
+    BOOT_SEQ_2,
+    BOOT_SEQ_3,
+    BOOT_SEQ_4,
+    BOOT_SEQ_5,
+    BOOT_SEQ_6,
+
+    // "Flugbahn-Trail" (System > Radar-Darstellung, siehe
+    // SettingsStore::trailEnabled()) - verblassende Spur der letzten
+    // Positionen des gerade ausgewaehlten Flugzeugs, siehe radar_screen.cpp.
+    MENU_FLIGHT_TRAIL,
 
     COUNT
 };

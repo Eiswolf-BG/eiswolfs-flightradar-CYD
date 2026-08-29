@@ -3,6 +3,11 @@
 #include <TFT_eSPI.h>
 
 namespace SplashScreen {
+    // Kurze, rein kosmetische Terminal-Boot-Sequenz im Stil eines alten
+    // Radarsystems, immer aktiv (kein Schalter) - spielt VOR begin() ab,
+    // bevor Logo/Titel erscheinen. Blockierend, Gesamtdauer ~2,4s.
+    void playBootSequence(TFT_eSPI& tft);
+
     void begin(TFT_eSPI& tft);
 
     void setStatusLine(TFT_eSPI& tft, uint8_t slot, const String& text, uint16_t color = TFT_WHITE);

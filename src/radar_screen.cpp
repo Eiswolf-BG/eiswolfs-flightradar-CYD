@@ -13,11 +13,13 @@
 #include "world_map.h"
 #include "airline_filter.h"
 #include "aircraft_watchlist.h"
+#include "squawk_watchlist.h"
 #include "aircraft_watchlist_screen.h"
 #include "i18n.h"
 #include "touch_input.h"
 #include "menu_stars.h"
 #include "menu_screen.h"
+#include "iss_tracker.h"
 #include <qrcode.h>
 #include <math.h>
 #include <time.h>
@@ -85,10 +87,14 @@ namespace {
         bool isHeavy;
         // Fuer den CRT-Phosphor-Effekt (siehe crtPhosphorColor() unten) -
         // bearingDeg wird fuer die Sweep-Treffer-Erkennung in tick()
-        // gebraucht, crtFadeEligible markiert niedrig fliegende Flugzeuge
-        // (Warnfarben/Bodenfahrzeuge sind NIE davon betroffen).
+        // gebraucht, crtFadeEligible ist jetzt fuer JEDE Kategorie true
+        // (frueher nur fuer niedrig fliegende, gruene Flugzeuge). baseColor
+        // ist die kategorie-eigene, UNGEFAEDETE Farbe (Gruen/Gelb/Rot/Blau) -
+        // tick() braucht sie als Fade-Ziel, da "color" zwischenzeitlich
+        // bereits eine gefaedete Zwischenfarbe enthalten kann.
         float bearingDeg;
         bool crtFadeEligible;
+        uint16_t baseColor;
     };
     constexpr uint8_t MAX_HIT_POINTS = Config::MAX_TRACKED_AIRCRAFT;
     HitPoint hitPoints[MAX_HIT_POINTS];
@@ -125,6 +131,52 @@ namespace {
             }
         }
         return nullptr; // sollte nie vorkommen, gleiche Kapazitaet wie hitPoints[]
+    }
+
+    // "Flugbahn-Trail" (SettingsStore::trailEnabled()) - verblassende Spur
+    // der letzten Positionen des gerade angetippten Flugzeugs. Bewusst NUR
+    // fuer das EINE ausgewaehlte Flugzeug (nicht alle gleichzeitig, Alex'
+    // ausdruecklicher Wunsch wegen Uebersichtlichkeit/Speicher) - deshalb
+    // ein einzelner globaler Ringpuffer statt einer Tabelle wie bei
+    // PhosphorEntry/hitPoints. Wird bei jedem NEUEN Datenstand
+    // (AircraftTable::version(), gleiche Versionsnummer wie beim Radar-
+    // Puls-Trigger) um genau eine Position ergaenzt, solange die Auswahl
+    // unveraendert bleibt - wechselt die Auswahl (anderer Hex-Code oder
+    // Abwahl), wird die Spur verworfen und faengt bei der naechsten
+    // Auswahl neu an. Speichert Polarkoordinaten (Distanz/Peilung) statt
+    // Bildschirmpixel, damit die Spur bei einem Reichweiten-Wechsel
+    // waehrend der Anzeige korrekt mitskaliert (RadarMath::toScreen()
+    // uebernimmt das genau wie bei den normalen Marken).
+    constexpr uint8_t TRAIL_MAX_POINTS = 6;
+    struct SelectedTrail {
+        char hex[7] = {0};
+        uint8_t count = 0;
+        float distanceKm[TRAIL_MAX_POINTS];
+        float bearingDeg[TRAIL_MAX_POINTS];
+        uint32_t lastVersion = 0xFFFFFFFFu;
+    };
+    SelectedTrail selectedTrail;
+
+    void updateSelectedTrail(const char* hex, float distanceKm, float bearingDeg, uint32_t dataVersion) {
+        if (strcmp(selectedTrail.hex, hex) != 0) {
+            selectedTrail = SelectedTrail{};
+            strncpy(selectedTrail.hex, hex, sizeof(selectedTrail.hex) - 1);
+        }
+        if (dataVersion == selectedTrail.lastVersion) return; // keine neue Position seit letztem Aufruf
+        selectedTrail.lastVersion = dataVersion;
+        if (selectedTrail.count < TRAIL_MAX_POINTS) {
+            selectedTrail.distanceKm[selectedTrail.count] = distanceKm;
+            selectedTrail.bearingDeg[selectedTrail.count] = bearingDeg;
+            selectedTrail.count++;
+        } else {
+            // Ringpuffer voll - aeltesten Punkt verwerfen, Rest nachruecken.
+            for (uint8_t i = 1; i < TRAIL_MAX_POINTS; i++) {
+                selectedTrail.distanceKm[i - 1] = selectedTrail.distanceKm[i];
+                selectedTrail.bearingDeg[i - 1] = selectedTrail.bearingDeg[i];
+            }
+            selectedTrail.distanceKm[TRAIL_MAX_POINTS - 1] = distanceKm;
+            selectedTrail.bearingDeg[TRAIL_MAX_POINTS - 1] = bearingDeg;
+        }
     }
 
     char selectedHex[7] = {0};
@@ -164,6 +216,13 @@ namespace {
         bool needsScroll = false;
         int32_t charOffset = 0;
         uint32_t lastStepMs = 0;
+        // Roter Abschnitt innerhalb von "text" (z.B. das Wort "Hinweis" im
+        // Filter-Hinweis, siehe RADAR_FILTER_HINT_WORD) - redLen<=0 heisst
+        // "kein roter Abschnitt, ganze Zeile normalfarbig" (bisheriges
+        // Verhalten). Position statt nur Laenge, da das rote Wort NICHT
+        // zwingend am Zeilenanfang steht (z.B. nach "X Flugzeuge - ...").
+        int32_t redStart = 0;
+        int32_t redLen = 0;
     };
     InfoMarquee infoMarquee;
 
@@ -175,8 +234,10 @@ namespace {
     // Baut Text + Ring-Puffer neu auf und setzt den Scroll-Fortschritt
     // zurueck - nur aufrufen, wenn sich die ART der Nachricht aendert
     // (Tap-Hinweis <-> Leerer-Himmel-Timer), siehe updateInfoMarqueeText()
-    // fuer den Fall, dass sich nur der Sekundenwert aendert.
-    void setupInfoMarquee(TFT_eSPI& tft, const String& text, int16_t viewportW) {
+    // fuer den Fall, dass sich nur der Sekundenwert aendert. redStart/
+    // redLen: siehe InfoMarquee oben, Default 0/0 = keine Rotfaerbung.
+    void setupInfoMarquee(TFT_eSPI& tft, const String& text, int16_t viewportW,
+                           int32_t redStart = 0, int32_t redLen = 0) {
         tft.setTextSize(1);
         infoMarquee.text = text;
         infoMarquee.needsScroll = tft.textWidth(text) > viewportW;
@@ -184,6 +245,8 @@ namespace {
         infoMarquee.ring = withGap + withGap;
         infoMarquee.charOffset = 0;
         infoMarquee.lastStepMs = millis();
+        infoMarquee.redStart = redStart;
+        infoMarquee.redLen = redLen;
     }
 
     // Aktualisiert nur den angezeigten Text (z.B. weil die Sekundenzahl des
@@ -196,12 +259,15 @@ namespace {
     // der allererste Text ("...seit 0s") noch kurz genug war und die
     // Laufschrift-Funktion spaeter (z.B. bei "...seit 5min") nie erneut
     // geprueft hat, ob der inzwischen laengere Text nun doch scrollen muss.
-    void updateInfoMarqueeText(TFT_eSPI& tft, const String& text, int16_t viewportW) {
+    void updateInfoMarqueeText(TFT_eSPI& tft, const String& text, int16_t viewportW,
+                                int32_t redStart = 0, int32_t redLen = 0) {
         tft.setTextSize(1);
         infoMarquee.text = text;
         infoMarquee.needsScroll = tft.textWidth(text) > viewportW;
         String withGap = text + "   ";
         infoMarquee.ring = withGap + withGap;
+        infoMarquee.redStart = redStart;
+        infoMarquee.redLen = redLen;
     }
 
     // Liefert den laengsten Ausschnitt ab startIdx, der noch in maxWidth
@@ -212,6 +278,40 @@ namespace {
             s.remove(s.length() - 1);
         }
         return s;
+    }
+
+    // Zeichnet einen (Teil-)Text der Info-Zeile in nach Rot/Normal
+    // getrennten Abschnitten - "display" ist der gerade sichtbare String
+    // (entweder infoMarquee.text komplett, oder das aktuelle Scroll-
+    // Fenster daraus), "baseOffset" die Position des ersten Zeichens von
+    // "display" innerhalb des periodischen Textes (0 im Nicht-Scroll-Fall,
+    // infoMarquee.charOffset beim Scrollen) und "periodLen" die Laenge
+    // einer vollen Wiederholung (text.length() bzw. text.length()+3 fuer
+    // die Luecke). Ohne roten Abschnitt (redLen<=0) einfach alles normal.
+    void printColoredSegment(TFT_eSPI& tft, const String& display, int32_t baseOffset,
+                              int32_t periodLen) {
+        if (infoMarquee.redLen <= 0 || periodLen <= 0) {
+            tft.setTextColor(TFT_WHITE, TFT_BLACK);
+            tft.print(display);
+            return;
+        }
+
+        int32_t n = (int32_t)display.length();
+        int32_t i = 0;
+        while (i < n) {
+            int32_t g = (baseOffset + i) % periodLen;
+            bool red = g >= infoMarquee.redStart && g < infoMarquee.redStart + infoMarquee.redLen;
+            int32_t j = i;
+            while (j < n) {
+                int32_t gg = (baseOffset + j) % periodLen;
+                bool r = gg >= infoMarquee.redStart && gg < infoMarquee.redStart + infoMarquee.redLen;
+                if (r != red) break;
+                j++;
+            }
+            tft.setTextColor(red ? TFT_RED : TFT_WHITE, TFT_BLACK);
+            tft.print(display.substring(i, j));
+            i = j;
+        }
     }
 
     // Zeichnet die Info-Zeile neu - wenn der Text nicht scrollen muss, wird
@@ -227,7 +327,7 @@ namespace {
         tft.setCursor(x, y);
 
         if (!infoMarquee.needsScroll) {
-            tft.print(infoMarquee.text);
+            printColoredSegment(tft, infoMarquee.text, 0, (int32_t)infoMarquee.text.length());
             return;
         }
 
@@ -242,7 +342,8 @@ namespace {
             if (infoMarquee.charOffset >= singleLen) infoMarquee.charOffset = 0;
         }
 
-        tft.print(infoMarqueeWindow(tft, infoMarquee.ring, infoMarquee.charOffset, w));
+        String window = infoMarqueeWindow(tft, infoMarquee.ring, infoMarquee.charOffset, w);
+        printColoredSegment(tft, window, infoMarquee.charOffset, (int32_t)infoMarquee.text.length() + 3);
     }
 
     bool isEmergencySquawk(const char* squawk) {
@@ -380,9 +481,9 @@ namespace {
     // aus und war dadurch nicht mehr klar von der gelben Stufe zu
     // unterscheiden. Rot bleibt deshalb Tag und Nacht der reine TFT_RED-Ton.
     // Ankreuzbares Extra "CRT-Phosphor" (SettingsStore::crtPhosphorEnabled(),
-    // siehe radar_theme_screen.cpp) - unabhaengig vom gewaehlten Farbschema
-    // (Gruen/Amber/Blau) kombinierbar, faedet niedrig fliegende Flugzeug-
-    // Marker in der jeweiligen Themefarbe aus, siehe crtPhosphorColor().
+    // siehe radar_theme_screen.cpp) - faedet JEDEN Marker (alle Hoehen-
+    // Farbkategorien plus Bodenfahrzeuge) in seiner eigenen Farbe aus,
+    // siehe crtPhosphorColor().
     bool crtModeActive() {
         return SettingsStore::crtPhosphorEnabled();
     }
@@ -404,22 +505,47 @@ namespace {
         return (uint16_t)((r5 << 11) | (g6 << 5) | b5);
     }
 
+    // Zeichnet die gespeicherten Vorgaenger-Positionen des "Flugbahn-
+    // Trail"-Effekts (SettingsStore::trailEnabled(), siehe SelectedTrail
+    // oben) - NICHT die aktuelle Position, die zeigt ohnehin schon der
+    // normale, helle Marker. Von der aeltesten (dunkelsten) zur juengsten
+    // (hellsten) gespeicherten Position heller werdend - gleicher Helper
+    // (scaleColorBrightness() oben) wie beim CRT-Phosphor-Fade, hier aber
+    // ueber die POSITION im Ringpuffer gesteuert statt ueber die Sweep-Zeit.
+    void drawSelectedTrail(TFT_eSPI& gfx, const Layout& L, float rangeKm, uint16_t baseColor) {
+        if (selectedTrail.count <= 1) return;
+        for (uint8_t i = 0; i < selectedTrail.count - 1; i++) {
+            float fraction = (float)(i + 1) / (float)selectedTrail.count;
+            uint16_t color = scaleColorBrightness(baseColor, 0.2f + 0.6f * fraction);
+            RadarMath::PolarCoord polar{selectedTrail.distanceKm[i], selectedTrail.bearingDeg[i]};
+            RadarMath::ScreenPoint pt = RadarMath::toScreen(polar, L.cx, L.cy, L.radius, rangeKm);
+            gfx.fillCircle(pt.x, pt.y, 2, color);
+        }
+    }
+
     // Helligkeit des CRT-Phosphor-Markers zum Zeitpunkt "nowMs": TFT_BLACK
     // (unsichtbar), solange der Sweep-Strahl das Flugzeug noch nie erfasst
     // hat (ph == nullptr oder everSwept == false) - taucht ein Flugzeug neu
     // auf, bleibt es also bis zum naechsten Strahl-Treffer verborgen. Danach
     // faedet die Farbe ueber eine volle Umdrehung (CRT_FADE_MS) linear von
-    // der aktuell gewaehlten Themefarbe (voll) auf ein dunkles Minimum
-    // (~40/255 = "fast verblasst") aus - respektiert also Gruen/Amber/Blau.
-    uint16_t crtPhosphorColor(TFT_eSPI& gfx, const PhosphorEntry* ph, uint32_t nowMs) {
+    // "baseColor" (voll) auf ein dunkles Minimum (~40/255 = "fast
+    // verblasst") aus. WICHTIG (vorher ein Bug): baseColor ist jetzt die
+    // TATSAECHLICHE Marker-Farbe der jeweiligen Kategorie (Gruen/Gelb/Rot
+    // per colorForAltitude(), Blau per colorForGroundVehicle()) statt fest
+    // der Radar-Theme-Grundfarbe - vorher faedete diese Funktion IMMER nur
+    // die Theme-Farbe (Gruen/Amber/Blau je nach Farbschema), was zufaellig
+    // wie "nur die gruenen Marker faden" aussah, weil colorForAltitude() bei
+    // niedriger Flughoehe ebenfalls die Theme-Farbe liefert - gelbe/rote
+    // Flugzeuge und blaue Bodenfahrzeug-Marker wurden dabei schlicht nie mit
+    // ihrer EIGENEN Farbe gefaedet.
+    uint16_t crtPhosphorColor(uint16_t baseColor, const PhosphorEntry* ph, uint32_t nowMs) {
         if (!ph || !ph->everSwept) return TFT_BLACK;
         uint32_t elapsed = nowMs - ph->lastSweptMs;
         float fraction = (float)elapsed / (float)CRT_FADE_MS;
         if (fraction > 1.0f) fraction = 1.0f;
         constexpr float MIN_BRIGHTNESS_FRACTION = 40.0f / 255.0f;
         float brightnessFraction = 1.0f - fraction * (1.0f - MIN_BRIGHTNESS_FRACTION);
-        uint16_t themeColor = nightDimActiveNow() ? themeDimColor(gfx) : themeBaseColor(gfx);
-        return scaleColorBrightness(themeColor, brightnessFraction);
+        return scaleColorBrightness(baseColor, brightnessFraction);
     }
 
     // Bogen-Test mit 360/0-Wrap-Behandlung: ist "target" (eine Peilung in
@@ -610,6 +736,26 @@ namespace {
         gfx.drawLine(tipX, tipY, w2x, w2y, color);
     }
 
+    // Marker fuer die ISS (Bonus-Feature, siehe iss_tracker.h) - ein
+    // achtstrahliger "Stern"/Sparkle statt Kreis+Pfeilkopf, damit er auf
+    // den ersten Blick eindeutig NICHT mit einem Flugzeug/Hubschrauber/
+    // Bodenfahrzeug verwechselt werden kann. Eigene, sonst auf dem Radar
+    // ungenutzte Farbe (Magenta) statt der ueblichen Hoehenfarbe - die ISS
+    // hat keine sinnvolle "Hoehenkategorie" im Sinne des Radars.
+    constexpr uint16_t ISS_MARKER_COLOR = TFT_MAGENTA;
+
+    void drawIssMarker(TFT_eSPI& gfx, int16_t x, int16_t y) {
+        constexpr int16_t R_OUTER = 8;
+        constexpr int16_t R_INNER = 3;
+        gfx.fillCircle(x, y, R_INNER, ISS_MARKER_COLOR);
+        for (int i = 0; i < 8; i++) {
+            double rad = i * 45.0 * PI / 180.0;
+            int16_t ex = x + (int16_t)(sin(rad) * R_OUTER);
+            int16_t ey = y - (int16_t)(cos(rad) * R_OUTER);
+            gfx.drawLine(x, y, ex, ey, ISS_MARKER_COLOR);
+        }
+    }
+
     void printLineTruncated(TFT_eSPI& gfx, int16_t x, int16_t y, int16_t maxWidth, const String& text) {
         String s = text;
         if (gfx.textWidth(s) > maxWidth) {
@@ -761,6 +907,180 @@ namespace {
         snprintf(ringLabel, sizeof(ringLabel), "%.0f", displayRange * 2 / 3);
         gfx.drawString(ringLabel, L.cx, L.cy - L.radius * 2 / 3);
         gfx.setTextDatum(TL_DATUM);
+    }
+
+    // Scanlinien-Overlay: immer aktiv, kein Schalter (bewusst so gewuenscht -
+    // anders als der "Nostalgisch"-Modus unten). Rein optisch, angelehnt an
+    // alte CRT-/Radarmonitore. WICHTIGER FIX: die erste Fassung zeichnete
+    // ueber den GESAMTEN Bildschirm (y=0 bis SCREEN_HEIGHT, volle Breite) -
+    // dadurch wurden auch der "Menu"-Button in der Kopfzeile und die
+    // Reichweiten-Anzeige/Info-Zeile unten von den Scanlinien-Punkten
+    // durchloechert, sichtbar als optisch "kaputter"/unterbrochener Text
+    // (von Alex per Screenshot gemeldet). Das Overlay soll aber laut
+    // Auftrag NUR ueber der eigentlichen Radarkreis-Flaeche liegen - jetzt
+    // per Distanz-Check (dx^2+dy^2 <= radius^2) strikt auf den Kreis
+    // begrenzt, Buttons/Kopfzeile/Info-Zeile liegen alle AUSSERHALB des
+    // Kreises und werden dadurch nie mehr beruehrt. TFT_eSPI kann auf
+    // diesem Board keine Pixel zuverlaessig zuruecklesen (readPixel/
+    // readRect setzt funktionierendes MISO voraus, was auf den meisten
+    // CYD-Boards nicht verlaesslich verdrahtet ist) - deshalb KEIN echtes
+    // Alpha-Blending, sondern ein gestreutes Punktmuster (nur jeder 2. Pixel
+    // in jeder 3. Zeile wird schwarz uebermalt, mit zeilenweise
+    // wechselndem Versatz gegen ein starres Streifenmuster/Moire). Wird
+    // bewusst nur am ENDE von render() aufgerufen (voller Redraw bei
+    // echter Datenaenderung/Tap), NICHT in tick() (80ms-Takt) - ein neuer
+    // Durchlauf nach jedem vollen render() reicht fuer den gewuenschten
+    // "immer sichtbaren" Eindruck, ohne den schnellen Tick zusaetzlich zu
+    // belasten.
+    void drawScanlines(TFT_eSPI& gfx, const Layout& L) {
+        int16_t y0 = L.cy - L.radius;
+        int16_t y1 = L.cy + L.radius;
+        int32_t radiusSq = (int32_t)L.radius * L.radius;
+        for (int16_t y = y0; y <= y1; y += 3) {
+            int16_t xOffset = ((y - y0) / 3) % 2;
+            for (int16_t x = L.cx - L.radius + xOffset; x <= L.cx + L.radius; x += 2) {
+                int32_t dx = x - L.cx, dy = y - L.cy;
+                if (dx * dx + dy * dy > radiusSq) continue;
+                gfx.drawPixel(x, y, TFT_BLACK);
+            }
+        }
+    }
+
+    // "Nostalgisch"-Modus, Teil 1: Vignette (SettingsStore::
+    // nostalgicModeEnabled()). Soll den Radarkreis in der Mitte optisch
+    // praesenter wirken lassen, indem die vier aeussersten Bildschirmecken
+    // ganz leicht angehaucht werden. ZWEITER FIX (Alex' Meldung: die erste
+    // Fassung zeichnete "knallgruene, harte Rechtecke" ueber grosse Teile
+    // des Radarbereichs): der Fehler lag an zwei Stellen - (1) die Farbe
+    // color565(0,40,0) wirkte auf dem echten Display deutlich satter/
+    // gruener als am Rechner berechnet, (2) fillCorner() oben zeichnete
+    // OHNE jede Bedingung JEDEN Pixel im 40x40-Block (reine Doppelschleife,
+    // kein Dithering mehr) - das ergab den harten, grossen Block statt
+    // eines weichen Verlaufs. Jetzt: neutrales, sehr dunkles Grau (kein
+    // Farbstich) UND ein per Distanz-Band gedithertes Punktmuster mit nach
+    // aussen abnehmender Dichte (dicht direkt am Eckpunkt, komplett leer ab
+    // VIGNETTE_MAX_DIST) statt einer soliden Flaeche - simuliert einen
+    // weichen Alpha-Verlauf, den TFT_eSPI auf diesem Board nicht echt kann
+    // (siehe Kommentar bei drawScanlines() oben zu fehlendem Pixel-
+    // Zuruecklesen). Deutlich kleinerer Radius (20px statt vorher 40px) -
+    // faellt nur in der unmittelbaren Ecke auf. Wird weiterhin sowohl in
+    // render() als auch in jedem tick() neu gezeichnet, NACH den
+    // Hintergrundsternen (siehe dort).
+    // DRITTER FIX (Alex' Meldung: "Muster auch oben in Kopfzeilennaehe und
+    // unten nahe der Button-Zeile", faelschlich als Flacker-/Scanlinien-
+    // Clipping-Fehler gedeutet): per Seriallog-Diagnose zweifelsfrei
+    // bestaetigt, dass Scanlinien (y=58-250) und Flacker (dieselbe Y-
+    // Spanne) sauber innerhalb von [top=42, infoTop=256] bleiben - beide
+    // fehlerfrei. Tatsaechliche Ursache war die Vignette: ihre Eckpunkte
+    // lagen EXAKT auf der Kopf-/Fusszeilen-Grenze (cornerY=top bzw.
+    // infoTop-1), dadurch beruehrte das gestreute Punktmuster sichtbar die
+    // Kopf-/Fusszeile, obwohl es sich technisch innerhalb der
+    // Inhaltsflaeche befand - korrektes Verhalten im Sinne von "Ecken der
+    // Inhaltsflaeche", aber optisch wie eine Linie AN der Kopf-/Fusszeile
+    // wahrgenommen. VIGNETTE_INSET zieht die Eckpunkte jetzt ein paar
+    // Pixel von der Kopf-/Fusszeile weg, damit ein sichtbarer Abstand
+    // bleibt. Vor Release nochmal grosszuegiger nachgezogen (8 statt 4px
+    // Inset, 16 statt 20px Ausdehnung) - reine Sicherheitsmarge, da Alex'
+    // Rueckmeldung zeitlich vor diesem Fix entstanden sein koennte.
+    constexpr int16_t VIGNETTE_MAX_DIST = 16;
+    constexpr int16_t VIGNETTE_INSET = 8;
+    void drawNostalgicVignette(TFT_eSPI& gfx, const Layout& L, int16_t top) {
+        uint16_t vignetteColor = gfx.color565(10, 10, 10);
+        int32_t minDist = L.radius + 6;
+        int32_t minDistSq = minDist * minDist;
+
+        // cornerX/cornerY: exakter Eckpunkt (schon um VIGNETTE_INSET von der
+        // Kopf-/Fusszeile abgerueckt, siehe Aufrufe unten). dirX/dirY:
+        // Richtung, in die von dort aus in den Inhaltsbereich hinein
+        // gezeichnet wird (+1 = nach rechts/unten, -1 = nach links/oben).
+        auto shadeCorner = [&](int16_t cornerX, int16_t cornerY, int8_t dirX, int8_t dirY) {
+            for (int16_t oy = 0; oy < VIGNETTE_MAX_DIST; oy++) {
+                for (int16_t ox = 0; ox < VIGNETTE_MAX_DIST; ox++) {
+                    // Gedrittelte Distanz-Baender mit je eigener Dither-
+                    // Dichte (1-von-2, 1-von-3, 1-von-5) statt einer
+                    // scharfen Kante zwischen "voll" und "leer".
+                    float dist = sqrtf((float)(ox * ox + oy * oy));
+                    if (dist >= VIGNETTE_MAX_DIST) continue;
+                    bool draw;
+                    if (dist < VIGNETTE_MAX_DIST / 3.0f) {
+                        draw = ((ox + oy) % 2) == 0;
+                    } else if (dist < VIGNETTE_MAX_DIST * 2.0f / 3.0f) {
+                        draw = ((ox + oy) % 3) == 0;
+                    } else {
+                        draw = ((ox + oy) % 5) == 0;
+                    }
+                    if (!draw) continue;
+
+                    int16_t x = cornerX + dirX * ox;
+                    int16_t y = cornerY + dirY * oy;
+                    int32_t dx = x - L.cx, dy = y - L.cy;
+                    if (dx * dx + dy * dy <= minDistSq) continue;
+                    gfx.drawPixel(x, y, vignetteColor);
+                }
+            }
+        };
+        shadeCorner(0, (int16_t)(top + VIGNETTE_INSET), 1, 1);
+        shadeCorner(Config::SCREEN_WIDTH - 1, (int16_t)(top + VIGNETTE_INSET), -1, 1);
+        shadeCorner(0, (int16_t)(L.infoTop - 1 - VIGNETTE_INSET), 1, -1);
+        shadeCorner(Config::SCREEN_WIDTH - 1, (int16_t)(L.infoTop - 1 - VIGNETTE_INSET), -1, -1);
+    }
+
+    // "Nostalgisch"-Modus, Teil 2: Bildrauschen. Laeuft im selben 80ms-Tick
+    // wie die Sweep-Linie/Hintergrundsterne mit (siehe tick() unten), aber
+    // im Gegensatz zu den Sternen mit staendig NEUEN Zufallspositionen
+    // statt fester Punkte - das erzeugt den "Flimmer"-Eindruck echten
+    // CRT-Bildrauschens. VIERTER FIX (Alex' explizite Vorgabe): soll ueber
+    // die GESAMTE Bildschirmbreite gehen (bewusst NICHT auf den Kreis
+    // eingeschraenkt, anders als der vorherige Fix), aber in der Hoehe
+    // exakt auf denselben vertikalen Bereich begrenzt sein, den auch
+    // drawScanlines() verwendet (L.cy-L.radius bis L.cy+L.radius) - oben ab
+    // knapp unterhalb der Kopfzeile, unten am Radarkreis-Rand, NICHT bis in
+    // die Info-/Button-Zeile hinein. Deshalb keine Umrechnung mehr per
+    // Winkel/Radius (das erzeugte einen auf die Kreisflaeche begrenzten
+    // Ring) - stattdessen ein simples Rechteck: x frei ueber die gesamte
+    // Breite, y auf [y0,y1] begrenzt.
+    constexpr uint8_t NOSTALGIC_NOISE_COUNT = 14;
+    struct NostalgicNoisePoint {
+        int16_t x, y;
+        bool valid;
+    };
+    NostalgicNoisePoint nostalgicNoise[NOSTALGIC_NOISE_COUNT];
+    bool nostalgicNoiseInitialized = false;
+
+    void clearNostalgicNoise(TFT_eSPI& gfx) {
+        if (!nostalgicNoiseInitialized) return;
+        for (uint8_t i = 0; i < NOSTALGIC_NOISE_COUNT; i++) {
+            if (!nostalgicNoise[i].valid) continue;
+            gfx.drawPixel(nostalgicNoise[i].x, nostalgicNoise[i].y, TFT_BLACK);
+            nostalgicNoise[i].valid = false;
+        }
+    }
+
+    void updateNostalgicNoise(TFT_eSPI& gfx, const Layout& L, int16_t top) {
+        (void)top; // nicht mehr gebraucht - die vertikale Grenze kommt jetzt direkt aus L (cy/radius), wie bei drawScanlines()
+        if (!nostalgicNoiseInitialized) {
+            for (uint8_t i = 0; i < NOSTALGIC_NOISE_COUNT; i++) nostalgicNoise[i].valid = false;
+            nostalgicNoiseInitialized = true;
+        }
+        int16_t y0 = L.cy - L.radius;
+        int16_t y1 = L.cy + L.radius;
+        for (uint8_t i = 0; i < NOSTALGIC_NOISE_COUNT; i++) {
+            if (nostalgicNoise[i].valid) {
+                gfx.drawPixel(nostalgicNoise[i].x, nostalgicNoise[i].y, TFT_BLACK);
+                nostalgicNoise[i].valid = false;
+            }
+            int16_t x = (int16_t)random(2, Config::SCREEN_WIDTH - 2);
+            int16_t y = (int16_t)random(y0, y1 + 1);
+
+            // Gedaempftes Grau-Rauschen statt gruen - soll wie neutrales
+            // Bildrauschen wirken, nicht wie ein weiterer Twinkelstern.
+            uint8_t bright = (uint8_t)(90 + random(0, 111));
+            uint16_t color = gfx.color565(bright, bright, bright);
+            gfx.drawPixel(x, y, color);
+            nostalgicNoise[i].x = x;
+            nostalgicNoise[i].y = y;
+            nostalgicNoise[i].valid = true;
+        }
     }
 
     // Laufschrift-Zustand fuer EINE Detail-Panel-Zeile - gleiches
@@ -1368,6 +1688,11 @@ void render(TFT_eSPI& tft, int16_t top) {
         AircraftTable::unlock();
 
         if (found && selected.distanceKm <= rangeKm * 1.05f) {
+            // Kein drawScanlines() hier: das Detail-Panel ersetzt den
+            // Radarkreis komplett durch eine eigene Text-Ansicht - das
+            // Scanlinien-Overlay ist explizit auf die Radarkreis-Flaeche
+            // begrenzt (siehe drawScanlines()) und haette hier nichts
+            // Sinnvolles zum Ueberlagern.
             tft.startWrite();
             drawDetailPanel(tft, selected);
             tft.endWrite();
@@ -1383,6 +1708,9 @@ void render(TFT_eSPI& tft, int16_t top) {
 
     drawWorldMap(tft, L);
     drawStaticBackground(tft, L, rangeKm);
+    if (SettingsStore::nostalgicModeEnabled()) {
+        drawNostalgicVignette(tft, L, top);
+    }
 
     drawSweepLine(tft, L, sweepAngleDeg, sweepLineColor(tft));
     prevSweepAngleDeg = sweepAngleDeg;
@@ -1443,25 +1771,31 @@ void render(TFT_eSPI& tft, int16_t top) {
         // unten), der jetzt ausschliesslich fuer Militaer-/Regierungs-
         // Rufzeichen reserviert ist.
         bool isHeavy = isHeavyCategory(a.category);
-        // Nur niedrig fliegende Flugzeuge (keine Bodenfahrzeuge) sind vom
-        // CRT-Phosphor-Effekt betroffen - Warnfarben (gelb/rot) und die
-        // blauen Bodenfahrzeug-Marker bleiben in JEDEM Farbschema immer voll
-        // sichtbar. Der Phosphor-Zustand wird unabhaengig vom aktiven
-        // Farbschema kontinuierlich mitgetrackt (siehe PhosphorEntry oben),
-        // nur die tatsaechliche Farbe wird ausschliesslich im CRT-Modus
-        // ueberschrieben.
-        bool crtFadeEligible = !isGroundVehicle && a.altBaroFt < Config::COLOR_LOW_ALT_THRESHOLD_FT;
+        // Der CRT-Phosphor-Effekt betrifft jetzt ALLE Marker-Kategorien
+        // gleichermassen (Alex' ausdruecklicher Wunsch - vorher waren nur
+        // niedrig fliegende, gruene Flugzeuge betroffen, siehe Kommentar bei
+        // crtPhosphorColor() oben). "ownColor" ist die normale,
+        // kategorie-eigene Farbe (Gruen/Gelb/Rot nach Hoehe, Blau fuer
+        // Bodenfahrzeuge) - genau DIESE Farbe faedet crtPhosphorColor() aus,
+        // statt wie vorher immer die Theme-Grundfarbe. Der Phosphor-Zustand
+        // wird unabhaengig vom aktiven Farbschema kontinuierlich mitgetrackt
+        // (siehe PhosphorEntry oben), nur die tatsaechliche Farbe wird
+        // ausschliesslich im CRT-Modus ueberschrieben.
+        bool crtFadeEligible = true;
+        uint16_t ownColor = isGroundVehicle ? colorForGroundVehicle(tft) : colorForAltitude(tft, a.altBaroFt);
         uint16_t color;
-        if (crtFadeEligible) {
-            PhosphorEntry* ph = findOrCreatePhosphor(a.hex);
-            if (ph) ph->seenThisRender = true;
-            color = crtModeActive() ? crtPhosphorColor(tft, ph, millis()) : colorForAltitude(tft, a.altBaroFt);
-        } else {
-            color = isGroundVehicle ? colorForGroundVehicle(tft) : colorForAltitude(tft, a.altBaroFt);
-        }
+        PhosphorEntry* ph = findOrCreatePhosphor(a.hex);
+        if (ph) ph->seenThisRender = true;
+        color = crtModeActive() ? crtPhosphorColor(ownColor, ph, millis()) : ownColor;
         bool isSelected = selectedHex[0] && strcmp(a.hex, selectedHex) == 0;
         bool isEmergency = SettingsStore::emergencyAlertEnabled() && isEmergencySquawk(a.squawk);
-        bool isWatched = SettingsStore::watchlistAlertEnabled() && AircraftWatchlist::isWatched(a.callsign);
+        // Squawk-Wachliste (siehe squawk_watchlist.h) zaehlt als derselbe
+        // "isWatched"-Zustand wie die Rufzeichen-Beobachtungsliste - beide
+        // bedeuten inhaltlich dasselbe ("ein Flugzeug, das mich
+        // interessiert, ist da"), daher ein gemeinsames Flag statt eines
+        // eigenen Alarm-Modus.
+        bool isWatched = SettingsStore::watchlistAlertEnabled() &&
+                          (AircraftWatchlist::isWatched(a.callsign) || SquawkWatchlist::isWatched(a.squawk));
         // Niedrigste Prioritaet der drei Ring-Markierungen (siehe unten) -
         // rein informativ, kein Alarm wie Notfall/Beobachtungsliste.
         bool isNotable = isNotableCallsign(a.callsign);
@@ -1471,6 +1805,10 @@ void render(TFT_eSPI& tft, int16_t top) {
             selectionStillPresent = true;
             selected = a;
             drawBearingIndicator(tft, L, a.bearingDeg);
+            if (SettingsStore::trailEnabled()) {
+                updateSelectedTrail(a.hex, a.distanceKm, a.bearingDeg, currentDataVersion);
+                drawSelectedTrail(tft, L, rangeKm, ownColor);
+            }
         }
         if (isGroundVehicle) {
             drawGroundVehicleMarker(tft, pt.x, pt.y, color);
@@ -1509,6 +1847,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         hitPoints[i].isHeavy = isHeavy;
         hitPoints[i].bearingDeg = a.bearingDeg;
         hitPoints[i].crtFadeEligible = crtFadeEligible;
+        hitPoints[i].baseColor = ownColor;
         strncpy(hitPoints[i].hex, a.hex, sizeof(hitPoints[i].hex) - 1);
         strncpy(hitPoints[i].callsign, a.callsign, sizeof(hitPoints[i].callsign) - 1);
     }
@@ -1567,6 +1906,8 @@ void render(TFT_eSPI& tft, int16_t top) {
         drawLegend(tft, infoTop + 44);
     }
 
+    drawScanlines(tft, L);
+
     tft.endWrite();
 }
 
@@ -1597,6 +1938,24 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     // tick()-Runde (spaetestens 80ms spaeter) laesst sie einfach wieder
     // aufblitzen, das ist zu kurz, um als Ruckeln wahrgenommen zu werden.
     updateBgStars(tft, L, top);
+
+    // "Nostalgisch"-Modus (SettingsStore::nostalgicModeEnabled()) - beide
+    // Teileffekte laufen jetzt auch hier im 80ms-Tick mit (nicht nur
+    // einmalig in render()), NACH updateBgStars(): die Vignette muss NACH
+    // dem eigentlichen Radar-Inhalt gezeichnet werden, sonst wird sie von
+    // spaeteren Zeichenoperationen (hier: den Hintergrundsternen) wieder
+    // ueberdeckt - das war der Kern des vorherigen Sichtbarkeits-Bugs, da
+    // die Vignette in render() zwar VOR den periodisch neu gezeichneten
+    // Sternen lag, aber jeder tick() die Sterne unabhaengig davon erneut
+    // ueber die (unsichtbare Schwarz-auf-Schwarz-)Vignette gezeichnet hat.
+    // Bei AUS wird Vignette+Rauschen sauber wieder geloescht statt bis zum
+    // naechsten vollen render() sichtbar zu bleiben.
+    if (SettingsStore::nostalgicModeEnabled()) {
+        drawNostalgicVignette(tft, L, top);
+        updateNostalgicNoise(tft, L, top);
+    } else {
+        clearNostalgicNoise(tft);
+    }
 
     if (prevSweepAngleDeg >= 0.0f) {
         drawSweepLine(tft, L, prevSweepAngleDeg, TFT_BLACK);
@@ -1646,8 +2005,10 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
         // CRT-Phosphor-Effekt: Sweep-Treffer-Erkennung laeuft unabhaengig
         // vom aktiven Farbschema kontinuierlich mit (siehe Kommentar bei
         // crtFadeEligible in render()), die Marker-Farbe wird aber nur im
-        // CRT-Modus tatsaechlich ueberschrieben - alle anderen Marker
-        // (Warnfarben, Bodenfahrzeuge) bleiben unveraendert wie bisher.
+        // CRT-Modus tatsaechlich ueberschrieben. Jetzt fuer ALLE Kategorien
+        // (hp.baseColor haelt die jeweils eigene, ungefaedete Farbe fest -
+        // Gruen/Gelb/Rot/Blau), nicht mehr nur fuer niedrig fliegende,
+        // gruene Flugzeuge.
         if (hp.crtFadeEligible) {
             if (sweepCrossedBearing(oldSweepAngle, sweepAngleDeg, hp.bearingDeg)) {
                 PhosphorEntry* ph = findOrCreatePhosphor(hp.hex);
@@ -1658,7 +2019,7 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             }
             if (crtModeActive()) {
                 PhosphorEntry* ph = findOrCreatePhosphor(hp.hex);
-                hp.color = crtPhosphorColor(tft, ph, nowMs);
+                hp.color = crtPhosphorColor(hp.baseColor, ph, nowMs);
             }
         }
 
@@ -1707,11 +2068,65 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
         tft.setTextDatum(TL_DATUM);
     }
 
+    // ISS-Marker (Bonus-Feature, siehe iss_tracker.h) - im selben
+    // Rendering-Durchlauf wie die Flugzeug-Marker oben, mit derselben
+    // Distanz-/Peilungsberechnung (RadarMath::toPolar()/toScreen()), aber
+    // bewusst NICHT Teil von hitPoints[]/visibleCountNow - zaehlt nicht
+    // als "Flugzeug", loest keinen Alarm/Ton aus und ist nicht antippbar.
+    // Nur gezeichnet, wenn der Schalter an ist (SettingsStore::
+    // issMarkerEnabled(), Menue > Flugoptionen > Anzeigefilter, AN per
+    // Default) UND eine Position bekannt UND innerhalb des aktuell
+    // eingestellten Radius ist - da die ISS mit ~7,66 km/s extrem schnell
+    // ist, ist das vermutlich nur fuer wenige Sekunden der Fall, wenn
+    // ueberhaupt (so beabsichtigt, nicht kuenstlich verlaengert).
+    if (SettingsStore::issMarkerEnabled()) {
+        IssTracker::Position iss = IssTracker::current();
+        if (iss.available) {
+            double homeLat = 0, homeLon = 0;
+            LocationManager::getHomeLocation(homeLat, homeLon);
+            RadarMath::PolarCoord issPolar = RadarMath::toPolar(homeLat, homeLon, iss.lat, iss.lon);
+            if (issPolar.distanceKm <= rangeKm * 1.05f) {
+                RadarMath::ScreenPoint issPt = RadarMath::toScreen(issPolar, L.cx, L.cy, L.radius, rangeKm);
+                drawIssMarker(tft, issPt.x, issPt.y);
+                tft.setTextColor(ISS_MARKER_COLOR);
+                tft.setTextDatum(BC_DATUM);
+                tft.drawString("ISS", issPt.x, issPt.y - 10);
+                tft.setTextDatum(TL_DATUM);
+            }
+        }
+    }
+
     uint8_t visibleCountNow = 0;
     for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) {
         if (hitPoints[i].valid) visibleCountNow++;
     }
     if (visibleCountNow > 0) lastAircraftSeenMs = millis();
+
+    // Filter-Hinweis: erscheint jetzt IMMER (unabhaengig von aircraftCount),
+    // sobald mindestens einer der Sichtbarkeitsfilter aktiv ist - macht
+    // sichtbar, dass weitere Flugzeuge unsichtbar bleiben KOENNTEN, auch
+    // wenn gerade zufaellig welche sichtbar sind (Alex' Meldung: vorher
+    // verschwand der Hinweis, sobald trotz aktivem Niedrigflieger-Filter
+    // ein passendes Flugzeug da war). Deshalb hier VOR der
+    // EmptySky/TapForDetails-Verzweigung berechnet, statt nur im
+    // EmptySky-Zweig. hideGroundVehicles() bewusst NICHT in dieser Liste -
+    // ist werksseitig standardmaessig AN, wuerde also bei den meisten
+    // Nutzern praktisch immer auftauchen und den Hinweis unnoetig
+    // "geschwaetzig" machen, obwohl es nur der Normalzustand ist (Alex'
+    // Rueckmeldung). Nur die Filter, die man eher vergisst.
+    String activeFilters;
+    if (SettingsStore::onlyHelicopters()) {
+        activeFilters += I18n::t(StringId::RADAR_FILTER_NAME_HELICOPTERS);
+    }
+    if (SettingsStore::onlyLowAltitude()) {
+        if (activeFilters.length()) activeFilters += ", ";
+        activeFilters += I18n::t(StringId::RADAR_FILTER_NAME_LOW_ALTITUDE);
+    }
+    if (AirlineFilter::count() > 0) {
+        if (activeFilters.length()) activeFilters += ", ";
+        activeFilters += I18n::t(StringId::RADAR_FILTER_NAME_AIRLINE);
+    }
+    infoTextHasFilterHint = activeFilters.length() > 0;
 
     String infoText;
     InfoMsgKind kind;
@@ -1726,37 +2141,7 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             snprintf(buf, sizeof(buf), "%lumin", minutes);
         }
         infoText = String(I18n::t(StringId::RADAR_EMPTY_SKY_PREFIX)) + buf;
-
-        // Filter-Hinweis: macht sichtbar, wenn der leere Radar an einem
-        // aktiven Filter liegen koennte statt an einem technischen Problem
-        // (Alex' Meldung: das fuehrte zu einer langen, unnoetigen
-        // Fehlersuche). Haengt sich an dieselbe Lauftext-Zeile an (scrollt
-        // bei Bedarf wie der Rest der Info-Zeile) statt eine eigene zweite
-        // Zeile einzufuehren - konsistent mit dem bestehenden Marquee-
-        // Muster, keine Layout-Aenderung noetig.
-        // hideGroundVehicles() bewusst NICHT in dieser Liste - ist werks-
-        // seitig standardmaessig AN, wuerde also bei den meisten Nutzern
-        // praktisch immer auftauchen und den Hinweis unnoetig
-        // "geschwaetzig" machen, obwohl es nur der Normalzustand ist (Alex'
-        // Rueckmeldung). Nur die Filter, die man eher vergisst.
-        String activeFilters;
-        if (SettingsStore::onlyHelicopters()) {
-            activeFilters += I18n::t(StringId::RADAR_FILTER_NAME_HELICOPTERS);
-        }
-        if (SettingsStore::onlyLowAltitude()) {
-            if (activeFilters.length()) activeFilters += ", ";
-            activeFilters += I18n::t(StringId::RADAR_FILTER_NAME_LOW_ALTITUDE);
-        }
-        if (AirlineFilter::count() > 0) {
-            if (activeFilters.length()) activeFilters += ", ";
-            activeFilters += I18n::t(StringId::RADAR_FILTER_NAME_AIRLINE);
-        }
-        infoTextHasFilterHint = activeFilters.length() > 0;
-        if (infoTextHasFilterHint) {
-            infoText += String(I18n::t(StringId::RADAR_FILTER_ACTIVE_PREFIX)) + activeFilters;
-        }
     } else {
-        infoTextHasFilterHint = false;
         kind = InfoMsgKind::TapForDetails;
         // Anzahl sichtbarer Flugzeuge der Hinweiszeile voranstellen (z.B.
         // "5 Flugzeuge - Für mehr Details ein Flugzeug antippen") - auf
@@ -1768,6 +2153,21 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
         infoText = countText + " - " + I18n::t(StringId::RADAR_TAP_FOR_DETAILS);
     }
 
+    // Filter-Hinweis an die jeweils aktive Zeile anhaengen (scrollt bei
+    // Bedarf mit, wie der Rest der Info-Zeile) - das Wort
+    // RADAR_FILTER_HINT_WORD ("Hinweis") wird rot hervorgehoben, der Rest
+    // in normaler Farbe (siehe printColoredSegment()). redStart markiert,
+    // wo genau das Wort innerhalb von infoText beginnt - NICHT zwingend am
+    // Anfang, da es hinter dem jeweiligen Haupttext angehaengt wird.
+    int32_t redStart = 0;
+    int32_t redLen = 0;
+    if (infoTextHasFilterHint) {
+        String hintWord = I18n::t(StringId::RADAR_FILTER_HINT_WORD);
+        redStart = (int32_t)infoText.length() + 3; // " - " davor, siehe unten
+        redLen = (int32_t)hintWord.length();
+        infoText += " - " + hintWord + String(I18n::t(StringId::RADAR_FILTER_ACTIVE_PREFIX)) + activeFilters;
+    }
+
     constexpr int16_t INFO_TEXT_X = 8;
     constexpr int16_t INFO_TEXT_GAP = 6;
     int16_t infoTextY = L.infoTop + 20;
@@ -1775,9 +2175,9 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
 
     if (kind != infoMarqueeKind) {
         infoMarqueeKind = kind;
-        setupInfoMarquee(tft, infoText, infoTextW);
+        setupInfoMarquee(tft, infoText, infoTextW, redStart, redLen);
     } else {
-        updateInfoMarqueeText(tft, infoText, infoTextW);
+        updateInfoMarqueeText(tft, infoText, infoTextW, redStart, redLen);
     }
     drawInfoMarquee(tft, INFO_TEXT_X, infoTextY, infoTextW);
 
@@ -1839,16 +2239,18 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
         return true;
     }
 
-    // Antippbarer Filter-Hinweis in der "Leerer Himmel"-Zeile (siehe
-    // render()) - nur aktiv, wenn dort gerade tatsaechlich ein Filter-
-    // Hinweis angezeigt wird (infoTextHasFilterHint), sonst wuerde ein Tap
-    // auf die normale "Leerer Himmel"-Zeile ungewollt das Menue oeffnen.
-    // Springt direkt ins "Anzeigefilter"-Menue, damit sich der Filter ohne
-    // eigene Navigation sofort abstellen laesst (Alex' Wunsch nach der
-    // langen Fehlersuche). Gleiches Muster wie runFlightQrScreen()/
-    // AircraftWatchlistScreen::run() oben: blockierender Vollbild-Aufruf
-    // direkt aus handleTap(), danach Panel/Kopfzeile ueber
-    // headerRedrawNeeded neu aufbauen lassen.
+    // Antippbarer Filter-Hinweis in der unteren Info-Zeile (siehe render())
+    // - erscheint dort jetzt unabhaengig von aircraftCount, sobald
+    // mindestens ein Filter aktiv ist (also auch neben der normalen
+    // "X Flugzeuge - ..."-Zeile, nicht nur bei "Leerer Himmel"). Nur aktiv,
+    // wenn dort gerade tatsaechlich ein Filter-Hinweis angezeigt wird
+    // (infoTextHasFilterHint), sonst wuerde ein Tap auf die normale
+    // Info-Zeile ungewollt das Menue oeffnen. Springt direkt ins
+    // "Anzeigefilter"-Menue, damit sich der Filter ohne eigene Navigation
+    // sofort abstellen laesst (Alex' Wunsch nach der langen Fehlersuche).
+    // Gleiches Muster wie runFlightQrScreen()/AircraftWatchlistScreen::run()
+    // oben: blockierender Vollbild-Aufruf direkt aus handleTap(), danach
+    // Panel/Kopfzeile ueber headerRedrawNeeded neu aufbauen lassen.
     if (infoTextHasFilterHint) {
         Rect infoTextRow = {0, L.infoTop, (int16_t)(L.rangeBtn.x - 2), (int16_t)(L.rangeBtn.h + 8)};
         if (infoTextRow.contains(x, y)) {
@@ -1910,7 +2312,12 @@ void updateProximityAlert(uint32_t nowMs) {
             if (!table[i].valid) continue;
             if (proximityOn && table[i].distanceKm <= Config::LED_ALERT_RADIUS_KM) anyClose = true;
             if (emergencyOn && isEmergencySquawk(table[i].squawk)) anyEmergency = true;
-            if (watchlistOn && AircraftWatchlist::isWatched(table[i].callsign)) anyWatched = true;
+            // Squawk-Wachliste loest denselben WatchlistBlue-Alarm aus wie
+            // die Rufzeichen-Beobachtungsliste (siehe squawk_watchlist.h) -
+            // gleicher watchlistAlertEnabled()-Schalter, kein eigenes
+            // Ein/Aus dafuer.
+            if (watchlistOn && (AircraftWatchlist::isWatched(table[i].callsign) ||
+                                 SquawkWatchlist::isWatched(table[i].squawk))) anyWatched = true;
         }
         AircraftTable::unlock();
     }

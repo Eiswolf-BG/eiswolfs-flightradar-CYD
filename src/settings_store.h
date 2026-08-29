@@ -116,6 +116,34 @@ namespace SettingsStore {
     bool radarPulseEnabled();
     void setRadarPulseEnabled(bool on);
 
+    // ISS-Marker-Bonusfeature (siehe iss_tracker.h) - AN per Default. Bei
+    // AUS unterbleibt sowohl die periodische Positionsabfrage (kein
+    // Netzwerk-Traffic) als auch das Zeichnen des Markers (siehe
+    // IssTracker::update()/radar_screen.cpp).
+    bool issMarkerEnabled();
+    void setIssMarkerEnabled(bool on);
+
+    // "Nostalgisch"-Modus (System > Anzeige) - AUS per Default. Bei AN:
+    // subtiles Bildrauschen am Bildschirmrand (radar_screen.cpp::tick()) und
+    // eine leichte Eckenabdunklung/Vignette um den Radarkreis (siehe
+    // drawStaticBackground()). Rein kosmetisch, keine Logikaenderung.
+    bool nostalgicModeEnabled();
+    void setNostalgicModeEnabled(bool on);
+
+    // "Flugbahn-Trail" (System > Radar-Darstellung) - AUS per Default. Bei
+    // AN zeigt das Antippen eines Flugzeugs zusaetzlich zum Detail-Panel
+    // eine verblassende Spur seiner letzten paar bekannten Positionen auf
+    // dem Radar (siehe radar_screen.cpp, SelectedTrail). Default AUS
+    // (nicht AN) aus zwei Gruenden: (1) zwei von drei bisherigen Radar-
+    // Darstellung-Extras (CRT-Phosphor, Nostalgisch) sind ebenfalls
+    // Opt-in, nur Radar-Puls ist AN; (2) das bestehende Detail-Panel
+    // ueberdeckt beim Oeffnen fast den kompletten Inhaltsbereich
+    // (DETAIL_PANEL_H reicht bis knapp unter die Kopfzeile) - die Spur ist
+    // dadurch aktuell nur fuer den kurzen Moment zwischen Antippen und
+    // Panel-Aufbau sichtbar, bis das Panel-Layout das beruecksichtigt.
+    bool trailEnabled();
+    void setTrailEnabled(bool on);
+
     // Zuletzt vom Geraet GEBOOTETE Firmware-Version (Config::APP_VERSION zum
     // Zeitpunkt des letzten Speicherns) - main.cpp::setup() vergleicht dies
     // beim Start gegen die AKTUELLE Config::APP_VERSION, um genau EINMAL

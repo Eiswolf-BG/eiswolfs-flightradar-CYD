@@ -13,6 +13,7 @@
 #include "airline_lookup.h"
 #include "airline_filter.h"
 #include "aircraft_watchlist.h"
+#include "squawk_watchlist.h"
 #include "sd_storage.h"
 #include "wifi_manager.h"
 #include "location_manager.h"
@@ -24,6 +25,7 @@
 #include "wifi_setup_screen.h"
 #include "wifi_manage_screen.h"
 #include "menu_screen.h"
+#include "radar_theme_screen.h"
 #include "timeout_screen.h"
 #include "settings_store.h"
 #include "net_task.h"
@@ -149,6 +151,28 @@ Rect wifiIconRect = {(int16_t)(menuBtn.x + menuBtn.w + 2), 3,
 // oeffnen.
 Rect clockRect = {0, (int16_t)(titleRect.y + titleRect.h), 80, (int16_t)(CONTENT_TOP - (titleRect.y + titleRect.h))};
 
+// "Modes"-Button - Direktzugriff auf das "Radar-Darstellung"-Untermenue
+// (CRT-Phosphor/Radar-Puls/Nostalgisch/Flugbahn-Trail, siehe
+// radar_theme_screen.cpp) von der Hauptansicht aus, statt nur ueber
+// Menue > System > Radar-Darstellung erreichbar. Die obere Icon-Zeile
+// (Titel/Wetter/Menu/WLAN, y=3-25) ist bereits randvoll (praktisch kein
+// Pixel Luft mehr zwischen den vier Elementen) - deshalb stattdessen in
+// der schmalen Status-Zeile direkt darunter platziert (y=HEADER_TITLE_H
+// bis CONTENT_TOP), DIREKT rechts neben der Uhr (clockRect endet bei
+// x=80, +4px Abstand) - FIX (Alex' Meldung: sah wie eine eigene Zeile
+// unter "Menu" aus statt neben der Uhr): der x-Wert war vorher faelschlich
+// an SCREEN_WIDTH-84 ausgerichtet (fast direkt unter menuBtn), obwohl der
+// Kommentar schon "rechts neben der Uhr" sagte - jetzt tatsaechlich direkt
+// an clockRect anschliessend. Rest der Zeile bleibt frei
+// (updateStatusLine() loescht diesen Bereich nur die Uhrzeit betreffend,
+// der Rest der Zeile ist ungenutzt). Kollidiert dadurch mit keinem
+// bestehenden Element (Menu-Button/Wetter/WLAN sitzen eine Zeile hoeher,
+// Filter-Hinweiszeile/Reichweiten-Button/Legende sitzen unten in der
+// Info-Leiste) und liegt ausserhalb des Radarkreises, der erst bei
+// CONTENT_TOP beginnt.
+Rect modesBtn = {(int16_t)(clockRect.x + clockRect.w + 4), (int16_t)(HEADER_TITLE_H + 1), 70,
+                  (int16_t)(STATUS_LINE_H - 2)};
+
 void drawMenuButton() {
     // Folgt jetzt dem auf dem Radar-Screen gewaehlten Farbschema (Menue >
     // System > Radar-Farbschema) statt fest Gruen zu bleiben - der Button
@@ -173,6 +197,24 @@ void drawMenuButton() {
         tft.fillCircle((int16_t)(menuBtn.x + menuBtn.w - 3), (int16_t)(menuBtn.y + 3), 3, TFT_RED);
         tft.drawCircle((int16_t)(menuBtn.x + menuBtn.w - 3), (int16_t)(menuBtn.y + 3), 3, TFT_BLACK);
     }
+}
+
+// Direktzugriff auf RadarThemeScreen (siehe modesBtn oben) - bewusst
+// schlicht gehalten (kein Rand, nur Text), da die Status-Zeile mit nur
+// STATUS_LINE_H-2 Pixeln Hoehe fuer eine vollwertige umrandete
+// Schaltflaeche (wie drawMenuButton() oben) zu knapp bemessen ist.
+// MC_DATUM statt setCursor()+print() - laut CLAUDE.md-Hinweis zur
+// Baseline-Falle bei unserem eigenen Font unkritisch, TFT_eSPI zentriert
+// bei datum-basiertem drawString() unabhaengig davon korrekt. Bewusst FEST
+// GELB (nicht das dynamische Radar-Farbschema wie beim Menu-Button) -
+// Alex' ausdruecklicher Wunsch, hebt den Button zusaetzlich optisch von
+// Menu/Uhr (beide Gruen/Grau) ab.
+void drawModesButton() {
+    tft.fillRect(modesBtn.x, modesBtn.y, modesBtn.w, modesBtn.h, TFT_BLACK);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+    tft.drawString("Modes", (int16_t)(modesBtn.x + modesBtn.w / 2), (int16_t)(modesBtn.y + modesBtn.h / 2));
+    tft.setTextDatum(TL_DATUM);
 }
 
 // Kleine, mit einfachen TFT_eSPI-Grundformen gezeichnete Wolke (kein
@@ -627,6 +669,7 @@ void drawHeader() {
     tft.setCursor(6, 10);
     tft.println("Eiswolfs FR");
     drawMenuButton();
+    drawModesButton();
     updateWifiIcon();
     drawWeatherIcon();
     lastRenderedWeather = Weather::current();
@@ -657,6 +700,11 @@ void updateStatusLine() {
     constexpr int16_t CLOCK_CLEAR_TOP = HEADER_TITLE_H - 10;
     tft.fillRect(0, CLOCK_CLEAR_TOP, CLOCK_CLEAR_W, CONTENT_TOP - CLOCK_CLEAR_TOP, TFT_BLACK);
     tft.fillRect(CLOCK_CLEAR_W, HEADER_TITLE_H, Config::SCREEN_WIDTH - CLOCK_CLEAR_W, STATUS_LINE_H, TFT_BLACK);
+    // Der obige fillRect() ueberdeckt modesBtn (liegt im selben Bereich,
+    // siehe Kommentar dort) - jede Sekunde direkt danach neu zeichnen,
+    // sonst waere der Button nur fuer den Sekundenbruchteil bis zum
+    // naechsten updateStatusLine()-Aufruf unsichtbar.
+    drawModesButton();
     tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
 
     time_t now = time(nullptr);
@@ -902,6 +950,13 @@ void setup() {
     // Nachziehen wie bei invertDisplay() direkt drueber.
     ledcWrite(BACKLIGHT_PWM_CHANNEL, normalBacklightPwm());
 
+    // Rein kosmetische Terminal-Boot-Sequenz (immer aktiv, kein Schalter) -
+    // erst HIER moeglich, da sie die richtige Sprache braucht
+    // (SettingsStore::load() ist gerade eben gelaufen). Laeuft blockierend
+    // vor dem eigentlichen Splash-Screen (SplashScreen::begin() unten),
+    // Gesamtdauer ~2,4s, siehe splash_screen.cpp.
+    SplashScreen::playBootSequence(tft);
+
     if (isFirstRun) {
         // Beim allerersten Start gibt es keine "vorherige Version", mit der
         // man einen Changelog sinnvoll vergleichen koennte - der Willkommens-
@@ -918,6 +973,7 @@ void setup() {
     LocationPresets::init();
     AirlineFilter::init();
     AircraftWatchlist::init();
+    SquawkWatchlist::init();
 
     SplashScreen::begin(tft);
     // Sofort einen ersten Sternen-Frame zeichnen, statt erst auf die naechste
@@ -1130,6 +1186,16 @@ void loop() {
             // Bildschirm-Timeout erreichbar) - macht damit die komplette
             // Kopfzeile reaktiv (Alex' Wunsch).
             TimeoutScreen::run(tft);
+            // Gleicher Grund wie bei den anderen Vollbild-Overlays oben -
+            // auch dieser Screen ueberschreibt den kompletten Bildschirm.
+            RadarScreen::invalidatePanel();
+            drawHeader();
+            updateStatusLine();
+            forceRedraw = true;
+        } else if (modesBtn.contains(tap.x, tap.y)) {
+            // Direktzugriff auf "Radar-Darstellung" (CRT-Phosphor/Radar-
+            // Puls/Nostalgisch) von der Hauptansicht aus, siehe modesBtn.
+            RadarThemeScreen::run(tft);
             // Gleicher Grund wie bei den anderen Vollbild-Overlays oben -
             // auch dieser Screen ueberschreibt den kompletten Bildschirm.
             RadarScreen::invalidatePanel();
