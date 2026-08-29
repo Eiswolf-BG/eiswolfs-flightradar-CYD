@@ -439,3 +439,12 @@ Push sauber per OTA von der zuletzt veröffentlichten auf die neue Version
 aktualisieren können; zeigt das Testgerät zwischendurch schon eine neue
 (aber noch nicht veröffentlichte) Nummer an, funktioniert dieser Versions-
 vergleich nicht mehr zuverlässig.
+
+## Wann temporäre Diagnose-Instrumentierung sinnvoll ist
+
+Nur bei Aufgaben, die explizit Fehlersuche/Verhalten-zur-Laufzeit betreffen
+(Netzwerk-/Verbindungsprobleme, Timing-/Race-Bugs, Zustände, die sich nicht
+allein durch Codelektüre beweisen lassen). Bei reinen Layout-/Text-/Farb-/
+Struktur-Änderungen genügt Codelektüre + einmaliger Build+Flash - kein
+Serial-Logging, kein zweiter Flash-Durchgang, sofern nicht der Nutzer
+ausdrücklich eine Live-Verifikation verlangt.

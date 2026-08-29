@@ -331,6 +331,14 @@ static const char* const I18N_EN[] = {
     "Synchronizing atomic clock...",
     "Loading airspace database...",
     "Radar system online.",
+    "Classic Radar",
+
+    "About CRT Phosphor",
+    "Aircraft markers fade out after the sweep passes and light back up in full color the next time the sweep crosses them - like an old cathode-ray radar screen.",
+    "About Radar Pulse",
+    "A bright ring expands outward from the radar center and fades out with every fresh data update.",
+    "About Classic Radar",
+    "Enables several classic radar screen effects at once: a comet tail behind the sweep line, extra grid spokes, plus a sonar-ping ring and a brief burst of signal noise whenever a new aircraft first appears on the radar.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

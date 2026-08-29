@@ -330,6 +330,14 @@ static const char* const I18N_IT[] = {
     "Sincronizzazione orologio atomico...",
     "Caricamento database dello spazio aereo...",
     "Sistema radar pronto.",
+    "Radar classico",
+
+    "Info su Fosforo CRT",
+    "I marcatori degli aerei si affievoliscono dopo il passaggio della scansione e si riaccendono a piena luminosità al passaggio successivo - come un vecchio schermo radar a tubo catodico.",
+    "Info su Impulso radar",
+    "Un anello luminoso si espande dal centro del radar verso l'esterno e si affievolisce a ogni nuovo aggiornamento dei dati.",
+    "Info su Radar classico",
+    "Attiva più effetti radar classici contemporaneamente: una scia cometa dietro la linea di scansione, razze aggiuntive della griglia, oltre a un anello sonar e un breve disturbo del segnale ogni volta che un nuovo aereo appare per la prima volta sul radar.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

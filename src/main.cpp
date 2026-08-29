@@ -130,6 +130,13 @@ constexpr int16_t HEADER_ROW_Y = 3;
 constexpr int16_t HEADER_ROW_H = 22;
 constexpr int16_t HEADER_GAP = 6;
 
+// Vorgezogen aus dem urspruenglichen Standort weiter unten (bei
+// updateWifiIcon()) - wird jetzt auch in layoutHeaderOnce() gebraucht, um
+// die sichtbare WLAN-Icon-Flaeche (fix an SCREEN_WIDTH-WIFI_ICON_W-2, siehe
+// updateWifiIcon()) fuer die Positionierung des neuen eyeIconRect zu kennen.
+constexpr int16_t WIFI_ICON_W = 22;
+constexpr int16_t WIFI_ICON_H = 14;
+
 // Platz, an dem frueher der Cam-Button war (siehe entfernte Screenshot-
 // Funktion) - zeigt jetzt stattdessen ein kleines Wetter-Icon fuer den
 // aktuell aktiven Standort (siehe weather.cpp/Weather::update()). Feste
@@ -151,10 +158,19 @@ Rect menuBtn = {0, HEADER_ROW_Y, 0, HEADER_ROW_H};
 
 // Tippbereich fuer die WLAN-Balken ganz rechts (siehe updateWifiIcon()/
 // drawWifiIcon() unten, WIFI_ICON_W/H dort) - das sichtbare Icon sitzt
-// ohnehin fest an SCREEN_WIDTH-WIFI_ICON_W-2, wifiIconRect deckt hier
-// eine etwas grosszuegigere Zone am rechten Rand als Tippzone ab. Breite
-// in layoutHeaderOnce() gesetzt.
+// fest an SCREEN_WIDTH-WIFI_ICON_W-2. x/w werden in layoutHeaderOnce() auf
+// GENAU diese sichtbare Icon-Flaeche gesetzt (frueher grosszuegiger bis
+// direkt an den Menu-Button heran, das wuerde aber jetzt den neuen
+// eyeIconRect-Tippbereich dazwischen ueberlappen, siehe dort).
 Rect wifiIconRect = {0, HEADER_ROW_Y, 0, HEADER_ROW_H};
+
+// Augen-Icon zwischen Menu-Button und WLAN-Anzeige - Direktzugriff auf den
+// "Anzeigefilter"-Screen (Bodenfahrzeuge/Helikopter/Niedrigflieger-Filter,
+// MenuScreen::run(tft, true)), Alex' Wunsch fuer schnelleren Zugriff ohne
+// erst durchs Menue zu muessen. x/w werden in layoutHeaderOnce() zentriert
+// im verbleibenden Zwischenraum bestimmt (siehe dortiger Kommentar fuer die
+// exakte Positionsrechnung).
+Rect eyeIconRect = {0, HEADER_ROW_Y, 0, HEADER_ROW_H};
 
 // Tippbereich fuer die Kopfzeilen-Uhr (siehe updateStatusLine()) - oeffnet
 // den Bildschirm-Timeout-Screen (Menue > System > Bildschirm-Timeout).
@@ -199,9 +215,26 @@ void layoutHeaderOnce() {
     // WLAN-Zone: vom rechten Bildschirmrand bis kurz nach dem Ende von
     // menuBtn (mit GAP), damit garantiert keine Ueberlappung entsteht,
     // unabhaengig von der gemessenen menuBtn-Breite.
-    int16_t wifiZoneStart = (int16_t)(menuBtn.x + menuBtn.w + HEADER_GAP);
-    wifiIconRect.x = wifiZoneStart;
-    wifiIconRect.w = (int16_t)(Config::SCREEN_WIDTH - wifiZoneStart);
+    // wifiIconRect deckt jetzt GENAU die sichtbare WLAN-Balken-Flaeche ab
+    // (fix an SCREEN_WIDTH-WIFI_ICON_W-2, siehe updateWifiIcon()) statt wie
+    // frueher grosszuegig bis direkt an menuBtn heranzureichen - der
+    // Zwischenraum gehoert jetzt dem neuen Augen-Icon (eyeIconRect unten).
+    wifiIconRect.x = (int16_t)(Config::SCREEN_WIDTH - WIFI_ICON_W - 2);
+    wifiIconRect.w = WIFI_ICON_W;
+
+    // Augen-Icon: zentriert im verbleibenden Zwischenraum zwischen
+    // menuBtn-Ende und dem sichtbaren WLAN-Icon, mit 3px Sicherheitsabstand
+    // zu beiden Tippzonen (menuBtn bzw. wifiIconRect) - siehe drawEyeFilterIcon()
+    // fuer die eigentliche Zeichnung (Radius 6 + Iris-Punkt, mittig in
+    // eyeIconRect platziert). Bei der gemessenen Standard-Kopfzeile
+    // (menuBtn.w mit "Menu"+Padding, SCREEN_WIDTH=240) ergibt das eine
+    // Tippzone von 27px Breite bei je 10px sichtbarem Icon-Abstand zu den
+    // Nachbarn (Positionsplanung im Auftrags-Chat dokumentiert).
+    constexpr int16_t EYE_SAFETY_GAP = 3;
+    int16_t eyeZoneStart = (int16_t)(menuBtn.x + menuBtn.w + EYE_SAFETY_GAP);
+    int16_t eyeZoneEnd = (int16_t)(wifiIconRect.x - EYE_SAFETY_GAP);
+    eyeIconRect.x = eyeZoneStart;
+    eyeIconRect.w = (int16_t)(eyeZoneEnd - eyeZoneStart);
 }
 
 void drawMenuButton() {
@@ -244,6 +277,22 @@ void drawModesButton() {
     tft.setTextColor(color, TFT_BLACK);
     tft.drawString("Mode", (int16_t)(modesBtn.x + modesBtn.w / 2), (int16_t)(modesBtn.y + modesBtn.h / 2));
     tft.setTextDatum(TL_DATUM);
+}
+
+// Augen-Icon (eyeIconRect) - Direktzugriff auf den "Anzeigefilter"-Screen
+// (Bodenfahrzeuge/Helikopter/Niedrigflieger, siehe Tap-Handler weiter
+// unten). Bewusst KEIN Rahmen/Button-Kasten wie bei Mode/Menu und KEIN
+// Textlabel (Alex' ausdruecklicher Wunsch) - nur das reine Symbol: ein
+// Kreis (Aussenlinie) mit einem kleinen ausgefuellten Punkt (Iris) in der
+// Mitte. Mittig in eyeIconRect platziert (siehe layoutHeaderOnce() fuer die
+// Positionsrechnung), Radius bewusst klein (6px) gewaehlt, damit beidseitig
+// sichtbarer Abstand zu Menu-Button und WLAN-Anzeige bleibt.
+void drawEyeFilterIcon() {
+    int16_t cx = (int16_t)(eyeIconRect.x + eyeIconRect.w / 2);
+    int16_t cy = (int16_t)(eyeIconRect.y + eyeIconRect.h / 2);
+    tft.fillRect(eyeIconRect.x, eyeIconRect.y, eyeIconRect.w, eyeIconRect.h, TFT_BLACK);
+    tft.drawCircle(cx, cy, 6, TFT_GREEN);
+    tft.fillCircle(cx, cy, 2, TFT_GREEN);
 }
 
 // Kleine, mit einfachen TFT_eSPI-Grundformen gezeichnete Wolke (kein
@@ -585,9 +634,6 @@ void drawScreensaverClock() {
     }
 }
 
-constexpr int16_t WIFI_ICON_W = 22;
-constexpr int16_t WIFI_ICON_H = 14;
-
 void updateWifiIcon() {
     int16_t iconX = Config::SCREEN_WIDTH - WIFI_ICON_W - 2;
     int16_t iconY = 2;
@@ -702,6 +748,7 @@ void drawHeader() {
     tft.setTextSize(1);
     drawMenuButton();
     drawModesButton();
+    drawEyeFilterIcon();
     updateWifiIcon();
     drawWeatherIcon();
     lastRenderedWeather = Weather::current();
@@ -1171,6 +1218,19 @@ void loop() {
             showWeatherInfo(tft);
             // Gleicher Grund wie beim Menue oben - auch der Wetter-Info-
             // Screen ist ein Vollbild-Overlay.
+            RadarScreen::invalidatePanel();
+            drawHeader();
+            updateStatusLine();
+            forceRedraw = true;
+        } else if (eyeIconRect.contains(tap.x, tap.y)) {
+            // Direktzugriff auf den "Anzeigefilter"-Screen (Bodenfahrzeuge/
+            // Helikopter/Niedrigflieger, siehe menu_screen.cpp) von der
+            // Hauptansicht aus, ohne erst durchs Menue zu muessen - gleiches
+            // startAtFilters=true wie beim antippbaren Filter-Hinweis im
+            // "Leerer Himmel"-Text (siehe RadarScreen::handleTap()).
+            MenuScreen::run(tft, true);
+            // Gleicher Grund wie bei den anderen Vollbild-Overlays oben -
+            // auch dieser Screen ueberschreibt den kompletten Bildschirm.
             RadarScreen::invalidatePanel();
             drawHeader();
             updateStatusLine();

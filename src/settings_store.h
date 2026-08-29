@@ -116,6 +116,14 @@ namespace SettingsStore {
     bool radarPulseEnabled();
     void setRadarPulseEnabled(bool on);
 
+    // "Klassik-Radar" (System > Radar-Darstellung) - AUS per Default. Bei
+    // AN: Kometenschweif hinter der Sweep-Linie (mehrere ausfadende
+    // Segmente statt einer einzelnen Linie) sowie zusaetzliche, dezente
+    // Rasterspeichen alle 30 Grad (die bestehenden N/S/E/W-Kreuzlinien
+    // bleiben unveraendert). Rein kosmetisch, siehe radar_screen.cpp.
+    bool classicRadarEnabled();
+    void setClassicRadarEnabled(bool on);
+
     // ISS-Marker-Bonusfeature (siehe iss_tracker.h) - AN per Default. Bei
     // AUS unterbleibt sowohl die periodische Positionsabfrage (kein
     // Netzwerk-Traffic) als auch das Zeichnen des Markers (siehe

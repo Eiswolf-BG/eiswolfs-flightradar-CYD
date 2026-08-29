@@ -582,6 +582,25 @@ enum class StringId : uint16_t {
     BOOT_SEQ_5,
     BOOT_SEQ_6,
 
+    // "Klassik-Radar" (System > Radar-Darstellung, siehe
+    // SettingsStore::classicRadarEnabled()) - Kometenschweif-Sweep +
+    // zusaetzliche Rasterspeichen alle 30 Grad, siehe radar_screen.cpp.
+    MENU_CLASSIC_RADAR,
+
+    // Kleine "?"-Info-Buttons rechts in den drei Schalter-Zeilen auf der
+    // "Radar-Darstellung"-Seite (radar_theme_screen.cpp) - CRT-Phosphor/
+    // Radar-Puls/Klassik-Radar, jeweils eigener kurzer Erklaertext ueber
+    // MenuScreen::showInfoScreen(), gleiches Prinzip wie ISS_MARKER_INFO_*
+    // oben. RADAR_CLASSIC_INFO_BODY deckt bewusst ALLE Klassik-Radar-
+    // Teileffekte ab (Kometenschweif, Rasterspeichen, Sonar-Ping,
+    // Signal-Rauschen), nicht nur den Namen des Schalters.
+    RADAR_THEME_CRT_INFO_TITLE,
+    RADAR_THEME_CRT_INFO_BODY,
+    RADAR_PULSE_INFO_TITLE,
+    RADAR_PULSE_INFO_BODY,
+    RADAR_CLASSIC_INFO_TITLE,
+    RADAR_CLASSIC_INFO_BODY,
+
     COUNT
 };
 

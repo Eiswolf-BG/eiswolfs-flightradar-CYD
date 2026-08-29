@@ -2,15 +2,16 @@
 #include "settings_store.h"
 #include "touch_input.h"
 #include "menu_stars.h"
+#include "menu_screen.h"
 #include "i18n.h"
 #include "config.h"
 
 // Einstell-Screen fuer die Radar-Darstellung (Menue > System > Radar-
 // Darstellung). Oben drei EXKLUSIVE Farbschema-Buttons (Gruen/Amber/Blau,
 // SettingsStore::radarThemeIndex(), gleiches 3-Wege-Auswahl-Muster wie
-// units_screen.cpp), darunter zwei UNABHAENGIGE, ankreuzbare Extras
-// (CRT-Phosphor, Radar-Puls) - lassen sich mit JEDEM der drei
-// Farbschemata kombinieren, deshalb eigene bool-Einstellungen statt
+// units_screen.cpp), darunter drei UNABHAENGIGE, ankreuzbare Extras
+// (CRT-Phosphor, Radar-Puls, Klassik-Radar) - lassen sich mit JEDEM der
+// drei Farbschemata kombinieren, deshalb eigene bool-Einstellungen statt
 // weiterer Werte fuer radarThemeIndex(). Betrifft NUR den Radar-Screen
 // (siehe radar_screen.cpp), alle anderen Bildschirme bleiben unveraendert
 // gruen.
@@ -58,11 +59,32 @@ namespace {
         tft.setTextDatum(TL_DATUM);
     }
 
+    // Kleiner "?"-Info-Button rechts in einer Kaestchen-Zeile (CRT-Phosphor/
+    // Radar-Puls/Klassik-Radar) - bewusst deutlich kleiner als die
+    // Standard-"?"-Buttons anderer Screens (dort 30x24, hier 20x20), damit
+    // er MIT Abstand innerhalb der jeweiligen Zeile Platz findet, statt mit
+    // deren eigenem Rahmen (drawCheckboxRow() oben) zu kollidieren. ROW_PAD
+    // haelt den gleichen Abstand zum rechten Zeilenrand wie zur Zeile
+    // selbst - siehe rowInfoBtnRect().
+    constexpr int16_t ROW_INFO_BTN_SIZE = 20;
+    constexpr int16_t ROW_INFO_BTN_PAD = 6;
+
+    Rect rowInfoBtnRect(const Rect& row) {
+        return {(int16_t)(row.x + row.w - ROW_INFO_BTN_SIZE - ROW_INFO_BTN_PAD),
+                (int16_t)(row.y + (row.h - ROW_INFO_BTN_SIZE) / 2),
+                ROW_INFO_BTN_SIZE, ROW_INFO_BTN_SIZE};
+    }
+
+    void drawRowInfoButton(TFT_eSPI& tft, const Rect& row) {
+        Rect btn = rowInfoBtnRect(row);
+        drawButton(tft, btn, "?");
+    }
+
     // Zeilenhoehe aus dem verfuegbaren Platz errechnet (gleiches Muster wie
-    // SYSTEM_ROW_H in menu_screen.cpp) statt fest verdrahtet - 6 Zeilen
-    // (3 Farbschemata + 2 Kaestchen + Zurueck) muessen mit ca. 10px Reserve
+    // SYSTEM_ROW_H in menu_screen.cpp) statt fest verdrahtet - 7 Zeilen
+    // (3 Farbschemata + 3 Kaestchen + Zurueck) muessen mit ca. 10px Reserve
     // zum unteren Rand aufs Display passen.
-    constexpr uint8_t ROW_COUNT = 6;
+    constexpr uint8_t ROW_COUNT = 7;
     constexpr int16_t ROW_GAP = 6;
     constexpr int16_t START_Y = 40;
     constexpr int16_t END_Y = Config::SCREEN_HEIGHT - 10;
@@ -98,11 +120,17 @@ void run(TFT_eSPI& tft) {
 
         Rect crtRow = rowRect(THEME_COUNT);
         drawCheckboxRow(tft, crtRow, I18n::t(StringId::RADAR_THEME_CRT), SettingsStore::crtPhosphorEnabled());
+        drawRowInfoButton(tft, crtRow);
 
         Rect pulseRow = rowRect(THEME_COUNT + 1);
         drawCheckboxRow(tft, pulseRow, I18n::t(StringId::RADAR_PULSE_TOGGLE), SettingsStore::radarPulseEnabled());
+        drawRowInfoButton(tft, pulseRow);
 
-        Rect backBtn = rowRect(THEME_COUNT + 2);
+        Rect classicRow = rowRect(THEME_COUNT + 2);
+        drawCheckboxRow(tft, classicRow, I18n::t(StringId::MENU_CLASSIC_RADAR), SettingsStore::classicRadarEnabled());
+        drawRowInfoButton(tft, classicRow);
+
+        Rect backBtn = rowRect(THEME_COUNT + 3);
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
         TouchInput::Point tap;
@@ -121,12 +149,37 @@ void run(TFT_eSPI& tft) {
                 handled = true;
             }
         }
+        // "?"-Info-Buttons zuerst pruefen (kleine Flaeche innerhalb der
+        // jeweiligen Zeile) - sonst wuerde ein Tap darauf faelschlich als
+        // Tap auf die ganze Zeile (Schalter umlegen) gewertet.
+        if (!handled && rowInfoBtnRect(crtRow).contains(tap.x, tap.y)) {
+            MenuScreen::showInfoScreen(tft, I18n::t(StringId::RADAR_THEME_CRT_INFO_TITLE),
+                                        I18n::t(StringId::RADAR_THEME_CRT_INFO_BODY), TFT_GREEN,
+                                        I18n::t(StringId::OK));
+            handled = true;
+        }
+        if (!handled && rowInfoBtnRect(pulseRow).contains(tap.x, tap.y)) {
+            MenuScreen::showInfoScreen(tft, I18n::t(StringId::RADAR_PULSE_INFO_TITLE),
+                                        I18n::t(StringId::RADAR_PULSE_INFO_BODY), TFT_GREEN,
+                                        I18n::t(StringId::OK));
+            handled = true;
+        }
+        if (!handled && rowInfoBtnRect(classicRow).contains(tap.x, tap.y)) {
+            MenuScreen::showInfoScreen(tft, I18n::t(StringId::RADAR_CLASSIC_INFO_TITLE),
+                                        I18n::t(StringId::RADAR_CLASSIC_INFO_BODY), TFT_GREEN,
+                                        I18n::t(StringId::OK));
+            handled = true;
+        }
         if (!handled && crtRow.contains(tap.x, tap.y)) {
             SettingsStore::setCrtPhosphorEnabled(!SettingsStore::crtPhosphorEnabled());
             handled = true;
         }
         if (!handled && pulseRow.contains(tap.x, tap.y)) {
             SettingsStore::setRadarPulseEnabled(!SettingsStore::radarPulseEnabled());
+            handled = true;
+        }
+        if (!handled && classicRow.contains(tap.x, tap.y)) {
+            SettingsStore::setClassicRadarEnabled(!SettingsStore::classicRadarEnabled());
             handled = true;
         }
         if (!handled && backBtn.contains(tap.x, tap.y)) {

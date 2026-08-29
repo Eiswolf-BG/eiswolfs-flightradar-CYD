@@ -44,6 +44,7 @@ namespace {
     // Wert, der in applyKeyValue() unten weiterhin Vorrang hat.
     bool radarPulseOn = true;
     bool issMarkerOn = true;
+    bool classicRadarOn = false;
     char lastSeenVersionBuf[16] = {0};
 
     // MUSS auf SD persistiert werden (nicht nur im RAM halten): wird kurz
@@ -112,6 +113,8 @@ namespace {
             radarPulseOn = (value.toInt() != 0);
         } else if (key == "iss_marker") {
             issMarkerOn = (value.toInt() != 0);
+        } else if (key == "classic_radar") {
+            classicRadarOn = (value.toInt() != 0);
         } else if (key == "last_seen_version") {
             strncpy(lastSeenVersionBuf, value.c_str(), sizeof(lastSeenVersionBuf) - 1);
             lastSeenVersionBuf[sizeof(lastSeenVersionBuf) - 1] = 0;
@@ -184,6 +187,7 @@ void save() {
     f.printf("crt_phosphor=%d\n", crtPhosphorOn ? 1 : 0);
     f.printf("radar_pulse=%d\n", radarPulseOn ? 1 : 0);
     f.printf("iss_marker=%d\n", issMarkerOn ? 1 : 0);
+    f.printf("classic_radar=%d\n", classicRadarOn ? 1 : 0);
     f.printf("last_seen_version=%s\n", lastSeenVersionBuf);
     f.printf("ota_just_installed=%d\n", otaJustInstalledFlag ? 1 : 0);
     f.close();
@@ -360,6 +364,13 @@ bool radarPulseEnabled() { return radarPulseOn; }
 
 void setRadarPulseEnabled(bool on) {
     radarPulseOn = on;
+    save();
+}
+
+bool classicRadarEnabled() { return classicRadarOn; }
+
+void setClassicRadarEnabled(bool on) {
+    classicRadarOn = on;
     save();
 }
 

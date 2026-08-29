@@ -359,6 +359,160 @@ namespace {
     // render()-Aufruf ebenfalls als "neue Daten" zaehlt.
     uint32_t lastPulseVersion = 0xFFFFFFFFu;
 
+    // "Klassik-Radar", Teil 3: Sonar-Ping bei neuem Kontakt - ein heller
+    // Ring, der LOKAL an der Bildschirmposition eines Flugzeugs expandiert
+    // und ausfadet, sobald dessen hex-ID zum allerersten Mal (bzw. nach
+    // laengerer Abwesenheit, siehe SONAR_KNOWN_GRACE_MS unten)
+    // erscheint - im Unterschied zum bestehenden Radar-Puls (der immer vom
+    // Zentrum aus kommt und bei JEDER Datenaenderung ausgeloest wird, siehe
+    // pulseActive oben). Bis zu MAX_SONAR_PINGS gleichzeitige Ringe, falls
+    // mehrere Flugzeuge im selben render()-Durchlauf neu auftauchen.
+    struct SonarPing {
+        bool active = false;
+        int16_t cx = 0, cy = 0;
+        uint16_t color = TFT_GREEN;
+        uint32_t startMs = 0;
+        // -1 = im letzten Tick kein Ring gezeichnet, nichts zu loeschen -
+        // gleiches Prinzip wie prevPulseRadius oben.
+        int16_t prevRadius = -1;
+    };
+    constexpr uint8_t MAX_SONAR_PINGS = 6;
+    SonarPing sonarPings[MAX_SONAR_PINGS];
+    constexpr uint32_t SONAR_PING_DURATION_MS = 900;
+    // Bewusst klein (lokaler Effekt am Flugzeug, kein bildschirmfuellender
+    // Ring wie beim Radar-Puls) - jeder Punkt wird trotzdem zusaetzlich auf
+    // den Radar-Kreis geclippt (siehe tick()), damit ein Ping nahe am
+    // Kreisrand nicht in Kopf-/Fusszeile hineinmalt.
+    constexpr int16_t SONAR_PING_MAX_RADIUS = 18;
+
+    void triggerSonarPing(int16_t cx, int16_t cy, uint16_t color) {
+        for (uint8_t i = 0; i < MAX_SONAR_PINGS; i++) {
+            if (!sonarPings[i].active) {
+                sonarPings[i] = SonarPing{};
+                sonarPings[i].active = true;
+                sonarPings[i].cx = cx;
+                sonarPings[i].cy = cy;
+                sonarPings[i].color = color;
+                sonarPings[i].startMs = millis();
+                return;
+            }
+        }
+        // Alle Slots belegt (in der Praxis kaum je der Fall) - ein einzelner
+        // verpasster Ping ist unkritisch, kein Ueberschreiben eines noch
+        // laufenden Rings.
+    }
+
+    // "Klassik-Radar", Teil 4: Signal-Rauschen bei neuem Kontakt - ein paar
+    // zufaellige, kurz aufblitzende Einzelpixel in unmittelbarer Naehe der
+    // neuen Flugzeugposition (deutlich kleinerer Streuradius als der
+    // Sonar-Ping-Ring, STATIC_NOISE_SPREAD statt SONAR_PING_MAX_RADIUS), die
+    // nach sehr kurzer Zeit wieder komplett verschwinden. Ausgeloest vom
+    // GLEICHEN "neuer Kontakt"-Ereignis wie der Sonar-Ping (siehe Aufrufer
+    // in render()), laeuft aber als eigener, unabhaengiger Effekt daneben -
+    // beide koennen gleichzeitig aktiv sein.
+    constexpr uint8_t STATIC_NOISE_POINT_COUNT = 6;
+    struct StaticNoise {
+        bool active = false;
+        int16_t cx = 0, cy = 0;
+        uint32_t startMs = 0;
+        uint16_t color = TFT_WHITE;
+        // Tatsaechlich gezeichnete Punkte des LETZTEN Ticks (nach Clipping,
+        // siehe tick()) - fuer sauberes Loeschen im naechsten Tick, gleiches
+        // Erase/Redraw-Prinzip wie beim Sonar-Ping/Radar-Puls. Punkte werden
+        // JEDEN Tick neu zufaellig gewuerfelt (kein starres Muster), fuer
+        // einen echten Flacker-/"Static"-Effekt.
+        uint8_t prevPointCount = 0;
+        int16_t prevPointsX[STATIC_NOISE_POINT_COUNT];
+        int16_t prevPointsY[STATIC_NOISE_POINT_COUNT];
+    };
+    constexpr uint8_t MAX_STATIC_NOISE = 6;
+    StaticNoise staticNoises[MAX_STATIC_NOISE];
+    // 300ms liegt in der von Alex vorgegebenen Bandbreite (200-400ms).
+    constexpr uint32_t STATIC_NOISE_DURATION_MS = 300;
+    // Bewusst deutlich kleiner als SONAR_PING_MAX_RADIUS (18px) - "nur
+    // wenige Pixel Streuung", wie von Alex gewuenscht.
+    constexpr int16_t STATIC_NOISE_SPREAD = 5;
+
+    void triggerStaticNoise(int16_t cx, int16_t cy) {
+        for (uint8_t i = 0; i < MAX_STATIC_NOISE; i++) {
+            if (!staticNoises[i].active) {
+                staticNoises[i] = StaticNoise{};
+                staticNoises[i].active = true;
+                staticNoises[i].cx = cx;
+                staticNoises[i].cy = cy;
+                staticNoises[i].startMs = millis();
+                return;
+            }
+        }
+        // Alle Slots belegt - ein einzelner verpasster Effekt ist unkritisch.
+    }
+
+    // "Bekannt seit"-Tracking fuer den Sonar-Ping, UNABHAENGIG von
+    // phosphorEntries[] oben: phosphorEntries wird bei JEDEM render()-
+    // Durchlauf, in dem ein Flugzeug nicht mehr in der Snapshot-Liste
+    // auftaucht, sofort freigegeben (siehe Kommentar dort) - ein einziger
+    // verpasster Fetch-Zyklus am Rand der Reichweite wuerde dort schon
+    // reichen, um beim naechsten Auftauchen faelschlich als "neu" zu gelten.
+    // Fuer den Sonar-Ping ist das zu empfindlich (Ping-Spam-Risiko, siehe
+    // Alex' Nachfrage) - dieses Array behaelt einen Eintrag stattdessen ueber
+    // SONAR_KNOWN_GRACE_MS hinweg, auch wenn das Flugzeug zwischenzeitlich
+    // nicht im Snapshot war. Erst wenn seit dem letzten Sichten mehr als die
+    // Gnadenfrist vergangen ist, zaehlt ein Wiederauftauchen erneut als
+    // "neuer Kontakt".
+    struct KnownAircraftEntry {
+        char hex[7] = {0};
+        bool used = false;
+        uint32_t lastSeenMs = 0;
+    };
+    constexpr uint8_t MAX_KNOWN_AIRCRAFT = MAX_HIT_POINTS;
+    KnownAircraftEntry knownAircraft[MAX_KNOWN_AIRCRAFT];
+    // 45s = mehrere FETCH_INTERVAL_MS-Zyklen (Config::FETCH_INTERVAL_MS =
+    // 10s) Puffer gegen kurze Signalaussetzer/Randschwankungen der
+    // Reichweite, ohne ein tatsaechlich abgeflogenes und Stunden spaeter
+    // zurueckkehrendes Flugzeug dauerhaft als "schon bekannt" zu behandeln.
+    constexpr uint32_t SONAR_KNOWN_GRACE_MS = 45000;
+
+    // Liefert true, wenn "hex" als neuer Kontakt zaehlt (noch nie gesehen,
+    // ODER seit mehr als SONAR_KNOWN_GRACE_MS nicht mehr gesehen) - und
+    // aktualisiert/erstellt in JEDEM Fall den Eintrag mit dem aktuellen
+    // Zeitstempel. Wird bewusst bei JEDEM sichtbaren Flugzeug aufgerufen,
+    // unabhaengig vom Klassik-Radar-Schalter (siehe Aufrufer in render()) -
+    // sonst wuerde ein Einschalten des Schalters faelschlich fuer bereits
+    // laengst bekannte Flugzeuge einen Ping ausloesen.
+    bool isNewContactAndTouch(const char* hex, uint32_t nowMs) {
+        int8_t freeIdx = -1;
+        int8_t staleIdx = -1;
+        uint32_t staleAge = 0;
+        for (uint8_t i = 0; i < MAX_KNOWN_AIRCRAFT; i++) {
+            if (knownAircraft[i].used && strcmp(knownAircraft[i].hex, hex) == 0) {
+                bool graceExpired = (nowMs - knownAircraft[i].lastSeenMs) > SONAR_KNOWN_GRACE_MS;
+                knownAircraft[i].lastSeenMs = nowMs;
+                return graceExpired;
+            }
+            if (!knownAircraft[i].used) {
+                if (freeIdx < 0) freeIdx = i;
+                continue;
+            }
+            uint32_t age = nowMs - knownAircraft[i].lastSeenMs;
+            if (age > SONAR_KNOWN_GRACE_MS && age > staleAge) {
+                staleAge = age;
+                staleIdx = i;
+            }
+        }
+        // Kein bestehender Eintrag gefunden - freien Slot nehmen, sonst den
+        // laengst abgelaufenen (aeltesten, > Gnadenfrist) Eintrag wieder
+        // verwenden (einfaches LRU), damit das feste Array auch bei vielen
+        // unterschiedlichen Flugzeugen ueber eine laengere Sitzung hinweg
+        // nicht "voll" bleibt.
+        int8_t idx = freeIdx >= 0 ? freeIdx : staleIdx;
+        if (idx < 0) return false; // Kapazitaet voll mit aktuell/kuerzlich gesehenen Flugzeugen - kein Ping
+        knownAircraft[idx] = KnownAircraftEntry{};
+        knownAircraft[idx].used = true;
+        strncpy(knownAircraft[idx].hex, hex, sizeof(knownAircraft[idx].hex) - 1);
+        knownAircraft[idx].lastSeenMs = nowMs;
+        return true;
+    }
+
     // Gleiche Logik wie main.cpp::isNightDimHours() - Nacht = zwischen
     // Sonnenuntergang und Sonnenaufgang am aktiven Standort (siehe
     // sun_times.h), mit Rueckfall auf ein festes 22:00-06:00-Fenster,
@@ -817,12 +971,72 @@ namespace {
         gfx.drawLine(L.cx, L.cy, x2, y2, color);
     }
 
+    // "Klassik-Radar", Teil 1: Kometenschweif hinter der Sweep-Linie
+    // (SettingsStore::classicRadarEnabled()). Erweitert die bestehende
+    // drawSweepLine() um mehrere zusaetzliche, blasser werdende Segmente
+    // HINTER der aktuellen Sweep-Position - ruft dafuer drawSweepLine()
+    // in einer Schleife bei mehreren Winkeln auf, anstatt eine eigene,
+    // unabhaengige Zeichenroutine zu erfinden. Nutzt exakt denselben
+    // Rotationsmechanismus/dieselbe Winkelgeschwindigkeit wie die normale
+    // Sweep-Linie (der Aufrufer uebergibt einfach sweepAngleDeg bzw.
+    // prevSweepAngleDeg wie gehabt) - es gibt keine zweite, unabhaengige
+    // Animation. Jedes Segment nutzt intern denselben L.radius-Bezug wie
+    // drawSweepLine() selbst, bleibt also strukturell garantiert innerhalb
+    // der Kreisflaeche, exakt wie die normale Sweep-Linie.
+    constexpr uint8_t SWEEP_TAIL_SEGMENTS = 8;
+    constexpr float SWEEP_TAIL_SPAN_DEG = 24.0f;
+
+    void drawSweepTail(TFT_eSPI& gfx, const Layout& L, float tipAngleDeg, uint16_t baseColor) {
+        for (uint8_t i = 0; i < SWEEP_TAIL_SEGMENTS; i++) {
+            float t = (float)i / (float)(SWEEP_TAIL_SEGMENTS - 1);
+            float segAngle = tipAngleDeg - t * SWEEP_TAIL_SPAN_DEG;
+            uint16_t segColor = (i == 0) ? baseColor : scaleColorBrightness(baseColor, 1.0f - t);
+            drawSweepLine(gfx, L, segAngle, segColor);
+        }
+    }
+
+    // Loescht denselben Winkelbereich, den drawSweepTail() fuer dieselbe
+    // Spitzenposition gezeichnet haette - aufgerufen mit der ALTEN
+    // Sweep-Position, symmetrisch zum bisherigen Erase-Aufruf von
+    // drawSweepLine(..., TFT_BLACK) bei der einfachen Linie.
+    void eraseSweepTail(TFT_eSPI& gfx, const Layout& L, float tipAngleDeg) {
+        for (uint8_t i = 0; i < SWEEP_TAIL_SEGMENTS; i++) {
+            float t = (float)i / (float)(SWEEP_TAIL_SEGMENTS - 1);
+            float segAngle = tipAngleDeg - t * SWEEP_TAIL_SPAN_DEG;
+            drawSweepLine(gfx, L, segAngle, TFT_BLACK);
+        }
+    }
+
     void drawStaticBackground(TFT_eSPI& gfx, const Layout& L, float rangeKm) {
         gfx.drawCircle(L.cx, L.cy, L.radius, TFT_DARKGREY);
         gfx.drawCircle(L.cx, L.cy, L.radius * 2 / 3, TFT_DARKGREY);
         gfx.drawCircle(L.cx, L.cy, L.radius / 3, TFT_DARKGREY);
         gfx.drawFastHLine(L.cx - L.radius, L.cy, L.radius * 2, TFT_DARKGREY);
         gfx.drawFastVLine(L.cx, L.cy - L.radius, L.radius * 2, TFT_DARKGREY);
+
+        // "Klassik-Radar", Teil 2: zusaetzliche Rasterspeichen alle 30 Grad
+        // (SettingsStore::classicRadarEnabled()) - die 4 Hauptrichtungen
+        // (0/90/180/270 Grad, N/S/E/W) sind bereits durch die Kreuzlinien
+        // oben abgedeckt, hier nur die 8 dazwischenliegenden Winkel
+        // (30/60/120/150/210/240/300/330). Deutlich dezenter als die
+        // Hauptlinie (gedaempftes Grau statt TFT_DARKGREY, TFT_eSPI kennt
+        // keine variable Linienstaerke). Statisch (keine Animation) -
+        // deshalb hier in drawStaticBackground() statt in tick(), laeuft
+        // aber trotzdem jeden 80ms-Tick mit, da diese Funktion ohnehin bei
+        // jedem Sweep-Restore neu aufgerufen wird (siehe tick() unten).
+        // Gleicher Radius-Bezug (L.radius) wie die Sweep-Linie/Kreuzlinien
+        // - dadurch strukturell auf die Kreisflaeche begrenzt, kein
+        // separater Clip-Check noetig.
+        if (SettingsStore::classicRadarEnabled()) {
+            uint16_t spokeColor = scaleColorBrightness(TFT_DARKGREY, 0.45f);
+            constexpr int16_t SPOKE_ANGLES_DEG[8] = {30, 60, 120, 150, 210, 240, 300, 330};
+            for (uint8_t i = 0; i < 8; i++) {
+                double rad = (double)SPOKE_ANGLES_DEG[i] * DEG_TO_RAD;
+                int16_t x2 = L.cx + (int16_t)(L.radius * sin(rad));
+                int16_t y2 = L.cy - (int16_t)(L.radius * cos(rad));
+                gfx.drawLine(L.cx, L.cy, x2, y2, spokeColor);
+            }
+        }
 
         gfx.setTextColor(TFT_DARKGREY, TFT_BLACK);
         gfx.setTextDatum(MC_DATUM);
@@ -1507,7 +1721,11 @@ void render(TFT_eSPI& tft, int16_t top) {
     drawWorldMap(tft, L);
     drawStaticBackground(tft, L, rangeKm);
 
-    drawSweepLine(tft, L, sweepAngleDeg, sweepLineColor(tft));
+    if (SettingsStore::classicRadarEnabled()) {
+        drawSweepTail(tft, L, sweepAngleDeg, sweepLineColor(tft));
+    } else {
+        drawSweepLine(tft, L, sweepAngleDeg, sweepLineColor(tft));
+    }
     prevSweepAngleDeg = sweepAngleDeg;
 
     tft.fillCircle(L.cx, L.cy, 3, TFT_WHITE);
@@ -1582,6 +1800,19 @@ void render(TFT_eSPI& tft, int16_t top) {
         PhosphorEntry* ph = findOrCreatePhosphor(a.hex);
         if (ph) ph->seenThisRender = true;
         color = crtModeActive() ? crtPhosphorColor(ownColor, ph, millis()) : ownColor;
+
+        // "Klassik-Radar", Teil 3+4: Sonar-Ping UND Signal-Rauschen bei
+        // neuem Kontakt - Tracking (isNewContactAndTouch()) laeuft bewusst
+        // IMMER, die sichtbaren Effekte nur bei eingeschaltetem
+        // Klassik-Radar (siehe Kommentar bei isNewContactAndTouch() oben).
+        // Beide Effekte werden vom selben Ereignis ausgeloest und laufen
+        // unabhaengig voneinander gleichzeitig.
+        bool isNewContact = isNewContactAndTouch(a.hex, millis());
+        if (isNewContact && SettingsStore::classicRadarEnabled()) {
+            triggerSonarPing(pt.x, pt.y, ownColor);
+            triggerStaticNoise(pt.x, pt.y);
+        }
+
         bool isSelected = selectedHex[0] && strcmp(a.hex, selectedHex) == 0;
         bool isEmergency = SettingsStore::emergencyAlertEnabled() && isEmergencySquawk(a.squawk);
         // Squawk-Wachliste (siehe squawk_watchlist.h) zaehlt als derselbe
@@ -1655,14 +1886,20 @@ void render(TFT_eSPI& tft, int16_t top) {
 
     if (visibleCount > 0) lastAircraftSeenMs = millis();
 
-    if (selectedHex[0] && !selectionStillPresent) {
-        selectedHex[0] = 0;
-    }
-
     if (selectionStillPresent) {
         tft.endWrite();
         drawDetailPanel(tft, selected);
-        tft.startWrite();
+        // FIX (Alex' Meldung: Scanlinien durchloechern "Modell:
+        // unbekannt"/"Typ: unbekannt" im Detail-Panel): hier fehlte ein
+        // return - die Ausfuehrung lief bisher ungebremst weiter bis zu
+        // drawScanlines(tft, L) weiter unten, die dann direkt ueber das
+        // gerade gezeichnete Panel hinwegzeichnete (Panel-Flaeche und
+        // Scanlinien-Bounding-Box ueberlappen vollstaendig). Kein erneutes
+        // tft.startWrite() mehr noetig, da direkt zurueckgekehrt wird -
+        // gleiches Prinzip wie im bereits korrekten panelAlreadyOpen-
+        // Fast-Path weiter oben (tft.endWrite() + return direkt nach
+        // drawDetailPanel()).
+        return;
     } else {
         lastPanel.valid = false;
         int16_t infoTop = L.infoTop;
@@ -1731,7 +1968,11 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     updateBgStars(tft, L, top);
 
     if (prevSweepAngleDeg >= 0.0f) {
-        drawSweepLine(tft, L, prevSweepAngleDeg, TFT_BLACK);
+        if (SettingsStore::classicRadarEnabled()) {
+            eraseSweepTail(tft, L, prevSweepAngleDeg);
+        } else {
+            drawSweepLine(tft, L, prevSweepAngleDeg, TFT_BLACK);
+        }
         // Alten Radar-Puls-Ring (falls im letzten Tick gezeichnet) ebenfalls
         // erst schwarz uebermalen, BEVOR der statische Hintergrund
         // wiederhergestellt wird - gleiches Prinzip wie bei der Sweep-Linie.
@@ -1749,6 +1990,36 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
                 tft.drawPixel(px, py, TFT_BLACK);
             }
         }
+        // Alte Sonar-Ping-Ringe (Klassik-Radar Teil 3) ebenfalls loeschen,
+        // gleiches Prinzip/gleiche Reihenfolge wie beim Radar-Puls oben.
+        // Doppeltes Clipping (Radar-Kreis UND top/L.infoTop) - ein Ping in
+        // Randnaehe des Kreises koennte sonst trotz des kleinen Radius in
+        // Kopf-/Fusszeile hineinmalen, genau der Fehler, der beim Radar-Puls
+        // (siehe ACHTER FIX oben) und bei drawScanlines() bereits einmal
+        // real aufgetreten ist.
+        for (uint8_t i = 0; i < MAX_SONAR_PINGS; i++) {
+            if (sonarPings[i].prevRadius < 0) continue;
+            for (int16_t angleDeg = 0; angleDeg < 360; angleDeg++) {
+                double rad = angleDeg * DEG_TO_RAD;
+                int16_t px = sonarPings[i].cx + (int16_t)(sonarPings[i].prevRadius * sin(rad));
+                int16_t py = sonarPings[i].cy - (int16_t)(sonarPings[i].prevRadius * cos(rad));
+                int16_t dx = px - L.cx;
+                int16_t dy = py - L.cy;
+                if ((int32_t)dx * dx + (int32_t)dy * dy > (int32_t)L.radius * L.radius) continue;
+                if (py < top || py >= L.infoTop) continue;
+                tft.drawPixel(px, py, TFT_BLACK);
+            }
+        }
+        // Altes Signal-Rauschen (Klassik-Radar Teil 4) ebenfalls loeschen -
+        // hier reicht ein einfaches Nachzeichnen der zuletzt TATSAECHLICH
+        // gezeichneten Punkte (prevPointCount/prevPointsX/Y, siehe unten),
+        // die beim Zeichnen bereits geclippt wurden - kein erneuter
+        // Clip-Check noetig.
+        for (uint8_t i = 0; i < MAX_STATIC_NOISE; i++) {
+            for (uint8_t p = 0; p < staticNoises[i].prevPointCount; p++) {
+                tft.drawPixel(staticNoises[i].prevPointsX[p], staticNoises[i].prevPointsY[p], TFT_BLACK);
+            }
+        }
         drawStaticBackground(tft, L, rangeKm);
         tft.fillCircle(L.cx, L.cy, 3, TFT_WHITE);
     }
@@ -1757,7 +2028,11 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     sweepAngleDeg += SWEEP_DEGREES_PER_SEC * (deltaMs / 1000.0f);
     if (sweepAngleDeg >= 360.0f) sweepAngleDeg -= 360.0f;
 
-    drawSweepLine(tft, L, sweepAngleDeg, sweepLineColor(tft));
+    if (SettingsStore::classicRadarEnabled()) {
+        drawSweepTail(tft, L, sweepAngleDeg, sweepLineColor(tft));
+    } else {
+        drawSweepLine(tft, L, sweepAngleDeg, sweepLineColor(tft));
+    }
     prevSweepAngleDeg = sweepAngleDeg;
 
     // Radar-Puls (SettingsStore::radarPulseEnabled(), ausgeloest in
@@ -1797,6 +2072,75 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             }
             prevPulseRadius = pulseRadius;
         }
+    }
+
+    // Sonar-Ping (Klassik-Radar Teil 3, ausgeloest in render() bei neuem
+    // Kontakt ueber isNewContactAndTouch()/triggerSonarPing()) - LOKALER
+    // Ring an der Flugzeugposition statt vom Zentrum aus (Unterschied zum
+    // Radar-Puls oben), waechst linear ueber SONAR_PING_DURATION_MS von 0
+    // auf SONAR_PING_MAX_RADIUS, faedet dabei gleichzeitig aus. Jeder Punkt
+    // wird zusaetzlich auf den Radar-Kreis geclippt (siehe Kommentar beim
+    // Loesch-Block oben) - ein Flugzeug knapp am Kreisrand darf den Ring
+    // nicht darueber hinausmalen lassen. Die weiter unten folgende
+    // Flugzeug-Marker-Schleife zeichnet eventuell vom Ring ueberdeckte
+    // Marker automatisch wieder her, exakt wie beim Radar-Puls.
+    for (uint8_t i = 0; i < MAX_SONAR_PINGS; i++) {
+        if (!sonarPings[i].active) continue;
+        uint32_t elapsed = nowMs - sonarPings[i].startMs;
+        if (elapsed >= SONAR_PING_DURATION_MS) {
+            sonarPings[i].active = false;
+            sonarPings[i].prevRadius = -1;
+            continue;
+        }
+        float fraction = (float)elapsed / (float)SONAR_PING_DURATION_MS;
+        int16_t ringRadius = (int16_t)(fraction * SONAR_PING_MAX_RADIUS);
+        float brightnessFraction = 1.0f - fraction;
+        uint16_t ringColor = scaleColorBrightness(sonarPings[i].color, brightnessFraction);
+        for (int16_t angleDeg = 0; angleDeg < 360; angleDeg++) {
+            double rad = angleDeg * DEG_TO_RAD;
+            int16_t px = sonarPings[i].cx + (int16_t)(ringRadius * sin(rad));
+            int16_t py = sonarPings[i].cy - (int16_t)(ringRadius * cos(rad));
+            int16_t dx = px - L.cx;
+            int16_t dy = py - L.cy;
+            if ((int32_t)dx * dx + (int32_t)dy * dy > (int32_t)L.radius * L.radius) continue;
+            if (py < top || py >= L.infoTop) continue;
+            tft.drawPixel(px, py, ringColor);
+        }
+        sonarPings[i].prevRadius = ringRadius;
+    }
+
+    // Signal-Rauschen (Klassik-Radar Teil 4, ausgeloest zusammen mit dem
+    // Sonar-Ping oben) - ein paar zufaellige Einzelpixel dicht um die
+    // Flugzeugposition (STATIC_NOISE_SPREAD, deutlich kleiner als der
+    // Sonar-Ping-Radius), JEDEN Tick neu ausgewuerfelt fuer einen echten
+    // Flacker-Effekt, verschwindet nach STATIC_NOISE_DURATION_MS komplett.
+    // Gleiches doppeltes Clipping (Radar-Kreis + top/L.infoTop) wie beim
+    // Sonar-Ping - ein Flugzeug direkt am Kreisrand darf keine Pixel
+    // ausserhalb malen.
+    for (uint8_t i = 0; i < MAX_STATIC_NOISE; i++) {
+        if (!staticNoises[i].active) continue;
+        uint32_t elapsed = nowMs - staticNoises[i].startMs;
+        if (elapsed >= STATIC_NOISE_DURATION_MS) {
+            staticNoises[i].active = false;
+            staticNoises[i].prevPointCount = 0;
+            continue;
+        }
+        uint8_t count = 0;
+        for (uint8_t p = 0; p < STATIC_NOISE_POINT_COUNT; p++) {
+            int16_t ox = (int16_t)random(-STATIC_NOISE_SPREAD, STATIC_NOISE_SPREAD + 1);
+            int16_t oy = (int16_t)random(-STATIC_NOISE_SPREAD, STATIC_NOISE_SPREAD + 1);
+            int16_t px = (int16_t)(staticNoises[i].cx + ox);
+            int16_t py = (int16_t)(staticNoises[i].cy + oy);
+            int16_t dx = px - L.cx;
+            int16_t dy = py - L.cy;
+            if ((int32_t)dx * dx + (int32_t)dy * dy > (int32_t)L.radius * L.radius) continue;
+            if (py < top || py >= L.infoTop) continue;
+            tft.drawPixel(px, py, staticNoises[i].color);
+            staticNoises[i].prevPointsX[count] = px;
+            staticNoises[i].prevPointsY[count] = py;
+            count++;
+        }
+        staticNoises[i].prevPointCount = count;
     }
 
     for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) {

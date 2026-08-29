@@ -330,6 +330,14 @@ static const char* const I18N_TR[] = {
     "Atom saati senkronize ediliyor...",
     "Hava sahası veritabanı yükleniyor...",
     "Radar sistemi hazır.",
+    "Klasik Radar",
+
+    "CRT Fosfor Hakkında",
+    "Uçak işaretleri tarama geçtikten sonra yavaşça soluklaşır ve bir sonraki geçişte tekrar tam renkle parlar - eski bir katot ışınlı tüp radar ekranı gibi.",
+    "Radar Nabzı Hakkında",
+    "Her yeni veri güncellemesinde radar merkezinden dışa doğru genişleyen parlak bir halka belirir ve sönerek kaybolur.",
+    "Klasik Radar Hakkında",
+    "Aynı anda birkaç klasik radar ekranı efektini etkinleştirir: tarama çizgisinin arkasında bir kuyruk izi, ek ızgara çizgileri, ayrıca radara ilk kez yeni bir uçak göründüğünde bir sonar halkası ve kısa bir sinyal paraziti.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

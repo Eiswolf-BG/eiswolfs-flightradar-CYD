@@ -330,6 +330,14 @@ static const char* const I18N_ES[] = {
     "Sincronizando reloj atómico...",
     "Cargando base de datos aérea...",
     "Sistema de radar listo.",
+    "Radar clásico",
+
+    "Sobre Fósforo CRT",
+    "Los marcadores de aeronaves se desvanecen después de que el barrido pasa y vuelven a brillar con su color completo en el siguiente barrido - como una vieja pantalla de radar de tubo catódico.",
+    "Sobre Pulso de radar",
+    "Un anillo brillante se expande desde el centro del radar y se desvanece con cada nueva actualización de datos.",
+    "Sobre Radar clásico",
+    "Activa varios efectos clásicos de pantalla de radar a la vez: una estela detrás de la línea de barrido, radios de cuadrícula adicionales, además de un anillo de sonar y un breve ruido de señal cada vez que una nueva aeronave aparece por primera vez en el radar.",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

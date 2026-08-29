@@ -330,6 +330,14 @@ static const char* const I18N_DE[] = {
     "Synchronisiere Atomuhr...",
     "Lade Luftraum-Datenbank...",
     "Radarsystem bereit.",
+    "Klassik-Radar",
+
+    "Über CRT-Phosphor",
+    "Flugzeug-Marker faden nach dem Sweep-Durchlauf langsam aus und leuchten erst beim nächsten Durchlauf wieder in voller Farbe auf - wie bei einem alten Röhrenradarschirm.",
+    "Über Radar-Puls",
+    "Bei jedem neuen Datenupdate expandiert ein heller Ring vom Radar-Zentrum aus nach außen und fadet dabei aus.",
+    "Über Klassik-Radar",
+    "Aktiviert mehrere klassische Radarschirm-Effekte gleichzeitig: ein Kometenschweif hinter der Sweep-Linie, zusätzliche Rasterspeichen, sowie ein Sonar-Ping-Ring und kurzes Signal-Rauschen, sobald ein neues Flugzeug zum ersten Mal auf dem Radar erscheint.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,
