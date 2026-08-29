@@ -1,5 +1,6 @@
 #include "menu_stars.h"
 #include "config.h"
+#include "ui_theme.h"
 
 namespace MenuStars {
 
@@ -44,7 +45,8 @@ void update(TFT_eSPI& tft, bool gray) {
         uint8_t bright = (stars[i].phase < 128)
             ? (uint8_t)(stars[i].phase * 2)
             : (uint8_t)((255 - stars[i].phase) * 2);
-        uint16_t color = gray ? tft.color565(bright, bright, bright) : tft.color565(0, bright, 0);
+        uint16_t color = gray ? tft.color565(bright, bright, bright)
+                              : UiTheme::accentColorDimmed(tft, bright / 255.0f);
         tft.drawPixel(stars[i].x, stars[i].y, color);
     }
 }

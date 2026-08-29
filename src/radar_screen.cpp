@@ -1049,7 +1049,7 @@ namespace {
     }
 
     void drawWorldMap(TFT_eSPI& gfx, const Layout& L) {
-        constexpr uint16_t dim = 0x0320;
+        uint16_t dim = UiTheme::accentColorDimmed(gfx, 0.4f);
         float scaleX = (2.0f * L.radius) / WorldMap::GRID_W;
         float scaleY = (2.0f * L.radius) / WorldMap::GRID_H;
         int32_t radiusSq = (int32_t)(L.radius - 2) * (L.radius - 2);
@@ -1692,7 +1692,7 @@ namespace {
             uint8_t bright = (stars[i].phase < 128)
                 ? (uint8_t)(stars[i].phase * 2)
                 : (uint8_t)((255 - stars[i].phase) * 2);
-            uint16_t color = gfx.color565(0, bright, 0);
+            uint16_t color = UiTheme::accentColorDimmed(gfx, bright / 255.0f);
             gfx.drawPixel(stars[i].x, stars[i].y, color);
         }
     }
@@ -1753,7 +1753,7 @@ namespace {
             uint8_t bright = (bgStars[i].phase < 128)
                 ? (uint8_t)(bgStars[i].phase * 2)
                 : (uint8_t)((255 - bgStars[i].phase) * 2);
-            uint16_t color = gfx.color565(0, bright, 0);
+            uint16_t color = UiTheme::accentColorDimmed(gfx, bright / 255.0f);
             gfx.drawPixel(bgStars[i].x, bgStars[i].y, color);
         }
     }

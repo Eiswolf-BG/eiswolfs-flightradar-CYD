@@ -68,7 +68,7 @@ namespace {
     // splash screen (72 instead of 80, same ring ratios kept) - at the
     // full splash radius it looked too cramped between title and button.
     void drawRadarReticle(TFT_eSPI& tft, int16_t cx, int16_t cy) {
-        uint16_t dim = 0x0320;
+        uint16_t dim = UiTheme::accentColorDimmed(tft, 0.4f);
         tft.drawCircle(cx, cy, 72, dim);
         tft.drawCircle(cx, cy, 49, dim);
         tft.drawCircle(cx, cy, 26, dim);
@@ -171,7 +171,7 @@ namespace {
     // exactly like on the splash screen").
     void drawRadarGroup(TFT_eSPI& tft, int16_t cx, int16_t cy) {
         drawRadarReticle(tft, cx, cy);
-        uint16_t dimGreen = 0x0320;
+        uint16_t dimGreen = UiTheme::accentColorDimmed(tft, 0.4f);
         drawMiniJet(tft, (int16_t)(cx - 45), (int16_t)(cy - 39), dimGreen, 25.0f);
         drawMiniJet(tft, (int16_t)(cx + 50), (int16_t)(cy - 14), dimGreen, 160.0f);
         drawMiniHeli(tft, (int16_t)(cx - 35), (int16_t)(cy + 41), dimGreen, 250.0f);

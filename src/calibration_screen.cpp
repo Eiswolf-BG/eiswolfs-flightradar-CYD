@@ -23,7 +23,7 @@ namespace {
     // Radii deliberately kept small so the targets in the screen corners
     // (edge margin M=24, see run()) don't extend past the screen edge.
     void drawTarget(TFT_eSPI& tft, int16_t x, int16_t y) {
-        uint16_t dim = 0x0320;
+        uint16_t dim = UiTheme::accentColorDimmed(tft, 0.4f);
         tft.drawCircle(x, y, 16, dim);
         tft.drawCircle(x, y, 10, dim);
         tft.drawFastHLine((int16_t)(x - 18), y, 36, UiTheme::accentColor(tft));
