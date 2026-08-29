@@ -323,7 +323,6 @@ static const char* const I18N_TR[] = {
     "ISS işareti: ",
     "ISS işareti hakkında",
     "Uluslararasi Uzay Istasyonu'nu (ISS), radar menzilinizin icinden gectigi anda ozel bir isaret olarak gosterir. Yuksek hizi (~7,66 km/sn) nedeniyle bu genellikle sadece birkac saniye icin, hatta hic gorunmeyebilir.",
-    "Nostaljik",
 
     "Transponder alıcısı başlatılıyor...",
     "Radar dizisi kalibre ediliyor...",
@@ -331,7 +330,6 @@ static const char* const I18N_TR[] = {
     "Atom saati senkronize ediliyor...",
     "Hava sahası veritabanı yükleniyor...",
     "Radar sistemi hazır.",
-    "Uçuş izi",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

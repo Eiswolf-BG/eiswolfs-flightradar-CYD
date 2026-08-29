@@ -133,52 +133,6 @@ namespace {
         return nullptr; // sollte nie vorkommen, gleiche Kapazitaet wie hitPoints[]
     }
 
-    // "Flugbahn-Trail" (SettingsStore::trailEnabled()) - verblassende Spur
-    // der letzten Positionen des gerade angetippten Flugzeugs. Bewusst NUR
-    // fuer das EINE ausgewaehlte Flugzeug (nicht alle gleichzeitig, Alex'
-    // ausdruecklicher Wunsch wegen Uebersichtlichkeit/Speicher) - deshalb
-    // ein einzelner globaler Ringpuffer statt einer Tabelle wie bei
-    // PhosphorEntry/hitPoints. Wird bei jedem NEUEN Datenstand
-    // (AircraftTable::version(), gleiche Versionsnummer wie beim Radar-
-    // Puls-Trigger) um genau eine Position ergaenzt, solange die Auswahl
-    // unveraendert bleibt - wechselt die Auswahl (anderer Hex-Code oder
-    // Abwahl), wird die Spur verworfen und faengt bei der naechsten
-    // Auswahl neu an. Speichert Polarkoordinaten (Distanz/Peilung) statt
-    // Bildschirmpixel, damit die Spur bei einem Reichweiten-Wechsel
-    // waehrend der Anzeige korrekt mitskaliert (RadarMath::toScreen()
-    // uebernimmt das genau wie bei den normalen Marken).
-    constexpr uint8_t TRAIL_MAX_POINTS = 6;
-    struct SelectedTrail {
-        char hex[7] = {0};
-        uint8_t count = 0;
-        float distanceKm[TRAIL_MAX_POINTS];
-        float bearingDeg[TRAIL_MAX_POINTS];
-        uint32_t lastVersion = 0xFFFFFFFFu;
-    };
-    SelectedTrail selectedTrail;
-
-    void updateSelectedTrail(const char* hex, float distanceKm, float bearingDeg, uint32_t dataVersion) {
-        if (strcmp(selectedTrail.hex, hex) != 0) {
-            selectedTrail = SelectedTrail{};
-            strncpy(selectedTrail.hex, hex, sizeof(selectedTrail.hex) - 1);
-        }
-        if (dataVersion == selectedTrail.lastVersion) return; // keine neue Position seit letztem Aufruf
-        selectedTrail.lastVersion = dataVersion;
-        if (selectedTrail.count < TRAIL_MAX_POINTS) {
-            selectedTrail.distanceKm[selectedTrail.count] = distanceKm;
-            selectedTrail.bearingDeg[selectedTrail.count] = bearingDeg;
-            selectedTrail.count++;
-        } else {
-            // Ringpuffer voll - aeltesten Punkt verwerfen, Rest nachruecken.
-            for (uint8_t i = 1; i < TRAIL_MAX_POINTS; i++) {
-                selectedTrail.distanceKm[i - 1] = selectedTrail.distanceKm[i];
-                selectedTrail.bearingDeg[i - 1] = selectedTrail.bearingDeg[i];
-            }
-            selectedTrail.distanceKm[TRAIL_MAX_POINTS - 1] = distanceKm;
-            selectedTrail.bearingDeg[TRAIL_MAX_POINTS - 1] = bearingDeg;
-        }
-    }
-
     char selectedHex[7] = {0};
 
     // Zeigt "Leerer Himmel"-Zeile gerade einen Filter-Hinweis an (siehe
@@ -503,24 +457,6 @@ namespace {
         g6 = (uint16_t)(g6 * fraction + 0.5f);
         b5 = (uint16_t)(b5 * fraction + 0.5f);
         return (uint16_t)((r5 << 11) | (g6 << 5) | b5);
-    }
-
-    // Zeichnet die gespeicherten Vorgaenger-Positionen des "Flugbahn-
-    // Trail"-Effekts (SettingsStore::trailEnabled(), siehe SelectedTrail
-    // oben) - NICHT die aktuelle Position, die zeigt ohnehin schon der
-    // normale, helle Marker. Von der aeltesten (dunkelsten) zur juengsten
-    // (hellsten) gespeicherten Position heller werdend - gleicher Helper
-    // (scaleColorBrightness() oben) wie beim CRT-Phosphor-Fade, hier aber
-    // ueber die POSITION im Ringpuffer gesteuert statt ueber die Sweep-Zeit.
-    void drawSelectedTrail(TFT_eSPI& gfx, const Layout& L, float rangeKm, uint16_t baseColor) {
-        if (selectedTrail.count <= 1) return;
-        for (uint8_t i = 0; i < selectedTrail.count - 1; i++) {
-            float fraction = (float)(i + 1) / (float)selectedTrail.count;
-            uint16_t color = scaleColorBrightness(baseColor, 0.2f + 0.6f * fraction);
-            RadarMath::PolarCoord polar{selectedTrail.distanceKm[i], selectedTrail.bearingDeg[i]};
-            RadarMath::ScreenPoint pt = RadarMath::toScreen(polar, L.cx, L.cy, L.radius, rangeKm);
-            gfx.fillCircle(pt.x, pt.y, 2, color);
-        }
     }
 
     // Helligkeit des CRT-Phosphor-Markers zum Zeitpunkt "nowMs": TFT_BLACK
@@ -909,9 +845,8 @@ namespace {
         gfx.setTextDatum(TL_DATUM);
     }
 
-    // Scanlinien-Overlay: immer aktiv, kein Schalter (bewusst so gewuenscht -
-    // anders als der "Nostalgisch"-Modus unten). Rein optisch, angelehnt an
-    // alte CRT-/Radarmonitore. WICHTIGER FIX: die erste Fassung zeichnete
+    // Scanlinien-Overlay: immer aktiv, kein Schalter. Rein optisch,
+    // angelehnt an alte CRT-/Radarmonitore. WICHTIGER FIX: die erste Fassung zeichnete
     // ueber den GESAMTEN Bildschirm (y=0 bis SCREEN_HEIGHT, volle Breite) -
     // dadurch wurden auch der "Menu"-Button in der Kopfzeile und die
     // Reichweiten-Anzeige/Info-Zeile unten von den Scanlinien-Punkten
@@ -943,143 +878,6 @@ namespace {
                 if (dx * dx + dy * dy > radiusSq) continue;
                 gfx.drawPixel(x, y, TFT_BLACK);
             }
-        }
-    }
-
-    // "Nostalgisch"-Modus, Teil 1: Vignette (SettingsStore::
-    // nostalgicModeEnabled()). Soll den Radarkreis in der Mitte optisch
-    // praesenter wirken lassen, indem die vier aeussersten Bildschirmecken
-    // ganz leicht angehaucht werden. ZWEITER FIX (Alex' Meldung: die erste
-    // Fassung zeichnete "knallgruene, harte Rechtecke" ueber grosse Teile
-    // des Radarbereichs): der Fehler lag an zwei Stellen - (1) die Farbe
-    // color565(0,40,0) wirkte auf dem echten Display deutlich satter/
-    // gruener als am Rechner berechnet, (2) fillCorner() oben zeichnete
-    // OHNE jede Bedingung JEDEN Pixel im 40x40-Block (reine Doppelschleife,
-    // kein Dithering mehr) - das ergab den harten, grossen Block statt
-    // eines weichen Verlaufs. Jetzt: neutrales, sehr dunkles Grau (kein
-    // Farbstich) UND ein per Distanz-Band gedithertes Punktmuster mit nach
-    // aussen abnehmender Dichte (dicht direkt am Eckpunkt, komplett leer ab
-    // VIGNETTE_MAX_DIST) statt einer soliden Flaeche - simuliert einen
-    // weichen Alpha-Verlauf, den TFT_eSPI auf diesem Board nicht echt kann
-    // (siehe Kommentar bei drawScanlines() oben zu fehlendem Pixel-
-    // Zuruecklesen). Deutlich kleinerer Radius (20px statt vorher 40px) -
-    // faellt nur in der unmittelbaren Ecke auf. Wird weiterhin sowohl in
-    // render() als auch in jedem tick() neu gezeichnet, NACH den
-    // Hintergrundsternen (siehe dort).
-    // DRITTER FIX (Alex' Meldung: "Muster auch oben in Kopfzeilennaehe und
-    // unten nahe der Button-Zeile", faelschlich als Flacker-/Scanlinien-
-    // Clipping-Fehler gedeutet): per Seriallog-Diagnose zweifelsfrei
-    // bestaetigt, dass Scanlinien (y=58-250) und Flacker (dieselbe Y-
-    // Spanne) sauber innerhalb von [top=42, infoTop=256] bleiben - beide
-    // fehlerfrei. Tatsaechliche Ursache war die Vignette: ihre Eckpunkte
-    // lagen EXAKT auf der Kopf-/Fusszeilen-Grenze (cornerY=top bzw.
-    // infoTop-1), dadurch beruehrte das gestreute Punktmuster sichtbar die
-    // Kopf-/Fusszeile, obwohl es sich technisch innerhalb der
-    // Inhaltsflaeche befand - korrektes Verhalten im Sinne von "Ecken der
-    // Inhaltsflaeche", aber optisch wie eine Linie AN der Kopf-/Fusszeile
-    // wahrgenommen. VIGNETTE_INSET zieht die Eckpunkte jetzt ein paar
-    // Pixel von der Kopf-/Fusszeile weg, damit ein sichtbarer Abstand
-    // bleibt. Vor Release nochmal grosszuegiger nachgezogen (8 statt 4px
-    // Inset, 16 statt 20px Ausdehnung) - reine Sicherheitsmarge, da Alex'
-    // Rueckmeldung zeitlich vor diesem Fix entstanden sein koennte.
-    constexpr int16_t VIGNETTE_MAX_DIST = 16;
-    constexpr int16_t VIGNETTE_INSET = 8;
-    void drawNostalgicVignette(TFT_eSPI& gfx, const Layout& L, int16_t top) {
-        uint16_t vignetteColor = gfx.color565(10, 10, 10);
-        int32_t minDist = L.radius + 6;
-        int32_t minDistSq = minDist * minDist;
-
-        // cornerX/cornerY: exakter Eckpunkt (schon um VIGNETTE_INSET von der
-        // Kopf-/Fusszeile abgerueckt, siehe Aufrufe unten). dirX/dirY:
-        // Richtung, in die von dort aus in den Inhaltsbereich hinein
-        // gezeichnet wird (+1 = nach rechts/unten, -1 = nach links/oben).
-        auto shadeCorner = [&](int16_t cornerX, int16_t cornerY, int8_t dirX, int8_t dirY) {
-            for (int16_t oy = 0; oy < VIGNETTE_MAX_DIST; oy++) {
-                for (int16_t ox = 0; ox < VIGNETTE_MAX_DIST; ox++) {
-                    // Gedrittelte Distanz-Baender mit je eigener Dither-
-                    // Dichte (1-von-2, 1-von-3, 1-von-5) statt einer
-                    // scharfen Kante zwischen "voll" und "leer".
-                    float dist = sqrtf((float)(ox * ox + oy * oy));
-                    if (dist >= VIGNETTE_MAX_DIST) continue;
-                    bool draw;
-                    if (dist < VIGNETTE_MAX_DIST / 3.0f) {
-                        draw = ((ox + oy) % 2) == 0;
-                    } else if (dist < VIGNETTE_MAX_DIST * 2.0f / 3.0f) {
-                        draw = ((ox + oy) % 3) == 0;
-                    } else {
-                        draw = ((ox + oy) % 5) == 0;
-                    }
-                    if (!draw) continue;
-
-                    int16_t x = cornerX + dirX * ox;
-                    int16_t y = cornerY + dirY * oy;
-                    int32_t dx = x - L.cx, dy = y - L.cy;
-                    if (dx * dx + dy * dy <= minDistSq) continue;
-                    gfx.drawPixel(x, y, vignetteColor);
-                }
-            }
-        };
-        shadeCorner(0, (int16_t)(top + VIGNETTE_INSET), 1, 1);
-        shadeCorner(Config::SCREEN_WIDTH - 1, (int16_t)(top + VIGNETTE_INSET), -1, 1);
-        shadeCorner(0, (int16_t)(L.infoTop - 1 - VIGNETTE_INSET), 1, -1);
-        shadeCorner(Config::SCREEN_WIDTH - 1, (int16_t)(L.infoTop - 1 - VIGNETTE_INSET), -1, -1);
-    }
-
-    // "Nostalgisch"-Modus, Teil 2: Bildrauschen. Laeuft im selben 80ms-Tick
-    // wie die Sweep-Linie/Hintergrundsterne mit (siehe tick() unten), aber
-    // im Gegensatz zu den Sternen mit staendig NEUEN Zufallspositionen
-    // statt fester Punkte - das erzeugt den "Flimmer"-Eindruck echten
-    // CRT-Bildrauschens. VIERTER FIX (Alex' explizite Vorgabe): soll ueber
-    // die GESAMTE Bildschirmbreite gehen (bewusst NICHT auf den Kreis
-    // eingeschraenkt, anders als der vorherige Fix), aber in der Hoehe
-    // exakt auf denselben vertikalen Bereich begrenzt sein, den auch
-    // drawScanlines() verwendet (L.cy-L.radius bis L.cy+L.radius) - oben ab
-    // knapp unterhalb der Kopfzeile, unten am Radarkreis-Rand, NICHT bis in
-    // die Info-/Button-Zeile hinein. Deshalb keine Umrechnung mehr per
-    // Winkel/Radius (das erzeugte einen auf die Kreisflaeche begrenzten
-    // Ring) - stattdessen ein simples Rechteck: x frei ueber die gesamte
-    // Breite, y auf [y0,y1] begrenzt.
-    constexpr uint8_t NOSTALGIC_NOISE_COUNT = 14;
-    struct NostalgicNoisePoint {
-        int16_t x, y;
-        bool valid;
-    };
-    NostalgicNoisePoint nostalgicNoise[NOSTALGIC_NOISE_COUNT];
-    bool nostalgicNoiseInitialized = false;
-
-    void clearNostalgicNoise(TFT_eSPI& gfx) {
-        if (!nostalgicNoiseInitialized) return;
-        for (uint8_t i = 0; i < NOSTALGIC_NOISE_COUNT; i++) {
-            if (!nostalgicNoise[i].valid) continue;
-            gfx.drawPixel(nostalgicNoise[i].x, nostalgicNoise[i].y, TFT_BLACK);
-            nostalgicNoise[i].valid = false;
-        }
-    }
-
-    void updateNostalgicNoise(TFT_eSPI& gfx, const Layout& L, int16_t top) {
-        (void)top; // nicht mehr gebraucht - die vertikale Grenze kommt jetzt direkt aus L (cy/radius), wie bei drawScanlines()
-        if (!nostalgicNoiseInitialized) {
-            for (uint8_t i = 0; i < NOSTALGIC_NOISE_COUNT; i++) nostalgicNoise[i].valid = false;
-            nostalgicNoiseInitialized = true;
-        }
-        int16_t y0 = L.cy - L.radius;
-        int16_t y1 = L.cy + L.radius;
-        for (uint8_t i = 0; i < NOSTALGIC_NOISE_COUNT; i++) {
-            if (nostalgicNoise[i].valid) {
-                gfx.drawPixel(nostalgicNoise[i].x, nostalgicNoise[i].y, TFT_BLACK);
-                nostalgicNoise[i].valid = false;
-            }
-            int16_t x = (int16_t)random(2, Config::SCREEN_WIDTH - 2);
-            int16_t y = (int16_t)random(y0, y1 + 1);
-
-            // Gedaempftes Grau-Rauschen statt gruen - soll wie neutrales
-            // Bildrauschen wirken, nicht wie ein weiterer Twinkelstern.
-            uint8_t bright = (uint8_t)(90 + random(0, 111));
-            uint16_t color = gfx.color565(bright, bright, bright);
-            gfx.drawPixel(x, y, color);
-            nostalgicNoise[i].x = x;
-            nostalgicNoise[i].y = y;
-            nostalgicNoise[i].valid = true;
         }
     }
 
@@ -1708,9 +1506,6 @@ void render(TFT_eSPI& tft, int16_t top) {
 
     drawWorldMap(tft, L);
     drawStaticBackground(tft, L, rangeKm);
-    if (SettingsStore::nostalgicModeEnabled()) {
-        drawNostalgicVignette(tft, L, top);
-    }
 
     drawSweepLine(tft, L, sweepAngleDeg, sweepLineColor(tft));
     prevSweepAngleDeg = sweepAngleDeg;
@@ -1805,10 +1600,6 @@ void render(TFT_eSPI& tft, int16_t top) {
             selectionStillPresent = true;
             selected = a;
             drawBearingIndicator(tft, L, a.bearingDeg);
-            if (SettingsStore::trailEnabled()) {
-                updateSelectedTrail(a.hex, a.distanceKm, a.bearingDeg, currentDataVersion);
-                drawSelectedTrail(tft, L, rangeKm, ownColor);
-            }
         }
         if (isGroundVehicle) {
             drawGroundVehicleMarker(tft, pt.x, pt.y, color);
@@ -1939,31 +1730,24 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     // aufblitzen, das ist zu kurz, um als Ruckeln wahrgenommen zu werden.
     updateBgStars(tft, L, top);
 
-    // "Nostalgisch"-Modus (SettingsStore::nostalgicModeEnabled()) - beide
-    // Teileffekte laufen jetzt auch hier im 80ms-Tick mit (nicht nur
-    // einmalig in render()), NACH updateBgStars(): die Vignette muss NACH
-    // dem eigentlichen Radar-Inhalt gezeichnet werden, sonst wird sie von
-    // spaeteren Zeichenoperationen (hier: den Hintergrundsternen) wieder
-    // ueberdeckt - das war der Kern des vorherigen Sichtbarkeits-Bugs, da
-    // die Vignette in render() zwar VOR den periodisch neu gezeichneten
-    // Sternen lag, aber jeder tick() die Sterne unabhaengig davon erneut
-    // ueber die (unsichtbare Schwarz-auf-Schwarz-)Vignette gezeichnet hat.
-    // Bei AUS wird Vignette+Rauschen sauber wieder geloescht statt bis zum
-    // naechsten vollen render() sichtbar zu bleiben.
-    if (SettingsStore::nostalgicModeEnabled()) {
-        drawNostalgicVignette(tft, L, top);
-        updateNostalgicNoise(tft, L, top);
-    } else {
-        clearNostalgicNoise(tft);
-    }
-
     if (prevSweepAngleDeg >= 0.0f) {
         drawSweepLine(tft, L, prevSweepAngleDeg, TFT_BLACK);
         // Alten Radar-Puls-Ring (falls im letzten Tick gezeichnet) ebenfalls
         // erst schwarz uebermalen, BEVOR der statische Hintergrund
         // wiederhergestellt wird - gleiches Prinzip wie bei der Sweep-Linie.
+        // Gleiches Clipping wie beim Zeichnen des Rings unten - sonst
+        // erzeugt gerade dieser Loeschschritt die vom Nutzer gemeldeten
+        // schwarzen Unterbrechungen in den Button-Rahmen (ein
+        // ungeclipptes tft.drawCircle() haette hier munter in die
+        // Kopf-/Fusszeile hinein schwarze Pixel gemalt).
         if (prevPulseRadius >= 0) {
-            tft.drawCircle(L.cx, L.cy, prevPulseRadius, TFT_BLACK);
+            for (int16_t angleDeg = 0; angleDeg < 360; angleDeg++) {
+                double rad = angleDeg * DEG_TO_RAD;
+                int16_t px = L.cx + (int16_t)(prevPulseRadius * sin(rad));
+                int16_t py = L.cy - (int16_t)(prevPulseRadius * cos(rad));
+                if (py < top || py >= L.infoTop) continue;
+                tft.drawPixel(px, py, TFT_BLACK);
+            }
         }
         drawStaticBackground(tft, L, rangeKm);
         tft.fillCircle(L.cx, L.cy, 3, TFT_WHITE);
@@ -1982,6 +1766,17 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     // faedet die Helligkeit gleichzeitig von voll auf 0. Die weiter unten
     // folgende Flugzeug-Marker-Schleife zeichnet eventuell vom Ring
     // ueberdeckte Marker automatisch wieder her (laeuft bei jedem Tick neu).
+    // ACHTER FIX (Alex' Meldung: der Ring schnitt die untere Kante der
+    // Mode-/Menu-Button-Rahmen ab): PULSE_MAX_RADIUS_FACTOR=1.4 laesst den
+    // Ring bewusst ueber L.radius hinauswachsen (Teil des Effekts), bisher
+    // per tft.drawCircle() - eine Bibliotheksfunktion, die NUR an den
+    // physischen Displaygrenzen clippt, nicht an unserer eigenen
+    // Kopf-/Fusszeilen-Grenze (top/L.infoTop). Bei radius=96 erreicht der
+    // Ring am Maximalpunkt bis zu top-22px, deutlich in die Kopfzeile
+    // hinein. Jetzt durch eine winkelbasierte, selbst geclippte Zeichnung
+    // ersetzt (gleiches Prinzip wie drawScanlines() oben) - jeder Punkt
+    // wird nur gezeichnet, wenn er innerhalb
+    // [top, L.infoTop) liegt.
     uint32_t nowMs = millis();
     if (pulseActive) {
         uint32_t elapsed = nowMs - pulseStartMs;
@@ -1993,7 +1788,13 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             int16_t pulseRadius = (int16_t)(fraction * L.radius * PULSE_MAX_RADIUS_FACTOR);
             float brightnessFraction = 1.0f - fraction;
             uint16_t pulseColor = scaleColorBrightness(sweepLineColor(tft), brightnessFraction);
-            tft.drawCircle(L.cx, L.cy, pulseRadius, pulseColor);
+            for (int16_t angleDeg = 0; angleDeg < 360; angleDeg++) {
+                double rad = angleDeg * DEG_TO_RAD;
+                int16_t px = L.cx + (int16_t)(pulseRadius * sin(rad));
+                int16_t py = L.cy - (int16_t)(pulseRadius * cos(rad));
+                if (py < top || py >= L.infoTop) continue;
+                tft.drawPixel(px, py, pulseColor);
+            }
             prevPulseRadius = pulseRadius;
         }
     }

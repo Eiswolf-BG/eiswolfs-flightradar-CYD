@@ -323,7 +323,6 @@ static const char* const I18N_FR[] = {
     "Marqueur ISS : ",
     "À propos du marqueur ISS",
     "Affiche la Station spatiale internationale (ISS) sous forme de marqueur special lorsqu'elle passe actuellement dans votre portee radar. En raison de sa grande vitesse (~7,66 km/s), elle n'est generalement visible que pendant quelques secondes, si tant est qu'elle le soit.",
-    "Mode nostalgique",
 
     "Initialisation du récepteur transpondeur...",
     "Étalonnage du réseau radar...",
@@ -331,7 +330,6 @@ static const char* const I18N_FR[] = {
     "Synchronisation de l'horloge atomique...",
     "Chargement de la base de données aériennes...",
     "Système radar en ligne.",
-    "Traînée de vol",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

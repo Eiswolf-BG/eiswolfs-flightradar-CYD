@@ -49,9 +49,11 @@
 
 TFT_eSPI tft = TFT_eSPI();
 
-constexpr int16_t HEADER_TITLE_H = 30;
-constexpr int16_t STATUS_LINE_H = 12;
-constexpr int16_t CONTENT_TOP = HEADER_TITLE_H + STATUS_LINE_H;
+// Nur noch EINE Kopfzeile (siehe HEADER_ROW_Y/HEADER_ROW_H weiter unten,
+// wo Uhrzeit/Mode/Wetter/Menu/WLAN jetzt alle nebeneinander sitzen) -
+// CONTENT_TOP dementsprechend kleiner als frueher (vorher zwei Zeilen,
+// 42px), jetzt knapp unterhalb der einzigen Zeile (endet bei y=25).
+constexpr int16_t CONTENT_TOP = 29;
 constexpr uint32_t POLL_INTERVAL_MS = 300;
 constexpr uint32_t SWEEP_TICK_MS = 80;
 constexpr uint32_t STATUS_LINE_UPDATE_MS = 1000;
@@ -112,66 +114,95 @@ struct Rect {
     }
 };
 
-Rect menuBtn = {Config::SCREEN_WIDTH - 90, 3, 54, 22};
-
-// Tippbereich fuer den Projekt-Titel oben links ("Eiswolfs FR", siehe
-// drawHeader()) - oeffnet den GitHub-QR-Code-Screen (runGithubQrScreen()
-// unten). Bewusst grosszuegig bemessen (bis kurz vor weatherIconRect),
-// nicht nur exakt der schmale Textbereich selbst - gleiches Prinzip wie
-// bei weatherIconRect/wifiIconRect.
-Rect titleRect = {0, 0, 100, 24};
+// Kopfzeile: SIEBTER FIX (Alex' Wunsch, ganz genau nach Beschreibung) -
+// jetzt EINE einzige Zeile statt zwei (vorher Icon-Zeile + separate
+// Uhr-Zeile darunter). Reihenfolge links nach rechts: Uhrzeit, Mode-
+// Button, Wetter-Icon, Menu-Button, WLAN-Balken. Das Wetter-Icon sitzt
+// exakt bei SCREEN_WIDTH/2 zentriert, Mode/Menu symmetrisch (gleicher
+// GAP, gleiche Boxbreite) links/rechts davon, Uhrzeit ganz links, WLAN
+// ganz rechts. Boxbreiten von Mode/Menu und die Uhr-Reservebreite werden
+// per tft.textWidth() zur Laufzeit gemessen (nicht geschaetzt) - siehe
+// layoutHeaderOnce() weiter unten, einmalig beim ersten drawHeader()-
+// Aufruf berechnet, da erst dann der Font sicher gesetzt ist. Deshalb
+// hier nur Platzhalter-Werte (x/w=0) fuer die zur Laufzeit berechneten
+// Felder - siehe layoutHeaderOnce().
+constexpr int16_t HEADER_ROW_Y = 3;
+constexpr int16_t HEADER_ROW_H = 22;
+constexpr int16_t HEADER_GAP = 6;
 
 // Platz, an dem frueher der Cam-Button war (siehe entfernte Screenshot-
 // Funktion) - zeigt jetzt stattdessen ein kleines Wetter-Icon fuer den
-// aktuell aktiven Standort (siehe weather.cpp/Weather::update()).
-Rect weatherIconRect = {(int16_t)(menuBtn.x - 46), 3, 42, 22};
+// aktuell aktiven Standort (siehe weather.cpp/Weather::update()). Feste
+// Breite (Icon-Groesse), x wird in layoutHeaderOnce() auf SCREEN_WIDTH/2
+// zentriert.
+Rect weatherIconRect = {0, HEADER_ROW_Y, 42, HEADER_ROW_H};
 
-// Tippbereich fuer die WLAN-Balken oben rechts (siehe updateWifiIcon()/
-// drawWifiIcon() unten, WIFI_ICON_W/H dort) - bewusst GROESSER als das
-// eigentlich gezeichnete 22x14px-Icon (rechts vom Menu-Button, in der
-// Luecke bis zum Bildschirmrand), damit das kleine Icon auch mit
-// ungenauem Tippen zuverlaessig trifft - gleiches Prinzip wie bei
-// weatherIconRect oben (auch dort ist der Tippbereich groesser als das
-// sichtbare Icon). Ueberlappt menuBtn nicht (startet erst 2px rechts von
-// dessen Ende).
-Rect wifiIconRect = {(int16_t)(menuBtn.x + menuBtn.w + 2), 3,
-                      (int16_t)(Config::SCREEN_WIDTH - (menuBtn.x + menuBtn.w + 2) - 2), 22};
+// "Mode"-Button - Direktzugriff auf das "Radar-Darstellung"-Untermenue
+// (CRT-Phosphor/Radar-Puls, siehe radar_theme_screen.cpp).
+// x/w werden in layoutHeaderOnce() bestimmt: symmetrisch links vom
+// zentrierten Wetter-Icon, Breite = gemessene Textbreite von "Mode" +
+// Padding.
+Rect modesBtn = {0, HEADER_ROW_Y, 0, HEADER_ROW_H};
 
-// Tippbereich fuer die kleine Kopfzeilen-Uhr (siehe updateStatusLine()) -
-// oeffnet den Bildschirm-Timeout-Screen (Menue > System > Bildschirm-
-// Timeout), macht damit die komplette Kopfzeile reaktiv (Titel/Menu-
-// Button/Wetter/WLAN sind es bereits, siehe titleRect/weatherIconRect/
-// wifiIconRect). Breite (80px) entspricht der Breite, die
-// updateStatusLine() beim Uhrzeit-Neuzeichnen jede Sekunde loescht
-// (CLOCK_CLEAR_W dort). Startet aber bewusst erst UNTER titleRect (dessen
-// Bereich bis y=24 reicht), nicht bei CLOCK_CLEAR_TOP (y=20) wie der
-// geloeschte Bereich dort - sonst wuerde sich diese Tippzone mit titleRect
-// ueberlappen und ein Tipp im Ueberlappungsbereich traefe wegen der
-// if/else-Reihenfolge immer titleRect statt hier den Timeout-Screen zu
-// oeffnen.
-Rect clockRect = {0, (int16_t)(titleRect.y + titleRect.h), 80, (int16_t)(CONTENT_TOP - (titleRect.y + titleRect.h))};
+// x/w werden in layoutHeaderOnce() bestimmt: symmetrisch rechts vom
+// zentrierten Wetter-Icon (gleicher GAP wie bei modesBtn), Breite =
+// gemessene Textbreite von "Menu" + Padding.
+Rect menuBtn = {0, HEADER_ROW_Y, 0, HEADER_ROW_H};
 
-// "Modes"-Button - Direktzugriff auf das "Radar-Darstellung"-Untermenue
-// (CRT-Phosphor/Radar-Puls/Nostalgisch/Flugbahn-Trail, siehe
-// radar_theme_screen.cpp) von der Hauptansicht aus, statt nur ueber
-// Menue > System > Radar-Darstellung erreichbar. Die obere Icon-Zeile
-// (Titel/Wetter/Menu/WLAN, y=3-25) ist bereits randvoll (praktisch kein
-// Pixel Luft mehr zwischen den vier Elementen) - deshalb stattdessen in
-// der schmalen Status-Zeile direkt darunter platziert (y=HEADER_TITLE_H
-// bis CONTENT_TOP), DIREKT rechts neben der Uhr (clockRect endet bei
-// x=80, +4px Abstand) - FIX (Alex' Meldung: sah wie eine eigene Zeile
-// unter "Menu" aus statt neben der Uhr): der x-Wert war vorher faelschlich
-// an SCREEN_WIDTH-84 ausgerichtet (fast direkt unter menuBtn), obwohl der
-// Kommentar schon "rechts neben der Uhr" sagte - jetzt tatsaechlich direkt
-// an clockRect anschliessend. Rest der Zeile bleibt frei
-// (updateStatusLine() loescht diesen Bereich nur die Uhrzeit betreffend,
-// der Rest der Zeile ist ungenutzt). Kollidiert dadurch mit keinem
-// bestehenden Element (Menu-Button/Wetter/WLAN sitzen eine Zeile hoeher,
-// Filter-Hinweiszeile/Reichweiten-Button/Legende sitzen unten in der
-// Info-Leiste) und liegt ausserhalb des Radarkreises, der erst bei
-// CONTENT_TOP beginnt.
-Rect modesBtn = {(int16_t)(clockRect.x + clockRect.w + 4), (int16_t)(HEADER_TITLE_H + 1), 70,
-                  (int16_t)(STATUS_LINE_H - 2)};
+// Tippbereich fuer die WLAN-Balken ganz rechts (siehe updateWifiIcon()/
+// drawWifiIcon() unten, WIFI_ICON_W/H dort) - das sichtbare Icon sitzt
+// ohnehin fest an SCREEN_WIDTH-WIFI_ICON_W-2, wifiIconRect deckt hier
+// eine etwas grosszuegigere Zone am rechten Rand als Tippzone ab. Breite
+// in layoutHeaderOnce() gesetzt.
+Rect wifiIconRect = {0, HEADER_ROW_Y, 0, HEADER_ROW_H};
+
+// Tippbereich fuer die Kopfzeilen-Uhr (siehe updateStatusLine()) - oeffnet
+// den Bildschirm-Timeout-Screen (Menue > System > Bildschirm-Timeout).
+// Rueckt jetzt an die Stelle, wo vorher das Wetter-Icon sass (ganz links
+// in DERSELBEN Zeile, keine eigene Uhr-Zeile mehr). Breite = gemessene
+// Breite des laengstmoeglichen Zeit-Strings ("12:59PM", 12h-Format mit
+// AM/PM), damit die Tippzone/Loeschbreite bei JEDER Zeiteinstellung
+// ausreicht - siehe layoutHeaderOnce().
+Rect clockRect = {2, HEADER_ROW_Y, 0, HEADER_ROW_H};
+
+// Einmalige Kopfzeilen-Vermessung/-Platzierung (Alex' expliziter Wunsch:
+// "die exakte X-Position jedes Elements" - deshalb zur Laufzeit per
+// tft.textWidth() gemessen statt geschaetzt, gleiches Prinzip wie zuvor
+// bei der frueheren Mode-Button-Positionierung). Wird ganz am Anfang von
+// drawHeader() aufgerufen (dort ist der globale Font bereits per
+// setFreeFont() in setup() gesetzt), einmalig dank static-Guard.
+void layoutHeaderOnce() {
+    static bool done = false;
+    if (done) return;
+    done = true;
+
+    tft.setTextSize(1);
+    constexpr int16_t BTN_PAD = 14; // 7px Innenabstand links/rechts vom Text
+    int16_t modeTextW = tft.textWidth("Mode");
+    int16_t menuTextW = tft.textWidth("Menu");
+    modesBtn.w = (int16_t)(modeTextW + BTN_PAD);
+    menuBtn.w = (int16_t)(menuTextW + BTN_PAD);
+
+    // Alex' Wunsch: Mode/Menu jeweils 5px naeher ans Wetter-Icon heran als
+    // der sonstige HEADER_GAP (6px) - eigener, kleinerer Abstand nur fuer
+    // diese beiden Nachbarn des zentrierten Wetter-Icons, der allgemeine
+    // HEADER_GAP (WLAN-Zone unten) bleibt unveraendert.
+    constexpr int16_t WEATHER_NEIGHBOR_GAP = HEADER_GAP - 5;
+    weatherIconRect.x = (int16_t)(Config::SCREEN_WIDTH / 2 - weatherIconRect.w / 2);
+    modesBtn.x = (int16_t)(weatherIconRect.x - WEATHER_NEIGHBOR_GAP - modesBtn.w);
+    menuBtn.x = (int16_t)(weatherIconRect.x + weatherIconRect.w + WEATHER_NEIGHBOR_GAP);
+
+    // Breitester moeglicher Zeit-String (12h-Format mit AM/PM) - siehe
+    // Kommentar bei clockRect oben.
+    clockRect.w = tft.textWidth("12:59PM");
+
+    // WLAN-Zone: vom rechten Bildschirmrand bis kurz nach dem Ende von
+    // menuBtn (mit GAP), damit garantiert keine Ueberlappung entsteht,
+    // unabhaengig von der gemessenen menuBtn-Breite.
+    int16_t wifiZoneStart = (int16_t)(menuBtn.x + menuBtn.w + HEADER_GAP);
+    wifiIconRect.x = wifiZoneStart;
+    wifiIconRect.w = (int16_t)(Config::SCREEN_WIDTH - wifiZoneStart);
+}
 
 void drawMenuButton() {
     // Folgt jetzt dem auf dem Radar-Screen gewaehlten Farbschema (Menue >
@@ -199,21 +230,19 @@ void drawMenuButton() {
     }
 }
 
-// Direktzugriff auf RadarThemeScreen (siehe modesBtn oben) - bewusst
-// schlicht gehalten (kein Rand, nur Text), da die Status-Zeile mit nur
-// STATUS_LINE_H-2 Pixeln Hoehe fuer eine vollwertige umrandete
-// Schaltflaeche (wie drawMenuButton() oben) zu knapp bemessen ist.
-// MC_DATUM statt setCursor()+print() - laut CLAUDE.md-Hinweis zur
-// Baseline-Falle bei unserem eigenen Font unkritisch, TFT_eSPI zentriert
-// bei datum-basiertem drawString() unabhaengig davon korrekt. Bewusst FEST
-// GELB (nicht das dynamische Radar-Farbschema wie beim Menu-Button) -
-// Alex' ausdruecklicher Wunsch, hebt den Button zusaetzlich optisch von
-// Menu/Uhr (beide Gruen/Grau) ab.
+// Direktzugriff auf RadarThemeScreen (siehe modesBtn oben) - im selben
+// Stil wie drawMenuButton() (fillRoundRect/drawRoundRect + MC_DATUM-
+// zentrierter Text), nur in Gelb statt Gruen. Sitzt jetzt in der
+// Icon-Zeile (zweites Viertel, siehe modesBtn oben), deshalb keine
+// dynamische x-Berechnung relativ zur Uhr mehr noetig - modesBtn.x ist
+// ein fester Wert wie bei menuBtn/weatherIconRect.
 void drawModesButton() {
-    tft.fillRect(modesBtn.x, modesBtn.y, modesBtn.w, modesBtn.h, TFT_BLACK);
+    uint16_t color = TFT_YELLOW;
+    tft.fillRoundRect(modesBtn.x, modesBtn.y, modesBtn.w, modesBtn.h, 4, TFT_BLACK);
+    tft.drawRoundRect(modesBtn.x, modesBtn.y, modesBtn.w, modesBtn.h, 4, color);
     tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-    tft.drawString("Modes", (int16_t)(modesBtn.x + modesBtn.w / 2), (int16_t)(modesBtn.y + modesBtn.h / 2));
+    tft.setTextColor(color, TFT_BLACK);
+    tft.drawString("Mode", (int16_t)(modesBtn.x + modesBtn.w / 2), (int16_t)(modesBtn.y + modesBtn.h / 2));
     tft.setTextDatum(TL_DATUM);
 }
 
@@ -568,10 +597,15 @@ void updateWifiIcon() {
     }
 }
 
-// Vollbild-QR-Code, der auf das GitHub-Repository des Projekts verlinkt -
-// erreichbar durch Antippen des Projekt-Titels ("Eiswolfs FR") oben links
-// im Header (siehe titleRect oben, Tap-Handling in loop()). Gleiches
-// Zeichen-/Ablaufmuster wie radar_screen.cpp::runFlightQrScreen() (dort
+// Vollbild-QR-Code, der auf das GitHub-Repository des Projekts verlinkt.
+// FRUEHER erreichbar durch Antippen des Projekt-Titels ("Eiswolfs FR")
+// oben links im Header - der Titel wurde entfernt (Kopfzeile jetzt
+// gleichmaessig auf Wetter/Mode/Menu/WLAN aufgeteilt, siehe Kommentar bei
+// weatherIconRect oben), damit ist diese Funktion aktuell OHNE
+// Tipp-Zugang von der UI aus erreichbar - bewusst NICHT geloescht (Alex'
+// eigenes Foto/Branding steckt darin), aber verwaist, bis ein neuer
+// Einstiegspunkt definiert wird. Gleiches Zeichen-/Ablaufmuster wie
+// radar_screen.cpp::runFlightQrScreen() (dort
 // fuer den Live-Tracking-Link eines konkreten Fluges), hier aber ohne
 // dynamischen Inhalt - Titel und Ziel-URL sind fest. Bewusst fest TFT_GREEN
 // statt RadarScreen::themeColor() - alle anderen Vollbild-Screens in
@@ -663,11 +697,9 @@ void runGithubQrScreen(TFT_eSPI& tftRef) {
 }
 
 void drawHeader() {
+    layoutHeaderOnce();
     tft.fillRect(0, 0, Config::SCREEN_WIDTH, CONTENT_TOP, TFT_BLACK);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setTextSize(1);
-    tft.setCursor(6, 10);
-    tft.println("Eiswolfs FR");
     drawMenuButton();
     drawModesButton();
     updateWifiIcon();
@@ -679,32 +711,16 @@ void drawHeader() {
 void updateStatusLine() {
     if (wasEmergency) return;
 
-    // Die Uhrzeit nutzt den global gesetzten 11pt-Font (setFreeFont() in
-    // setup()) ueber setCursor()+print() - bei GFXFF-Fonts ist das
-    // baseline-verankert, der Text waechst also nach OBEN (siehe
-    // CLAUDE.md-Hinweis zu diesem Pitfall). Die Ziffern-Glyphen sind laut
-    // Font-Metrik 8px hoch und reichen damit bis y=HEADER_TITLE_H-6 - also
-    // OBERHALB des schmalen STATUS_LINE_H-Bereichs, der hier bisher allein
-    // geloescht wurde. Dadurch blieben alte Ziffern-Reste stehen und
-    // ueberlagerten sich mit den neuen (am sichtbarsten bei der letzten
-    // Minutenziffer, die sich am haeufigsten aendert). Deshalb hier gezielt
-    // NUR unter der Uhrzeit einen hoeheren Bereich loeschen - nicht die
-    // ganze Zeile, sonst wuerde das jede Sekunde in den Menu-Button
-    // hineinschneiden, der bis y=25 reicht.
-    // Auf 80px verbreitert (vorher 50) - das 12h-Format mit AM/PM (siehe
-    // unten) ist mit bis zu 7 Zeichen ("12:59PM") laenger als das feste
-    // 5-Zeichen-24h-Format ("23:12") und wurde sonst nicht vollstaendig
-    // geloescht (Ziffernreste blieben stehen). Der Bereich rechts daneben
-    // war hier ohnehin leer, daher unkritisch.
-    constexpr int16_t CLOCK_CLEAR_W = 80;
-    constexpr int16_t CLOCK_CLEAR_TOP = HEADER_TITLE_H - 10;
-    tft.fillRect(0, CLOCK_CLEAR_TOP, CLOCK_CLEAR_W, CONTENT_TOP - CLOCK_CLEAR_TOP, TFT_BLACK);
-    tft.fillRect(CLOCK_CLEAR_W, HEADER_TITLE_H, Config::SCREEN_WIDTH - CLOCK_CLEAR_W, STATUS_LINE_H, TFT_BLACK);
-    // Der obige fillRect() ueberdeckt modesBtn (liegt im selben Bereich,
-    // siehe Kommentar dort) - jede Sekunde direkt danach neu zeichnen,
-    // sonst waere der Button nur fuer den Sekundenbruchteil bis zum
-    // naechsten updateStatusLine()-Aufruf unsichtbar.
-    drawModesButton();
+    // Uhrzeit jetzt in derselben Kopfzeile wie Mode/Wetter/Menu/WLAN (kein
+    // eigenes Zeilenpaar mehr, siehe HEADER_ROW_Y/layoutHeaderOnce()) -
+    // eigener, in sich geschlossener Loesch-und-Zeichen-Block wie bei den
+    // Buttons: nur clockRect selbst wird geloescht, das ueberlappt nach
+    // layoutHeaderOnce()'s Platzierung keinen Nachbarn mehr, daher keine
+    // Notwendigkeit mehr, modesBtn danach sicherheitshalber neu zu
+    // zeichnen. MC_DATUM statt setCursor()+print() - laut CLAUDE.md-
+    // Hinweis zur Baseline-Falle unkritisch, TFT_eSPI zentriert bei
+    // datum-basiertem drawString() unabhaengig davon korrekt.
+    tft.fillRect(clockRect.x, clockRect.y, clockRect.w, clockRect.h, TFT_BLACK);
     tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
 
     time_t now = time(nullptr);
@@ -723,8 +739,9 @@ void updateStatusLine() {
             snprintf(timeBuf, sizeof(timeBuf), "%d:%02d%s", hour12, tmNow.tm_min,
                      tmNow.tm_hour < 12 ? "AM" : "PM");
         }
-        tft.setCursor(6, HEADER_TITLE_H + 2);
-        tft.print(timeBuf);
+        tft.setTextDatum(MC_DATUM);
+        tft.drawString(timeBuf, (int16_t)(clockRect.x + clockRect.w / 2), (int16_t)(clockRect.y + clockRect.h / 2));
+        tft.setTextDatum(TL_DATUM);
     }
 
     updateWifiIcon();
@@ -1137,17 +1154,7 @@ void loop() {
     }
 
     if (tapped) {
-        if (titleRect.contains(tap.x, tap.y)) {
-            // Vollbild-QR-Code auf das GitHub-Repository - siehe
-            // runGithubQrScreen() oben.
-            runGithubQrScreen(tft);
-            // Gleicher Grund wie bei den anderen Vollbild-Overlays unten -
-            // auch dieser Screen ueberschreibt den kompletten Bildschirm.
-            RadarScreen::invalidatePanel();
-            drawHeader();
-            updateStatusLine();
-            forceRedraw = true;
-        } else if (menuBtn.contains(tap.x, tap.y)) {
+        if (menuBtn.contains(tap.x, tap.y)) {
             MenuScreen::run(tft);
             // Menue lief als Vollbild-Screen und kann dabei ein evtl. noch
             // offenes Flugzeug-Detail-Panel komplett ueberschrieben haben -
@@ -1194,7 +1201,7 @@ void loop() {
             forceRedraw = true;
         } else if (modesBtn.contains(tap.x, tap.y)) {
             // Direktzugriff auf "Radar-Darstellung" (CRT-Phosphor/Radar-
-            // Puls/Nostalgisch) von der Hauptansicht aus, siehe modesBtn.
+            // Puls) von der Hauptansicht aus, siehe modesBtn.
             RadarThemeScreen::run(tft);
             // Gleicher Grund wie bei den anderen Vollbild-Overlays oben -
             // auch dieser Screen ueberschreibt den kompletten Bildschirm.

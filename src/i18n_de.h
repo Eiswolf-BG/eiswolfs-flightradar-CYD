@@ -323,7 +323,6 @@ static const char* const I18N_DE[] = {
     "ISS-Marker: ",
     "Über den ISS-Marker",
     "Zeigt die Internationale Raumstation (ISS) als Sondermarker, wenn sie gerade innerhalb eurer Radar-Reichweite vorbeifliegt. Wegen ihrer hohen Geschwindigkeit (~7,66 km/s) ist das meist nur für wenige Sekunden sichtbar, wenn überhaupt.",
-    "Nostalgisch",
 
     "Initialisiere Transponder-Empfänger...",
     "Kalibriere Radar-Array...",
@@ -331,7 +330,6 @@ static const char* const I18N_DE[] = {
     "Synchronisiere Atomuhr...",
     "Lade Luftraum-Datenbank...",
     "Radarsystem bereit.",
-    "Flugbahn-Trail",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

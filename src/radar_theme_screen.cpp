@@ -8,12 +8,12 @@
 // Einstell-Screen fuer die Radar-Darstellung (Menue > System > Radar-
 // Darstellung). Oben drei EXKLUSIVE Farbschema-Buttons (Gruen/Amber/Blau,
 // SettingsStore::radarThemeIndex(), gleiches 3-Wege-Auswahl-Muster wie
-// units_screen.cpp), darunter vier UNABHAENGIGE, ankreuzbare Extras
-// (CRT-Phosphor, Radar-Puls, Nostalgisch, Flugbahn-Trail) - lassen sich
-// mit JEDEM der drei Farbschemata kombinieren, deshalb eigene bool-
-// Einstellungen statt weiterer Werte fuer radarThemeIndex(). Betrifft NUR
-// den Radar-Screen (siehe radar_screen.cpp), alle anderen Bildschirme
-// bleiben unveraendert gruen.
+// units_screen.cpp), darunter zwei UNABHAENGIGE, ankreuzbare Extras
+// (CRT-Phosphor, Radar-Puls) - lassen sich mit JEDEM der drei
+// Farbschemata kombinieren, deshalb eigene bool-Einstellungen statt
+// weiterer Werte fuer radarThemeIndex(). Betrifft NUR den Radar-Screen
+// (siehe radar_screen.cpp), alle anderen Bildschirme bleiben unveraendert
+// gruen.
 namespace RadarThemeScreen {
 
 namespace {
@@ -59,10 +59,10 @@ namespace {
     }
 
     // Zeilenhoehe aus dem verfuegbaren Platz errechnet (gleiches Muster wie
-    // SYSTEM_ROW_H in menu_screen.cpp) statt fest verdrahtet - 8 Zeilen
-    // (3 Farbschemata + 4 Kaestchen + Zurueck) muessen mit ca. 10px Reserve
+    // SYSTEM_ROW_H in menu_screen.cpp) statt fest verdrahtet - 6 Zeilen
+    // (3 Farbschemata + 2 Kaestchen + Zurueck) muessen mit ca. 10px Reserve
     // zum unteren Rand aufs Display passen.
-    constexpr uint8_t ROW_COUNT = 8;
+    constexpr uint8_t ROW_COUNT = 6;
     constexpr int16_t ROW_GAP = 6;
     constexpr int16_t START_Y = 40;
     constexpr int16_t END_Y = Config::SCREEN_HEIGHT - 10;
@@ -102,13 +102,7 @@ void run(TFT_eSPI& tft) {
         Rect pulseRow = rowRect(THEME_COUNT + 1);
         drawCheckboxRow(tft, pulseRow, I18n::t(StringId::RADAR_PULSE_TOGGLE), SettingsStore::radarPulseEnabled());
 
-        Rect nostalgicRow = rowRect(THEME_COUNT + 2);
-        drawCheckboxRow(tft, nostalgicRow, I18n::t(StringId::MENU_NOSTALGIC_MODE), SettingsStore::nostalgicModeEnabled());
-
-        Rect trailRow = rowRect(THEME_COUNT + 3);
-        drawCheckboxRow(tft, trailRow, I18n::t(StringId::MENU_FLIGHT_TRAIL), SettingsStore::trailEnabled());
-
-        Rect backBtn = rowRect(THEME_COUNT + 4);
+        Rect backBtn = rowRect(THEME_COUNT + 2);
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
         TouchInput::Point tap;
@@ -133,14 +127,6 @@ void run(TFT_eSPI& tft) {
         }
         if (!handled && pulseRow.contains(tap.x, tap.y)) {
             SettingsStore::setRadarPulseEnabled(!SettingsStore::radarPulseEnabled());
-            handled = true;
-        }
-        if (!handled && nostalgicRow.contains(tap.x, tap.y)) {
-            SettingsStore::setNostalgicModeEnabled(!SettingsStore::nostalgicModeEnabled());
-            handled = true;
-        }
-        if (!handled && trailRow.contains(tap.x, tap.y)) {
-            SettingsStore::setTrailEnabled(!SettingsStore::trailEnabled());
             handled = true;
         }
         if (!handled && backBtn.contains(tap.x, tap.y)) {

@@ -569,11 +569,6 @@ enum class StringId : uint16_t {
     ISS_MARKER_INFO_TITLE,
     ISS_MARKER_INFO_BODY,
 
-    // "Nostalgisch"-Modus (System > Anzeige, siehe
-    // SettingsStore::nostalgicModeEnabled()) - subtiles Bildrauschen am
-    // Rand + Ecken-Vignette um den Radarkreis, siehe radar_screen.cpp.
-    MENU_NOSTALGIC_MODE,
-
     // Terminal-Stil-Boot-Sequenz, immer aktiv (kein Schalter), spielt vor
     // dem eigentlichen Splash-Screen ab (siehe SplashScreen::
     // playBootSequence() in splash_screen.cpp) - rein kosmetischer
@@ -586,11 +581,6 @@ enum class StringId : uint16_t {
     BOOT_SEQ_4,
     BOOT_SEQ_5,
     BOOT_SEQ_6,
-
-    // "Flugbahn-Trail" (System > Radar-Darstellung, siehe
-    // SettingsStore::trailEnabled()) - verblassende Spur der letzten
-    // Positionen des gerade ausgewaehlten Flugzeugs, siehe radar_screen.cpp.
-    MENU_FLIGHT_TRAIL,
 
     COUNT
 };
