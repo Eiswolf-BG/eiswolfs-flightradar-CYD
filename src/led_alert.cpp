@@ -9,6 +9,17 @@ namespace {
     constexpr uint8_t PIN_GREEN = 16;
     constexpr uint8_t PIN_BLUE  = 17;
 
+    // PWM statt reinem digitalWrite (siehe writeChannel()/AMBER_*-Kommentar
+    // unten) - eigene ledc-Kanaele, getrennt vom Backlight-Kanal (Kanal 0,
+    // siehe BACKLIGHT_PWM_CHANNEL in main.cpp). 5kHz/8-Bit wie beim
+    // Backlight, fuer eine LED voellig ausreichend (kein sichtbares
+    // Flackern, feine Helligkeitsstufen 0-255).
+    constexpr uint8_t RED_PWM_CHANNEL   = 1;
+    constexpr uint8_t GREEN_PWM_CHANNEL = 2;
+    constexpr uint8_t BLUE_PWM_CHANNEL  = 3;
+    constexpr uint32_t PWM_FREQ_HZ = 5000;
+    constexpr uint8_t PWM_RESOLUTION_BITS = 8;
+
     constexpr uint32_t GREEN_BLINK_INTERVAL_MS = 400;
     constexpr uint32_t RED_BLINK_INTERVAL_MS   = 150;
 
@@ -75,27 +86,64 @@ namespace {
         return (phase % UPDATE_BLINK_SLOT_MS) < UPDATE_BLINK_ON_MS;
     }
 
+    // Einzelner Kanal, 0 (aus) bis 255 (volle Helligkeit) - die LED ist
+    // active-low (LOW = an), ledcWrite() erwartet aber den HIGH-Zeitanteil
+    // (Duty), deshalb hier invertiert (255-brightness).
+    void writeChannel(uint8_t pwmChannel, uint8_t brightness) {
+        ledcWrite(pwmChannel, 255 - brightness);
+    }
+
     void setAllOff() {
-        digitalWrite(PIN_RED, HIGH);
-        digitalWrite(PIN_GREEN, HIGH);
-        digitalWrite(PIN_BLUE, HIGH);
+        writeChannel(RED_PWM_CHANNEL, 0);
+        writeChannel(GREEN_PWM_CHANNEL, 0);
+        writeChannel(BLUE_PWM_CHANNEL, 0);
+    }
+
+    // AMBER-Mischung: auf dem verbauten RGB-LED-Modul dominiert bei
+    // GLEICH HELLEM Ansteuern von Rot+Gruen sichtbar das Gruen, Rot bleibt
+    // praktisch unsichtbar (Live-Test an ZWEI Geraeten 31.08., siehe
+    // Chat-Verlauf) - reines Rot UND reines Gruen einzeln funktionieren
+    // beide einwandfrei, die gruene Diode dieses billigen CYD-LED-Moduls
+    // ist gegenueber der roten aber deutlich heller/dominanter. Zwei
+    // Zwischenschritte bereits verworfen: (1) gleichzeitiges digitalWrite
+    // beider Kanaele (nur Gruen sichtbar), (2) zeitliches Alternieren
+    // (Time-Multiplexing, zuletzt mit 3ms/165Hz) - selbst bei theoretisch
+    // 50/50 Zeitaufteilung wurde es als klar ungleich (~80/20 fuer Gruen)
+    // UND als getrenntes Blinken statt echter Mischfarbe wahrgenommen,
+    // nicht nur als Timing-Artefakt, sondern weil die gruene Diode pro
+    // Zeiteinheit schlicht heller ist. Jetzt echtes PWM (siehe
+    // writeChannel() oben): Rot auf volle Helligkeit, Gruen gedimmt auf
+    // AMBER_GREEN_BRIGHTNESS, um die staerkere gruene Diode auszugleichen
+    // - beide Kanaele GLEICHZEITIG und DAUERHAFT an (kein Blinken
+    // zwischen den Farben mehr, nur noch das normale Alarm-Blinken der
+    // Mischfarbe als Ganzes). Der Wert ist eine erste Schaetzung (kein
+    // Messgeraet verfuegbar) und muss ggf. am echten Geraet nachjustiert
+    // werden, bis der Amber-Eindruck stimmt.
+    constexpr uint8_t AMBER_GREEN_BRIGHTNESS = 25;
+
+    void writeAlarmChannels(bool r, bool g, bool b) {
+        if (r && g && !b) {
+            writeChannel(RED_PWM_CHANNEL, 255);
+            writeChannel(GREEN_PWM_CHANNEL, AMBER_GREEN_BRIGHTNESS);
+            writeChannel(BLUE_PWM_CHANNEL, 0);
+            return;
+        }
+        writeChannel(RED_PWM_CHANNEL,   r ? 255 : 0);
+        writeChannel(GREEN_PWM_CHANNEL, g ? 255 : 0);
+        writeChannel(BLUE_PWM_CHANNEL,  b ? 255 : 0);
     }
 
     // Heartbeat (mode==Off) und Naeherungsalarm (Mode::ProximityGreen)
     // folgen jetzt dem gewaehlten Systemthema (SettingsStore::
     // radarThemeIndex(), dieselbe zentrale Quelle wie UiTheme::
-    // accentColor() fuer die restliche UI) statt fest Gruen zu sein. Die
-    // LED hat aber nur drei reine An/Aus-Kanaele (kein PWM, siehe
-    // digitalWrite() ueberall in dieser Datei) - eine echte RGB565-Farbe wie
-    // bei UiTheme::accentColor() laesst sich hier nicht abbilden. Amber wird
-    // deshalb als bestmoegliche Zwei-Kanal-Annaeherung ueber Rot+Gruen
-    // gemeinsam dargestellt (reines Gelb auf einer Standard-RGB-LED, kommt
-    // dem "Amber" der restlichen UI so nahe wie mit drei diskreten Kanaelen
-    // ueberhaupt moeglich), Blau ueber den Blau-Kanal allein. Wichtig fuer
-    // Watchlist-Alarm (siehe update() unten): DORT wird bewusst NICHT diese
-    // Funktion verwendet, sondern fest Cyan (Gruen+Blau) - sonst waere der
-    // Watchlist-Alarm bei aktivem Blau-Thema (nur Blau-Kanal) farblich nicht
-    // vom Naeherungsalarm zu unterscheiden.
+    // accentColor() fuer die restliche UI) statt fest Gruen zu sein. Amber
+    // wird als bestmoegliche Zwei-Kanal-Annaeherung ueber Rot+Gruen
+    // gemeinsam dargestellt (siehe writeAlarmChannels() oben fuer die
+    // Helligkeits-Kompensation), Blau ueber den Blau-Kanal allein. Wichtig
+    // fuer Watchlist-Alarm (siehe update() unten): DORT wird bewusst NICHT
+    // diese Funktion verwendet, sondern fest Cyan (Gruen+Blau) - sonst
+    // waere der Watchlist-Alarm bei aktivem Blau-Thema (nur Blau-Kanal)
+    // farblich nicht vom Naeherungsalarm zu unterscheiden.
     void themeLedChannels(bool& r, bool& g, bool& b) {
         r = false; g = false; b = false;
         switch (SettingsStore::radarThemeIndex()) {
@@ -107,9 +155,12 @@ namespace {
 }
 
 void begin() {
-    pinMode(PIN_RED, OUTPUT);
-    pinMode(PIN_GREEN, OUTPUT);
-    pinMode(PIN_BLUE, OUTPUT);
+    ledcSetup(RED_PWM_CHANNEL, PWM_FREQ_HZ, PWM_RESOLUTION_BITS);
+    ledcSetup(GREEN_PWM_CHANNEL, PWM_FREQ_HZ, PWM_RESOLUTION_BITS);
+    ledcSetup(BLUE_PWM_CHANNEL, PWM_FREQ_HZ, PWM_RESOLUTION_BITS);
+    ledcAttachPin(PIN_RED, RED_PWM_CHANNEL);
+    ledcAttachPin(PIN_GREEN, GREEN_PWM_CHANNEL);
+    ledcAttachPin(PIN_BLUE, BLUE_PWM_CHANNEL);
     setAllOff();
     initialized = true;
 }
@@ -141,9 +192,7 @@ bool update(Mode mode, uint32_t nowMs, bool updateAvailable) {
         if (heartbeatInWindow) {
             bool r, g, b;
             themeLedChannels(r, g, b);
-            digitalWrite(PIN_RED,   r ? LOW : HIGH);
-            digitalWrite(PIN_GREEN, g ? LOW : HIGH);
-            digitalWrite(PIN_BLUE,  b ? LOW : HIGH);
+            writeAlarmChannels(r, g, b);
             blinkState = false;
             lastMode = mode;
             return true;
@@ -154,9 +203,9 @@ bool update(Mode mode, uint32_t nowMs, bool updateAvailable) {
         // Signal, siehe Kommentar bei UPDATE_BLINK_* oben), daher erst HIER
         // nach der Heartbeat-Pruefung ausgewertet.
         if (updateBlinkActive) {
-            digitalWrite(PIN_RED, LOW);
-            digitalWrite(PIN_BLUE, LOW);
-            digitalWrite(PIN_GREEN, HIGH);
+            writeChannel(RED_PWM_CHANNEL, 255);
+            writeChannel(BLUE_PWM_CHANNEL, 255);
+            writeChannel(GREEN_PWM_CHANNEL, 0);
             blinkState = false;
             lastMode = mode;
             return true;
@@ -213,9 +262,9 @@ bool update(Mode mode, uint32_t nowMs, bool updateAvailable) {
     // klar als solcher erkennbar bleibt und nicht vom weissen Blitz
     // dominiert wird.
     if (heartbeatInWindow && mode != Mode::EmergencyRed) {
-        digitalWrite(PIN_RED, LOW);
-        digitalWrite(PIN_GREEN, LOW);
-        digitalWrite(PIN_BLUE, LOW);
+        writeChannel(RED_PWM_CHANNEL, 255);
+        writeChannel(GREEN_PWM_CHANNEL, 255);
+        writeChannel(BLUE_PWM_CHANNEL, 255);
         return blinkState;
     }
 
@@ -226,15 +275,13 @@ bool update(Mode mode, uint32_t nowMs, bool updateAvailable) {
     // Signal optisch klar vom Heartbeat unterscheidet - beide sollen bei
     // einem Blick auf die LED nicht verwechselbar sein.
     if (updateBlinkActive) {
-        digitalWrite(PIN_RED, LOW);
-        digitalWrite(PIN_GREEN, HIGH);
-        digitalWrite(PIN_BLUE, LOW);
+        writeChannel(RED_PWM_CHANNEL, 255);
+        writeChannel(GREEN_PWM_CHANNEL, 0);
+        writeChannel(BLUE_PWM_CHANNEL, 255);
         return blinkState;
     }
 
-    digitalWrite(PIN_RED,   (chR && blinkState) ? LOW : HIGH);
-    digitalWrite(PIN_GREEN, (chG && blinkState) ? LOW : HIGH);
-    digitalWrite(PIN_BLUE,  (chB && blinkState) ? LOW : HIGH);
+    writeAlarmChannels(chR && blinkState, chG && blinkState, chB && blinkState);
 
     return blinkState;
 }
@@ -242,9 +289,9 @@ bool update(Mode mode, uint32_t nowMs, bool updateAvailable) {
 void flashWhite(uint32_t durationMs) {
     if (!initialized) begin();
 
-    digitalWrite(PIN_RED, LOW);
-    digitalWrite(PIN_GREEN, LOW);
-    digitalWrite(PIN_BLUE, LOW);
+    writeChannel(RED_PWM_CHANNEL, 255);
+    writeChannel(GREEN_PWM_CHANNEL, 255);
+    writeChannel(BLUE_PWM_CHANNEL, 255);
     delay(durationMs);
     setAllOff();
 }
