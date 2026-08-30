@@ -147,7 +147,7 @@ bool run(TFT_eSPI& tft) {
 
                 bool emergency = isEmergencySquawk(a.squawk);
                 bool watched = AircraftWatchlist::isWatched(a.callsign);
-                uint16_t borderColor = emergency ? TFT_RED : (watched ? TFT_CYAN : TFT_GREEN);
+                uint16_t borderColor = emergency ? TFT_RED : (watched ? TFT_CYAN : UiTheme::accentColor(tft));
                 tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, borderColor);
 
                 // WICHTIG (siehe CLAUDE.md-Falle "Font ist Baseline-verankert"):
