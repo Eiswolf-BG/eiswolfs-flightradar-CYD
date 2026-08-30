@@ -354,6 +354,21 @@ static const char* const I18N_TR[] = {
     "Yağmur Efekti",
     "Yağmur Efekti Hakkında",
     "Yalnızca hava durumu verileri gerçekten yağmur veya fırtına gösterdiğinde görünür. Damlalar gerçek rüzgar yönünde hareket eder - rüzgara bağlı olarak radarda yukarı doğru yağıyormuş gibi görünebilir (örn. güneyden esen rüzgarda). Bu fiziksel olarak doğrudur, hata değildir.",
+
+    "MQTT",
+    "MQTT",
+    "MQTT'yi Etkinleştir",
+    "Broker: ",
+    "Broker adresi (host:port)",
+    "Kullanıcı adı: ",
+    "Kullanıcı adı (isteğe bağlı)",
+    "Şifre: ",
+    "Şifre (isteğe bağlı)",
+    "(ayarlanmadı)",
+    "MQTT Hakkında",
+    "MQTT, Home Assistant gibi akıllı ev sistemlerinin diğer cihazlarla canlı değerler alışverişi yapmak için kullandığı basit bir mesajlaşma protokolüdür. Etkinleştirildiğinde bu cihaz, menzildeki uçak sayısını, izleme listesi ve yakınlık alarmı durumunu düzenli olarak kendi MQTT broker'ınıza gönderir - burada bir broker adresi girilmeden hiçbir şey gönderilmez.",
+
+    "= Resmi/Askeri (tahmini)",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

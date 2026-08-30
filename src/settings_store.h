@@ -163,6 +163,22 @@ namespace SettingsStore {
     bool issMarkerEnabled();
     void setIssMarkerEnabled(bool on);
 
+    // Optionale MQTT-Schnittstelle (siehe mqtt_client.h/mqtt_screen.cpp) -
+    // AUS per Default. mqttBroker() liefert "host:port" als ein Feld (so
+    // wie im Eingabe-Screen erfasst, siehe MqttScreen::run()) statt
+    // getrennter Host-/Port-Felder - MqttClient::loop() zerlegt die
+    // Zeichenkette selbst (letzter ":"), das spart ein zweites
+    // Eingabefeld. Nutzername/Passwort duerfen leer bleiben (z.B. fuer
+    // oeffentliche Test-Broker ohne Authentifizierung).
+    bool mqttEnabled();
+    void setMqttEnabled(bool on);
+    String mqttBroker();
+    void setMqttBroker(const String& hostPort);
+    String mqttUsername();
+    void setMqttUsername(const String& user);
+    String mqttPassword();
+    void setMqttPassword(const String& pass);
+
     // Zuletzt vom Geraet GEBOOTETE Firmware-Version (Config::APP_VERSION zum
     // Zeitpunkt des letzten Speicherns) - main.cpp::setup() vergleicht dies
     // beim Start gegen die AKTUELLE Config::APP_VERSION, um genau EINMAL

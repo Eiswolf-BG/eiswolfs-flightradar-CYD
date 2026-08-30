@@ -48,6 +48,11 @@ namespace {
     bool classicRadarOn = false;
     bool militarySquawkDetectionOn = false;
     bool rainEffectOn = true;
+    bool mqttOn = false;
+    // "host:port" als ein Feld, siehe Kommentar in settings_store.h.
+    char mqttBrokerBuf[64] = {0};
+    char mqttUserBuf[33] = {0};
+    char mqttPassBuf[33] = {0};
     char lastSeenVersionBuf[16] = {0};
 
     // MUSS auf SD persistiert werden (nicht nur im RAM halten): wird kurz
@@ -124,6 +129,17 @@ namespace {
             militarySquawkDetectionOn = (value.toInt() != 0);
         } else if (key == "rain_effect") {
             rainEffectOn = (value.toInt() != 0);
+        } else if (key == "mqtt_enabled") {
+            mqttOn = (value.toInt() != 0);
+        } else if (key == "mqtt_broker") {
+            strncpy(mqttBrokerBuf, value.c_str(), sizeof(mqttBrokerBuf) - 1);
+            mqttBrokerBuf[sizeof(mqttBrokerBuf) - 1] = 0;
+        } else if (key == "mqtt_user") {
+            strncpy(mqttUserBuf, value.c_str(), sizeof(mqttUserBuf) - 1);
+            mqttUserBuf[sizeof(mqttUserBuf) - 1] = 0;
+        } else if (key == "mqtt_pass") {
+            strncpy(mqttPassBuf, value.c_str(), sizeof(mqttPassBuf) - 1);
+            mqttPassBuf[sizeof(mqttPassBuf) - 1] = 0;
         } else if (key == "last_seen_version") {
             strncpy(lastSeenVersionBuf, value.c_str(), sizeof(lastSeenVersionBuf) - 1);
             lastSeenVersionBuf[sizeof(lastSeenVersionBuf) - 1] = 0;
@@ -200,6 +216,10 @@ void save() {
     f.printf("classic_radar=%d\n", classicRadarOn ? 1 : 0);
     f.printf("military_squawk_detection=%d\n", militarySquawkDetectionOn ? 1 : 0);
     f.printf("rain_effect=%d\n", rainEffectOn ? 1 : 0);
+    f.printf("mqtt_enabled=%d\n", mqttOn ? 1 : 0);
+    f.printf("mqtt_broker=%s\n", mqttBrokerBuf);
+    f.printf("mqtt_user=%s\n", mqttUserBuf);
+    f.printf("mqtt_pass=%s\n", mqttPassBuf);
     f.printf("last_seen_version=%s\n", lastSeenVersionBuf);
     f.printf("ota_just_installed=%d\n", otaJustInstalledFlag ? 1 : 0);
     f.close();
@@ -411,6 +431,37 @@ bool issMarkerEnabled() { return issMarkerOn; }
 
 void setIssMarkerEnabled(bool on) {
     issMarkerOn = on;
+    save();
+}
+
+bool mqttEnabled() { return mqttOn; }
+
+void setMqttEnabled(bool on) {
+    mqttOn = on;
+    save();
+}
+
+String mqttBroker() { return String(mqttBrokerBuf); }
+
+void setMqttBroker(const String& hostPort) {
+    strncpy(mqttBrokerBuf, hostPort.c_str(), sizeof(mqttBrokerBuf) - 1);
+    mqttBrokerBuf[sizeof(mqttBrokerBuf) - 1] = 0;
+    save();
+}
+
+String mqttUsername() { return String(mqttUserBuf); }
+
+void setMqttUsername(const String& user) {
+    strncpy(mqttUserBuf, user.c_str(), sizeof(mqttUserBuf) - 1);
+    mqttUserBuf[sizeof(mqttUserBuf) - 1] = 0;
+    save();
+}
+
+String mqttPassword() { return String(mqttPassBuf); }
+
+void setMqttPassword(const String& pass) {
+    strncpy(mqttPassBuf, pass.c_str(), sizeof(mqttPassBuf) - 1);
+    mqttPassBuf[sizeof(mqttPassBuf) - 1] = 0;
     save();
 }
 

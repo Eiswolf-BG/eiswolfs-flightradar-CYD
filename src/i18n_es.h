@@ -354,6 +354,21 @@ static const char* const I18N_ES[] = {
     "Efecto de lluvia",
     "Sobre el Efecto de lluvia",
     "Solo visible cuando los datos meteorológicos muestran realmente lluvia o tormenta. Las gotas se mueven en la dirección real del viento - según el viento, esto puede hacer que parezca que llueve hacia arriba en el radar (p. ej. con viento del sur). Esto es físicamente correcto, no un error.",
+
+    "MQTT",
+    "MQTT",
+    "Activar MQTT",
+    "Broker: ",
+    "Dirección del broker (host:puerto)",
+    "Usuario: ",
+    "Usuario (opcional)",
+    "Contraseña: ",
+    "Contraseña (opcional)",
+    "(no definido)",
+    "Acerca de MQTT",
+    "MQTT es un protocolo de mensajería simple que utilizan sistemas domóticos como Home Assistant para intercambiar valores en vivo con otros dispositivos. Al activarlo, este dispositivo envía regularmente el número de aviones en alcance y el estado de las alertas de lista de vigilancia y de proximidad a su propio broker MQTT - no se envía nada sin una dirección de broker configurada aquí.",
+
+    "= Gubernamental/Militar (estimación)",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

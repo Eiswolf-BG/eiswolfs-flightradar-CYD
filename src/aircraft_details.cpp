@@ -22,9 +22,18 @@ namespace {
         if (mutex == nullptr) mutex = xSemaphoreCreateMutex();
     }
 
-    bool httpGetString(WiFiClientSecure& client, const String& url, String& outBody) {
+    // FIX: nimmt den Timeout jetzt als Parameter entgegen und setzt NUR
+    // diesen (via http.setTimeout(), was intern client->setTimeout()
+    // aufruft - siehe HTTPClient.cpp) - vorher wurde hier IMMER
+    // http.setTimeout(5000) hart gesetzt, was den vom Aufrufer kurz zuvor
+    // per client.setTimeout(N) gesetzten Wert unbemerkt ueberschrieben hat.
+    // Dadurch liefen faktisch ALLE fuenf API-Aufrufe einheitlich mit 5s,
+    // unabhaengig vom im jeweiligen Aufrufer dokumentierten Wert (3s/4s) -
+    // der beabsichtigte kuerzere Timeout fuer hexdb.io griff also nie
+    // (siehe Analyse im Chat-Verlauf).
+    bool httpGetString(WiFiClientSecure& client, const String& url, String& outBody, uint32_t timeoutMs) {
         HTTPClient http;
-        http.setTimeout(5000);
+        http.setTimeout(timeoutMs);
         if (!http.begin(client, url)) return false;
         int code = http.GET();
         bool ok = (code == HTTP_CODE_OK);
@@ -80,12 +89,17 @@ void update() {
     WiFiClientSecure client;
     client.setInsecure();
 
-    // hexdb.io zuerst versuchen (bisherige Quelle) - aber mit kuerzerem
-    // Timeout (3s statt 5s), damit ein kompletter Ausfall des Dienstes die
-    // ADS-B-Abfrage nicht unnoetig lange blockiert, bevor der Fallback greift.
-    client.setTimeout(3000);
+    // hexdb.io zuerst versuchen (bisherige Quelle) - mit kurzem, JETZT
+    // TATSAECHLICH wirksamem Timeout (1200ms, siehe httpGetString()-Fix
+    // oben): ein Verbindungstest hat gezeigt, dass hexdb.io TCP/TLS zwar
+    // sofort annimmt, aber teils gar keine HTTP-Antwort mehr liefert -
+    // 1200ms reichen fuer eine funktionierende Antwort (in Tests <250ms)
+    // locker, begrenzen einen Ausfall aber auf ein Minimum, bevor der
+    // Fallback greift.
+    constexpr uint32_t HEXDB_TIMEOUT_MS = 1200;
+    constexpr uint32_t OTHER_TIMEOUT_MS = 4000;
     String body;
-    if (httpGetString(client, String("https://hexdb.io/api/v1/aircraft/") + hex, body)) {
+    if (httpGetString(client, String("https://hexdb.io/api/v1/aircraft/") + hex, body, HEXDB_TIMEOUT_MS)) {
         JsonDocument doc;
         DeserializationError err = deserializeJson(doc, body);
         if (!err) {
@@ -103,9 +117,8 @@ void update() {
     // adsbdb.com als zweite, unabhaengige Quelle versuchen (andere API-Form,
     // aber inhaltlich aequivalent: Hersteller + Typ ueber den Hex-Code).
     if (!result.model[0]) {
-        client.setTimeout(4000);
         String body2;
-        if (httpGetString(client, String("https://api.adsbdb.com/v0/aircraft/") + hex, body2)) {
+        if (httpGetString(client, String("https://api.adsbdb.com/v0/aircraft/") + hex, body2, OTHER_TIMEOUT_MS)) {
             JsonDocument doc2;
             DeserializationError err2 = deserializeJson(doc2, body2);
             if (!err2) {
@@ -120,23 +133,34 @@ void update() {
         }
     }
 
-    // Flugroute (Start-/Zielflughafen) - jetzt ueber eine Kette aus DREI
-    // unabhaengigen kostenlosen Quellen statt nur einer, absteigend nach in
-    // Tests beobachteter Trefferquote sortiert. Vorher lieferte adsbdb.com
-    // allein in ca. 80% der Faelle "unknown" (siehe Alex' Feedback) - die
-    // drei Quellen speisen sich aus unterschiedlichen, ueberlappenden aber
-    // nicht identischen Community-Datenbanken, daher deutlich bessere
-    // Gesamtabdeckung durch Verketten:
-    //   1. VRS-Standing-Data-Mirror (adsb.lol) - stuendlich aktualisierter
-    //      Spiegel des Virtual-Radar-Server-Projekts, in Tests die mit
-    //      Abstand zuverlaessigste Quelle. Pfad = erste 2 Zeichen des
-    //      (GROSSGESCHRIEBENEN - der Dienst ist case-sensitiv) Rufzeichens
-    //      als Ordner, liefert "airport_codes":"ORIG-DEST" (ICAO).
-    //   2. hexdb.io - eigener Route-Endpunkt (andere URL als der
-    //      Aircraft-Endpunkt weiter oben), liefert "route":"ORIG-DEST".
-    //   3. adsbdb.com Callsign-Endpunkt - bisherige einzige Quelle, bleibt
-    //      als letzter Fallback, da sie gelegentlich Daten hat, die die
-    //      anderen beiden nicht haben.
+    // Flugroute (Start-/Zielflughafen) - Kette aus DREI unabhaengigen
+    // kostenlosen Quellen. Reihenfolge am 30.08. anhand echter Messungen
+    // (8 Live-Callsigns, siehe Chat-Verlauf) neu sortiert - vorher stand
+    // hexdb.io an zweiter Stelle, lieferte dabei aber in 8/8 Faellen
+    // ueberhaupt keine Antwort mehr (TCP/TLS-Verbindung gelingt sofort,
+    // aber keine HTTP-Antwort - vermutlich ein Ausfall auf hexdb.io-Seite,
+    // Datum siehe CLAUDE.md "Bekannte Probleme"). Jede Anfrage, die
+    // hexdb.io an zweiter Stelle durchlaufen musste, wartete dadurch
+    // faktisch immer den vollen Timeout aus, bevor der eigentlich meist
+    // erfolgreiche dritte Server (adsbdb.com) ueberhaupt gefragt wurde:
+    //   1. VRS-Standing-Data-Mirror (adsb.lol) - bleibt an erster Stelle,
+    //      stuendlich aktualisierter Spiegel des Virtual-Radar-Server-
+    //      Projekts, in frueheren wie in dieser Messung die schnellste und
+    //      (fuer Fluege mit hinterlegtem Flugplan) zuverlaessigste Quelle.
+    //      Pfad = erste 2 Zeichen des (GROSSGESCHRIEBENEN - der Dienst ist
+    //      case-sensitiv) Rufzeichens als Ordner, liefert
+    //      "airport_codes":"ORIG-DEST" (ICAO).
+    //   2. adsbdb.com Callsign-Endpunkt - VORGEZOGEN von Platz 3 auf 2 (war
+    //      in der Messung durchgehend schnell UND traf beide getesteten
+    //      Linienflug-Callsigns, waehrend hexdb.io an dieser Stelle nur
+    //      Wartezeit ohne Ergebnis erzeugte).
+    //   3. hexdb.io - eigener Route-Endpunkt (andere URL als der Aircraft-
+    //      Endpunkt weiter oben), liefert "route":"ORIG-DEST". Ans Ende
+    //      verschoben UND mit kurzem HEXDB_TIMEOUT_MS (1200ms statt vorher
+    //      wirkungslos gemeintem 3000ms) versehen - faellt der Dienst
+    //      erneut aus, kostet das jetzt nur noch ~1,2s statt ~5s, und nur
+    //      noch in den (seltenen) Faellen, in denen weder VRS noch adsbdb
+    //      etwas hatten.
     // Nur versuchen, wenn ueberhaupt ein Rufzeichen bekannt ist -
     // Sichtflug-Maschinen ohne Callsign haben ohnehin keine darueber
     // auswertbare Route.
@@ -166,10 +190,9 @@ void update() {
 
     if (trimmedCallsign.length() >= 2) {
         // 1. VRS-Standing-Data-Mirror.
-        client.setTimeout(4000);
         String folder = trimmedCallsign.substring(0, 2);
         String body3;
-        if (httpGetString(client, String("https://vrs-standing-data.adsb.lol/routes/") + folder + "/" + trimmedCallsign + ".json", body3)) {
+        if (httpGetString(client, String("https://vrs-standing-data.adsb.lol/routes/") + folder + "/" + trimmedCallsign + ".json", body3, OTHER_TIMEOUT_MS)) {
             JsonDocument doc3;
             if (!deserializeJson(doc3, body3)) {
                 const char* codes = doc3["airport_codes"] | "";
@@ -182,26 +205,13 @@ void update() {
                 applyRouteCodesIata(String(codesIata));
             }
         }
-
-        // 2. hexdb.io Route-Endpunkt, falls Quelle 1 nichts geliefert hat.
-        if (!result.routeOrigin[0] || !result.routeDest[0]) {
-            client.setTimeout(3000);
-            String body4;
-            if (httpGetString(client, String("https://hexdb.io/api/v1/route/icao/") + trimmedCallsign, body4)) {
-                JsonDocument doc4;
-                if (!deserializeJson(doc4, body4)) {
-                    const char* route = doc4["route"] | "";
-                    applyRouteCodes(String(route));
-                }
-            }
-        }
     }
 
-    // 3. adsbdb.com Callsign-Endpunkt als letzter Fallback.
+    // 2. adsbdb.com Callsign-Endpunkt - vorgezogen von Platz 3 auf Platz 2
+    // (siehe Begruendung oben), falls Quelle 1 nichts geliefert hat.
     if (trimmedCallsign.length() > 0 && (!result.routeOrigin[0] || !result.routeDest[0])) {
-        client.setTimeout(4000);
         String body5;
-        if (httpGetString(client, String("https://api.adsbdb.com/v0/callsign/") + trimmedCallsign, body5)) {
+        if (httpGetString(client, String("https://api.adsbdb.com/v0/callsign/") + trimmedCallsign, body5, OTHER_TIMEOUT_MS)) {
             JsonDocument doc5;
             if (!deserializeJson(doc5, body5)) {
                 const char* originIcao = doc5["response"]["flightroute"]["origin"]["icao_code"] | "";
@@ -219,6 +229,19 @@ void update() {
                         strncpy(result.routeDestIata, destIata, sizeof(result.routeDestIata) - 1);
                     }
                 }
+            }
+        }
+    }
+
+    // 3. hexdb.io Route-Endpunkt - ans Ende verschoben, kurzer Timeout
+    // (siehe Begruendung oben), letzter Fallback statt zweiter Versuch.
+    if (trimmedCallsign.length() > 0 && (!result.routeOrigin[0] || !result.routeDest[0])) {
+        String body4;
+        if (httpGetString(client, String("https://hexdb.io/api/v1/route/icao/") + trimmedCallsign, body4, HEXDB_TIMEOUT_MS)) {
+            JsonDocument doc4;
+            if (!deserializeJson(doc4, body4)) {
+                const char* route = doc4["route"] | "";
+                applyRouteCodes(String(route));
             }
         }
     }

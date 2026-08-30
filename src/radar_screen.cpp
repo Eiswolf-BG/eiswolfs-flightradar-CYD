@@ -1505,6 +1505,14 @@ namespace {
         char callsign[9] = {0};
         char reg[9] = {0};
         LineMarquee airline, model, type, route, alt, speed, climb, distHeading, squawk, seats;
+        // Verfolgt den zuletzt gezeichneten Zustand der letzten Panel-Zeile
+        // (Militaer-/Behoerden-Legende vs. "Antippen zum Schliessen"-Hinweis,
+        // siehe drawDetailPanel()) - ermoeglicht ein Neuzeichnen dieser einen
+        // Zeile, wenn sich z.B. der Squawk waehrend der Anzeige aendert,
+        // ohne bei JEDEM Aufruf pauschal neu zu zeichnen (gleiches
+        // Sparsamkeits-Prinzip wie bei den LineMarquee-Feldern oben).
+        bool notable = false;
+        bool notableInitialized = false;
     };
     PanelState lastPanel;
 
@@ -1827,10 +1835,48 @@ namespace {
         updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.seats, seatsLine, forceFull);
         y += 22;
 
-        if (forceFull) {
-            gfx.setTextColor(themeDimColor(gfx), TFT_BLACK);
-            gfx.setCursor(8, y);
-            gfx.print(I18n::t(StringId::DETAIL_TAP_CLOSE));
+        // Letzte Panel-Zeile: entweder die neue Militaer-/Behoerden-Legende
+        // (nur wenn dieser Flug ueber isNotableCallsign()/
+        // isMilitaryGovSquawk() als solcher erkannt wurde - derselbe
+        // Zustand, der auf dem Radar selbst den oranger Ring ergibt, siehe
+        // render()/tick()) ODER wie bisher der "Antippen zum Schliessen"-
+        // Hinweis. BEWUSST gegenseitig ausschliessend statt einer
+        // zusaetzlichen zwoelften Zeile: das Panel ist bereits jetzt bis auf
+        // wenige Pixel randvoll (DETAIL_PANEL_H=286 reicht bis exakt zum
+        // unteren Bildschirmrand, y=310 fuer die letzte Zeile liegt schon
+        // nur 10px vor Config::SCREEN_HEIGHT=320) - eine echte zusaetzliche
+        // Zeile wuerde ueber den Bildschirmrand hinauslaufen. Der "Antippen
+        // zum Schliessen"-Hinweis entfaellt dadurch bei erkannten Militaer-/
+        // Behoerdenfluegen, was aber unkritisch ist (das Panel schliesst
+        // sich weiterhin per Antippen, nur der Hinweis fehlt dann).
+        bool notable = isNotableCallsign(a.callsign) ||
+                       (SettingsStore::militarySquawkDetectionEnabled() && isMilitaryGovSquawk(a.squawk));
+        bool notableChanged = forceFull || !lastPanel.notableInitialized || lastPanel.notable != notable;
+        if (notableChanged) {
+            // Zeile komplett loeschen, bevor sie neu gezeichnet wird - sonst
+            // koennte beim Wechsel zwischen den beiden unterschiedlich
+            // langen Texten (z.B. Squawk-Aenderung waehrend das Panel offen
+            // bleibt) ein Textrest des vorherigen Inhalts stehen bleiben.
+            gfx.fillRect(0, (int16_t)(y - 16), Config::SCREEN_WIDTH, 20, TFT_BLACK);
+            if (notable) {
+                // Mini-Ring in derselben Farbe/Form wie der Marker-Ring auf
+                // dem Radar selbst (siehe isNotable-Zweig in render()/
+                // tick(), dort Radius 12, TFT_ORANGE) - hier deutlich
+                // kleiner, da reines Legenden-Symbol, kein echter Marker.
+                constexpr int16_t RING_R = 4;
+                int16_t ringCx = 8 + RING_R;
+                int16_t ringCy = (int16_t)(y - 5);
+                gfx.drawCircle(ringCx, ringCy, RING_R, TFT_ORANGE);
+                gfx.setTextColor(TFT_ORANGE, TFT_BLACK);
+                gfx.setCursor((int16_t)(ringCx + RING_R + 6), y);
+                gfx.print(I18n::t(StringId::DETAIL_MILITARY_LEGEND));
+            } else {
+                gfx.setTextColor(themeDimColor(gfx), TFT_BLACK);
+                gfx.setCursor(8, y);
+                gfx.print(I18n::t(StringId::DETAIL_TAP_CLOSE));
+            }
+            lastPanel.notable = notable;
+            lastPanel.notableInitialized = true;
         }
 
         lastPanel.valid = true;

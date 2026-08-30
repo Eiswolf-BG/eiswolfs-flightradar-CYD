@@ -13,6 +13,9 @@
 #include "weather.h"
 #include "ota_update.h"
 #include "iss_tracker.h"
+#include "mqtt_client.h"
+#include "aircraft_watchlist.h"
+#include "squawk_watchlist.h"
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -52,6 +55,8 @@ namespace {
     bool webServerStarted = false;
 
     void taskFunc(void*) {
+        MqttClient::init();
+
         for (;;) {
             WifiMgr::update();
             LocationManager::update();
@@ -77,6 +82,12 @@ namespace {
             // ota_update.cpp) - hier einfach jede Schleife mit aufrufen,
             // genau wie Weather::update() oben.
             OtaUpdate::pollBackground();
+            // Optionale MQTT-Anbindung (SettingsStore::mqttEnabled(), AUS
+            // per Default, siehe mqtt_client.h) - kuemmert sich selbst um
+            // (Wieder-)Verbinden mit eigenem Mindestabstand zwischen
+            // Versuchen, hier einfach jede Schleife mit aufrufen, gleiches
+            // Muster wie Weather::update()/OtaUpdate::pollBackground() oben.
+            MqttClient::loop();
             // Unabhaengig vom Erfolg der ADS-B-Abfrage weiter unten pruefen,
             // damit die 24h-Sicherheitsabschaltung des Flugbuchs auch waehrend
             // laengerer WLAN-/ADS-B-Ausfaelle zuverlaessig greift (siehe
@@ -127,6 +138,41 @@ namespace {
                         AircraftTable::unlock();
 
                         FlightLogbook::update();
+
+                        // MQTT-Statuswerte (SettingsStore::mqttEnabled(),
+                        // siehe mqtt_client.h) - dieselben drei Kennzahlen,
+                        // die auch die LED-Alarme steuern (Naeherungs-/
+                        // Watchlist-Alarm, siehe radar_screen.cpp::
+                        // updateProximityAlert()), hier unabhaengig auf
+                        // Core 0 aus der frisch aktualisierten
+                        // AircraftTable neu berechnet - MqttClient::
+                        // publishStatus() selbst prueft mqttEnabled() und
+                        // den Verbindungsstatus, ist also auch bei
+                        // ausgeschaltetem MQTT gefahrlos aufrufbar (reiner
+                        // No-Op).
+                        {
+                            bool watchlistOn = SettingsStore::watchlistAlertEnabled();
+                            bool proximityOn = SettingsStore::proximityAlertEnabled();
+                            bool anyWatched = false;
+                            bool anyClose = false;
+                            AircraftTable::lock();
+                            Aircraft* table = AircraftTable::raw();
+                            uint8_t aircraftCount = AircraftTable::validCount();
+                            if (watchlistOn || proximityOn) {
+                                for (uint8_t i = 0; i < AircraftTable::capacity(); i++) {
+                                    if (!table[i].valid) continue;
+                                    if (watchlistOn && (AircraftWatchlist::isWatched(table[i].callsign) ||
+                                                         SquawkWatchlist::isWatched(table[i].squawk))) {
+                                        anyWatched = true;
+                                    }
+                                    if (proximityOn && table[i].distanceKm <= Config::LED_ALERT_RADIUS_KM) {
+                                        anyClose = true;
+                                    }
+                                }
+                            }
+                            AircraftTable::unlock();
+                            MqttClient::publishStatus(aircraftCount, anyWatched, anyClose);
+                        }
 
                         // Kurzer gruener LED-Blitz als "Herzschlag" - zeigt,
                         // dass gerade eine Abfrage gelaufen ist. Wird von

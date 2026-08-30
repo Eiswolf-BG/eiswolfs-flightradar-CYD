@@ -651,6 +651,33 @@ enum class StringId : uint16_t {
     RAIN_EFFECT_INFO_TITLE,
     RAIN_EFFECT_INFO_BODY,
 
+    // Optionale MQTT-Schnittstelle (mqtt_client.h/mqtt_screen.cpp) - AUS
+    // per Default, Menue-Eintrag bei System > Werkzeuge (Page::
+    // SystemTools, menu_screen.cpp), neben Kalibrierung/Web-Livekarte/
+    // Sicherung & Reset.
+    MENU_MQTT,
+    MQTT_TITLE,
+    MQTT_ENABLE,
+    MQTT_BROKER_LABEL,
+    MQTT_BROKER_PROMPT,
+    MQTT_USERNAME_LABEL,
+    MQTT_USERNAME_PROMPT,
+    MQTT_PASSWORD_LABEL,
+    MQTT_PASSWORD_PROMPT,
+    MQTT_NOT_SET,
+    MQTT_INFO_TITLE,
+    MQTT_INFO_BODY,
+
+    // Kurze Legenden-Zeile im Detail-Panel (drawDetailPanel(), letzte
+    // Zeile - ersetzt dort den "Antippen zum Schliessen"-Hinweis, siehe
+    // Kommentar dort) fuer als Militaer-/Behoerdenflug erkannte Flugzeuge
+    // (isNotableCallsign()/isMilitaryGovSquawk(), gleicher Best-Effort-
+    // Charakter wie MILITARY_SQUAWK_INFO_BODY) - Mini-Ring-Symbol in
+    // TFT_ORANGE (wie der Marker-Ring auf dem Radar) plus dieser kurze
+    // Text, im "Punkt + Beschriftung"-Legendenstil wie die bestehende
+    // Hoehen-Legende.
+    DETAIL_MILITARY_LEGEND,
+
     COUNT
 };
 

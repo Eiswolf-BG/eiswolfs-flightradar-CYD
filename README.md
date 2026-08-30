@@ -93,6 +93,8 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Update-available LED signal** – the RGB LED blinks magenta three times every 10 seconds whenever a firmware update is available, in addition to the existing red dot badges; suppressed while an emergency alert is active, and stops as soon as the update is installed or no longer available
 - **Color-themed LED alerts** – the heartbeat flash and proximity alert LED now follow the selected **Radar Display** color theme (green/amber/blue) instead of always being green; the watchlist alert LED is fixed cyan so it stays clearly distinguishable from the proximity alert even on the blue theme
 - **Web Live Radar improvements** – the page now shows a live-counting "last updated" timestamp plus the firmware version and connection status in the footer, automatically follows the device's selected color theme, shows a subtle watchlist/squawk status hint when a tracked aircraft is visible, and the logbook table below it is now searchable (by date) and sortable by clicking a column header
+- **MQTT / Home Assistant integration** – an optional MQTT connection (**Menu → System → Tools → "MQTT"**, off by default) publishes aircraft count, proximity/watchlist alert status, WiFi signal strength, and firmware version to your own broker, with automatic Home Assistant device discovery so all sensors show up grouped under one device, including online/offline availability (see [MQTT / Home Assistant](#-mqtt--home-assistant) below)
+- **Military/government legend hint** – the aircraft detail panel now shows a small legend line (matching the existing altitude-legend style) whenever the currently viewed aircraft was detected as a military/government flight, in addition to the existing orange ring on the radar itself
 
 ## Feature Deep-Dive
 
@@ -200,6 +202,13 @@ A small built-in web page lets you view a live radar and export the flight logbo
 **How to use it:** while your computer or phone is on the same WiFi network as the device, open a browser and go to the device's IP address (e.g. `http://192.168.1.42/`).
 
 Don't know the device's current IP? **Menu > System > "Logbook / WebUI"** shows it live on the device, along with a short explanation of the page (the "?" info button on the **Logbook files** screen also still shows it). While connected to WiFi, this screen also shows a **QR code** for the page's URL, so you can open it on your phone without typing the IP address by hand.
+
+### 🏠 MQTT / Home Assistant
+An optional MQTT connection (**Menu → System → Tools → "MQTT"**, off by default) lets you feed a few live radar values into your own smart-home system, such as Home Assistant. Turn it on, enter your broker's address (host and port, e.g. `192.168.1.10:1883`), and optionally a username/password if your broker requires authentication – public test brokers without a login work too.
+
+Once connected, the device regularly publishes the number of aircraft currently in range, the proximity-alert and watchlist-alert status, the WiFi signal strength, and the running firmware version, all under a shared `eiswolfs-flightradar/` topic prefix.
+
+**Home Assistant auto-discovery:** if you're using Home Assistant, no manual configuration is needed – the device announces all of the above as sensors via the standard MQTT Discovery mechanism as soon as it connects, and they appear automatically as a single grouped device ("Eiswolfs Flightradar") on your dashboard. A proper MQTT Last-Will-and-Testament makes sure Home Assistant correctly shows the device as unavailable if the connection ever drops unexpectedly (e.g. power loss), not just when you turn MQTT off on purpose.
 
 ### ☀️ Weather Icon
 A small icon in the header (where the camera button used to be) shows the current weather conditions – sun, cloud, sun-behind-cloud, rain, snow, or thunderstorm – drawn entirely with simple shapes, no image files or extra fonts needed.

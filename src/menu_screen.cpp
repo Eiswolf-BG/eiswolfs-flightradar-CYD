@@ -6,6 +6,7 @@
 #include "stats_history_screen.h"
 #include "logbook_files_screen.h"
 #include "webui_screen.h"
+#include "mqtt_screen.h"
 #include "location_presets_screen.h"
 #include "airline_filter_screen.h"
 #include "aircraft_watchlist_screen.h"
@@ -930,13 +931,15 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             // Sicherung & Reset (das bestehende Page::BackupReset-Untermenue
             // bleibt unveraendert, wird jetzt nur eine Ebene tiefer erreicht:
             // System > Werkzeuge > Sicherung & Reset).
-            Rect calibBtn       = subMenuRowRect(0, 4);
-            Rect webuiBtn       = subMenuRowRect(1, 4);
-            Rect backupResetBtn = subMenuRowRect(2, 4);
-            Rect backBtn        = subMenuRowRect(3, 4);
+            Rect calibBtn       = subMenuRowRect(0, 5);
+            Rect webuiBtn       = subMenuRowRect(1, 5);
+            Rect mqttBtn        = subMenuRowRect(2, 5);
+            Rect backupResetBtn = subMenuRowRect(3, 5);
+            Rect backBtn        = subMenuRowRect(4, 5);
 
             drawButton(tft, calibBtn, I18n::t(StringId::MENU_CALIBRATE));
             drawButton(tft, webuiBtn, I18n::t(StringId::MENU_LOGBOOK_WEBUI));
+            drawButton(tft, mqttBtn, I18n::t(StringId::MENU_MQTT));
             drawButton(tft, backupResetBtn, I18n::t(StringId::MENU_BACKUP_RESET));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
@@ -952,6 +955,8 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
                 CalibrationScreen::run(tft);
             } else if (webuiBtn.contains(tap.x, tap.y)) {
                 WebUiScreen::run(tft);
+            } else if (mqttBtn.contains(tap.x, tap.y)) {
+                MqttScreen::run(tft);
             } else if (backupResetBtn.contains(tap.x, tap.y)) {
                 page = Page::BackupReset;
             } else if (backBtn.contains(tap.x, tap.y)) {

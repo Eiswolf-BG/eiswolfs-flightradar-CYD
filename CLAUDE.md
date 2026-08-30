@@ -258,6 +258,52 @@ behoben halten oder denselben gescheiterten Lösungsansatz wiederholen.
   bewusst wieder auf lokales, pro Aufruf freigegebenes `JsonDocument`
   zurückgesetzt. Kein Fix vorhanden, Stand: v4.1.0.
 
+- **hexdb.io testweise mit komplettem Ausfall beobachtet** (30.08.,
+  `aircraft_details.cpp`, Modell- UND Routen-Endpunkt gleichermaßen
+  betroffen): Per `curl -v` von außerhalb des Geräts verifiziert - DNS
+  löst auf, TCP-Connect (~20ms) und TLS-Handshake (~50ms, gültiges
+  Zertifikat) laufen sofort durch, aber die eigentliche HTTP-Antwort kam
+  in 8/8 Testanfragen nie zurück (Timeout). Eindeutig ein serverseitiges
+  Problem bei hexdb.io/dessen Cloudflare-Origin, kein Client-/Netzwerk-
+  Problem. Unklar, ob Dauerzustand oder vorübergehend. Dabei zusätzlich
+  gefunden und behoben: `httpGetString()` setzte intern immer
+  `http.setTimeout(5000)`, was den vom Aufrufer gesetzten
+  `client.setTimeout()`-Wert überschrieb - die beabsichtigten kürzeren
+  Timeouts für hexdb.io griffen dadurch nie (alle fünf API-Aufrufe liefen
+  faktisch einheitlich mit 5s). Seit dem Fix bekommt hexdb.io einen
+  eigenen, jetzt wirksamen 1200ms-Timeout und wurde in der Routen-
+  Fallback-Kette ans Ende verschoben (adsbdb.com vorgezogen, siehe
+  Kommentare in `aircraft_details.cpp`). Hinweis aus dem Live-Test: der
+  tatsächliche Zeitbedarf bis zum Fehlschlag lag trotz 1200ms-Timeout bei
+  ~2,7-2,8s (nicht 1,2s) - vermutlich TCP-Connect-/TLS-Overhead auf der
+  ESP32-Hardware, der vom `http.setTimeout()`-Wert nicht mit abgedeckt
+  wird (separater `_connectTimeout`, bleibt beim HTTPClient-Standardwert
+  5000ms). Kein weiterer Fix vorgenommen, da bereits deutliche
+  Verbesserung gegenüber vorher (~5s pro Fehlschlag).
+
+- **Unerklärte automatische Neu-Auswahl eines Flugzeugs ohne Touch-Eingabe**
+  (30.08., beobachtet via Diagnose-Log am Testgerät): Bei einem frischen
+  Boot wurden - ohne jede Touch-Interaktion - zweimal kurz hintereinander
+  (~35s Abstand, beide innerhalb der ersten ~70s nach Boot) automatisch
+  unterschiedliche Flugzeuge ausgewählt (`RadarScreen::selectAircraft()`/
+  `AircraftDetails::request()` liefen jeweils für ein Flugzeug, das nicht
+  über den in dieser Sitzung eigens eingebauten Test-Trigger ausgelöst
+  wurde - dessen eigener Aufruf lag zeitlich nachweislich NICHT davor).
+  Alle drei bekannten Aufrufer von `AircraftDetails::request()`
+  (`radar_screen.cpp::handleTap()` zweimal, `selectAircraft()`) sind
+  eigentlich touch-gebunden. Mögliche Ursache: spontane/spurious
+  Touch-Ereignisse vom XPT2046-Touch-Controller kurz nach dem Booten
+  (bekannte Fehlerklasse bei resistiven Touch-Controllern, z.B. durch
+  SPI-Bus-Störungen während der Display-Initialisierung). In den
+  restlichen ~2,5 Minuten desselben Testlaufs trat es nicht erneut auf -
+  wirkt daher eher wie ein Boot-Zeit-Phänomen als ein dauerhaft
+  wiederkehrendes Problem, könnte aber auf Alex' Gerät unter anderen
+  elektrischen/Umgebungsbedingungen häufiger auftreten. NICHT
+  ursächlich für einen mehrminütigen "lädt..."-Hänger geprüft/bestätigt -
+  reine Beobachtung, die weitere Untersuchung verdient, falls das
+  gemeldete Hängenbleiben erneut auftritt. Kein Fix vorgenommen, Stand:
+  v4.6.0+.
+
 ## Standard-Workflow: Push & Release
 
 WICHTIG - wann dieser Workflow startet: Der komplette Release-Workflow

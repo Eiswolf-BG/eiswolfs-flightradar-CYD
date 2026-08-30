@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "4.6.0";
+    constexpr const char* APP_VERSION = "4.7.0";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -192,4 +192,13 @@ namespace Config {
     constexpr uint8_t EMERGENCY_SQUAWK_COUNT = 3;
 
     constexpr uint8_t MAX_WIFI_NETWORKS = 3;
+
+    // MQTT-Schnittstelle (optional, AUS per Default, siehe mqtt_client.h/
+    // mqtt_screen.cpp) - fuer Nutzer, die den Radar an ein eigenes Smart-
+    // Home-System (z.B. Home Assistant) anbinden wollen. Topic-Praefix
+    // bewusst als eigener Namensraum, damit auf einem geteilten Broker
+    // (z.B. ein bereits fuer andere Geraete genutzter Home-Assistant-
+    // Broker) keine Kollision mit anderen Themen entsteht.
+    constexpr const char* MQTT_TOPIC_PREFIX = "eiswolfs-flightradar";
+    constexpr uint16_t MQTT_DEFAULT_PORT = 1883;
 }

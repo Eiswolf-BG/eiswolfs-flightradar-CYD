@@ -355,6 +355,21 @@ static const char* const I18N_EN[] = {
     "Rain Effect",
     "About the Rain Effect",
     "Only visible when the weather data actually shows rain or a thunderstorm. The drops move in the actual wind direction - depending on the wind, this can make it look like it's raining upward on the radar (e.g. with wind from the south). That's physically correct, not a bug.",
+
+    "MQTT",
+    "MQTT",
+    "Enable MQTT",
+    "Broker: ",
+    "Broker address (host:port)",
+    "Username: ",
+    "Username (optional)",
+    "Password: ",
+    "Password (optional)",
+    "(not set)",
+    "About MQTT",
+    "MQTT is a simple messaging protocol used by smart-home systems like Home Assistant to exchange live values with other devices. When enabled, this device regularly sends aircraft count, watchlist-alert, and proximity-alert status to your own MQTT broker - nothing is sent unless you enter a broker address here.",
+
+    "= Government/Military (best-effort)",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,
