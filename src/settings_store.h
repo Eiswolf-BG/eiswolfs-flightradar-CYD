@@ -163,6 +163,13 @@ namespace SettingsStore {
     bool issMarkerEnabled();
     void setIssMarkerEnabled(bool on);
 
+    // Steuert NUR das LED-Blinken bei verfuegbarem Update (dreimal kurz
+    // Magenta, siehe radar_screen.cpp) - AN per Default (bisheriges
+    // Verhalten). Der rote Punkt am "Nach Update suchen"-Button bleibt bei
+    // AUS unveraendert bestehen, betrifft ausschliesslich das LED-Signal.
+    bool updateLedSignalEnabled();
+    void setUpdateLedSignalEnabled(bool on);
+
     // Optionale MQTT-Schnittstelle (siehe mqtt_client.h/mqtt_screen.cpp) -
     // AUS per Default. mqttBroker() liefert "host:port" als ein Feld (so
     // wie im Eingabe-Screen erfasst, siehe MqttScreen::run()) statt

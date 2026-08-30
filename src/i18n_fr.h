@@ -324,6 +324,7 @@ static const char* const I18N_FR[] = {
     "À propos du marqueur ISS",
     "Affiche la Station spatiale internationale (ISS) sous forme de marqueur special lorsqu'elle passe actuellement dans votre portee radar. En raison de sa grande vitesse (~7,66 km/s), elle n'est generalement visible que pendant quelques secondes, si tant est qu'elle le soit.",
 
+    "Démarrage...",
     "Initialisation du récepteur transpondeur...",
     "Étalonnage du réseau radar...",
     "Connexion au satellite...",
@@ -369,6 +370,10 @@ static const char* const I18N_FR[] = {
     "MQTT est un protocole de messagerie simple utilisé par les systèmes domotiques comme Home Assistant pour échanger des valeurs en direct avec d'autres appareils. Une fois activé, cet appareil envoie régulièrement le nombre d'avions à portée ainsi que l'état des alertes de liste de surveillance et de proximité à votre propre broker MQTT - rien n'est envoyé tant qu'aucune adresse de broker n'est renseignée ici.",
 
     "= Gouvernemental/Militaire (estimation)",
+
+    "Alerte LED sur mise a jour : ",
+    "A propos de l'alerte LED de mise a jour",
+    "Lorsqu'une mise a jour est disponible, la LED clignote brievement en magenta trois fois toutes les 10 secondes, en plus du point rouge sur le bouton de mise a jour. Desactivez ceci si le clignotement vous derange - le point rouge sur le bouton reste affiche dans tous les cas.",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

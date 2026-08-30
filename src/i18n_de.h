@@ -324,6 +324,7 @@ static const char* const I18N_DE[] = {
     "Über den ISS-Marker",
     "Zeigt die Internationale Raumstation (ISS) als Sondermarker, wenn sie gerade innerhalb eurer Radar-Reichweite vorbeifliegt. Wegen ihrer hohen Geschwindigkeit (~7,66 km/s) ist das meist nur für wenige Sekunden sichtbar, wenn überhaupt.",
 
+    "Systemstart...",
     "Initialisiere Transponder-Empfänger...",
     "Kalibriere Radar-Array...",
     "Verbinde mit Satellit...",
@@ -369,6 +370,10 @@ static const char* const I18N_DE[] = {
     "MQTT ist ein einfaches Nachrichtenprotokoll, das Smart-Home-Systeme wie Home Assistant nutzen, um Live-Werte mit anderen Geräten auszutauschen. Bei aktiviertem Schalter sendet das Gerät regelmäßig die Anzahl Flugzeuge in Reichweite sowie den Watchlist- und Näherungsalarm-Status an deinen eigenen MQTT-Broker - ohne eingetragene Broker-Adresse wird nichts gesendet.",
 
     "= Behörden/Militär (Best-Effort)",
+
+    "LED-Hinweis bei Update: ",
+    "Über den Update-LED-Hinweis",
+    "Sobald ein Update verfügbar ist, blinkt die LED alle 10 Sekunden zusätzlich zum roten Punkt am Update-Button dreimal kurz Magenta. Bei Bedarf lässt sich das Blinken hier abschalten - der rote Punkt am Button bleibt davon unberührt bestehen.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

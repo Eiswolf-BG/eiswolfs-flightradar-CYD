@@ -23,23 +23,72 @@ namespace {
         StringId::BOOT_SEQ_4, StringId::BOOT_SEQ_5, StringId::BOOT_SEQ_6,
     };
     constexpr uint8_t BOOT_LINE_COUNT = sizeof(BOOT_LINES) / sizeof(BOOT_LINES[0]);
-    constexpr uint32_t BOOT_LINE_DELAY_MS = 350;
-    constexpr uint32_t BOOT_FINAL_PAUSE_MS = 300;
+    // Timing bewusst so gewaehlt, dass jede Zeile einzeln lesbar
+    // "reinklappt" statt alle sofort dazustehen, aber die Gesamtsequenz
+    // trotzdem klar unter 5s bleibt (Titel-Pause + 6 Zeilen a 550ms +
+    // Schlusspause = ca. 4.1s).
+    constexpr uint32_t BOOT_TITLE_PAUSE_MS = 400;
+    constexpr uint32_t BOOT_LINE_DELAY_MS = 550;
+    constexpr uint32_t BOOT_FINAL_PAUSE_MS = 400;
+    constexpr int16_t BOOT_TITLE_Y = 34;
     constexpr int16_t BOOT_START_X = 14;
-    constexpr int16_t BOOT_START_Y = 40;
+    constexpr int16_t BOOT_RIGHT_MARGIN = 10;
+    constexpr int16_t BOOT_START_Y = 150;
     constexpr int16_t BOOT_LINE_H = 22;
+
+    // Lokale Kopie des layoutWrapped()-Musters (siehe location_presets_screen.cpp/
+    // wifi_manage_screen.cpp, dort bewusst dupliziert statt geteilt) - bricht
+    // EINE Boot-Zeile wortweise um, falls sie nicht in die Bildschirmbreite
+    // passt, statt sie wie bisher per drawString() einfach ueber den rechten
+    // Rand hinauslaufen und abschneiden zu lassen.
+    int16_t drawWrappedBootLine(TFT_eSPI& tft, const String& text, int16_t startY) {
+        int16_t maxWidth = tft.width() - BOOT_START_X - BOOT_RIGHT_MARGIN;
+        int16_t y = startY;
+        int32_t start = 0;
+        int32_t len = text.length();
+        while (start < len) {
+            while (start < len && text[start] == ' ') start++;
+            if (start >= len) break;
+
+            String line = text.substring(start, len);
+            while (tft.textWidth(line) > maxWidth) {
+                int32_t lastSpace = line.lastIndexOf(' ');
+                if (lastSpace <= 0) break;
+                line = line.substring(0, lastSpace);
+            }
+
+            tft.setCursor(BOOT_START_X, y);
+            tft.print(line);
+            y += BOOT_LINE_H;
+            start += line.length();
+        }
+        return y;
+    }
 }
 
 void playBootSequence(TFT_eSPI& tft) {
     tft.fillScreen(TFT_BLACK);
+
+    // Grosser, zentrierter Titel oben - macht den Screen als eigenstaendigen
+    // Ladebildschirm erkennbar, statt "nackt" nur mit den Statuszeilen.
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+    tft.setTextSize(2);
+    tft.drawString(I18n::t(StringId::BOOT_TITLE), tft.width() / 2, BOOT_TITLE_Y);
+    delay(BOOT_TITLE_PAUSE_MS);
+
+    // Boot-Zeilen bauen sich nacheinander auf ("Split-Flap"-Optik ohne
+    // echte Hoch-/Runterschiebe-Animation, siehe Bahnhofstafel-Vorbild) -
+    // jede Zeile wird einzeln gezeichnet und bekommt danach eine spuerbare
+    // Pause, bevor die naechste erscheint.
     tft.setTextDatum(TL_DATUM);
     tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setTextSize(1);
 
+    int16_t y = BOOT_START_Y;
     for (uint8_t i = 0; i < BOOT_LINE_COUNT; i++) {
-        int16_t y = BOOT_START_Y + i * BOOT_LINE_H;
         String line = String("> ") + I18n::t(BOOT_LINES[i]);
-        tft.drawString(line, BOOT_START_X, y);
+        y = drawWrappedBootLine(tft, line, y);
         delay(BOOT_LINE_DELAY_MS);
     }
     delay(BOOT_FINAL_PAUSE_MS);

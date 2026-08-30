@@ -1760,7 +1760,11 @@ namespace {
                            details.routeOriginIata[0] && details.routeDestIata[0];
             const char* origin = useIata ? details.routeOriginIata : details.routeOrigin;
             const char* dest = useIata ? details.routeDestIata : details.routeDest;
-            routeLine = String(I18n::t(StringId::DETAIL_ROUTE)) + origin + " -> " + dest;
+            // Kurzes Label dahinter, welches Format gerade angezeigt wird
+            // (nicht der jeweils andere Code-Wert) - reine Lesehilfe beim
+            // Umschalten per Antippen der Zeile.
+            routeLine = String(I18n::t(StringId::DETAIL_ROUTE)) + origin + " -> " + dest +
+                        (useIata ? " (IATA)" : " (ICAO)");
         } else {
             routeLine = String(I18n::t(StringId::DETAIL_ROUTE)) + I18n::t(StringId::DETAIL_UNKNOWN);
         }
@@ -2981,9 +2985,13 @@ void updateProximityAlert(uint32_t nowMs) {
 
     // Update-Verfuegbar-Signal (dreimal kurz Magenta, alle 10s) laeuft
     // unabhaengig von proximityOn/emergencyOn/watchlistOn immer mit, sofern
-    // OtaUpdate::isUpdateAvailable() true liefert - LedAlert::update()
-    // unterdrueckt es selbst automatisch waehrend mode == EmergencyRed.
-    ledBlinkOn = LedAlert::update(mode, nowMs, OtaUpdate::isUpdateAvailable());
+    // OtaUpdate::isUpdateAvailable() true liefert UND der Nutzer das per
+    // SettingsStore::updateLedSignalEnabled() nicht abgeschaltet hat (Menue
+    // > System) - LedAlert::update() unterdrueckt es zusaetzlich selbst
+    // automatisch waehrend mode == EmergencyRed. Der rote Punkt am
+    // "Nach Update suchen"-Button (siehe main.cpp) bleibt davon unberuehrt.
+    bool updateBlinkWanted = SettingsStore::updateLedSignalEnabled() && OtaUpdate::isUpdateAvailable();
+    ledBlinkOn = LedAlert::update(mode, nowMs, updateBlinkWanted);
 }
 
 EmergencyInfo checkEmergency() {

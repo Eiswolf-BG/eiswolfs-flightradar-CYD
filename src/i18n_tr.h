@@ -324,6 +324,7 @@ static const char* const I18N_TR[] = {
     "ISS işareti hakkında",
     "Uluslararasi Uzay Istasyonu'nu (ISS), radar menzilinizin icinden gectigi anda ozel bir isaret olarak gosterir. Yuksek hizi (~7,66 km/sn) nedeniyle bu genellikle sadece birkac saniye icin, hatta hic gorunmeyebilir.",
 
+    "Başlatılıyor...",
     "Transponder alıcısı başlatılıyor...",
     "Radar dizisi kalibre ediliyor...",
     "Uyduya bağlanılıyor...",
@@ -369,6 +370,10 @@ static const char* const I18N_TR[] = {
     "MQTT, Home Assistant gibi akıllı ev sistemlerinin diğer cihazlarla canlı değerler alışverişi yapmak için kullandığı basit bir mesajlaşma protokolüdür. Etkinleştirildiğinde bu cihaz, menzildeki uçak sayısını, izleme listesi ve yakınlık alarmı durumunu düzenli olarak kendi MQTT broker'ınıza gönderir - burada bir broker adresi girilmeden hiçbir şey gönderilmez.",
 
     "= Resmi/Askeri (tahmini)",
+
+    "Güncelleme LED uyarısı: ",
+    "Güncelleme LED uyarısı hakkında",
+    "Bir güncelleme mevcut olduğunda, güncelleme düğmesindeki kırmızı noktaya ek olarak LED her 10 saniyede bir kısa süreliğine üç kez magenta renginde yanıp söner. Yanıp sönme rahatsız ediyorsa burada kapatabilirsiniz - düğmedeki kırmızı nokta her durumda kalmaya devam eder.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

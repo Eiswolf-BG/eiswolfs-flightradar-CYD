@@ -1062,12 +1062,18 @@ void setup() {
     // Nachziehen wie bei invertDisplay() direkt drueber.
     ledcWrite(BACKLIGHT_PWM_CHANNEL, normalBacklightPwm());
 
-    // Rein kosmetische Terminal-Boot-Sequenz (immer aktiv, kein Schalter) -
-    // erst HIER moeglich, da sie die richtige Sprache braucht
-    // (SettingsStore::load() ist gerade eben gelaufen). Laeuft blockierend
-    // vor dem eigentlichen Splash-Screen (SplashScreen::begin() unten),
-    // Gesamtdauer ~2,4s, siehe splash_screen.cpp.
-    SplashScreen::playBootSequence(tft);
+    // Rein kosmetische Terminal-Boot-Sequenz (kein eigener Schalter) - erst
+    // HIER moeglich, da sie die richtige Sprache braucht (SettingsStore::
+    // load() ist gerade eben gelaufen). Laeuft blockierend vor dem
+    // eigentlichen Splash-Screen (SplashScreen::begin() unten), siehe
+    // splash_screen.cpp. NUR ab dem ersten Boot NACH abgeschlossener
+    // Ersteinrichtung (isFirstRun == false, siehe SD_SETTINGS_FILE-Check
+    // oben) - beim allerersten Boot eines neuen/zurueckgesetzten Geraets
+    // wuerde sie sonst schon auf Englisch vor Sprachauswahl/WLAN-Assistent
+    // erscheinen, obwohl der Nutzer noch gar nichts eingerichtet hat.
+    if (!isFirstRun) {
+        SplashScreen::playBootSequence(tft);
+    }
 
     if (isFirstRun) {
         // Beim allerersten Start gibt es keine "vorherige Version", mit der

@@ -325,6 +325,7 @@ static const char* const I18N_EN[] = {
     "About the ISS marker",
     "Shows the International Space Station (ISS) as a special marker when it's currently passing within your radar range. Because it moves so fast (~7.66 km/s), it's usually only visible for a few seconds, if at all.",
 
+    "Booting...",
     "Initializing transponder receiver...",
     "Calibrating radar array...",
     "Connecting to satellite uplink...",
@@ -370,6 +371,10 @@ static const char* const I18N_EN[] = {
     "MQTT is a simple messaging protocol used by smart-home systems like Home Assistant to exchange live values with other devices. When enabled, this device regularly sends aircraft count, watchlist-alert, and proximity-alert status to your own MQTT broker - nothing is sent unless you enter a broker address here.",
 
     "= Government/Military (best-effort)",
+
+    "LED alert on update: ",
+    "About the update LED alert",
+    "When an update is available, the LED briefly flashes magenta three times every 10 seconds, in addition to the red dot on the update button. Turn this off if the flashing bothers you - the red dot on the button stays either way.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

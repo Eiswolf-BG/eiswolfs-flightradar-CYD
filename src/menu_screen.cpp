@@ -128,23 +128,6 @@ namespace {
         drawButton(tft, btn, "?");
     }
 
-    // Zweizeilige Variante von drawButton() - fuer den zusammengelegten
-    // "Nach Update suchen"-Button im System-Menue (siehe Page::System),
-    // der jetzt in Zeile 1 die aktuelle Version und in Zeile 2 den
-    // bisherigen Button-Text traegt, seit der eigene "Info"-Button/-Screen
-    // entfernt wurde (die Versionsnummer war dort der einzige wirklich
-    // relevante Inhalt).
-    void drawButtonTwoLines(TFT_eSPI& tft, const Rect& r, const String& line1, const String& line2) {
-        tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
-        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, UiTheme::accentColor(tft));
-        tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
-        constexpr int16_t LINE_GAP = 14;
-        tft.drawString(line1, r.x + r.w / 2, r.y + r.h / 2 - LINE_GAP / 2);
-        tft.drawString(line2, r.x + r.w / 2, r.y + r.h / 2 + LINE_GAP / 2);
-        tft.setTextDatum(TL_DATUM);
-    }
-
     String onOff(bool on) { return I18n::t(on ? StringId::ON : StringId::OFF); }
 
     // Fortschrittspunkte-Anzeige waehrend SettingsBackup::backup()/restore()
@@ -798,16 +781,53 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             // Page::SystemDisplay/Page::SystemTools unten). "Nach Update
             // suchen" bleibt bewusst ein eigener, sofort sichtbarer Button
             // (kein Untermenue, nur eine einzelne Aktion) - zeigt weiterhin
-            // direkt Version + roten Punkt. Gleiche catRowRect()-Groesse wie
-            // das Hauptmenue (Page::Main), passt auch mit 4 Zeilen (statt
-            // dort 5) noch komfortabel auf den Bildschirm.
-            Rect displayBtn      = catRowRect(0);
-            Rect toolsBtn        = catRowRect(1);
-            Rect checkUpdateBtn  = catRowRect(2);
-            Rect backBtn         = catRowRect(3);
+            // direkt Version + roten Punkt.
+            //
+            // Eigene, lokale Zeilenaufteilung statt catRowRect() fuer diese
+            // Seite (der Update-Bereich ist bewusst hoeher als die anderen
+            // Zeilen und traegt zusaetzlich den neuen LED-Schalter - passt
+            // nicht mehr ins gleichfoermige catRowRect()-Raster). Endet
+            // exakt bei SCREEN_HEIGHT-10, gleiche Bodenmarge wie
+            // subMenuRowRect().
+            constexpr int16_t SYS_START_Y = 28;
+            constexpr int16_t SYS_GAP = 8;
+            constexpr int16_t SYS_ROW_H = 50;
+            // Update-Info (oben) und LED-Schalter (unten) teilen sich EINEN
+            // gemeinsamen, durchgehenden Button-Rahmen (Alex' Wunsch - vorher
+            // zwei getrennte Kaesten mit einer Linie dazwischen sah aus wie
+            // zwei gestapelte Buttons statt einem zusammengehoerigen). Jede
+            // Haelfte bleibt trotzdem unabhaengig antippbar, siehe
+            // updateHalf/ledHalf unten.
+            constexpr int16_t SYS_UPDATE_HALF_H = 52;
+            constexpr int16_t SYS_LED_HALF_H = 52;
+
+            Rect displayBtn = {10, SYS_START_Y, (int16_t)(Config::SCREEN_WIDTH - 20), SYS_ROW_H};
+            Rect toolsBtn = {10, (int16_t)(displayBtn.y + SYS_ROW_H + SYS_GAP),
+                              (int16_t)(Config::SCREEN_WIDTH - 20), SYS_ROW_H};
+            // updateHalf = obere Haelfte des gemeinsamen Kastens (Version +
+            // "Nach Update suchen"), ledHalf = untere Haelfte (LED-Schalter) -
+            // beide zusammen ergeben den sichtbaren Aussenrahmen unten.
+            Rect updateHalf = {10, (int16_t)(toolsBtn.y + SYS_ROW_H + SYS_GAP),
+                                (int16_t)(Config::SCREEN_WIDTH - 20), SYS_UPDATE_HALF_H};
+            Rect ledHalf = {10, (int16_t)(updateHalf.y + SYS_UPDATE_HALF_H),
+                             (int16_t)(Config::SCREEN_WIDTH - 20), SYS_LED_HALF_H};
+            Rect outerUpdateBox = {updateHalf.x, updateHalf.y, updateHalf.w,
+                                    (int16_t)(SYS_UPDATE_HALF_H + SYS_LED_HALF_H)};
+            Rect backBtn = {10, (int16_t)(ledHalf.y + SYS_LED_HALF_H + SYS_GAP),
+                             (int16_t)(Config::SCREEN_WIDTH - 20), SYS_ROW_H};
 
             drawButton(tft, displayBtn, I18n::t(StringId::MENU_CATEGORY_DISPLAY));
             drawButton(tft, toolsBtn, I18n::t(StringId::MENU_CATEGORY_SYSTEM_TOOLS));
+
+            // EIN gemeinsamer Rahmen fuer beide Haelften - kein zweiter
+            // Aussenrahmen um die LED-Zeile mehr, keine durchgehende Linie
+            // ueber die volle Breite zwischen den beiden Haelften.
+            tft.fillRoundRect(outerUpdateBox.x, outerUpdateBox.y, outerUpdateBox.w, outerUpdateBox.h, 4, TFT_BLACK);
+            tft.drawRoundRect(outerUpdateBox.x, outerUpdateBox.y, outerUpdateBox.w, outerUpdateBox.h, 4, UiTheme::accentColor(tft));
+
+            // Obere Haelfte: Version/Update-Text, reiner Textinhalt ohne
+            // eigenen Rahmen (der ist ja bereits der gemeinsame Aussenrahmen
+            // oben) - gleiche Zwei-Zeilen-Optik wie vorher.
             // Zeigt "Update verfuegbar: vX.X.X" statt der laufenden Version,
             // sobald der Hintergrund-Check (oder ein vorheriger manueller
             // Check) eins gefunden hat - der eigentliche Tastendruck fuehrt
@@ -816,15 +836,48 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
             String checkUpdateLine1 = OtaUpdate::isUpdateAvailable()
                 ? String(I18n::t(StringId::OTA_UPDATE_AVAILABLE_PREFIX)) + OtaUpdate::availableVersion()
                 : String(I18n::t(StringId::CHECK_UPDATE_VERSION_PREFIX)) + Config::APP_VERSION;
-            drawButtonTwoLines(tft, checkUpdateBtn, checkUpdateLine1, I18n::t(StringId::MENU_CHECK_UPDATE));
+            tft.setTextDatum(MC_DATUM);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+            constexpr int16_t UPDATE_LINE_GAP = 14;
+            tft.drawString(checkUpdateLine1, updateHalf.x + updateHalf.w / 2, updateHalf.y + updateHalf.h / 2 - UPDATE_LINE_GAP / 2);
+            tft.drawString(I18n::t(StringId::MENU_CHECK_UPDATE), updateHalf.x + updateHalf.w / 2, updateHalf.y + updateHalf.h / 2 + UPDATE_LINE_GAP / 2);
+            tft.setTextDatum(TL_DATUM);
             if (OtaUpdate::isUpdateAvailable()) {
                 // Gleicher kleiner roter Punkt wie an den anderen Stellen
                 // (Menu-Button, "System"-Kachel) - hier zusaetzlich zur
                 // bereits geaenderten Textzeile oben, damit der Button auch
                 // beim schnellen Ueberfliegen der Seite auffaellt.
-                tft.fillCircle((int16_t)(checkUpdateBtn.x + checkUpdateBtn.w - 8), (int16_t)(checkUpdateBtn.y + 8), 4, TFT_RED);
-                tft.drawCircle((int16_t)(checkUpdateBtn.x + checkUpdateBtn.w - 8), (int16_t)(checkUpdateBtn.y + 8), 4, TFT_BLACK);
+                tft.fillCircle((int16_t)(updateHalf.x + updateHalf.w - 8), (int16_t)(updateHalf.y + 8), 4, TFT_RED);
+                tft.drawCircle((int16_t)(updateHalf.x + updateHalf.w - 8), (int16_t)(updateHalf.y + 8), 4, TFT_BLACK);
             }
+
+            // Kurzer interner Trennstrich zwischen den beiden Haelften - NUR
+            // innerhalb des Rahmens, beruehrt nicht den linken/rechten Rand
+            // (dezente Gliederung statt eines zweiten Aussenrahmens).
+            {
+                int16_t sepInset = 24;
+                int16_t sepY = updateHalf.y + updateHalf.h;
+                tft.drawFastHLine((int16_t)(outerUpdateBox.x + sepInset), sepY,
+                                   (int16_t)(outerUpdateBox.w - 2 * sepInset), UiTheme::accentColor(tft));
+            }
+
+            // Untere Haelfte: LED-Schalter-Text + "?"-Info-Button, ebenfalls
+            // ohne eigenen Rahmen. Text wird NICHT ueber die volle Zeilen-
+            // breite zentriert (das liess bei diesem laengeren Label das
+            // letzte Zeichen von "AN" unter dem rechts sitzenden "?"-Button
+            // verschwinden, weil der Button NACH dem Text gezeichnet wird
+            // und dessen schwarzer Hintergrund den ueberlappenden Textrest
+            // uebermalt) - sondern nur ueber den Bereich LINKS vom
+            // "?"-Button, damit garantiert Platz bleibt.
+            Rect ledInfoBtn = rowInfoBtnRect(ledHalf);
+            int16_t ledTextAreaW = ledInfoBtn.x - ledHalf.x - 4;
+            tft.setTextDatum(MC_DATUM);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+            tft.drawString(I18n::t(StringId::MENU_UPDATE_LED_SIGNAL) + onOff(SettingsStore::updateLedSignalEnabled()),
+                            ledHalf.x + ledTextAreaW / 2, ledHalf.y + ledHalf.h / 2);
+            tft.setTextDatum(TL_DATUM);
+            drawRowInfoButton(tft, ledHalf);
+
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -840,12 +893,22 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
                 delay(20);
             }
 
-            if (displayBtn.contains(tap.x, tap.y)) {
+            // "?"-Info-Button zuerst pruefen (kleine Flaeche innerhalb der
+            // LED-Schalter-Zeile) - sonst wuerde ein Tap darauf faelschlich
+            // als Tap auf die ganze Zeile (Schalter umlegen) gewertet,
+            // gleiches Prinzip wie bei der ISS-Marker-Zeile (Page::
+            // FlightFilters).
+            if (rowInfoBtnRect(ledHalf).contains(tap.x, tap.y)) {
+                infoScreen(tft, I18n::t(StringId::UPDATE_LED_SIGNAL_INFO_TITLE), I18n::t(StringId::UPDATE_LED_SIGNAL_INFO_BODY),
+                           UiTheme::accentColor(tft), I18n::t(StringId::OK));
+            } else if (displayBtn.contains(tap.x, tap.y)) {
                 page = Page::SystemDisplay;
             } else if (toolsBtn.contains(tap.x, tap.y)) {
                 page = Page::SystemTools;
-            } else if (checkUpdateBtn.contains(tap.x, tap.y)) {
+            } else if (updateHalf.contains(tap.x, tap.y)) {
                 runOtaUpdateScreen(tft);
+            } else if (ledHalf.contains(tap.x, tap.y)) {
+                SettingsStore::setUpdateLedSignalEnabled(!SettingsStore::updateLedSignalEnabled());
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::Main;
             }

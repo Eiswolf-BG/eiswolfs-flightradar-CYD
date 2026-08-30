@@ -575,6 +575,7 @@ enum class StringId : uint16_t {
     // Flavour-Text im Stil eines alten Radarsystems, keine echten
     // Statusmeldungen (die bestehenden SPLASH_*-Strings oben bleiben
     // unveraendert die tatsaechlichen Boot-Status-Anzeigen).
+    BOOT_TITLE,
     BOOT_SEQ_1,
     BOOT_SEQ_2,
     BOOT_SEQ_3,
@@ -677,6 +678,16 @@ enum class StringId : uint16_t {
     // Text, im "Punkt + Beschriftung"-Legendenstil wie die bestehende
     // Hoehen-Legende.
     DETAIL_MILITARY_LEGEND,
+
+    // Schalter auf der System-Seite (Page::System, menu_screen.cpp),
+    // direkt unter dem "Nach Update suchen"-Button - steuert NUR das
+    // LED-Blinken bei verfuegbarem Update (dreimal kurz Magenta, siehe
+    // radar_screen.cpp), AN per Default. Der rote Punkt am Button selbst
+    // bleibt bei AUS unveraendert bestehen (siehe SettingsStore::
+    // updateLedSignalEnabled()).
+    MENU_UPDATE_LED_SIGNAL,
+    UPDATE_LED_SIGNAL_INFO_TITLE,
+    UPDATE_LED_SIGNAL_INFO_BODY,
 
     COUNT
 };
