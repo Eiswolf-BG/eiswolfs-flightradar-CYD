@@ -2,7 +2,8 @@
 #include <TFT_eSPI.h>
 
 // Zentrale, projektweite UI-Akzentfarbe (Menue > System > Radar-
-// Darstellung, SettingsStore::radarThemeIndex() - Gruen/Amber/Blau).
+// Darstellung, SettingsStore::radarThemeIndex() - Gruen/Amber/Blau/Rot/
+// Lila).
 // Urspruenglich NUR fuer den Radar-Screen selbst gedacht (Sweep-Linie,
 // Panel-Rahmen, niedrigste Hoehenstufe), jetzt auf das GESAMTE Projekt
 // ausgeweitet (Alex' ausdruecklicher Wunsch) - alle Menues/Buttons/Rahmen/

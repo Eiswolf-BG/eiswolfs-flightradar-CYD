@@ -16,9 +16,17 @@ namespace {
         }
     };
 
-    constexpr int16_t ROW_H = 36;
+    // ROW_H dynamisch aus dem verfuegbaren Platz berechnet (gleiches
+    // Prinzip wie in language_screen.cpp) statt fest 36px - mit der
+    // siebten Sprache (Portugiesisch) waeren das 7 Zeilen, die mit fest
+    // 36px+6px Abstand ab START_Y=60 ueber den unteren Bildschirmrand
+    // hinausgereicht haetten.
     constexpr int16_t ROW_GAP = 6;
     constexpr int16_t START_Y = 60;
+    constexpr int16_t BOTTOM_MARGIN = 10;
+    constexpr uint8_t ROW_COUNT = I18n::LANG_COUNT;
+    constexpr int16_t ROW_H =
+        (Config::SCREEN_HEIGHT - START_Y - BOTTOM_MARGIN - (ROW_COUNT - 1) * ROW_GAP) / ROW_COUNT;
 
     Rect rowRect(uint8_t index) {
         return {20, (int16_t)(START_Y + index * (ROW_H + ROW_GAP)),

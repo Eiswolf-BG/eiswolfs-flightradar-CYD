@@ -57,6 +57,8 @@ namespace {
         switch (SettingsStore::radarThemeIndex()) {
             case 1: return {"#ffb000", "#3a2c1a", "#a08a5a"};  // Amber
             case 2: return {"#00c8ff", "#1a2c3a", "#6a90a0"};  // Blau
+            case 3: return {"#ff0202", "#3a1a1a", "#a06a6a"};  // Rot
+            case 4: return {"#b400ff", "#2a1a3a", "#8a6aa0"};  // Lila
             default: return {"#39ff14", "#1f3a2b", "#7a9a86"}; // Gruen (Standard)
         }
     }
@@ -280,7 +282,7 @@ namespace {
         // uebernommen werden kann, ohne die Seite neu laden zu muessen. Bei
         // Aenderung an einer der drei Farben bitte BEIDE Stellen synchron
         // halten.
-        html += "var THEME_PALETTES=[['#39ff14','#1f3a2b','#7a9a86'],['#ffb000','#3a2c1a','#a08a5a'],['#00c8ff','#1a2c3a','#6a90a0']];";
+        html += "var THEME_PALETTES=[['#39ff14','#1f3a2b','#7a9a86'],['#ffb000','#3a2c1a','#a08a5a'],['#00c8ff','#1a2c3a','#6a90a0'],['#ff0202','#3a1a1a','#a06a6a'],['#b400ff','#2a1a3a','#8a6aa0']];";
         html += "var lastThemeIndex=" + String(SettingsStore::radarThemeIndex()) + ";";
         html += "function applyTheme(idx){var p=THEME_PALETTES[idx]||THEME_PALETTES[0];var s=document.documentElement.style;";
         html += "s.setProperty('--accent',p[0]);s.setProperty('--accent-border',p[1]);s.setProperty('--accent-muted',p[2]);}";

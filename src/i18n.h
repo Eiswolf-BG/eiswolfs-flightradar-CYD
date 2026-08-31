@@ -732,11 +732,24 @@ enum class StringId : uint16_t {
     LEGEND_MILITARY_GOV,
     LEGEND_HEAVY,
 
+    // Menue-Umbau Radar-Darstellung: die drei einzelnen Farbschema-Buttons
+    // (RADAR_THEME_GREEN/AMBER/BLUE oben) wurden durch einen einzelnen
+    // "Farben"-Button ersetzt, der einen neuen Unterscreen mit ALLEN
+    // Farboptionen oeffnet (jetzt fuenf statt drei, siehe
+    // radar_theme_screen.cpp::runColorsScreen()) - RADAR_COLORS_BUTTON ist
+    // das Button-Label im Hauptscreen, RADAR_COLORS_TITLE der Titel des
+    // Unterscreens. RADAR_THEME_RED/PURPLE sind die beiden neuen
+    // Farboptionen darin.
+    RADAR_COLORS_BUTTON,
+    RADAR_COLORS_TITLE,
+    RADAR_THEME_RED,
+    RADAR_THEME_PURPLE,
+
     COUNT
 };
 
 namespace I18n {
-    constexpr uint8_t LANG_COUNT = 6;
+    constexpr uint8_t LANG_COUNT = 7;
     const char* t(StringId id);
     const char* languageName(uint8_t index);
 }

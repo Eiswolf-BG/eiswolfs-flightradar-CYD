@@ -48,7 +48,8 @@ vorausgesetzt werden.
 ## ⚠️ WICHTIGSTE FALLE: Der eigene Font ist grundlinien-verankert
 
 Die eingebauten TFT_eSPI-Fonts (GLCD, Font2 etc.) sind reines ASCII. Für
-Umlaute/Akzente (Deutsch, Türkisch, Französisch, Spanisch, Italienisch)
+Umlaute/Akzente (Deutsch, Türkisch, Französisch, Spanisch, Italienisch,
+brasilianisches Portugiesisch)
 gibt's einen **selbst generierten Font** (`src/ui_font.h`, via
 `tft.setFreeFont(&UiFont11pt)` global in `main.cpp::setup()` aktiviert, gilt
 danach für JEDEN `print()`/`drawString()`-Aufruf in der ganzen App).
@@ -88,18 +89,18 @@ Vorsicht bei neuem Code!):**
   Höhen-Farben-Legende-Overlay lief die Zeile dadurch links UND rechts
   über den Bildschirmrand hinaus, siehe Git-Historie/Bugfix). Ein
   festes Zeilenlimit ist nur dann unkritisch, wenn zusätzlich VORHER
-  geprüft wird, dass der Text in ALLEN 6 Sprachen tatsächlich in dieses
+  geprüft wird, dass der Text in ALLEN 7 Sprachen tatsächlich in dieses
   Limit passt — im Zweifel immer das uneingeschränkte `layoutWrapped()`
   nehmen.
 
 Falls neue Screens/Textstellen dazukommen: lieber einmal mehr testen (idealerweise
 mit Foto vom echten Display), bevor der Code als fertig gilt.
 
-## Pflichtprüfung: Textbreite/-höhe in ALLEN 6 Sprachen
+## Pflichtprüfung: Textbreite/-höhe in ALLEN 7 Sprachen
 
 Jeder neu hinzugefügte oder geänderte Text auf JEDEM Screen muss vor
 Abschluss der Aufgabe nachweislich innerhalb der verfügbaren
-Bildschirmbreite/-höhe bleiben — in ALLEN 6 Sprachen, nicht nur der
+Bildschirmbreite/-höhe bleiben — in ALLEN 7 Sprachen, nicht nur der
 zuletzt getesteten (meist Deutsch/Englisch). Bei jeder neuen
 Text-Ausgabe ist zu prüfen/sicherzustellen, dass `layoutWrapped()`
 (oder ein gleichwertiger, wortweise und pro Zeile pixel-breiten-
@@ -115,37 +116,56 @@ langen) Textes abhängen, nicht von einem für die kürzeste Sprache
 passenden festen Offset — sonst verschieben sich in längeren Sprachen
 nachfolgende Elemente ineinander oder aus dem sichtbaren Bereich.
 
-## i18n (6 Sprachen)
+## i18n (7 Sprachen)
 
 - `src/i18n.h`: `enum class StringId` — jeder feste UI-Text hat eine ID.
 - `src/i18n_en.h`, `i18n_de.h`, `i18n_fr.h`, `i18n_tr.h`, `i18n_es.h`,
-  `i18n_it.h`: je ein `static const char* const[]`-Array, in **exakt
-  derselben Reihenfolge** wie das Enum.
+  `i18n_it.h`, `i18n_pt.h` (brasilianisches Portugiesisch): je ein
+  `static const char* const[]`-Array, in **exakt derselben Reihenfolge**
+  wie das Enum.
 - Jede Datei hat am Ende einen `static_assert`, der die Array-Größe gegen
   `StringId::COUNT` prüft — **wenn der Build wegen eines fehlschlagenden
   static_assert bricht, fehlt in mindestens einer Sprachdatei ein Eintrag
-  oder es ist einer zu viel.** Neue StringId → in ALLEN 6 Dateien an
+  oder es ist einer zu viel.** Neue StringId → in ALLEN 7 Dateien an
   derselben Position ergänzen, sonst verschiebt sich die Zuordnung.
 - Eigennamen der Sprachen (`I18n::languageName()`) sind separat in
   `i18n.cpp` hinterlegt, mit korrekten landessprachlichen Sonderzeichen
-  (z.B. "Français", "Türkçe", "Español").
+  (z.B. "Français", "Türkçe", "Español", "Português").
 
 ## UI-Konventionen (bitte einhalten für neue Screens)
 
 - **Farbschema:** Schwarzer Hintergrund (`TFT_BLACK`), Rahmen/Text/Buttons
   in der projektweiten UI-Akzentfarbe `UiTheme::accentColor(tft)`
-  (`src/ui_theme.h/.cpp` - Grün/Amber/Blau, folgt Menü > System > Radar-
-  Darstellung, `SettingsStore::radarThemeIndex()`), aktive/ausgewählte
-  Einträge invertiert (Akzentfarbe gefüllt, schwarzer Text). Destruktive
-  Aktionen (Abbrechen/Löschen) in Rot (`TFT_RED`). Neue Screens: immer
-  `UiTheme::accentColor(tft)` statt fest verdrahtetem `TFT_GREEN`
-  verwenden, `#include "ui_theme.h"` nicht vergessen.
+  (`src/ui_theme.h/.cpp` - Grün/Amber/Blau/Rot/Lila, folgt Menü > System >
+  Radar-Darstellung > "Farben" (eigener Unterscreen, siehe
+  `radar_theme_screen.cpp::runColorsScreen()`), `SettingsStore::
+  radarThemeIndex()`), aktive/ausgewählte Einträge invertiert (Akzentfarbe
+  gefüllt, schwarzer Text). Destruktive Aktionen (Abbrechen/Löschen) in Rot
+  (`TFT_RED`). Neue Screens: immer `UiTheme::accentColor(tft)` statt fest
+  verdrahtetem `TFT_GREEN` verwenden, `#include "ui_theme.h"` nicht
+  vergessen.
   **Ausnahmen** (bleiben literal, NICHT themenabhängig, da sie eine eigene
   Bedeutung tragen): Flugzeug-Höhenfarben (Grün <3000m/Gelb 3000-9100m/Rot
   >9100m, `colorForAltitude()` in `radar_screen.cpp` und
   `aircraft_list_screen.cpp`), Status-Ringe (Notfall-Rot, Beobachtungs-
   Cyan, Militär-/Behörden-Orange), sowie einfache Erfolg/Fehler-Anzeigen
   (z.B. Backup/Restore-Rückmeldung: Grün=erfolgreich/Rot=fehlgeschlagen).
+  **Feste Grundregel für jedes (aktuelle UND zukünftige) Farbthema:** Ein
+  Farbthema MUSS immer an die LED gebunden sein (`led_alert.cpp::
+  themeLedChannels()`) UND systemweit auf ALLEN Screens wirken -
+  einschließlich Ruhebildschirm (`main.cpp`), Boot-Sequenz
+  (`splash_screen.cpp`/Terminal-Bootsequenz), sämtlichen Menüs und der
+  Web-UI (`web_export_server.cpp::THEME_PALETTES`). Kein Farbthema darf
+  nur auf einzelnen Screens wirken - wird ein neues Thema ergänzt (wie Rot/
+  Lila), sind alle diese Stellen Pflicht, nicht optional. Falls eine
+  LED-Mischung eines neuen Themas mit einer bereits vergebenen Signalfarbe
+  (z.B. Notfall-Rot, Update-Verfügbar-Weiß) kollidieren würde, muss die
+  PWM-Mischung gezielt abgestimmt werden, bis sie eindeutig unterscheidbar
+  ist (siehe `AMBER_GREEN_BRIGHTNESS`/`PURPLE_RED_BRIGHTNESS` in
+  `led_alert.cpp` als Vorbild) - niemals einfach dieselbe Mischung
+  zweitverwenden. Das Update-Verfügbar-Signal ist bewusst Weiß (nicht
+  Magenta) - dadurch bleibt Magenta als einfache 1:1-Rot+Blau-Mischung frei
+  nutzbar, z.B. für ein Farbthema wie Lila.
 - Jeder Screen hat i.d.R. eine lokale `struct Rect` mit `contains(x,y)` und
   eine `drawButton()`-Hilfsfunktion (Copy-Paste-Muster aus den bestehenden
   Screens, kein gemeinsames Rect/Button-Modul — das ist bewusst so, um
@@ -162,7 +182,7 @@ nachfolgende Elemente ineinander oder aus dem sichtbaren Bereich.
   Infotext über `MenuScreen::showInfoScreen()`. Gilt für ALLE
   zukünftigen Toggle-Buttons, nicht nur für ausgewählte - auch ohne
   expliziten Auftrag im jeweiligen Prompt. Neue StringIds für Label +
-  Infotext-Titel + Infotext-Body dafür immer in allen 6 Sprachen
+  Infotext-Titel + Infotext-Body dafür immer in allen 7 Sprachen
   ergänzen (siehe i18n-Abschnitt oben).
 - **Sterne-Animation** (`src/menu_stars.h/.cpp`): Läuft im Hintergrund auf
   JEDEM schwarzen Menü-/Splash-Screen. Neue Screens sollten
@@ -256,7 +276,7 @@ wird. Das betrifft insbesondere:
   sichtbar ist (z.B. auf GitHub)
 
 Ausnahme: Die Firmware-UI selbst bleibt mehrsprachig wie gehabt
-(`i18n_de/en/fr/tr/es/it.h`) — diese Regel betrifft NUR die
+(`i18n_de/en/fr/tr/es/it/pt.h`) — diese Regel betrifft NUR die
 Projekt-Außendarstellung (Repo, Release Notes, Webseite), nicht die
 App-Oberfläche auf dem Gerät. Interne Code-Kommentare bleiben ebenfalls
 wie gehabt auf Deutsch (siehe „Code-Stil" oben) — diese Regel gilt nur
@@ -369,13 +389,13 @@ in dieser Reihenfolge:
    Falls im Push-Wunsch keine explizite Versionsnummer genannt wurde, bei
    Alex nachfragen statt zu raten. Zusammen mit `APP_VERSION` IMMER auch
    den Changelog fuer DIESES Release aktualisieren - der ist MEHRSPRACHIG
-   (alle 6 Sprachen wie der Rest der Geraete-UI), liegt in
+   (alle 7 Sprachen wie der Rest der Geraete-UI), liegt in
    `src/changelog.cpp` als sechs Konstanten (`CHANGELOG_EN`, `CHANGELOG_DE`,
    `CHANGELOG_FR`, `CHANGELOG_TR`, `CHANGELOG_ES`, `CHANGELOG_IT`, jeweils
    eine kurze Bullet-Liste), ausgewaehlt ueber `changelogLatest()`
    (deklariert in `src/changelog.h`) nach `SettingsStore::language()`. ALLE
-   6 Sprachen muessen aktualisiert werden, nicht nur Englisch - sonst zeigt
-   das Geraet nach dem naechsten Update fuer 5 von 6 Sprachen noch den
+   7 Sprachen muessen aktualisiert werden, nicht nur Englisch - sonst zeigt
+   das Geraet nach dem naechsten Update fuer 6 von 7 Sprachen noch den
    Changelog des VORHERIGEN Releases. Wird auf dem Geraet nach einem
    erfolgreichen OTA-Update auf dem "Update installiert"-Screen angezeigt.
 

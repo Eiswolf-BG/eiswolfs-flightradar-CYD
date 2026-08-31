@@ -870,6 +870,8 @@ namespace {
         switch (SettingsStore::radarThemeIndex()) {
             case 1: return gfx.color565(160, 110, 0);  // Amber, gedaempft
             case 2: return gfx.color565(0, 120, 160);  // Blau, gedaempft
+            case 3: return gfx.color565(160, 1, 1);     // Rot, gedaempft
+            case 4: return gfx.color565(113, 0, 160);  // Lila, gedaempft
             default: return gfx.color565(0, 160, 0);    // Gruen, gedaempft
         }
     }

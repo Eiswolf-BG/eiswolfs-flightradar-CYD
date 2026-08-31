@@ -114,7 +114,7 @@ namespace {
             onlyLowAltitudeOn = (value.toInt() != 0);
         } else if (key == "language") {
             int v = value.toInt();
-            if (v >= 0 && v <= 5) languageIdx = (uint8_t)v;
+            if (v >= 0 && v <= 6) languageIdx = (uint8_t)v;
         } else if (key == "units_mode") {
             int v = value.toInt();
             if (v >= 0 && v <= 2) unitsModeVal = (uint8_t)v;
@@ -122,7 +122,7 @@ namespace {
             iataAirportCodesOn = (value.toInt() != 0);
         } else if (key == "radar_theme") {
             int v = value.toInt();
-            if (v >= 0 && v <= 2) radarThemeIdx = (uint8_t)v;
+            if (v >= 0 && v <= 4) radarThemeIdx = (uint8_t)v;
         } else if (key == "crt_phosphor") {
             crtPhosphorOn = (value.toInt() != 0);
         } else if (key == "radar_pulse") {
@@ -365,7 +365,7 @@ void setOnlyLowAltitude(bool on) {
 uint8_t language() { return languageIdx; }
 
 void setLanguage(uint8_t lang) {
-    if (lang <= 5) {
+    if (lang <= 6) {
         languageIdx = lang;
         save();
     }
@@ -390,7 +390,7 @@ void setUseIataAirportCodes(bool on) {
 uint8_t radarThemeIndex() { return radarThemeIdx; }
 
 void setRadarThemeIndex(uint8_t idx) {
-    if (idx <= 2) {
+    if (idx <= 4) {
         radarThemeIdx = idx;
         save();
     }

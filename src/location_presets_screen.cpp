@@ -11,6 +11,7 @@
 #include "i18n.h"
 #include "units.h"
 #include "ui_theme.h"
+#include <cstring>
 
 namespace LocationPresetsScreen {
 
@@ -34,6 +35,52 @@ namespace {
         tft.drawString(label, r.x + r.w / 2, r.y + r.h / 2);
         tft.setTextDatum(TL_DATUM);
     }
+
+    // ---- UTF-8-bewusste Puffer-Helfer (fuer die Sonderzeichen-Tasten in
+    // runPresetNameKeypad() unten, z.B. "Ä") - dupliziert aus
+    // address_search_screen.cpp::runAddressKeyboard() (CLAUDE.md-
+    // Konvention "jeder Screen unabhaengig lauffaehig"). ----
+    void appendUtf8(char* buf, uint8_t& len, uint8_t cap, const char* s) {
+        size_t sl = strlen(s);
+        if (len + sl >= cap) return;
+        memcpy(buf + len, s, sl);
+        len += (uint8_t)sl;
+        buf[len] = 0;
+    }
+
+    // Entfernt beim Loeschen eine ganze UTF-8-Zeichensequenz (nicht nur ein
+    // einzelnes Byte) - sonst bliebe bei Sonderzeichen ein kaputtes halbes
+    // Byte im Puffer stehen.
+    void backspaceUtf8(char* buf, uint8_t& len) {
+        if (len == 0) return;
+        len--;
+        while (len > 0 && (((uint8_t)buf[len]) & 0xC0) == 0x80) len--;
+        buf[len] = 0;
+    }
+
+    // Zeigt nur so viel vom ENDE des Puffers, wie in maxWidth passt.
+    String visibleTail(TFT_eSPI& tft, const char* buf, int16_t maxWidth) {
+        String s(buf);
+        while (s.length() > 0 && tft.textWidth(s) > maxWidth) {
+            int32_t cut = ((((uint8_t)s[0]) & 0xE0) == 0xC0) ? 2 : 1;
+            if (cut > (int32_t)s.length()) cut = s.length();
+            s = s.substring(cut);
+        }
+        return s;
+    }
+
+    // Gleicher Sonderzeichen-Satz wie address_search_screen.cpp::
+    // runAddressKeyboard() (dort auch fuer die Adress-Suche verwendet) -
+    // dupliziert statt geteilt, siehe CLAUDE.md-Konvention. SPEC0-3 haben
+    // je 6 Tasten, SPEC4 nur 4 (Â/Î/Ë/Û, seltener gebraucht) - alle Glyphen
+    // bereits im Font vorhanden (ui_font.h deckt U+0020-U+015F durchgehend
+    // ab), keine neuen Pixel-Glyphen noetig.
+    constexpr const char* SPEC0[6] = {"À", "Á", "Ä", "Ç", "É", "È"};
+    constexpr const char* SPEC1[6] = {"Ê", "Í", "Ñ", "Ó", "Ò", "Ô"};
+    constexpr const char* SPEC2[6] = {"Ö", "Ù", "Ú", "Ü", "ß", "Ğ"};
+    constexpr const char* SPEC3[6] = {"İ", "Ş", "/", ".", "'", "-"};
+    constexpr const char* SPEC4[4] = {"Â", "Î", "Ë", "Û"};
+    constexpr uint8_t SPEC_ROW_COUNT = 5;
 
     String runNumericKeypad(TFT_eSPI& tft, const String& title) {
         MenuStars::reset();
@@ -124,6 +171,12 @@ namespace {
     // (Ortsnamen enthalten oft Leerzeichen, z.B. "Bei Oma") und OHNE
     // Eingabepflicht - der Name ist optional, "Ohne Namen" bestaetigt mit
     // leerem Puffer statt die Eingabe abzubrechen.
+    // Seit der Font-/Tastatur-Analyse (Alex' Wunsch) jetzt MIT
+    // Sonderzeichen-Seite (gleicher Zeichensatz/gleiches Muster wie
+    // address_search_screen.cpp::runAddressKeyboard()/runNameKeypad(), per
+    // appendUtf8()/backspaceUtf8() oben), damit z.B. "Zürich" oder
+    // "São Paulo" korrekt als Preset-Name eingetippt werden koennen -
+    // vorher bewusst ASCII-only, das war der urspruengliche Auftrag.
     String runPresetNameKeypad(TFT_eSPI& tft) {
         MenuStars::reset();
         constexpr const char* DIGITS = "1234567890";
@@ -131,10 +184,17 @@ namespace {
         constexpr const char* ROW2 = "ASDFGHJKL";
         constexpr const char* ROW3 = "ZXCVBNM";
 
-        char buf[17] = {0};
+        // Kapazitaet bewusst identisch zu Preset::name (siehe
+        // location_presets.cpp, char name[17]) gehalten, NICHT groesser -
+        // ein laengerer Eingabepuffer, der dann per strncpy() in
+        // addPreset() auf 16 Byte gekuerzt wird, koennte ein Mehrbyte-
+        // UTF-8-Sonderzeichen mitten entzweischneiden und einen kaputten
+        // Namen abspeichern.
+        constexpr uint8_t CAP = 17;
+        char buf[CAP] = {0};
         uint8_t len = 0;
+        bool specialPage = false;
 
-        constexpr int16_t KEY_H = 30;
         constexpr int16_t KEY_GAP = 3;
         constexpr int16_t FIELD_H = 34;
 
@@ -149,6 +209,16 @@ namespace {
         tft.println(I18n::t(StringId::LOCATION_NAME_HINT));
         int16_t fieldY = (int16_t)(tft.getCursorY() + 4);
         int16_t ROW0_Y = (int16_t)(fieldY + FIELD_H + 8);
+
+        // KEY_H dynamisch berechnet - siehe ausfuehrlicher Kommentar in
+        // address_search_screen.cpp::runAddressKeyboard() (gleicher Fix,
+        // gleicher Grund: die fuenfte Sonderzeichen-Zeile passte mit fest
+        // 30px nicht mehr aufs Display, die Aktionszeile wurde ueber den
+        // Bildschirmrand hinausgeschoben).
+        constexpr uint8_t TOTAL_ROWS = SPEC_ROW_COUNT + 2;
+        constexpr int16_t BOTTOM_MARGIN = 6;
+        int16_t availableH = (int16_t)(Config::SCREEN_HEIGHT - ROW0_Y - BOTTOM_MARGIN);
+        int16_t KEY_H = (int16_t)((availableH - (TOTAL_ROWS - 1) * KEY_GAP) / TOTAL_ROWS);
 
         auto layoutRow = [&](const char* row, int16_t y, Rect* outRects, uint8_t n) {
             int16_t usableW = Config::SCREEN_WIDTH - 8;
@@ -166,15 +236,36 @@ namespace {
         layoutRow(ROW2, (int16_t)(ROW0_Y + 2 * (KEY_H + KEY_GAP)), row2Rects, 9);
         layoutRow(ROW3, (int16_t)(ROW0_Y + 3 * (KEY_H + KEY_GAP)), row3Rects, 7);
 
-        Rect spaceBtn     = {4, (int16_t)(ROW0_Y + 4 * (KEY_H + KEY_GAP)), 150, KEY_H};
-        Rect backspaceBtn = {158, (int16_t)(ROW0_Y + 4 * (KEY_H + KEY_GAP)), (int16_t)(Config::SCREEN_WIDTH - 8 - 154), KEY_H};
-        Rect skipBtn      = {4, (int16_t)(ROW0_Y + 5 * (KEY_H + KEY_GAP)), 110, KEY_H};
-        Rect confirmBtn   = {118, (int16_t)(ROW0_Y + 5 * (KEY_H + KEY_GAP)), (int16_t)(Config::SCREEN_WIDTH - 8 - 114), KEY_H};
+        // Gleiche 5 Sonderzeichen-Zeilen wie address_search_screen.cpp
+        // (SPEC0-4, siehe oben).
+        Rect specRects[SPEC_ROW_COUNT][6];
+        for (uint8_t r = 0; r < 4; r++) {
+            layoutRow(nullptr, (int16_t)(ROW0_Y + r * (KEY_H + KEY_GAP)), specRects[r], 6);
+        }
+        layoutRow(nullptr, (int16_t)(ROW0_Y + 4 * (KEY_H + KEY_GAP)), specRects[4], 4);
+
+        Rect spaceBtn, backspaceBtn, toggleBtn, skipBtn, confirmBtn;
+
+        // Buchstaben-Seite hat 4 Inhaltszeilen, die Sonderzeichen-Seite 5 -
+        // gleiches Prinzip wie in runAddressKeyboard()/runNameKeypad().
+        auto layoutTrailingButtons = [&]() {
+            uint8_t contentRows = specialPage ? SPEC_ROW_COUNT : 4;
+            int16_t spaceRowY = (int16_t)(ROW0_Y + contentRows * (KEY_H + KEY_GAP));
+            int16_t btnRowY = (int16_t)(ROW0_Y + (contentRows + 1) * (KEY_H + KEY_GAP));
+            spaceBtn     = {4, spaceRowY, 150, KEY_H};
+            backspaceBtn = {158, spaceRowY, (int16_t)(Config::SCREEN_WIDTH - 8 - 154), KEY_H};
+            toggleBtn = {4, btnRowY, 80, KEY_H};
+            skipBtn   = {(int16_t)(4 + 80 + KEY_GAP), btnRowY, 90, KEY_H};
+            confirmBtn = {(int16_t)(4 + 80 + KEY_GAP + 90 + KEY_GAP), btnRowY,
+                          (int16_t)(Config::SCREEN_WIDTH - 8 - (80 + KEY_GAP + 90 + KEY_GAP)), KEY_H};
+        };
+        layoutTrailingButtons();
 
         bool done = false;
         bool confirmed = false;
 
         auto redraw = [&]() {
+            layoutTrailingButtons();
             tft.fillScreen(TFT_BLACK);
             tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
@@ -187,16 +278,25 @@ namespace {
             tft.setTextSize(2);
             tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(14, (int16_t)(fieldY + 26));
-            tft.print(buf);
+            tft.print(visibleTail(tft, buf, (int16_t)(Config::SCREEN_WIDTH - 28)));
             tft.setTextSize(1);
 
-            for (uint8_t i = 0; i < 10; i++) drawButton(tft, digitRects[i], String(DIGITS[i]));
-            for (uint8_t i = 0; i < 10; i++) drawButton(tft, row1Rects[i], String(ROW1[i]));
-            for (uint8_t i = 0; i < 9; i++) drawButton(tft, row2Rects[i], String(ROW2[i]));
-            for (uint8_t i = 0; i < 7; i++) drawButton(tft, row3Rects[i], String(ROW3[i]));
+            if (!specialPage) {
+                for (uint8_t i = 0; i < 10; i++) drawButton(tft, digitRects[i], String(DIGITS[i]));
+                for (uint8_t i = 0; i < 10; i++) drawButton(tft, row1Rects[i], String(ROW1[i]));
+                for (uint8_t i = 0; i < 9; i++) drawButton(tft, row2Rects[i], String(ROW2[i]));
+                for (uint8_t i = 0; i < 7; i++) drawButton(tft, row3Rects[i], String(ROW3[i]));
+            } else {
+                for (uint8_t i = 0; i < 6; i++) drawButton(tft, specRects[0][i], SPEC0[i]);
+                for (uint8_t i = 0; i < 6; i++) drawButton(tft, specRects[1][i], SPEC1[i]);
+                for (uint8_t i = 0; i < 6; i++) drawButton(tft, specRects[2][i], SPEC2[i]);
+                for (uint8_t i = 0; i < 6; i++) drawButton(tft, specRects[3][i], SPEC3[i]);
+                for (uint8_t i = 0; i < 4; i++) drawButton(tft, specRects[4][i], SPEC4[i]);
+            }
 
             drawButton(tft, spaceBtn, I18n::t(StringId::WIFI_SPACE));
             drawButton(tft, backspaceBtn, "<-");
+            drawButton(tft, toggleBtn, specialPage ? "ABC" : "ÄÖÜ");
             drawButton(tft, skipBtn, I18n::t(StringId::LOCATION_NAME_SKIP));
             drawButton(tft, confirmBtn, I18n::t(StringId::OK));
         };
@@ -208,27 +308,55 @@ namespace {
             if (!TouchInput::wasTapped(tap)) { MenuStars::update(tft); delay(20); continue; }
 
             bool handled = false;
-            for (uint8_t i = 0; i < 10 && !handled; i++) {
-                if (digitRects[i].contains(tap.x, tap.y) && len < sizeof(buf) - 1) { buf[len++] = DIGITS[i]; buf[len] = 0; handled = true; }
+            if (!specialPage) {
+                for (uint8_t i = 0; i < 10 && !handled; i++) {
+                    if (digitRects[i].contains(tap.x, tap.y)) {
+                        char s[2] = {DIGITS[i], 0};
+                        appendUtf8(buf, len, CAP, s);
+                        handled = true;
+                    }
+                }
+                for (uint8_t i = 0; i < 10 && !handled; i++) {
+                    if (row1Rects[i].contains(tap.x, tap.y)) {
+                        char s[2] = {ROW1[i], 0};
+                        appendUtf8(buf, len, CAP, s);
+                        handled = true;
+                    }
+                }
+                for (uint8_t i = 0; i < 9 && !handled; i++) {
+                    if (row2Rects[i].contains(tap.x, tap.y)) {
+                        char s[2] = {ROW2[i], 0};
+                        appendUtf8(buf, len, CAP, s);
+                        handled = true;
+                    }
+                }
+                for (uint8_t i = 0; i < 7 && !handled; i++) {
+                    if (row3Rects[i].contains(tap.x, tap.y)) {
+                        char s[2] = {ROW3[i], 0};
+                        appendUtf8(buf, len, CAP, s);
+                        handled = true;
+                    }
+                }
+            } else {
+                for (uint8_t i = 0; i < 6 && !handled; i++) {
+                    if (specRects[0][i].contains(tap.x, tap.y)) { appendUtf8(buf, len, CAP, SPEC0[i]); handled = true; }
+                }
+                for (uint8_t i = 0; i < 6 && !handled; i++) {
+                    if (specRects[1][i].contains(tap.x, tap.y)) { appendUtf8(buf, len, CAP, SPEC1[i]); handled = true; }
+                }
+                for (uint8_t i = 0; i < 6 && !handled; i++) {
+                    if (specRects[2][i].contains(tap.x, tap.y)) { appendUtf8(buf, len, CAP, SPEC2[i]); handled = true; }
+                }
+                for (uint8_t i = 0; i < 6 && !handled; i++) {
+                    if (specRects[3][i].contains(tap.x, tap.y)) { appendUtf8(buf, len, CAP, SPEC3[i]); handled = true; }
+                }
+                for (uint8_t i = 0; i < 4 && !handled; i++) {
+                    if (specRects[4][i].contains(tap.x, tap.y)) { appendUtf8(buf, len, CAP, SPEC4[i]); handled = true; }
+                }
             }
-            for (uint8_t i = 0; i < 10 && !handled; i++) {
-                if (row1Rects[i].contains(tap.x, tap.y) && len < sizeof(buf) - 1) { buf[len++] = ROW1[i]; buf[len] = 0; handled = true; }
-            }
-            for (uint8_t i = 0; i < 9 && !handled; i++) {
-                if (row2Rects[i].contains(tap.x, tap.y) && len < sizeof(buf) - 1) { buf[len++] = ROW2[i]; buf[len] = 0; handled = true; }
-            }
-            for (uint8_t i = 0; i < 7 && !handled; i++) {
-                if (row3Rects[i].contains(tap.x, tap.y) && len < sizeof(buf) - 1) { buf[len++] = ROW3[i]; buf[len] = 0; handled = true; }
-            }
-            if (!handled && spaceBtn.contains(tap.x, tap.y) && len < sizeof(buf) - 1) {
-                buf[len++] = ' ';
-                buf[len] = 0;
-                handled = true;
-            }
-            if (!handled && backspaceBtn.contains(tap.x, tap.y)) {
-                if (len > 0) { len--; buf[len] = 0; }
-                handled = true;
-            }
+            if (!handled && spaceBtn.contains(tap.x, tap.y)) { appendUtf8(buf, len, CAP, " "); handled = true; }
+            if (!handled && backspaceBtn.contains(tap.x, tap.y)) { backspaceUtf8(buf, len); handled = true; }
+            if (!handled && toggleBtn.contains(tap.x, tap.y)) { specialPage = !specialPage; handled = true; }
             if (!handled && skipBtn.contains(tap.x, tap.y)) {
                 buf[0] = 0;
                 len = 0;

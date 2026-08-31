@@ -385,6 +385,11 @@ static const char* const I18N_ES[] = {
 
     "Avión militar/gubernamental",
     "Avión Heavy",
+
+    "Colores",
+    "Colores",
+    "Rojo",
+    "Morado",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

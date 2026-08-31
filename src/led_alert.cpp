@@ -21,7 +21,6 @@ namespace {
     constexpr uint8_t PWM_RESOLUTION_BITS = 8;
 
     constexpr uint32_t GREEN_BLINK_INTERVAL_MS = 400;
-    constexpr uint32_t RED_BLINK_INTERVAL_MS   = 150;
 
     // blinkState/lastToggleMs/lastMode/initialized werden AUSSCHLIESSLICH
     // von update()/begin() aus gelesen/geschrieben, und die werden beide nur
@@ -58,8 +57,9 @@ namespace {
     // ausserhalb des Pulsfensters.
     std::atomic<uint32_t> heartbeatStartMs{static_cast<uint32_t>(0 - (HEARTBEAT_PULSE_MS + 1))};
 
-    // Update-Verfuegbar-Signal: dreimal kurz MAGENTA blinken, alle 10
-    // Sekunden wiederholt, solange OtaUpdate::isUpdateAvailable() true
+    // Update-Verfuegbar-Signal: dreimal kurz WEISS blinken (vorher
+    // Magenta, siehe update() unten), alle 10 Sekunden wiederholt, solange
+    // OtaUpdate::isUpdateAvailable() true
     // liefert. Anders als beim Heartbeat wird das "verfuegbar?"-Flag NICHT
     // hier im LED-Modul selbst gecacht - der Aufrufer (radar_screen.cpp::
     // updateProximityAlert(), Core 1) uebergibt es direkt als Parameter an
@@ -121,11 +121,29 @@ namespace {
     // werden, bis der Amber-Eindruck stimmt.
     constexpr uint8_t AMBER_GREEN_BRIGHTNESS = 25;
 
+    // LILA-Mischung: urspruenglich bewusst NICHT 1:1 Rot+Blau gemischt,
+    // weil volles Magenta (255/255) damals noch fuer das Update-
+    // Verfuegbar-Signal vergeben war. Das Update-Signal wurde inzwischen
+    // auf Weiss umgestellt (siehe UPDATE_BLINK_* oben) - Magenta ist damit
+    // komplett frei, ein einfaches 1:1-Magenta waere jetzt unbedenklich
+    // moeglich. Diese abgestimmte Mischung (Rot gedimmt auf
+    // PURPLE_RED_BRIGHTNESS, Blau voll) bleibt trotzdem bestehen (Alex'
+    // Entscheidung ueberlassen, funktionierender Code, kein Grund zum
+    // Zurueckstellen) - ergibt einen erkennbar blaulastigeren, gedimmteren
+    // Purpur-Ton als ein einfaches Magenta.
+    constexpr uint8_t PURPLE_RED_BRIGHTNESS = 130;
+
     void writeAlarmChannels(bool r, bool g, bool b) {
         if (r && g && !b) {
             writeChannel(RED_PWM_CHANNEL, 255);
             writeChannel(GREEN_PWM_CHANNEL, AMBER_GREEN_BRIGHTNESS);
             writeChannel(BLUE_PWM_CHANNEL, 0);
+            return;
+        }
+        if (r && b && !g) {
+            writeChannel(RED_PWM_CHANNEL, PURPLE_RED_BRIGHTNESS);
+            writeChannel(GREEN_PWM_CHANNEL, 0);
+            writeChannel(BLUE_PWM_CHANNEL, 255);
             return;
         }
         writeChannel(RED_PWM_CHANNEL,   r ? 255 : 0);
@@ -149,8 +167,49 @@ namespace {
         switch (SettingsStore::radarThemeIndex()) {
             case 1: r = true; g = true; break;  // Amber (Naeherung: Rot+Gruen)
             case 2: b = true; break;             // Blau
+            case 3: r = true; break;             // Rot
+            case 4: r = true; b = true; break;   // Lila (siehe PURPLE_RED_BRIGHTNESS oben)
             default: g = true; break;            // Gruen (Standard)
         }
+    }
+
+    // SOS-Morsecode-Sequenz fuer EmergencyRed (Alex' Wunsch: eindeutig als
+    // Morse-SOS erkennbar - unterscheidet den Notfall-Alarm klar von einem
+    // aktiven Rot-Farbthema, das wie die anderen Themen nur kontinuierlich
+    // pulsiert, unabhaengig davon welches Thema gerade sonst aktiv ist).
+    // Standard-Morse-Zeiteinheiten (1 Einheit = SOS_UNIT_MS): Punkt = 1
+    // Einheit an, Strich = 3 Einheiten an, Pause INNERHALB eines
+    // Buchstabens = 1 Einheit aus, Pause ZWISCHEN Buchstaben = 3 Einheiten
+    // aus, Pause vor der Wiederholung = 7 Einheiten aus (Wortabstand-
+    // Konvention). Rein rechnerisch aus nowMs abgeleitet (kein eigener
+    // Zustand, gleiches Prinzip wie updateBlinkOn() oben) - liefert true,
+    // waehrend die LED gerade "an" sein soll.
+    constexpr uint32_t SOS_UNIT_MS = 200;
+    struct SosSegment { uint32_t units; bool on; };
+    constexpr SosSegment SOS_SEQUENCE[] = {
+        // S: Punkt Punkt Punkt
+        {1, true}, {1, false}, {1, true}, {1, false}, {1, true},
+        {3, false}, // Buchstabenabstand
+        // O: Strich Strich Strich
+        {3, true}, {1, false}, {3, true}, {1, false}, {3, true},
+        {3, false}, // Buchstabenabstand
+        // S: Punkt Punkt Punkt
+        {1, true}, {1, false}, {1, true}, {1, false}, {1, true},
+        {7, false}, // Pause vor der Wiederholung
+    };
+    constexpr uint8_t SOS_SEGMENT_COUNT = sizeof(SOS_SEQUENCE) / sizeof(SOS_SEQUENCE[0]);
+
+    bool sosBlinkOn(uint32_t nowMs) {
+        uint32_t totalUnits = 0;
+        for (uint8_t i = 0; i < SOS_SEGMENT_COUNT; i++) totalUnits += SOS_SEQUENCE[i].units;
+        uint32_t phase = nowMs % (totalUnits * SOS_UNIT_MS);
+        uint32_t acc = 0;
+        for (uint8_t i = 0; i < SOS_SEGMENT_COUNT; i++) {
+            uint32_t segMs = SOS_SEQUENCE[i].units * SOS_UNIT_MS;
+            if (phase < acc + segMs) return SOS_SEQUENCE[i].on;
+            acc += segMs;
+        }
+        return false;
     }
 }
 
@@ -198,14 +257,20 @@ bool update(Mode mode, uint32_t nowMs, bool updateAvailable) {
             return true;
         }
 
-        // MAGENTA (Rot+Blau) fuer das Update-Signal - Heartbeat hat bei
+        // WEISS (alle 3 Kanaele) fuer das Update-Signal - vorher Magenta,
+        // auf Alex' Wunsch umgestellt, um Magenta komplett freizugeben
+        // (kein PWM-Abstimmungsdruck mehr fuer das Lila-Farbthema, siehe
+        // PURPLE_RED_BRIGHTNESS-Kommentar oben). Ueberschneidung mit dem
+        // ebenfalls weissen Heartbeat-Blitz waehrend eines Naeherungs-/
+        // Watchlist-Alarms ist bewusst in Kauf genommen (Alex' Wunsch,
+        // keine weitere Absicherung noetig). Heartbeat hat bei
         // gleichzeitigem Zusammentreffen Vorrang (kuerzeres, selteneres
         // Signal, siehe Kommentar bei UPDATE_BLINK_* oben), daher erst HIER
         // nach der Heartbeat-Pruefung ausgewertet.
         if (updateBlinkActive) {
             writeChannel(RED_PWM_CHANNEL, 255);
+            writeChannel(GREEN_PWM_CHANNEL, 255);
             writeChannel(BLUE_PWM_CHANNEL, 255);
-            writeChannel(GREEN_PWM_CHANNEL, 0);
             blinkState = false;
             lastMode = mode;
             return true;
@@ -222,8 +287,6 @@ bool update(Mode mode, uint32_t nowMs, bool updateAvailable) {
         blinkState = true;
         lastMode = mode;
     }
-
-    uint32_t interval = (mode == Mode::EmergencyRed) ? RED_BLINK_INTERVAL_MS : GREEN_BLINK_INTERVAL_MS;
 
     // Notfall bleibt fest Rot, Watchlist bleibt fest CYAN (Gruen+Blau) -
     // beide UNABHAENGIG vom Systemthema, wie von Alex ausdruecklich
@@ -246,8 +309,13 @@ bool update(Mode mode, uint32_t nowMs, bool updateAvailable) {
     // (siehe unten) - so bleibt der zurueckgegebene blinkState (synchronisiert
     // die Marker-Blinkphase in radar_screen.cpp, siehe ledBlinkOn) exakt im
     // normalen Alarm-Takt, unabhaengig davon, ob der Heartbeat gerade
-    // ueberlagert oder nicht.
-    if (nowMs - lastToggleMs >= interval) {
+    // ueberlagert oder nicht. EmergencyRed folgt NICHT dem einfachen
+    // Ein/Aus-Toggle der anderen Modi, sondern der SOS-Morsesequenz (siehe
+    // sosBlinkOn() oben) - rein rechnerisch aus nowMs, kein lastToggleMs
+    // noetig dafuer.
+    if (mode == Mode::EmergencyRed) {
+        blinkState = sosBlinkOn(nowMs);
+    } else if (nowMs - lastToggleMs >= GREEN_BLINK_INTERVAL_MS) {
         lastToggleMs = nowMs;
         blinkState = !blinkState;
     }
@@ -268,15 +336,14 @@ bool update(Mode mode, uint32_t nowMs, bool updateAvailable) {
         return blinkState;
     }
 
-    // Update-Ueberlagerung: gleiches Prinzip wie der Heartbeat-Weiss-Blitz
-    // (siehe oben) - zusaetzlich zu ProximityGreen/WatchlistBlue, NIEMALS
-    // bei EmergencyRed (bereits in updateBlinkActive per && ausgeschlossen).
-    // MAGENTA (Rot+Blau an, Gruen aus) statt Weiss, damit sich das Update-
-    // Signal optisch klar vom Heartbeat unterscheidet - beide sollen bei
-    // einem Blick auf die LED nicht verwechselbar sein.
+    // Update-Ueberlagerung: jetzt WEISS statt Magenta (siehe Kommentar
+    // oben) - zusaetzlich zu ProximityGreen/WatchlistBlue, NIEMALS bei
+    // EmergencyRed (bereits in updateBlinkActive per && ausgeschlossen).
+    // Optische Ueberschneidung mit dem Heartbeat-Weiss-Blitz ist bewusst
+    // in Kauf genommen (Alex' Wunsch, siehe oben).
     if (updateBlinkActive) {
         writeChannel(RED_PWM_CHANNEL, 255);
-        writeChannel(GREEN_PWM_CHANNEL, 0);
+        writeChannel(GREEN_PWM_CHANNEL, 255);
         writeChannel(BLUE_PWM_CHANNEL, 255);
         return blinkState;
     }

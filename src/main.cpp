@@ -540,11 +540,13 @@ void drawScreensaverVersion() {
 
 // Datum GEMAESS DER AKTUELLEN SPRACHE formatiert (nicht der
 // Einheiten-Einstellung wie die Uhrzeit unten) - Reihenfolge/Trennzeichen
-// unterscheiden sich je Sprachraum: DE/TR mit Punkten TT.MM.JJJJ, FR/ES/IT
-// mit Schraegstrichen TT/MM/JJJJ, EN im US-Format MM/TT/JJJJ (konsistent zur
-// bereits bestehenden Kopplung "Englisch/Imperial -> 12h mit AM/PM" weiter
-// unten sowie in updateStatusLine()). SettingsStore::language()-Werte wie in
-// i18n.cpp/changelog.cpp: 0=EN, 1=DE, 2=FR, 3=TR, 4=ES, 5=IT.
+// unterscheiden sich je Sprachraum: DE/TR mit Punkten TT.MM.JJJJ, FR/ES/IT/PT
+// mit Schraegstrichen TT/MM/JJJJ (brasilianisches Portugiesisch faellt
+// bewusst mit in den "default"-Zweig, gleiches Format), EN im US-Format
+// MM/TT/JJJJ (konsistent zur bereits bestehenden Kopplung "Englisch/
+// Imperial -> 12h mit AM/PM" weiter unten sowie in updateStatusLine()).
+// SettingsStore::language()-Werte wie in i18n.cpp/changelog.cpp: 0=EN,
+// 1=DE, 2=FR, 3=TR, 4=ES, 5=IT, 6=PT.
 void formatLocalizedDate(const struct tm& tmNow, char* out, size_t outLen) {
     int day = tmNow.tm_mday;
     int month = tmNow.tm_mon + 1;
