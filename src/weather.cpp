@@ -2,6 +2,7 @@
 #include "config.h"
 #include "location_manager.h"
 #include "airport_lookup.h"
+#include "radar_math.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -20,6 +21,16 @@ namespace {
 
     Metar currentMetarData;
     Forecast currentForecastData;
+    NearestAirport currentNearestAirportData;
+
+    // Kurzer, eigener Timeout fuer den hexdb.io-Flughafen-Endpunkt (siehe
+    // fetchAirportIata() unten) - dieselbe Begruendung wie
+    // HEXDB_TIMEOUT_MS in aircraft_details.cpp: hexdb.io war bereits
+    // mehrfach komplett unerreichbar (siehe CLAUDE.md "Bekannte
+    // Probleme"), ein IATA-Code ist rein dekorativ und die Abfrage darf
+    // deshalb keine spuerbare Wartezeit verursachen, falls der Dienst
+    // gerade ausfaellt.
+    constexpr uint32_t HEXDB_AIRPORT_TIMEOUT_MS = 1200;
 
     // Wie lange im Voraus die Kurzvorhersage gelten soll (siehe
     // Weather::Forecast in weather.h) - eine einzelne konstante Stundenzahl,
@@ -93,6 +104,40 @@ namespace {
         // Ausgabe, wodurch sich "Abfrage lief nie" nicht von "Abfrage lief
         // still und erfolgreich durch" unterscheiden liess.
         Serial.printf("[Weather] METAR fuer %s erfolgreich empfangen: %s\n", icao, currentMetarData.raw);
+    }
+
+    // IATA-Code fuer einen ICAO-Flughafencode per hexdb.io-Flughafen-
+    // Endpunkt (liefert u.a. "iata"/"icao"/"airport"-Felder, live per
+    // curl bestaetigt: https://hexdb.io/api/v1/airport/icao/<ICAO>) - die
+    // lokale airports.csv (AirportLookup) enthaelt NUR ICAO-Codes, kein
+    // IATA (siehe Kommentar bei NearestAirport in weather.h), daher diese
+    // zusaetzliche Live-Abfrage. Kurzer eigener Timeout (siehe
+    // HEXDB_AIRPORT_TIMEOUT_MS oben) - schlaegt sie fehl, bleibt outIata
+    // einfach leer und Aufrufer fallen auf den ICAO-Code zurueck, kein
+    // Fehler/Absturz.
+    void fetchAirportIata(WiFiClientSecure& client, const char* icao, char* outIata, size_t outIataSize) {
+        outIata[0] = 0;
+        HTTPClient http;
+        char url[80];
+        snprintf(url, sizeof(url), "https://hexdb.io/api/v1/airport/icao/%s", icao);
+
+        http.setTimeout(HEXDB_AIRPORT_TIMEOUT_MS);
+        if (!http.begin(client, url)) return;
+        int code = http.GET();
+        if (code != HTTP_CODE_OK) {
+            http.end();
+            return;
+        }
+        String body = http.getString();
+        http.end();
+
+        JsonDocument doc;
+        if (deserializeJson(doc, body)) return;
+        const char* iata = doc["iata"] | "";
+        if (iata[0]) {
+            strncpy(outIata, iata, outIataSize - 1);
+            outIata[outIataSize - 1] = 0;
+        }
     }
 
     // Ordnet den WMO-Wettercode von Open-Meteo (Feld "weathercode", siehe
@@ -225,9 +270,26 @@ namespace {
             Serial.printf("[Weather] Naechster Flughafen: %s (%s), %.0f km entfernt - frage METAR ab...\n",
                           nearest.icao, nearest.name, nearest.distanceKm);
             fetchMetarFor(client, nearest.icao);
+
+            // NearestAirport-Cache (siehe weather.h) - Peilung per
+            // RadarMath::toPolar() (dieselbe Funktion, die AirportLookup
+            // intern schon fuer die Distanz nutzt) NEU berechnet statt in
+            // AirportLookup::Nearest mitgespeichert, um dieses bestehende,
+            // an mehreren Stellen genutzte Struct nicht aendern zu
+            // muessen. IATA per zusaetzlicher hexdb.io-Abfrage, siehe
+            // fetchAirportIata() oben - bleibt bei einem Fehlschlag leer.
+            NearestAirport na;
+            na.available = true;
+            strncpy(na.icao, nearest.icao, sizeof(na.icao) - 1);
+            strncpy(na.name, nearest.name, sizeof(na.name) - 1);
+            na.distanceKm = nearest.distanceKm;
+            na.bearingDeg = RadarMath::toPolar(lat, lon, nearest.lat, nearest.lon).bearingDeg;
+            fetchAirportIata(client, nearest.icao, na.iata, sizeof(na.iata));
+            currentNearestAirportData = na;
         } else {
             Serial.println("[Weather] METAR uebersprungen: kein Flughafen in airports.csv auf der SD-Karte gefunden.");
             currentMetarData = Metar{};
+            currentNearestAirportData = NearestAirport{};
         }
     }
 }
@@ -263,5 +325,7 @@ float currentWindDirectionDeg() { return currentWindDirDeg; }
 Metar currentMetar() { return currentMetarData; }
 
 Forecast currentForecast() { return currentForecastData; }
+
+NearestAirport currentNearestAirport() { return currentNearestAirportData; }
 
 }

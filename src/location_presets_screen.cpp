@@ -2,6 +2,8 @@
 #include "location_presets.h"
 #include "location_manager.h"
 #include "airport_lookup.h"
+#include "weather.h"
+#include "settings_store.h"
 #include "address_search_screen.h"
 #include "touch_input.h"
 #include "menu_stars.h"
@@ -724,13 +726,37 @@ void run(TFT_eSPI& tft) {
             }
             nearest = AirportLookup::findNearest(activeLat, activeLon);
             if (nearest.found) {
+                // Zeigt den Flughafen-CODE jetzt in der zentralen IATA/ICAO-
+                // Einstellung (SettingsStore::useIataAirportCodes(), gleiche
+                // Einstellung wie Detail-Panel und die "Naechster Flughafen"-
+                // Anzeige auf dem Radarschirm) statt vorher fest immer ICAO
+                // zu zeigen (Alex' Meldung, bei ihr immer "EDDS" statt "STR"
+                // trotz IATA-Einstellung). Der IATA-Code selbst kommt aus dem
+                // bereits von Weather::update() (Core 0) live abgefragten
+                // Cache (siehe fetchAirportIata() in weather.cpp) statt hier
+                // eine eigene Netzwerkabfrage zu starten - AirportLookup
+                // selbst bleibt bewusst eine rein lokale SD-Abfrage (Name/
+                // Distanz/ICAO sollen weiterhin sofort und offline
+                // funktionieren, auch direkt nach einem Presetwechsel, bevor
+                // der naechste Weather-Fetch-Zyklus durchgelaufen ist) - nur
+                // wenn der IATA-Cache zufaellig zum selben Flughafen passt
+                // (strcmp gegen nearest.icao), wird er verwendet, sonst
+                // faellt es sauber auf ICAO zurueck (kein Fake-Code).
+                const char* code = nearest.icao;
+                if (SettingsStore::useIataAirportCodes()) {
+                    Weather::NearestAirport na = Weather::currentNearestAirport();
+                    if (na.available && na.iata[0] && strcmp(na.icao, nearest.icao) == 0) {
+                        code = na.iata;
+                    }
+                }
+
                 // Respektiert jetzt die Einheiten-Einstellung (Menue >
                 // Einheiten) - vorher immer "(XX km)", auch bei Imperial.
                 char buf[48];
                 if (LocationManager::useMetricUnits()) {
-                    snprintf(buf, sizeof(buf), "%s %s (%.0f km)", nearest.icao, nearest.name, nearest.distanceKm);
+                    snprintf(buf, sizeof(buf), "%s %s (%.0f km)", code, nearest.name, nearest.distanceKm);
                 } else {
-                    snprintf(buf, sizeof(buf), "%s %s (%.0f nm)", nearest.icao, nearest.name, Units::kmToNm(nearest.distanceKm));
+                    snprintf(buf, sizeof(buf), "%s %s (%.0f nm)", code, nearest.name, Units::kmToNm(nearest.distanceKm));
                 }
                 String line = String(I18n::t(StringId::LOCATION_NEAREST_AIRPORT_PREFIX)) + buf;
                 setupMarquee(tft, line, AIRPORT_LINE_W);

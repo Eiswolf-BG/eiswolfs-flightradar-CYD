@@ -79,4 +79,32 @@ namespace Weather {
     // Wie current()/currentMetar() nur vom NetTask geschrieben, vom
     // UI-Thread gelesen - gleiche Begruendung, kein Lock noetig.
     Forecast currentForecast();
+
+    // Naechstgelegener Flughafen zum aktuell aktiven Standort - wird im
+    // selben fetchNow()-Zyklus wie die METAR-Abfrage ermittelt (siehe
+    // weather.cpp), damit die dafuer ohnehin schon noetige
+    // AirportLookup::findNearest()-Abfrage nicht noch einmal irgendwo
+    // anders wiederholt werden muss. Fuer die dauerhaft sichtbare
+    // "Naechster Flughafen"-Anzeige in der oberen linken Radarecke
+    // (radar_screen.cpp) UND fuer den Flughafen-Hinweis auf dem
+    // Standort-Presets-Screen (location_presets_screen.cpp) gedacht -
+    // beide lesen von hier statt jeweils selbst AirportLookup
+    // aufzurufen. iata bleibt ein leerer String, wenn der IATA-Code
+    // (nicht in der lokalen airports.csv enthalten, siehe
+    // AirportLookup::Nearest) nicht per Live-Abfrage (hexdb.io
+    // Flughafen-Endpunkt) ermittelt werden konnte - Aufrufer sollen
+    // dann auf icao zurueckfallen, siehe SettingsStore::
+    // useIataAirportCodes().
+    struct NearestAirport {
+        bool available = false;
+        char icao[5] = {0};
+        char iata[4] = {0};
+        char name[32] = {0};
+        float distanceKm = 0;
+        float bearingDeg = 0; // 0-360, 0 = Nord, im Uhrzeigersinn
+    };
+
+    // Wie current()/currentMetar() nur vom NetTask geschrieben, vom
+    // UI-Thread gelesen - gleiche Begruendung, kein Lock noetig.
+    NearestAirport currentNearestAirport();
 }

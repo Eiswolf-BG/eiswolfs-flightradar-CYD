@@ -85,10 +85,10 @@ namespace {
     }
 
     // Zeilenhoehe aus dem verfuegbaren Platz errechnet (gleiches Muster wie
-    // SYSTEM_ROW_H in menu_screen.cpp) statt fest verdrahtet - 9 Zeilen
-    // (3 Farbschemata + 5 Kaestchen + Zurueck) muessen mit ca. 10px Reserve
+    // SYSTEM_ROW_H in menu_screen.cpp) statt fest verdrahtet - 10 Zeilen
+    // (3 Farbschemata + 6 Kaestchen + Zurueck) muessen mit ca. 10px Reserve
     // zum unteren Rand aufs Display passen.
-    constexpr uint8_t ROW_COUNT = 9;
+    constexpr uint8_t ROW_COUNT = 10;
     constexpr int16_t ROW_GAP = 6;
     constexpr int16_t START_Y = 40;
     constexpr int16_t END_Y = Config::SCREEN_HEIGHT - 10;
@@ -142,7 +142,11 @@ void run(TFT_eSPI& tft) {
         drawCheckboxRow(tft, rainRow, I18n::t(StringId::MENU_RAIN_EFFECT), SettingsStore::rainEffectEnabled());
         drawRowInfoButton(tft, rainRow);
 
-        Rect backBtn = rowRect(THEME_COUNT + 5);
+        Rect eventCornerRow = rowRect(THEME_COUNT + 5);
+        drawCheckboxRow(tft, eventCornerRow, I18n::t(StringId::MENU_EVENT_CORNER_OVERLAY), SettingsStore::eventCornerOverlayEnabled());
+        drawRowInfoButton(tft, eventCornerRow);
+
+        Rect backBtn = rowRect(THEME_COUNT + 6);
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
         TouchInput::Point tap;
@@ -194,6 +198,12 @@ void run(TFT_eSPI& tft) {
                                         I18n::t(StringId::OK));
             handled = true;
         }
+        if (!handled && rowInfoBtnRect(eventCornerRow).contains(tap.x, tap.y)) {
+            MenuScreen::showInfoScreen(tft, I18n::t(StringId::EVENT_CORNER_OVERLAY_INFO_TITLE),
+                                        I18n::t(StringId::EVENT_CORNER_OVERLAY_INFO_BODY), UiTheme::accentColor(tft),
+                                        I18n::t(StringId::OK));
+            handled = true;
+        }
         if (!handled && crtRow.contains(tap.x, tap.y)) {
             SettingsStore::setCrtPhosphorEnabled(!SettingsStore::crtPhosphorEnabled());
             handled = true;
@@ -212,6 +222,10 @@ void run(TFT_eSPI& tft) {
         }
         if (!handled && rainRow.contains(tap.x, tap.y)) {
             SettingsStore::setRainEffectEnabled(!SettingsStore::rainEffectEnabled());
+            handled = true;
+        }
+        if (!handled && eventCornerRow.contains(tap.x, tap.y)) {
+            SettingsStore::setEventCornerOverlayEnabled(!SettingsStore::eventCornerOverlayEnabled());
             handled = true;
         }
         if (!handled && backBtn.contains(tap.x, tap.y)) {

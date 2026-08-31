@@ -372,8 +372,18 @@ static const char* const I18N_TR[] = {
     "= Resmi/Askeri (tahmini)",
 
     "Güncelleme LED uyarısı: ",
-    "Güncelleme LED uyarısı hakkında",
+    "Güncelleme düğmesi hakkında",
+    "GitHub'da daha yeni bir ürün yazılımı sürümü olup olmadığını kontrol eder ve burada gösterir. Bu düğmeye dokunarak doğrudan WiFi üzerinden indirip kurabilirsiniz - kablo veya web flaşlayıcı gerekmez.",
     "Bir güncelleme mevcut olduğunda, güncelleme düğmesindeki kırmızı noktaya ek olarak LED her 10 saniyede bir kısa süreliğine üç kez magenta renginde yanıp söner. Yanıp sönme rahatsız ediyorsa burada kapatabilirsiniz - düğmedeki kırmızı nokta her durumda kalmaya devam eder.",
+
+    "Yükseklik renkleri",
+    "Her uçak işaretinin rengi yüksekliğini gösterir:",
+
+    "3sa sonra",
+
+    "Olay köşesi",
+    "Olay köşesi hakkında",
+    "Sağ alt köşede, radarda şu anda bir askeri/resmi uçuş, bir squawk izleme listesi eşleşmesi, bir uçak izleme listesi eşleşmesi veya gizlenmiş (filtrelenmiş) bir havayolu bulunduğunda soluk bir simge veya kısa etiket gösterir. Birden fazlası aynı anda geçerliyse, her 2 saniyede bir sırayla değişirler. Simgeye dokunmak doğrudan ilgili ekrana götürür.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

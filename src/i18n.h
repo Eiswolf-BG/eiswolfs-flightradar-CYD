@@ -686,8 +686,43 @@ enum class StringId : uint16_t {
     // bleibt bei AUS unveraendert bestehen (siehe SettingsStore::
     // updateLedSignalEnabled()).
     MENU_UPDATE_LED_SIGNAL,
-    UPDATE_LED_SIGNAL_INFO_TITLE,
+    // Gemeinsamer "?"-Infoscreen fuer den kombinierten Update-Button
+    // (Version/Update-Suche oben, LED-Schalter unten - EIN "?"-Button oben
+    // rechts in der Ecke des Buttons statt zwei getrennter, siehe
+    // Page::System) - deckt BEIDE Themen ab: UPDATE_CHECK_INFO_BODY
+    // erklaert die Update-Suche selbst, UPDATE_LED_SIGNAL_INFO_BODY (siehe
+    // unten) weiterhin den LED-Schalter, getrennt durch einen dezenten
+    // Trennstrich (twoPartInfoScreen() in menu_screen.cpp).
+    UPDATE_BUTTON_INFO_TITLE,
+    UPDATE_CHECK_INFO_BODY,
     UPDATE_LED_SIGNAL_INFO_BODY,
+
+    // Antippbare Hoehen-Farb-Legende am unteren Radarschirmrand (siehe
+    // drawLegend()/handleTap() in radar_screen.cpp) - oeffnet einen
+    // eigenen Vollbild-Info-Screen (showAltitudeLegendScreen()), der die
+    // Legende nochmal groesser in Farbe zeigt (inkl. Bodenfahrzeug-
+    // Quadrat, falls sichtbar) plus eine kurze Erklaerung, was die
+    // Farben bedeuten. LEGEND_GROUND_VEHICLE (oben) wird fuer die
+    // Bodenfahrzeug-Zeile dort wiederverwendet, kein eigener String noetig.
+    LEGEND_INFO_TITLE,
+    LEGEND_INFO_INTRO,
+
+    // Gedimmtes 3h-Wettervorschau-Symbol in der oberen rechten Ecke
+    // ausserhalb des Radarkreises (siehe drawForecastCorner()/tick() in
+    // radar_screen.cpp) - erscheint NUR, wenn sich Weather::currentForecast()
+    // von Weather::current() unterscheidet. Kurz gehalten, damit es in
+    // jeder Sprache neben dem kleinen Symbol in die Ecke passt.
+    FORECAST_CORNER_LABEL,
+
+    // Schalter im "Mode"-Menue (radar_theme_screen.cpp, dort wo bereits
+    // Klassik-Radar/CRT-Phosphor/Radar-Puls/Regen-Effekt liegen) fuer die
+    // neue Ereignis-Ecke unten rechts (Militaer/Squawk-Wachposten/
+    // Watchlist/Airline-Filter, siehe radar_screen.cpp::
+    // drawEventCorner()) - AN per Default. Betrifft NICHT den Update-
+    // Indikator (andere Ecke, eigener, nicht abschaltbarer Mechanismus).
+    MENU_EVENT_CORNER_OVERLAY,
+    EVENT_CORNER_OVERLAY_INFO_TITLE,
+    EVENT_CORNER_OVERLAY_INFO_BODY,
 
     COUNT
 };

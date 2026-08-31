@@ -170,6 +170,14 @@ namespace SettingsStore {
     bool updateLedSignalEnabled();
     void setUpdateLedSignalEnabled(bool on);
 
+    // Steuert die Ereignis-Ecke unten rechts auf dem Radarschirm (Militaer-
+    // /Behoerdenflug, Squawk-Wachposten, Rufzeichen-Watchlist, Airline-
+    // Filter-Treffer - siehe radar_screen.cpp::drawEventCorner()), AN per
+    // Default. Der Update-Indikator (Ausrufezeichen-Kreis, andere Ecke)
+    // haengt NICHT an diesem Schalter.
+    bool eventCornerOverlayEnabled();
+    void setEventCornerOverlayEnabled(bool on);
+
     // Optionale MQTT-Schnittstelle (siehe mqtt_client.h/mqtt_screen.cpp) -
     // AUS per Default. mqttBroker() liefert "host:port" als ein Feld (so
     // wie im Eingabe-Screen erfasst, siehe MqttScreen::run()) statt

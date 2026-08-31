@@ -373,8 +373,18 @@ static const char* const I18N_EN[] = {
     "= Government/Military (best-effort)",
 
     "LED alert on update: ",
-    "About the update LED alert",
+    "About the update button",
+    "Checks whether a newer firmware version is available on GitHub and shows it here. Tap this button to download and install it directly over WiFi - no cable or web flasher needed.",
     "When an update is available, the LED briefly flashes magenta three times every 10 seconds, in addition to the red dot on the update button. Turn this off if the flashing bothers you - the red dot on the button stays either way.",
+
+    "Altitude colors",
+    "The color of each aircraft marker shows its altitude:",
+
+    "in 3h",
+
+    "Event Corner",
+    "About the event corner",
+    "Shows a dimmed symbol or short label in the bottom-right corner whenever a military/government flight, a squawk watchlist match, an aircraft watchlist match, or a hidden (filtered) airline is currently on the radar. If several apply at once, they rotate every 2 seconds. Tap the symbol to jump straight to the matching screen.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

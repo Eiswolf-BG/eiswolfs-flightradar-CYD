@@ -527,6 +527,138 @@ namespace {
         }
     }
 
+    // Zwei-Themen-Variante von infoScreen() - fuer den kombinierten
+    // "Update"-Button im System-Menue (Page::System), dessen einzelner
+    // "?"-Button jetzt sowohl die Update-Suche als auch den LED-Hinweis-
+    // Schalter erklaeren muss. Rendert body1, dann einen dezenten, nicht
+    // bis zum Rand durchgezogenen Trennstrich (gleicher Stil wie der
+    // interne Trennstrich im Button selbst), dann body2 - jeweils
+    // eigenstaendig wortweise umgebrochen statt eines einzigen
+    // durchlaufenden Fliesstexts, da layoutWrapped() keine Absaetze kennt.
+    // Scroll-Logik ansonsten identisch zu infoScreen().
+    void twoPartInfoScreen(TFT_eSPI& tft, const String& title, const String& body1, const String& body2,
+                            uint16_t accentColor, const String& buttonLabel) {
+        constexpr int16_t BOX_X = 4;
+        constexpr int16_t BOX_Y = 4;
+        constexpr int16_t BOX_W = Config::SCREEN_WIDTH - 2 * BOX_X;
+        constexpr int16_t BOX_H = Config::SCREEN_HEIGHT - 2 * BOX_Y;
+        constexpr int16_t TEXT_MAX_WIDTH = BOX_W - 20;
+        constexpr int16_t LINE_H = 16;
+        constexpr int16_t TITLE_Y = BOX_Y + 16;
+        // Root Cause (per Live-Diagnose 31.08., siehe Chat-Verlauf): unser
+        // Font ist BASELINE-verankert (siehe CLAUDE.md) - die Buchstaben
+        // der ERSTEN body2-Zeile ragen ca. 10-11px UEBER ihre Baseline
+        // (body2Start) nach oben hinaus. Der Trennstrich sass mit nur
+        // SEP_GAP/2=7px Abstand VOR body2Start mitten in dieser
+        // Aufragzone - "Trennstrich schneidet durch den ersten Satz von
+        // body2" trotz rechnerisch korrekter body1End/body2Start-Werte.
+        // Jetzt deutlich grosszuegiger UND asymmetrisch: Trennstrich sitzt
+        // naeher an body1 (das hat selbst schon eingebaute Descent-
+        // Reserve, siehe sepY-Formel unten), body2Start bekommt genug
+        // Abstand, damit auch dessen Aufragzone sicher frei bleibt.
+        constexpr int16_t SEP_GAP = 26; // Gesamtluecke zwischen body1End und body2Start
+
+        tft.setTextSize(2);
+        uint8_t titleTextSize = 2;
+        if (tft.textWidth(title) > TEXT_MAX_WIDTH) {
+            tft.setTextSize(1);
+            titleTextSize = 1;
+        }
+        constexpr int MAX_TITLE_LINES = 3;
+        String titleLines[MAX_TITLE_LINES];
+        int titleLineCount = wrapTitleLines(tft, title, TEXT_MAX_WIDTH, titleLines, MAX_TITLE_LINES);
+        tft.setTextSize(1);
+        int16_t VIEW_TOP = (int16_t)(TITLE_Y + titleLineCount * LINE_H + 12);
+
+        constexpr int16_t BTN_H = 40;
+        constexpr int16_t BOTTOM_MARGIN = 10;
+        constexpr int16_t BTN_Y = BOX_Y + BOX_H - BOTTOM_MARGIN - BTN_H;
+        constexpr int16_t SCROLL_ROW_H = 28;
+        constexpr int16_t SCROLL_ROW_GAP = 8;
+
+        constexpr int16_t VIEW_BOTTOM_NO_SCROLL = BTN_Y - 8;
+        constexpr int16_t VIEW_BOTTOM_SCROLL = VIEW_BOTTOM_NO_SCROLL - SCROLL_ROW_H - SCROLL_ROW_GAP;
+
+        int16_t body1End = layoutWrapped(tft, BOX_X + 10, VIEW_TOP, TEXT_MAX_WIDTH, LINE_H, body1, 0, 0, 0, false);
+        // sepY NICHT hinter body1End (das war der Bug), sondern 6px DAVOR -
+        // body1End selbst liegt ja bereits einen vollen LINE_H unter body1s
+        // tatsaechlicher letzter Baseline (baseline+16), waehrend Text nur
+        // ein paar px Unterlaenge hat - dort ist also schon von Natur aus
+        // reichlich Luft. body2Start bekommt den vollen SEP_GAP Abstand,
+        // damit auch body2s Aufragzone (Baseline minus ~11px) sicher frei
+        // bleibt.
+        int16_t sepY = body1End - 6;
+        int16_t body2Start = body1End + SEP_GAP;
+        int16_t totalH = layoutWrapped(tft, BOX_X + 10, body2Start, TEXT_MAX_WIDTH, LINE_H, body2, 0, 0, 0, false);
+
+        bool scrollable = (totalH - VIEW_BOTTOM_NO_SCROLL) > 0;
+        int16_t viewBottom = scrollable ? VIEW_BOTTOM_SCROLL : VIEW_BOTTOM_NO_SCROLL;
+        int16_t maxScroll = totalH - viewBottom;
+        if (maxScroll < 0) maxScroll = 0;
+        int16_t scrollY = 0;
+        constexpr int16_t SCROLL_STEP = 48;
+
+        Rect okBtn = {(int16_t)(BOX_X + 10), BTN_Y, (int16_t)(BOX_W - 20), BTN_H};
+        int16_t scrollRowY = VIEW_BOTTOM_SCROLL + SCROLL_ROW_GAP;
+        Rect upBtn   = {(int16_t)(BOX_X + BOX_W / 2 - 64), scrollRowY, 60, SCROLL_ROW_H};
+        Rect downBtn = {(int16_t)(BOX_X + BOX_W / 2 + 4), scrollRowY, 60, SCROLL_ROW_H};
+
+        MenuStars::reset();
+
+        auto redraw = [&]() {
+            tft.fillScreen(TFT_BLACK);
+            tft.drawRoundRect(BOX_X, BOX_Y, BOX_W, BOX_H, 6, accentColor);
+
+            tft.setTextDatum(MC_DATUM);
+            tft.setTextColor(accentColor, TFT_BLACK);
+            tft.setTextSize(titleTextSize);
+            for (int i = 0; i < titleLineCount; i++) {
+                tft.drawString(titleLines[i], BOX_X + BOX_W / 2, (int16_t)(TITLE_Y + i * LINE_H));
+            }
+            tft.setTextSize(1);
+            tft.setTextDatum(TL_DATUM);
+
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+            layoutWrapped(tft, BOX_X + 10, VIEW_TOP, TEXT_MAX_WIDTH, LINE_H, body1, scrollY, VIEW_TOP, viewBottom, true);
+
+            int16_t sepScreenY = sepY - scrollY;
+            if (sepScreenY >= VIEW_TOP && sepScreenY <= viewBottom) {
+                constexpr int16_t sepInset = 20;
+                tft.drawFastHLine((int16_t)(BOX_X + 10 + sepInset), sepScreenY,
+                                   (int16_t)(TEXT_MAX_WIDTH - 2 * sepInset), accentColor);
+            }
+
+            layoutWrapped(tft, BOX_X + 10, body2Start, TEXT_MAX_WIDTH, LINE_H, body2, scrollY, VIEW_TOP, viewBottom, true);
+
+            drawButton(tft, okBtn, buttonLabel);
+            if (scrollable) {
+                drawButton(tft, upBtn, "^");
+                drawButton(tft, downBtn, "v");
+            }
+        };
+
+        redraw();
+
+        while (true) {
+            TouchInput::Point tap;
+            if (TouchInput::wasTapped(tap)) {
+                if (okBtn.contains(tap.x, tap.y)) return;
+                if (scrollable && upBtn.contains(tap.x, tap.y) && scrollY > 0) {
+                    scrollY -= SCROLL_STEP;
+                    if (scrollY < 0) scrollY = 0;
+                    redraw();
+                } else if (scrollable && downBtn.contains(tap.x, tap.y) && scrollY < maxScroll) {
+                    scrollY += SCROLL_STEP;
+                    if (scrollY > maxScroll) scrollY = maxScroll;
+                    redraw();
+                }
+            }
+            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return;
+            MenuStars::update(tft);
+            delay(20);
+        }
+    }
+
     // Fortschrittsanzeige waehrend OtaUpdate::performUpdate() laeuft -
     // gleiches Namespace-globale-Zeiger-Prinzip wie progressTft oben (siehe
     // Settings-Backup-Fortschrittspunkte), da OtaUpdate::performUpdate()
@@ -678,8 +810,8 @@ namespace {
     };
 }
 
-void run(TFT_eSPI& tft, bool startAtFilters) {
-    Page page = startAtFilters ? Page::FlightFilters : Page::Main;
+void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
+    Page page = startAtFilters ? Page::FlightFilters : (startAtSystem ? Page::System : Page::Main);
     bool done = false;
     MenuStars::reset();
 
@@ -846,10 +978,25 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
                 // Gleicher kleiner roter Punkt wie an den anderen Stellen
                 // (Menu-Button, "System"-Kachel) - hier zusaetzlich zur
                 // bereits geaenderten Textzeile oben, damit der Button auch
-                // beim schnellen Ueberfliegen der Seite auffaellt.
-                tft.fillCircle((int16_t)(updateHalf.x + updateHalf.w - 8), (int16_t)(updateHalf.y + 8), 4, TFT_RED);
-                tft.drawCircle((int16_t)(updateHalf.x + updateHalf.w - 8), (int16_t)(updateHalf.y + 8), 4, TFT_BLACK);
+                // beim schnellen Ueberfliegen der Seite auffaellt. In die
+                // OBERE LINKE Ecke verschoben (war vorher oben rechts) - die
+                // obere rechte Ecke des gesamten Kastens gehoert jetzt dem
+                // gemeinsamen "?"-Info-Button (siehe updateInfoBtn unten),
+                // sonst wuerden sich beide ueberlappen.
+                tft.fillCircle((int16_t)(updateHalf.x + 8), (int16_t)(updateHalf.y + 8), 4, TFT_RED);
+                tft.drawCircle((int16_t)(updateHalf.x + 8), (int16_t)(updateHalf.y + 8), 4, TFT_BLACK);
             }
+
+            // EIN gemeinsamer "?"-Info-Button oben rechts in der Ecke des
+            // GESAMTEN Buttons (nicht mehr innerhalb der LED-Zeile) - deckt
+            // ueber twoPartInfoScreen() jetzt BEIDE Themen ab (Update-Suche
+            // + LED-Schalter), gleicher Eck-Stil wie auf anderen Screens mit
+            // Seiten-Header-"?"-Button (z.B. location_presets_screen.cpp/
+            // wifi_manage_screen.cpp).
+            Rect updateInfoBtn = {(int16_t)(outerUpdateBox.x + outerUpdateBox.w - ROW_INFO_BTN_SIZE - ROW_INFO_BTN_PAD),
+                                   (int16_t)(outerUpdateBox.y + ROW_INFO_BTN_PAD),
+                                   ROW_INFO_BTN_SIZE, ROW_INFO_BTN_SIZE};
+            drawButton(tft, updateInfoBtn, "?");
 
             // Kurzer interner Trennstrich zwischen den beiden Haelften - NUR
             // innerhalb des Rahmens, beruehrt nicht den linken/rechten Rand
@@ -861,22 +1008,54 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
                                    (int16_t)(outerUpdateBox.w - 2 * sepInset), UiTheme::accentColor(tft));
             }
 
-            // Untere Haelfte: LED-Schalter-Text + "?"-Info-Button, ebenfalls
-            // ohne eigenen Rahmen. Text wird NICHT ueber die volle Zeilen-
-            // breite zentriert (das liess bei diesem laengeren Label das
-            // letzte Zeichen von "AN" unter dem rechts sitzenden "?"-Button
-            // verschwinden, weil der Button NACH dem Text gezeichnet wird
-            // und dessen schwarzer Hintergrund den ueberlappenden Textrest
-            // uebermalt) - sondern nur ueber den Bereich LINKS vom
-            // "?"-Button, damit garantiert Platz bleibt.
-            Rect ledInfoBtn = rowInfoBtnRect(ledHalf);
-            int16_t ledTextAreaW = ledInfoBtn.x - ledHalf.x - 4;
+            // Untere Haelfte: LED-Schalter-Text, ebenfalls ohne eigenen
+            // Rahmen. FEST auf zwei Zeilen aufgeteilt (Label / AN-AUS-
+            // Status) statt einer einzigen zentrierten Zeile - bei
+            // laengeren Uebersetzungen (z.B. Italienisch "Avviso LED
+            // aggiornamento: ON") wurde eine einzige Zeile zu breit und
+            // wirkte gequetscht, je nach Sprache unterschiedlich stark.
+            // Zwei FESTE Zeilen (gleiches Prinzip wie die obere Haelfte mit
+            // Version/"Nach Update suchen") sehen dadurch in JEDER der 6
+            // Sprachen garantiert gleich aus, unabhaengig von der
+            // jeweiligen Textlaenge. Der "?"-Button ist nicht mehr Teil
+            // dieser Zeile (siehe updateInfoBtn oben) - Text darf deshalb
+            // jetzt ueber die VOLLE Zeilenbreite zentriert werden.
             tft.setTextDatum(MC_DATUM);
             tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
-            tft.drawString(I18n::t(StringId::MENU_UPDATE_LED_SIGNAL) + onOff(SettingsStore::updateLedSignalEnabled()),
-                            ledHalf.x + ledTextAreaW / 2, ledHalf.y + ledHalf.h / 2);
+            // War vorher 14 - die Umrandung um den AN/AUS-Wert (siehe unten)
+            // ragte dadurch bis in die Unterlaengen der Label-Zeile hinein
+            // (z.B. das "g" in "aggiornamento"), sichtbare Ueberlappung. Auf
+            // 24 vergroessert, damit auch bei Zeichen mit Unterlaenge
+            // sicher Abstand bleibt.
+            constexpr int16_t LED_LINE_GAP = 24;
+            int16_t ledLabelY = ledHalf.y + ledHalf.h / 2 - LED_LINE_GAP / 2;
+            int16_t ledValueY = ledHalf.y + ledHalf.h / 2 + LED_LINE_GAP / 2;
+            int16_t ledCenterX = ledHalf.x + ledHalf.w / 2;
+            tft.drawString(I18n::t(StringId::MENU_UPDATE_LED_SIGNAL), ledCenterX, ledLabelY);
+
+            // AN/AUS-Wert bekommt eine eigene kleine Umrandung (gleicher
+            // Stil wie der "?"-Button) - reiner Text ohne Rahmen sah nicht
+            // wie ein antippbares Element aus, anders als bei den anderen
+            // Ein/Aus-Schaltern im Projekt (volle Button-Flaeche mit Rahmen).
+            String ledValueText = onOff(SettingsStore::updateLedSignalEnabled());
+            int16_t ledValueTextW = tft.textWidth(ledValueText);
+            // Box eng am Text orientiert statt am LED_LINE_GAP (Abstand
+            // zwischen Label- und Wert-ZEILE, nicht die Texthoehe selbst) -
+            // die Hoehe wurde dadurch vorher unnoetig gross (32px fuer eine
+            // einzelne kurze Textzeile), wirkte klobig statt wie ein
+            // kompakter Schalter. LED_VALUE_TEXT_H orientiert sich an der
+            // ueblichen Ein-Zeilen-Texthoehe (LINE_H=16 an anderen Stellen
+            // in dieser Datei), Padding knapp wie beim benachbarten
+            // "?"-Button.
+            constexpr int16_t LED_VALUE_TEXT_H = 16;
+            constexpr int16_t LED_VALUE_PAD_X = 8;
+            constexpr int16_t LED_VALUE_PAD_Y = 3;
+            int16_t ledValueBoxW = ledValueTextW + 2 * LED_VALUE_PAD_X;
+            int16_t ledValueBoxH = LED_VALUE_TEXT_H + 2 * LED_VALUE_PAD_Y;
+            tft.drawRoundRect((int16_t)(ledCenterX - ledValueBoxW / 2), (int16_t)(ledValueY - ledValueBoxH / 2),
+                               ledValueBoxW, ledValueBoxH, 4, UiTheme::accentColor(tft));
+            tft.drawString(ledValueText, ledCenterX, ledValueY);
             tft.setTextDatum(TL_DATUM);
-            drawRowInfoButton(tft, ledHalf);
 
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
@@ -893,14 +1072,16 @@ void run(TFT_eSPI& tft, bool startAtFilters) {
                 delay(20);
             }
 
-            // "?"-Info-Button zuerst pruefen (kleine Flaeche innerhalb der
-            // LED-Schalter-Zeile) - sonst wuerde ein Tap darauf faelschlich
-            // als Tap auf die ganze Zeile (Schalter umlegen) gewertet,
-            // gleiches Prinzip wie bei der ISS-Marker-Zeile (Page::
-            // FlightFilters).
-            if (rowInfoBtnRect(ledHalf).contains(tap.x, tap.y)) {
-                infoScreen(tft, I18n::t(StringId::UPDATE_LED_SIGNAL_INFO_TITLE), I18n::t(StringId::UPDATE_LED_SIGNAL_INFO_BODY),
-                           UiTheme::accentColor(tft), I18n::t(StringId::OK));
+            // "?"-Info-Button zuerst pruefen (kleine Flaeche oben rechts im
+            // gesamten Update-Kasten) - sonst wuerde ein Tap darauf
+            // faelschlich als Tap auf die obere Haelfte (Update-Suche
+            // starten) gewertet. Deckt jetzt BEIDE Themen des Buttons ab
+            // (Update-Suche + LED-Schalter), siehe twoPartInfoScreen() oben.
+            if (updateInfoBtn.contains(tap.x, tap.y)) {
+                twoPartInfoScreen(tft, I18n::t(StringId::UPDATE_BUTTON_INFO_TITLE),
+                                   I18n::t(StringId::UPDATE_CHECK_INFO_BODY),
+                                   I18n::t(StringId::UPDATE_LED_SIGNAL_INFO_BODY),
+                                   UiTheme::accentColor(tft), I18n::t(StringId::OK));
             } else if (displayBtn.contains(tap.x, tap.y)) {
                 page = Page::SystemDisplay;
             } else if (toolsBtn.contains(tap.x, tap.y)) {

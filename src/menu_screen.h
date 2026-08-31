@@ -9,8 +9,14 @@ namespace MenuScreen {
     // springt direkt in die "Anzeigefilter"-Unterseite (Flugoptionen >
     // Anzeigefilter) statt beim Hauptmenue zu beginnen - fuer den
     // antippbaren Filter-Hinweis im "Leerer Himmel"-Text (siehe
-    // radar_screen.cpp::handleTap()).
-    void run(TFT_eSPI& tft, bool startAtFilters = false);
+    // radar_screen.cpp::handleTap()). startAtSystem=true springt
+    // stattdessen direkt in die System-Seite (Version/"Nach Update
+    // suchen"-Button sichtbar) - fuer den antippbaren "Update"-Button in
+    // der unteren linken Radarecke (siehe radar_screen.cpp::
+    // drawUpdateCornerButton()/handleTap()), sobald ein Update verfuegbar
+    // ist. Beide Flags schliessen sich gegenseitig aus (kein Aufrufer
+    // braucht aktuell beide gleichzeitig).
+    void run(TFT_eSPI& tft, bool startAtFilters = false, bool startAtSystem = false);
 
     // Oeffentliche Huelle um das interne infoScreen() (siehe menu_screen.cpp)
     // - ein dauerhaft stehenbleibender, bei Bedarf automatisch scrollbarer

@@ -372,8 +372,18 @@ static const char* const I18N_ES[] = {
     "= Gubernamental/Militar (estimación)",
 
     "Aviso LED de actualización: ",
-    "Sobre el aviso LED de actualización",
+    "Sobre el botón de actualización",
+    "Comprueba si hay una versión de firmware más reciente disponible en GitHub y la muestra aquí. Toca este botón para descargarla e instalarla directamente por WiFi - no se necesita cable ni flasher web.",
     "Cuando hay una actualización disponible, el LED parpadea brevemente en magenta tres veces cada 10 segundos, además del punto rojo en el botón de actualización. Desactívalo si el parpadeo te molesta - el punto rojo del botón permanece en cualquier caso.",
+
+    "Colores de altitud",
+    "El color de cada marcador de avión indica su altitud:",
+
+    "en 3h",
+
+    "Esquina de eventos",
+    "Sobre la esquina de eventos",
+    "Muestra en la esquina inferior derecha un símbolo o sigla atenuados en cuanto haya un vuelo militar/gubernamental, una coincidencia en la lista de vigilancia de squawk, una coincidencia en la lista de vigilancia de aviones, o una aerolínea oculta (filtrada) en el radar. Si varios se cumplen a la vez, se alternan cada 2 segundos. Tocar el símbolo abre directamente la pantalla correspondiente.",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

@@ -372,8 +372,18 @@ static const char* const I18N_DE[] = {
     "= Behörden/Militär (Best-Effort)",
 
     "LED-Hinweis bei Update: ",
-    "Über den Update-LED-Hinweis",
+    "Über den Update-Button",
+    "Prüft, ob auf GitHub eine neuere Firmware-Version verfügbar ist, und zeigt sie hier an. Antippen lädt sie herunter und installiert sie direkt über WLAN - kein Kabel oder Web-Flasher nötig.",
     "Sobald ein Update verfügbar ist, blinkt die LED alle 10 Sekunden zusätzlich zum roten Punkt am Update-Button dreimal kurz Magenta. Bei Bedarf lässt sich das Blinken hier abschalten - der rote Punkt am Button bleibt davon unberührt bestehen.",
+
+    "Höhen-Farben",
+    "Die Farbe jedes Flugzeug-Markers zeigt seine Flughöhe an:",
+
+    "in 3h",
+
+    "Ereignis-Ecke",
+    "Über die Ereignis-Ecke",
+    "Zeigt unten rechts ein gedimmtes Symbol oder Kürzel, sobald ein Militär-/Behördenflug, ein Squawk-Wachposten-Treffer, ein Watchlist-Treffer oder eine ausgeblendete (gefilterte) Airline gerade auf dem Radar ist. Treffen mehrere gleichzeitig zu, wechseln sie alle 2 Sekunden durch. Antippen springt direkt zur passenden Ansicht.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

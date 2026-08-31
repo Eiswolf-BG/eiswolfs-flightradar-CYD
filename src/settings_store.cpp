@@ -52,6 +52,11 @@ namespace {
     // verfuegbarem Update, siehe radar_screen.cpp) bleibt unveraendert,
     // solange der Nutzer nicht aktiv abschaltet.
     bool updateLedSignalOn = true;
+    // AN per Default - die neue Ereignis-Ecke (Militaer/Squawk-Wachposten/
+    // Watchlist/Airline-Filter, siehe radar_screen.cpp::drawEventCorner())
+    // soll wie die uebrigen Radar-Darstellung-Extras direkt nutzbar sein,
+    // ohne dass man sie erst suchen/aktivieren muss.
+    bool eventCornerOverlayOn = true;
     bool mqttOn = false;
     // "host:port" als ein Feld, siehe Kommentar in settings_store.h.
     char mqttBrokerBuf[64] = {0};
@@ -135,6 +140,8 @@ namespace {
             rainEffectOn = (value.toInt() != 0);
         } else if (key == "update_led_signal") {
             updateLedSignalOn = (value.toInt() != 0);
+        } else if (key == "event_corner_overlay") {
+            eventCornerOverlayOn = (value.toInt() != 0);
         } else if (key == "mqtt_enabled") {
             mqttOn = (value.toInt() != 0);
         } else if (key == "mqtt_broker") {
@@ -223,6 +230,7 @@ void save() {
     f.printf("military_squawk_detection=%d\n", militarySquawkDetectionOn ? 1 : 0);
     f.printf("rain_effect=%d\n", rainEffectOn ? 1 : 0);
     f.printf("update_led_signal=%d\n", updateLedSignalOn ? 1 : 0);
+    f.printf("event_corner_overlay=%d\n", eventCornerOverlayOn ? 1 : 0);
     f.printf("mqtt_enabled=%d\n", mqttOn ? 1 : 0);
     f.printf("mqtt_broker=%s\n", mqttBrokerBuf);
     f.printf("mqtt_user=%s\n", mqttUserBuf);
@@ -445,6 +453,13 @@ bool updateLedSignalEnabled() { return updateLedSignalOn; }
 
 void setUpdateLedSignalEnabled(bool on) {
     updateLedSignalOn = on;
+    save();
+}
+
+bool eventCornerOverlayEnabled() { return eventCornerOverlayOn; }
+
+void setEventCornerOverlayEnabled(bool on) {
+    eventCornerOverlayOn = on;
     save();
 }
 

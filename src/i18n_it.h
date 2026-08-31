@@ -372,8 +372,18 @@ static const char* const I18N_IT[] = {
     "= Governativo/Militare (stima)",
 
     "Avviso LED aggiornamento: ",
-    "Info sull'avviso LED di aggiornamento",
+    "Info sul pulsante di aggiornamento",
+    "Verifica se su GitHub è disponibile una versione firmware più recente e la mostra qui. Tocca questo pulsante per scaricarla e installarla direttamente via WiFi - non serve alcun cavo o flasher web.",
     "Quando è disponibile un aggiornamento, il LED lampeggia brevemente in magenta tre volte ogni 10 secondi, oltre al punto rosso sul pulsante di aggiornamento. Disattivalo se il lampeggio ti disturba - il punto rosso sul pulsante resta comunque presente.",
+
+    "Colori altitudine",
+    "Il colore di ogni marcatore aereo indica la sua altitudine:",
+
+    "tra 3h",
+
+    "Angolo eventi",
+    "Info sull'angolo eventi",
+    "Mostra in basso a destra un simbolo o una sigla attenuati non appena un volo militare/governativo, una corrispondenza nella lista di controllo squawk, una corrispondenza nella lista di controllo aerei, o una compagnia nascosta (filtrata) e' attualmente sul radar. Se piu' condizioni valgono insieme, si alternano ogni 2 secondi. Toccare il simbolo apre direttamente la schermata corrispondente.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

@@ -16,16 +16,21 @@
 #include "aircraft_watchlist.h"
 #include "squawk_watchlist.h"
 #include "aircraft_watchlist_screen.h"
+#include "squawk_watchlist_screen.h"
+#include "airline_filter_screen.h"
+#include "radar_theme_screen.h"
 #include "i18n.h"
 #include "touch_input.h"
 #include "menu_stars.h"
 #include "menu_screen.h"
+#include "location_presets_screen.h"
 #include "iss_tracker.h"
 #include "weather.h"
 #include "ui_theme.h"
 #include <qrcode.h>
 #include <math.h>
 #include <time.h>
+#include <cctype>
 
 namespace RadarScreen {
 
@@ -153,6 +158,26 @@ namespace {
     }
 
     char selectedHex[7] = {0};
+
+    // Zustand fuer die neue "Ereignis-Ecke" unten rechts (siehe
+    // drawEventCorner()/render() weiter unten) - waehrend des periodischen
+    // Aircraft-Scans in render() (nicht bei jedem 80ms-Tick, siehe
+    // Kommentar dort) neu ermittelt, danach von tick()/render() gleichermassen
+    // zum Zeichnen gelesen (gleiches Persistenz-Prinzip wie hitPoints[]).
+    struct EventCornerState {
+        bool militaryActive = false;
+        bool squawkWatchActive = false;
+        bool callsignWatchActive = false;
+        bool airlineFilterActive = false;
+        // Nur EIN Rufzeichen/Airline-Kuerzel gespeichert (das zuletzt in
+        // dieser render()-Runde gefundene) - bei mehreren gleichzeitigen
+        // Treffern desselben Ereignistyps reicht ein Beispielwert fuer die
+        // kleine Eckenanzeige voellig aus, ein Zaehler waere hier
+        // ueberdimensioniert.
+        char watchlistCallsign[9] = {0};
+        char airlinePrefix[4] = {0};
+    };
+    EventCornerState eventCorner;
 
     // Zeigt "Leerer Himmel"-Zeile gerade einen Filter-Hinweis an (siehe
     // render())? Von handleTap() geprueft, um die Zeile nur dann antippbar
@@ -1247,21 +1272,30 @@ namespace {
         gfx.setTextDatum(TL_DATUM);
     }
 
-    void drawLegend(TFT_eSPI& gfx, int16_t y) {
+    // Gemeinsame Hoehen-Label-Berechnung (Meter/Fuss je nach
+    // LocationManager::useMetricUnits()) - von drawLegend() (kompakte
+    // Infoleisten-Zeile) UND showAltitudeLegendScreen() (grosser Info-
+    // Screen, siehe handleTap()) genutzt, damit beide garantiert dieselben
+    // Werte/Rundung zeigen statt zweier unabhaengiger Implementierungen.
+    void altitudeLegendLabels(char* lowLabel, size_t lowSz, char* midLabel, size_t midSz,
+                               char* highLabel, size_t highSz) {
         bool metric = LocationManager::useMetricUnits();
-
-        char lowLabel[10], midLabel[10], highLabel[10];
         if (metric) {
             int lowM = (int)(Units::feetToMeters(Config::COLOR_LOW_ALT_THRESHOLD_FT) / 100) * 100;
             int midM = (int)(Units::feetToMeters(Config::COLOR_MID_ALT_THRESHOLD_FT) / 100) * 100;
-            snprintf(lowLabel, sizeof(lowLabel), "<%dm", lowM);
-            snprintf(midLabel, sizeof(midLabel), "%d-%dm", lowM, midM);
-            snprintf(highLabel, sizeof(highLabel), ">%dm", midM);
+            snprintf(lowLabel, lowSz, "<%dm", lowM);
+            snprintf(midLabel, midSz, "%d-%dm", lowM, midM);
+            snprintf(highLabel, highSz, ">%dm", midM);
         } else {
-            snprintf(lowLabel, sizeof(lowLabel), "<10k ft");
-            snprintf(midLabel, sizeof(midLabel), "10-30k");
-            snprintf(highLabel, sizeof(highLabel), ">30k ft");
+            snprintf(lowLabel, lowSz, "<10k ft");
+            snprintf(midLabel, midSz, "10-30k");
+            snprintf(highLabel, highSz, ">30k ft");
         }
+    }
+
+    void drawLegend(TFT_eSPI& gfx, int16_t y) {
+        char lowLabel[10], midLabel[10], highLabel[10];
+        altitudeLegendLabels(lowLabel, sizeof(lowLabel), midLabel, sizeof(midLabel), highLabel, sizeof(highLabel));
 
         // Dieselbe colorForAltitude()-Funktion wie fuer die Flugzeug-Marker
         // selbst verwenden (mit einer typischen Hoehe je Band) - sonst zeigt
@@ -1916,6 +1950,76 @@ namespace {
         gfx.setTextDatum(TL_DATUM);
     }
 
+    // Vollbild-Info-Screen fuer die antippbare Hoehen-Farb-Legende in der
+    // unteren Infoleiste (siehe drawLegend()/handleTap() - legendRowRect()
+    // unten deckt die ganze Zeile ab, unabhaengig davon, welchen der drei
+    // Eintraege man konkret trifft). Zeigt dieselben Werte wie die
+    // kompakte Leisten-Legende (altitudeLegendLabels(), respektiert also
+    // die Einheiten-Einstellung), nur groesser/uebersichtlicher plus einer
+    // kurzen Erklaerung, was die Farben bedeuten - gleiches Bau-Muster wie
+    // runFlightQrScreen() unten (Vollbild, eigene Touch-Schleife, "?"-Info-
+    // Screen-Stil aus menu_screen.cpp als Vorbild fuer Rahmen/Button).
+    void showAltitudeLegendScreen(TFT_eSPI& gfx) {
+        MenuStars::reset();
+        gfx.setTextSize(1);
+
+        char lowLabel[10], midLabel[10], highLabel[10];
+        altitudeLegendLabels(lowLabel, sizeof(lowLabel), midLabel, sizeof(midLabel), highLabel, sizeof(highLabel));
+
+        // Gleiche colorForAltitude()-Aufrufe (mit einer typischen Hoehe je
+        // Band) wie in drawLegend() - siehe dortiger Kommentar zur
+        // Nachtdimmung.
+        struct { uint16_t color; const char* label; } items[3] = {
+            {colorForAltitude(gfx, 0),                                  lowLabel},
+            {colorForAltitude(gfx, Config::COLOR_LOW_ALT_THRESHOLD_FT), midLabel},
+            {colorForAltitude(gfx, Config::COLOR_MID_ALT_THRESHOLD_FT), highLabel},
+        };
+
+        Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+
+        gfx.fillScreen(TFT_BLACK);
+        gfx.setTextColor(themeBaseColor(gfx), TFT_BLACK);
+        gfx.setCursor(10, 14);
+        gfx.println(I18n::t(StringId::LEGEND_INFO_TITLE));
+
+        constexpr int16_t INTRO_Y = 46;
+        drawWrappedCenteredHint(gfx, I18n::t(StringId::LEGEND_INFO_INTRO), Config::SCREEN_WIDTH / 2, INTRO_Y,
+                                 (int16_t)(Config::SCREEN_WIDTH - 20), 16);
+
+        constexpr int16_t DOT_X = 30;
+        constexpr int16_t LABEL_X = 50;
+        constexpr int16_t ROW_H = 30;
+        int16_t rowY = INTRO_Y + 40;
+        gfx.setTextColor(TFT_WHITE, TFT_BLACK);
+        for (uint8_t i = 0; i < 3; i++) {
+            gfx.fillCircle(DOT_X, rowY, 6, items[i].color);
+            gfx.setCursor(LABEL_X, (int16_t)(rowY + 5));
+            gfx.print(items[i].label);
+            rowY = (int16_t)(rowY + ROW_H);
+        }
+
+        // Bodenfahrzeug-Quadrat ebenfalls Teil der Legende - nur wenn
+        // ueberhaupt sichtbar (gleiche Bedingung wie in drawLegend()).
+        if (!SettingsStore::hideGroundVehicles()) {
+            gfx.fillRect((int16_t)(DOT_X - 6), (int16_t)(rowY - 6), 12, 12, colorForGroundVehicle(gfx));
+            gfx.setCursor(LABEL_X, (int16_t)(rowY + 5));
+            gfx.print(I18n::t(StringId::LEGEND_GROUND_VEHICLE));
+        }
+
+        drawButton(gfx, backBtn, I18n::t(StringId::OK));
+
+        while (true) {
+            TouchInput::Point tap;
+            if (TouchInput::wasTapped(tap)) {
+                if (backBtn.contains(tap.x, tap.y)) return;
+            }
+            // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return;
+            MenuStars::update(gfx);
+            delay(20);
+        }
+    }
+
     // Vollbild-QR-Code mit einem FlightAware-Live-Tracking-Link fuer das
     // uebergebene Rufzeichen - erreichbar ueber den "QR"-Button oben rechts
     // im Detail-Panel (siehe drawDetailPanel()/qrButtonRect()). Gleiches
@@ -2079,6 +2183,437 @@ namespace {
             gfx.drawPixel(bgStars[i].x, bgStars[i].y, color);
         }
     }
+
+    // Gedimmtes 3h-Wettervorschau-Symbol in der oberen rechten Ecke
+    // ausserhalb des Radarkreises (Alex' Wunsch) - gleiche Symbol-Formen
+    // wie das bestehende Header-Wetter-Icon (drawCloudShape()/
+    // drawSunShape() in main.cpp), hier aber lokal dupliziert (gfx-
+    // parametrisiert statt an main.cpp's globales tft gebunden, siehe
+    // CLAUDE.md "jeder Screen unabhaengig lauffaehig") UND in der
+    // Themenfarbe statt der festen Wetter-Icon-Farben (Gelb/Grau/Blau).
+    // Fester Anker-Punkt statt dynamischer Positionierung relativ zu L -
+    // rechnerisch geprueft: selbst beim maximal moeglichen Radius
+    // (SCREEN_WIDTH/2-6, durch die Breite begrenzt) bleibt dieser Punkt
+    // mit deutlichem Abstand (>15px) ausserhalb des Kreises, unabhaengig
+    // von der gewaehlten Radar-Reichweite.
+    // Naeher an die tatsaechliche Bildschirmecke geschoben (war vorher
+    // SCREEN_WIDTH-28 / top+22) - sass dort noch zu nah am Kreisrand und
+    // kollidierte mit der Nordost-Rasterspeiche bei aktivem "Klassik-
+    // Radar" (30/60-Grad-Speichen, siehe drawStaticBackground()). Rechnerisch
+    // bleibt auch dieser Punkt bei jedem moeglichen Radius (maximal
+    // SCREEN_WIDTH/2-6, siehe computeLayout()) klar ausserhalb des Kreises,
+    // aber mit spuerbar mehr Puffer als vorher.
+    // Feinjustierung: 1px nach links, 3px nach oben (Alex' Wunsch) - war
+    // vorher SCREEN_WIDTH-20 / 16 / 40.
+    constexpr int16_t FORECAST_ICON_CX = Config::SCREEN_WIDTH - 21;
+    constexpr int16_t FORECAST_ICON_CY_OFFSET = 13; // relativ zu "top"
+    constexpr int16_t FORECAST_TEXT_Y_OFFSET = 37;  // relativ zu "top"
+
+    void drawForecastCloudShape(TFT_eSPI& gfx, int16_t cx, int16_t cy, uint16_t color) {
+        gfx.fillCircle((int16_t)(cx - 7), (int16_t)(cy + 1), 4, color);
+        gfx.fillCircle((int16_t)(cx - 1), (int16_t)(cy - 3), 5, color);
+        gfx.fillCircle((int16_t)(cx + 6), cy, 5, color);
+        gfx.fillRect((int16_t)(cx - 11), cy, 18, 4, color);
+    }
+
+    void drawForecastSunShape(TFT_eSPI& gfx, int16_t cx, int16_t cy, int16_t r, uint16_t color) {
+        gfx.fillCircle(cx, cy, r, color);
+        for (uint8_t i = 0; i < 8; i++) {
+            float angle = i * (PI / 4.0f);
+            int16_t x1 = (int16_t)(cx + (r + 3) * cosf(angle));
+            int16_t y1 = (int16_t)(cy + (r + 3) * sinf(angle));
+            int16_t x2 = (int16_t)(cx + (r + 6) * cosf(angle));
+            int16_t y2 = (int16_t)(cy + (r + 6) * sinf(angle));
+            gfx.drawLine(x1, y1, x2, y2, color);
+        }
+    }
+
+    // Nur sichtbar, wenn eine 3h-Vorhersage vorliegt UND sie sich vom
+    // AKTUELLEN Wetter unterscheidet (Alex' ausdruecklicher Wunsch - bei
+    // gleichbleibender Lage keine Anzeige). Wird wie updateBgStars() aus
+    // tick() heraus im 80ms-Takt neu gezeichnet (siehe dortiger
+    // Kommentar), damit es das render()-Vollclear ueberlebt, ohne bis zu
+    // 80ms lang zu verschwinden/zu flackern.
+    void drawForecastCorner(TFT_eSPI& gfx, int16_t top) {
+        Weather::Forecast fc = Weather::currentForecast();
+        Weather::Condition cur = Weather::current();
+        if (!fc.available) return;
+        if (cur == Weather::Condition::Unknown || fc.condition == Weather::Condition::Unknown) return;
+        if (fc.condition == cur) return;
+
+        int16_t cx = FORECAST_ICON_CX;
+        int16_t cy = (int16_t)(top + FORECAST_ICON_CY_OFFSET);
+        // Deutlich gedimmt statt volle Themenfarbe (Alex' Wunsch: "kaum
+        // sichtbar/sehr dezent" - 0.45 war noch genauso kraeftig wie
+        // normale UI-Elemente, jetzt auf ~18% reduziert) - gleicher Dimm-
+        // Mechanismus wie drawWorldMap()/updateBgStars() oben.
+        uint16_t color = UiTheme::accentColorDimmed(gfx, 0.18f);
+
+        switch (fc.condition) {
+            case Weather::Condition::Clear:
+                drawForecastSunShape(gfx, cx, cy, 9, color);
+                break;
+            case Weather::Condition::PartlyCloudy:
+                drawForecastSunShape(gfx, (int16_t)(cx - 6), (int16_t)(cy - 4), 6, color);
+                drawForecastCloudShape(gfx, (int16_t)(cx + 5), (int16_t)(cy + 3), color);
+                break;
+            case Weather::Condition::Cloudy:
+                drawForecastCloudShape(gfx, cx, cy, color);
+                break;
+            case Weather::Condition::Rain:
+                drawForecastCloudShape(gfx, cx, (int16_t)(cy - 4), color);
+                gfx.drawLine((int16_t)(cx - 6), (int16_t)(cy + 6), (int16_t)(cx - 9), (int16_t)(cy + 12), color);
+                gfx.drawLine(cx,                (int16_t)(cy + 6), (int16_t)(cx - 3), (int16_t)(cy + 12), color);
+                gfx.drawLine((int16_t)(cx + 6), (int16_t)(cy + 6), (int16_t)(cx + 3), (int16_t)(cy + 12), color);
+                break;
+            case Weather::Condition::Snow:
+                drawForecastCloudShape(gfx, cx, (int16_t)(cy - 4), color);
+                gfx.drawPixel((int16_t)(cx - 6), (int16_t)(cy + 9), color);
+                gfx.drawPixel(cx,                (int16_t)(cy + 11), color);
+                gfx.drawPixel((int16_t)(cx + 6), (int16_t)(cy + 9), color);
+                break;
+            case Weather::Condition::Thunderstorm:
+                drawForecastCloudShape(gfx, cx, (int16_t)(cy - 4), color);
+                gfx.drawLine(cx,                (int16_t)(cy + 4),  (int16_t)(cx - 4), (int16_t)(cy + 10), color);
+                gfx.drawLine((int16_t)(cx - 4), (int16_t)(cy + 10), (int16_t)(cx + 1), (int16_t)(cy + 10), color);
+                gfx.drawLine((int16_t)(cx + 1), (int16_t)(cy + 10), (int16_t)(cx - 3), (int16_t)(cy + 16), color);
+                break;
+            default:
+                return;
+        }
+
+        // "in 3h" fett (1px-Offset-Technik, gleiches Muster wie
+        // drawCenteredWrappedBold() in first_run_welcome_screen.cpp).
+        int16_t textY = (int16_t)(top + FORECAST_TEXT_Y_OFFSET);
+        gfx.setTextDatum(MC_DATUM);
+        gfx.setTextColor(color, TFT_BLACK);
+        gfx.drawString(I18n::t(StringId::FORECAST_CORNER_LABEL), cx, textY);
+        gfx.drawString(I18n::t(StringId::FORECAST_CORNER_LABEL), (int16_t)(cx + 1), textY);
+        gfx.setTextDatum(TL_DATUM);
+    }
+
+    // Antippbares "!"-in-Kreis-Icon in der unteren linken Radarecke - NUR
+    // sichtbar, wenn OtaUpdate::isUpdateAvailable() true liefert (gleiche
+    // Erkennung wie roter Punkt am Menu-Button/LED-Update-Signal in
+    // led_alert.cpp). Ersetzt den fruehren Text-Button ("Update") - der
+    // liess sich trotz mehrerer Anlaeufe nicht mehr kollisionsfrei mit der
+    // horizontalen Trennlinie bei y=infoTop unterbringen (diese Ecke ist
+    // strukturell viel enger als die rechte obere mit dem Wetter-Symbol,
+    // siehe drawForecastCorner() - der Kreis reicht hier fast bis infoTop
+    // herunter). Ein kompaktes Icon passt dagegen mit klarem Puffer.
+    //
+    // Groesse/Position (3. Ueberarbeitung, Alex' Wunsch nach Screenshot-
+    // Feedback): der vorherige Versuch zeichnete den Ring als ZWEI
+    // ueberlagerte drawCircle()-Aufrufe (R und R-1) - bei diesem kleinen
+    // Radius zeigte TFT_eSPIs Kreis-Algorithmus dabei Luecken an den
+    // Kardinalpunkten (sichtbar als zwei offene Halbbogen statt eines
+    // geschlossenen Kreises, siehe Screenshot). Jetzt EIN einziger
+    // fillCircle()-Aufruf (garantiert luecklos, da vollflaechig statt
+    // Umriss) - das "!" wird darin in TFT_BLACK (Kontrastfarbe zur
+    // gefuellten Kreisflaeche) aus zwei einzelnen Grundformen gezeichnet
+    // (Balken + Punkt, siehe drawUpdateCornerButton() unten) statt aus dem
+    // Font-Zeichen "!", das beim vorherigen Versuch nur als duenner
+    // Strich ohne erkennbaren Punkt erschien.
+    //
+    // Position deutlich groszuegiger von Kreis UND Trennlinie abgerueckt
+    // als beim letzten Mal (dort nur 4.1px Kreis-Puffer - zu wenig, wirkte
+    // auf dem Foto wie am Kreisrand klebend). Rechnung (Standardfall,
+    // Bodenfahrzeuge ausgeblendet -> infoBarHeight()=64, L.cx=120/
+    // L.cy=147/Radius=102):
+    //   infoTop (Trennlinien-Y)  = SCREEN_HEIGHT(320) - 64             = 256
+    //   cy (Icon-Mittelpunkt)    = infoTop - CY_OFFSET_FROM_LINE(31)   = 225
+    //   cx (Icon-Mittelpunkt)    = 22 (fest)
+    //   Icon-Unterkante          = cy + R(12)                         = 237
+    //   Abstand Icon-Unterkante -> Trennlinie = 256 - 237              = 19px
+    //   Kreisrand: dx=120-22=98, dy=225-147=78
+    //     dist(Mittelpunkte) = sqrt(98^2+78^2) = 125.25
+    //     minus Icon-Radius(12) = 113.25, minus Kreisradius(102) = 11.25px Puffer
+    // Zum Vergleich die Mitte des freien Eckbereichs an dieser Stelle:
+    // horizontal (bei y=225) reicht der Kreis bis x=54.3, Mitte zum
+    // Bildschirmrand also x=27 - cx=22 liegt nah dran, leicht nach links
+    // versetzt fuer den zusaetzlichen Sicherheitsabstand. Vertikal (bei
+    // x=22) reicht der Kreis bis y=175.3, Mitte zur Trennlinie (256) also
+    // y=215.65 - cy=225 liegt nah dran, leicht nach unten versetzt fuer
+    // mehr Trennlinien-Puffer. Alternativfall (Bodenfahrzeuge sichtbar,
+    // infoBarHeight()=82, Kreisradius 93px, L.cy=138) liefert mit
+    // derselben Formel sogar noch mehr Puffer (14.9px Kreis / 19px Linie).
+    constexpr int16_t UPDATE_ICON_CX = 22;
+    constexpr int16_t UPDATE_ICON_R = 12;
+    constexpr int16_t UPDATE_ICON_CY_OFFSET_FROM_LINE = 31;
+    constexpr uint32_t UPDATE_ICON_PULSE_PERIOD_MS = 2600;
+
+    Rect updateCornerButtonRect() {
+        int16_t cy = (int16_t)(Config::SCREEN_HEIGHT - infoBarHeight() - UPDATE_ICON_CY_OFFSET_FROM_LINE);
+        return {(int16_t)(UPDATE_ICON_CX - UPDATE_ICON_R), (int16_t)(cy - UPDATE_ICON_R),
+                (int16_t)(UPDATE_ICON_R * 2), (int16_t)(UPDATE_ICON_R * 2)};
+    }
+
+    void drawUpdateCornerButton(TFT_eSPI& gfx) {
+        if (!OtaUpdate::isUpdateAvailable()) return;
+
+        Rect box = updateCornerButtonRect();
+        int16_t cx = (int16_t)(box.x + UPDATE_ICON_R);
+        int16_t cy = (int16_t)(box.y + UPDATE_ICON_R);
+
+        // Sanftes "Atmen" - stateless, reine Funktion von millis(), damit
+        // tick()/render() sie beliebig oft neu aufrufen koennen, ohne
+        // eigenen Fortschritts-Zustand pflegen zu muessen (gleiches
+        // Prinzip wie die zeitbasierten Blink-Berechnungen in
+        // led_alert.cpp). 0.12..0.95 Hub - bei einer bereits gesaettigten
+        // Themenfarbe (z.B. Amber) sah ein kleinerer Hub kaum wie ein
+        // Wechsel aus (Alex' Meldung beim ersten Text-Button-Versuch).
+        // Pulsiert jetzt die FUELLFARBE des Kreises (vorher nur den
+        // duennen Ringumriss), dadurch deutlich praesenter sichtbar.
+        uint32_t phase = millis() % UPDATE_ICON_PULSE_PERIOD_MS;
+        float t = (float)phase / (float)UPDATE_ICON_PULSE_PERIOD_MS;
+        float breathe = (sinf(t * 2.0f * PI) + 1.0f) / 2.0f; // 0..1
+        float brightness = 0.12f + 0.83f * breathe; // 0.12..0.95
+        uint16_t color = UiTheme::accentColorDimmed(gfx, brightness);
+
+        // EIN einziger fillCircle()-Aufruf - garantiert geschlossen, keine
+        // Umriss-Luecken (siehe Kommentar oben).
+        gfx.fillCircle(cx, cy, UPDATE_ICON_R, color);
+
+        // "!" aus zwei einzelnen Grundformen statt dem Font-Zeichen -
+        // TFT_BLACK als Kontrastfarbe zur jetzt farbig gefuellten
+        // Kreisflaeche. Balken: 3px breit, 7px hoch, oberer Teil des
+        // Kreises (Mitte des Balkens bei cy-4.5, also deutlich oberhalb
+        // des Kreiszentrums). Punkt: Radius 2px, mit sichtbarem 3px-
+        // Abstand unter dem Balken. Beide zusammen span von cy-8 bis
+        // cy+6 (14px) - passt mit deutlichem Rand in den 24px-
+        // Kreisdurchmesser (R=12).
+        constexpr int16_t BAR_W = 3;
+        constexpr int16_t BAR_H = 7;
+        constexpr int16_t BAR_TOP_OFFSET = 8; // ab cy nach oben
+        constexpr int16_t DOT_R = 2;
+        constexpr int16_t DOT_CY_OFFSET = 4; // ab cy nach unten
+        gfx.fillRect((int16_t)(cx - BAR_W / 2), (int16_t)(cy - BAR_TOP_OFFSET), BAR_W, BAR_H, TFT_BLACK);
+        gfx.fillCircle(cx, (int16_t)(cy + DOT_CY_OFFSET), DOT_R, TFT_BLACK);
+    }
+
+    // "Naechster Flughafen"-Anzeige in der oberen linken Radarecke -
+    // IMMER sichtbar (kein Ereignis-getriggertes Ein-/Ausblenden wie bei
+    // Wetter-Symbol/Update-Icon), Daten aus Weather::currentNearestAirport()
+    // (dort ermittelt, um die AirportLookup-SD-Abfrage nicht zusaetzlich
+    // hier zu wiederholen, siehe weather.h). Gleicher gedimmter Stil wie
+    // das Wetter-Symbol (0.18 Helligkeitsfaktor).
+    //
+    // Ueberarbeitet auf DREI linksbuendige Zeilen (Code / Distanz /
+    // Peilung) statt vorher zwei ZENTRIERTE Zeilen - bei einem
+    // dreistelligen km-Wert plus Peilung (z.B. "999km SW", getestet per
+    // Simulation) haette die zentrierte Variante zur HAELFTE nach LINKS
+    // ueber den Bildschirmrand hinaus gemalt (MC_DATUM zentriert um
+    // cx=20, ein 8-Zeichen-String reicht dabei bis x=-12). Linksbuendig
+    // (ML_DATUM) ab einem festen Anker waechst der Text stattdessen immer
+    // nach RECHTS, also kontrolliert in Richtung Kreis statt unkontrolliert
+    // ueber den Bildschirmrand - UND jede Zeile ist durch die Aufteilung
+    // auf drei kurze Zeilen ohnehin viel kuerzer (max. 5 Zeichen: "999km").
+    //
+    // Kreisrand-Check fuer die UNTERSTE (= dem Kreis am naechsten liegende)
+    // Zeile, Standardfall (Radius=102, L.cx=120/L.cy=147, top=29):
+    //   line3Y (Peilung)  = top + CY_OFFSET(18) + GAP(13)   = 60
+    //   dy = 60 - 147 = -87, dx_max = sqrt(102^2-87^2) = 53.2
+    //   Kreisrand an dieser Hoehe: x = 120 - 53.2            = 66.8
+    //   Laengste Zeile ("999km", 5 Zeichen, ~9px/Zeichen)    = ~45px
+    //   Textrechte Kante = ANKER_X(6) + 45                   = 51
+    //   Puffer zum Kreisrand: 66.8 - 51                      = ~16px
+    // Alle drei Zeilen bleiben damit sicher innerhalb des Eckbereichs,
+    // unabhaengig von der tatsaechlichen Distanz (max. 3-stellig + "km").
+    constexpr int16_t AIRPORT_INFO_X = 6;
+    constexpr int16_t AIRPORT_INFO_CY_OFFSET = 18; // relativ zu "top"
+    constexpr int16_t AIRPORT_INFO_LINE_GAP = 13;
+
+    // Antippbare Flaeche fuer alle drei Zeilen (siehe handleTap()) - grosszuegig
+    // bemessen (deckt auch etwas Rand um den Text ab), damit ein Tap nicht
+    // pixelgenau treffen muss.
+    Rect nearestAirportCornerRect(int16_t top) {
+        int16_t y0 = (int16_t)(top + AIRPORT_INFO_CY_OFFSET - AIRPORT_INFO_LINE_GAP - 8);
+        return {0, y0, 90, (int16_t)(2 * AIRPORT_INFO_LINE_GAP + 16)};
+    }
+
+    void drawNearestAirportCorner(TFT_eSPI& gfx, int16_t top) {
+        Weather::NearestAirport na = Weather::currentNearestAirport();
+        if (!na.available) return;
+
+        // Respektiert dieselbe zentrale IATA/ICAO-Einstellung wie das
+        // Detail-Panel (SettingsStore::useIataAirportCodes()) - faellt auf
+        // ICAO zurueck, wenn IATA gewuenscht, aber (noch) nicht ermittelt
+        // werden konnte (siehe fetchAirportIata() in weather.cpp).
+        bool useIata = SettingsStore::useIataAirportCodes() && na.iata[0];
+        const char* code = useIata ? na.iata : na.icao;
+
+        char distLine[12];
+        if (LocationManager::useMetricUnits()) {
+            snprintf(distLine, sizeof(distLine), "%.0fkm", na.distanceKm);
+        } else {
+            snprintf(distLine, sizeof(distLine), "%.0fnm", Units::kmToNm(na.distanceKm));
+        }
+        const char* bearingLine = compassLabel(na.bearingDeg);
+
+        int16_t x = AIRPORT_INFO_X;
+        int16_t line1Y = (int16_t)(top + AIRPORT_INFO_CY_OFFSET - AIRPORT_INFO_LINE_GAP);
+        int16_t line2Y = (int16_t)(top + AIRPORT_INFO_CY_OFFSET);
+        int16_t line3Y = (int16_t)(top + AIRPORT_INFO_CY_OFFSET + AIRPORT_INFO_LINE_GAP);
+        uint16_t color = UiTheme::accentColorDimmed(gfx, 0.18f);
+
+        gfx.setTextDatum(ML_DATUM);
+        gfx.setTextColor(color, TFT_BLACK);
+        gfx.drawString(code, x, line1Y);
+        gfx.drawString(code, (int16_t)(x + 1), line1Y); // fett, gleiche 1px-Offset-Technik wie oben
+        gfx.drawString(distLine, x, line2Y);
+        gfx.drawString(bearingLine, x, line3Y);
+        gfx.setTextDatum(TL_DATUM);
+    }
+
+    // Ereignis-Ecke unten rechts (Alex' Wunsch) - zeigt an, ob GERADE ein
+    // Militaer-/Behoerdenflug, ein Squawk-Wachposten-Treffer, ein
+    // Rufzeichen-Watchlist-Treffer oder ein Airline-Filter-Treffer aktiv
+    // ist (eventCorner-Zustand, siehe render()-Aufbau oben). Bei mehreren
+    // gleichzeitig aktiven Ereignissen rotieren Symbol/Text alle 2s durch,
+    // in fester Prioritaet Militaer > Squawk-Wachposten > Watchlist >
+    // Airline-Filter. currentEventCornerType() ist die EINZIGE Stelle, die
+    // "welches Ereignis wird gerade gezeigt" berechnet - sowohl
+    // drawEventCorner() als auch der Tap-Handler in handleTap() nutzen
+    // exakt diese Funktion, damit ein Tap IMMER zum aktuell sichtbaren
+    // Symbol passt, auch waehrend der Rotation.
+    enum class EventCornerType { None, Military, SquawkWatch, CallsignWatch, AirlineFilter };
+
+    constexpr uint32_t EVENT_CORNER_ROTATE_MS = 3000;
+
+    EventCornerType currentEventCornerType() {
+        EventCornerType active[4];
+        uint8_t n = 0;
+        if (eventCorner.militaryActive) active[n++] = EventCornerType::Military;
+        if (eventCorner.squawkWatchActive) active[n++] = EventCornerType::SquawkWatch;
+        if (eventCorner.callsignWatchActive) active[n++] = EventCornerType::CallsignWatch;
+        if (eventCorner.airlineFilterActive) active[n++] = EventCornerType::AirlineFilter;
+        if (n == 0) return EventCornerType::None;
+        if (n == 1) return active[0];
+        uint32_t idx = (millis() / EVENT_CORNER_ROTATE_MS) % n;
+        return active[idx];
+    }
+
+    // Position spiegelbildlich zum Update-Icon (untere linke Ecke, dort
+    // bereits rechnerisch mit 11.25-19px Puffer bestaetigt, siehe
+    // drawUpdateCornerButton()) - hier cx von rechts statt links gemessen,
+    // gleiche cy-Formel. Fuer Text (Callsign/Airline-Kuerzel) zusaetzlich
+    // eine per tft.textWidth() ABGESICHERTE Kuerzung (siehe
+    // drawEventCorner() unten) - anders als beim vorherigen Update-Button-
+    // Layoutproblem verlassen wir uns hier NICHT allein auf eine
+    // rechnerische Abschaetzung der Zeichenbreite, sondern messen die
+    // tatsaechliche Pixelbreite zur Laufzeit und kuerzen bei Bedarf, damit
+    // JEDE Callsign-/Airline-Kuerzel-Laenge garantiert in den verfuegbaren
+    // Platz passt.
+    constexpr int16_t EVENT_CORNER_CX = Config::SCREEN_WIDTH - 22;
+    constexpr int16_t EVENT_CORNER_CY_OFFSET_FROM_LINE = 31;
+    constexpr int16_t EVENT_CORNER_R = 12;
+    // Textbereich: linker Rand rechnerisch geprueft (siehe unten), rechter
+    // Rand kurz vor dem Bildschirmrand - zeichenweise Kuerzung zur
+    // Laufzeit (drawTruncatedLeft()) haelt sich an diese Breite, egal wie
+    // lang der Ausgangstext (Callsign bis 8 Zeichen) ist, es gibt also
+    // KEIN Ueberlaufrisiko unabhaengig von der genauen Zeichenbreiten-
+    // Schaetzung.
+    //
+    // Linke Kante rechnerisch (Standardfall, Radius=102, L.cx=120/
+    // L.cy=147, top=29, cy=225 wie beim Update-Icon):
+    //   Text-GLYPH ragt bei MC/ML_DATUM ca. 9px ueber cy hinaus (unser
+    //   Font ist zwar baseline-verankert, TFT_eSPI zentriert bei
+    //   Datum-Nutzung aber korrekt um die Glyphenbox, siehe CLAUDE.md-
+    //   Fontkommentar) - oberste Glyphen-Kante also bei cy-9=216.
+    //   dy = 216-147 = 69, dx_max = sqrt(102^2-69^2) = 75.1
+    //   Kreisrand an dieser Hoehe: x = 120+75.1 = 195.1
+    //   + 6px Sicherheitsabstand -> linke Textkante bei x=201
+    // Alternativfall (Bodenfahrzeuge sichtbar, Radius=93, L.cy=138,
+    // cy=207): Glyphenkante bei 198, dy=60, dx_max=71.1, Kreisrand=191.1
+    // - x=201 liegt dort mit ~10px Puffer sogar noch sicherer.
+    constexpr int16_t EVENT_CORNER_TEXT_X = 201;
+    constexpr int16_t EVENT_CORNER_TEXT_MAX_W = 35; // bis x=236, 4px vor dem Bildschirmrand (240)
+
+    Rect eventCornerRect(int16_t top) {
+        int16_t cy = (int16_t)(Config::SCREEN_HEIGHT - infoBarHeight() - EVENT_CORNER_CY_OFFSET_FROM_LINE);
+        // Grosszuegige, gemeinsame Tap-Flaeche fuer Icon- UND Text-Faelle
+        // (deckt beide moeglichen Positionen ab, praezises Pixel-Treffen
+        // nicht noetig).
+        return {(int16_t)(EVENT_CORNER_TEXT_X - 6), (int16_t)(cy - EVENT_CORNER_R - 4),
+                (int16_t)(Config::SCREEN_WIDTH - (EVENT_CORNER_TEXT_X - 6)), (int16_t)(2 * EVENT_CORNER_R + 8)};
+    }
+
+    // Zeichnet "text", zur Laufzeit per tft.textWidth() auf maxWidth
+    // gekuerzt (zeichenweise von hinten, kein "...", da bei so kurzen
+    // Kuerzeln/Callsigns kein Platz fuer drei zusaetzliche Punkte bleibt) -
+    // linksbuendig ab x, waechst also nach RECHTS (weg vom Radarkreis, zum
+    // Bildschirmrand hin), siehe Geometrie-Kommentar oben.
+    void drawTruncatedLeft(TFT_eSPI& gfx, const char* text, int16_t x, int16_t y, int16_t maxWidth) {
+        String s = text;
+        while (s.length() > 1 && gfx.textWidth(s) > maxWidth) {
+            s.remove(s.length() - 1);
+        }
+        gfx.drawString(s, x, y);
+    }
+
+    void drawEventCorner(TFT_eSPI& gfx, int16_t top) {
+        if (!SettingsStore::eventCornerOverlayEnabled()) return;
+        EventCornerType type = currentEventCornerType();
+        if (type == EventCornerType::None) return;
+
+        // Vorheriges Symbol IMMER erst vollstaendig loeschen, bevor das
+        // aktuelle gezeichnet wird - sonst blieb beim Rotationswechsel
+        // (z.B. Flugzeug-Symbol -> Militaer-Ring) das alte Symbol stehen
+        // und beide ueberlagerten sich sichtbar (Alex' Screenshot-
+        // Meldung). eventCornerRect() deckt sowohl die Icon- als auch die
+        // Text-Zeichenflaeche ab, ein einziges fillRect() genuegt daher
+        // fuer alle vier Ereignistypen.
+        Rect clearArea = eventCornerRect(top);
+        gfx.fillRect(clearArea.x, clearArea.y, clearArea.w, clearArea.h, TFT_BLACK);
+
+        int16_t cy = (int16_t)(Config::SCREEN_HEIGHT - infoBarHeight() - EVENT_CORNER_CY_OFFSET_FROM_LINE);
+        int16_t cx = EVENT_CORNER_CX;
+        // Fetter/praesenter als das rein dekorative Wetter-/Flughafen-Duo
+        // (0.18) - dies hier ist ein tatsaechlicher Hinweis-/Alarm-artiger
+        // Zustand, soll also deutlicher auffallen, bleibt aber weiterhin
+        // klar gedimmt gegenueber normalen UI-Elementen (Alex' Wunsch:
+        // "gedimmtes, fettes Symbol").
+        uint16_t color = UiTheme::accentColorDimmed(gfx, 0.4f);
+
+        gfx.setTextDatum(ML_DATUM);
+        gfx.setTextColor(color, TFT_BLACK);
+
+        switch (type) {
+            case EventCornerType::Military: {
+                // Ring-Symbol, angelehnt an den bestehenden oranger Ring
+                // (siehe isNotable-Zweig in render()), hier aber in der
+                // gedimmten Themenfarbe statt TFT_ORANGE. Zwei Kreise MIT
+                // deutlich unterschiedlichem Radius (nicht R und R-1 wie
+                // beim fruehen, verworfenen Update-Button-Versuch, der bei
+                // fast gleichen Radien sichtbare Luecken zeigte) - hier nur
+                // EIN drawCircle(), bewusst kein zweiter, um dasselbe
+                // Problem gar nicht erst zu riskieren.
+                gfx.drawCircle(cx, cy, EVENT_CORNER_R, color);
+                break;
+            }
+            case EventCornerType::SquawkWatch: {
+                // Generische Flugzeug-Silhouette - dieselbe Funktion wie
+                // fuer normale Flugzeug-Marker auf dem Radar (heading fest
+                // "nach oben", heavy=true fuer volle/fette Optik).
+                drawAircraftMarker(gfx, cx, cy, 0.0f, color, true);
+                break;
+            }
+            case EventCornerType::CallsignWatch: {
+                drawTruncatedLeft(gfx, eventCorner.watchlistCallsign, EVENT_CORNER_TEXT_X, cy, EVENT_CORNER_TEXT_MAX_W);
+                drawTruncatedLeft(gfx, eventCorner.watchlistCallsign, (int16_t)(EVENT_CORNER_TEXT_X + 1), cy, EVENT_CORNER_TEXT_MAX_W); // fett
+                break;
+            }
+            case EventCornerType::AirlineFilter: {
+                drawTruncatedLeft(gfx, eventCorner.airlinePrefix, EVENT_CORNER_TEXT_X, cy, EVENT_CORNER_TEXT_MAX_W);
+                drawTruncatedLeft(gfx, eventCorner.airlinePrefix, (int16_t)(EVENT_CORNER_TEXT_X + 1), cy, EVENT_CORNER_TEXT_MAX_W); // fett
+                break;
+            }
+            default:
+                break;
+        }
+
+        gfx.setTextDatum(TL_DATUM);
+    }
 }
 
 uint16_t themeColor(TFT_eSPI& gfx) {
@@ -2148,6 +2683,18 @@ void render(TFT_eSPI& tft, int16_t top) {
 
     tft.fillRect(0, top, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT - top, TFT_BLACK);
 
+    // Sofort hier neu zeichnen statt nur auf den naechsten tick()
+    // (80ms-Takt, siehe dort) zu warten - bei den einzelnen Hintergrund-
+    // Sternen-PIXELN faellt eine kurze Luecke nach diesem Vollclear nicht
+    // auf, bei diesem deutlich groesseren Symbol schon (sichtbares
+    // Flackern bei jedem Datenupdate, von Alex gemeldet). tick() zieht es
+    // danach weiterhin im 80ms-Takt mit, hier nur die Luecke unmittelbar
+    // NACH einem render()-Vollclear geschlossen.
+    drawForecastCorner(tft, top);
+    drawUpdateCornerButton(tft);
+    drawEventCorner(tft, top);
+    drawNearestAirportCorner(tft, top);
+
     drawWorldMap(tft, L);
     drawStaticBackground(tft, L, rangeKm);
 
@@ -2177,6 +2724,11 @@ void render(TFT_eSPI& tft, int16_t top) {
     for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) hitPoints[i].valid = false;
     for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) phosphorEntries[i].seenThisRender = false;
 
+    // Frisch ermitteln bei jedem render()-Durchlauf (Ereignis-Ecke unten
+    // rechts, siehe drawEventCorner()) - genau wie hitPoints[] oben, damit
+    // ein Ereignis, das nicht mehr zutrifft, auch wieder verschwindet.
+    eventCorner = EventCornerState{};
+
     for (uint8_t i = 0; i < count && i < MAX_HIT_POINTS; i++) {
         Aircraft& a = snapshot[i];
         if (a.distanceKm > rangeKm * 1.05f) continue;
@@ -2194,7 +2746,22 @@ void render(TFT_eSPI& tft, int16_t top) {
         if (SettingsStore::onlyLowAltitude() &&
             (a.category[0] == 'C' || a.altBaroFt >= Config::COLOR_LOW_ALT_THRESHOLD_FT)) continue;
 
-        if (AirlineFilter::isHidden(a.callsign)) continue;
+        if (AirlineFilter::isHidden(a.callsign)) {
+            // Fuer die Ereignis-Ecke festhalten, BEVOR das Flugzeug hier
+            // uebersprungen wird (es wird ja bewusst NICHT auf dem Radar
+            // gezeichnet, siehe Airline-Filter-Feature) - gleiche
+            // Praefix-Extraktion wie AirlineFilter::isHidden() intern
+            // nutzt (extractPrefix() in airline_filter.cpp), hier lokal
+            // dupliziert statt die interne Funktion zu exportieren (siehe
+            // CLAUDE.md "jeder Screen unabhaengig lauffaehig").
+            eventCorner.airlineFilterActive = true;
+            int pfxLen = 0;
+            for (; pfxLen < 3 && a.callsign[pfxLen] && isalpha((unsigned char)a.callsign[pfxLen]); pfxLen++) {
+                eventCorner.airlinePrefix[pfxLen] = (char)toupper((unsigned char)a.callsign[pfxLen]);
+            }
+            eventCorner.airlinePrefix[pfxLen] = 0;
+            continue;
+        }
 
         visibleCount++;
 
@@ -2267,6 +2834,23 @@ void render(TFT_eSPI& tft, int16_t top) {
         // militarySquawkDetectionEnabled()).
         bool isNotable = isNotableCallsign(a.callsign) ||
                           (SettingsStore::militarySquawkDetectionEnabled() && isMilitaryGovSquawk(a.squawk));
+
+        // Fuer die Ereignis-Ecke unten rechts (siehe drawEventCorner()) -
+        // getrennt von "isWatched"/"isNotable" oben erfasst, weil die Ecke
+        // Squawk-Wachposten und Rufzeichen-Watchlist als ZWEI eigene
+        // Ereignistypen unterscheiden soll (Alex' Wunsch), waehrend der
+        // bestehende Ring auf dem Radar sie bewusst zu einem gemeinsamen
+        // "isWatched"-Zustand zusammenfasst.
+        if (SettingsStore::watchlistAlertEnabled() && SquawkWatchlist::isWatched(a.squawk)) {
+            eventCorner.squawkWatchActive = true;
+        }
+        if (SettingsStore::watchlistAlertEnabled() && AircraftWatchlist::isWatched(a.callsign)) {
+            eventCorner.callsignWatchActive = true;
+            strncpy(eventCorner.watchlistCallsign, a.callsign, sizeof(eventCorner.watchlistCallsign) - 1);
+        }
+        if (SettingsStore::militarySquawkDetectionEnabled() && isMilitaryGovSquawk(a.squawk)) {
+            eventCorner.militaryActive = true;
+        }
 
         if (isSelected) {
             tft.drawCircle(pt.x, pt.y, 9, TFT_WHITE);
@@ -2408,6 +2992,10 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     // tick()-Runde (spaetestens 80ms spaeter) laesst sie einfach wieder
     // aufblitzen, das ist zu kurz, um als Ruckeln wahrgenommen zu werden.
     updateBgStars(tft, L, top);
+    drawForecastCorner(tft, top);
+    drawUpdateCornerButton(tft);
+    drawEventCorner(tft, top);
+    drawNearestAirportCorner(tft, top);
 
     if (prevSweepAngleDeg >= 0.0f) {
         if (SettingsStore::classicRadarEnabled()) {
@@ -2911,6 +3499,88 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
         Rect infoTextRow = {0, L.infoTop, (int16_t)(L.rangeBtn.x - 2), (int16_t)(L.rangeBtn.h + 8)};
         if (infoTextRow.contains(x, y)) {
             MenuScreen::run(tft, true);
+            lastPanel.valid = false;
+            headerRedrawNeeded = true;
+            return true;
+        }
+    }
+
+    // Antippbare Hoehen-Farb-Legende (drawLegend(), siehe render()) - die
+    // GANZE Zeile ist antippbar, unabhaengig davon, welchen der drei
+    // Eintraege (oder das Bodenfahrzeug-Quadrat darunter) man konkret
+    // trifft. Deckt beide moeglichen Legenden-Zeilen ab (infoBarHeight()
+    // reserviert die zweite nur, wenn Bodenfahrzeuge sichtbar sind) und
+    // beginnt bewusst ERST unterhalb von rangeBtn/infoTextRow (die enden
+    // bei infoTop+30), damit sich die Tap-Flaechen nicht ueberschneiden.
+    Rect legendRow = {0, (int16_t)(L.infoTop + 30), Config::SCREEN_WIDTH, (int16_t)(infoBarHeight() - 30)};
+    if (legendRow.contains(x, y)) {
+        showAltitudeLegendScreen(tft);
+        lastPanel.valid = false;
+        headerRedrawNeeded = true;
+        return true;
+    }
+
+    // Antippbarer "Update"-Button in der unteren linken Radarecke (siehe
+    // drawUpdateCornerButton() oben) - nur pruefen/reagieren, wenn er
+    // gerade tatsaechlich sichtbar ist (sonst waere die Flaeche auch bei
+    // fehlendem Update unsichtbar antippbar). Springt direkt in die
+    // System-Seite des Menues (Version/"Nach Update suchen"-Button
+    // sichtbar) statt das Hauptmenue zu oeffnen - keine doppelte
+    // Update-Logik, die existiert bereits dort.
+    if (OtaUpdate::isUpdateAvailable() && updateCornerButtonRect().contains(x, y)) {
+        MenuScreen::run(tft, false, true);
+        lastPanel.valid = false;
+        headerRedrawNeeded = true;
+        return true;
+    }
+
+    // Antippbare "Naechster Flughafen"-Anzeige in der oberen linken
+    // Radarecke (siehe drawNearestAirportCorner() oben) - springt direkt
+    // zum Standort-Presets-Screen, wo die dortige (bereits bestehende)
+    // antippbare Flughafen-Zeile denselben naechsten Flughafen sofort als
+    // neuen Preset anlegen kann (LocationPresetsScreen::run() ->
+    // airportRect-Handler, siehe location_presets_screen.cpp) - keine
+    // neue/doppelte "Preset anlegen"-Logik hier noetig, der bestehende
+    // Ein-Tipp-Weg dort deckt "vorausgefuellt, nur noch bestaetigen"
+    // bereits ab (Name/Koordinaten kommen direkt aus AirportLookup, kein
+    // manuelles Eintippen).
+    if (Weather::currentNearestAirport().available && nearestAirportCornerRect(top).contains(x, y)) {
+        LocationPresetsScreen::run(tft);
+        lastPanel.valid = false;
+        headerRedrawNeeded = true;
+        return true;
+    }
+
+    // Antippbare Ereignis-Ecke unten rechts (siehe drawEventCorner() oben)
+    // - springt je nach AKTUELL gezeigtem Symbol (currentEventCornerType(),
+    // dieselbe Funktion, die auch drawEventCorner() fuer die Rotation
+    // nutzt - garantiert, dass ein Tap waehrend der Rotation immer zum
+    // gerade sichtbaren Symbol passt) zur passenden Verwaltungsseite.
+    // Militaer springt bewusst in die Radar-Darstellung-Einstellung
+    // (RadarThemeScreen, dort liegt der Erkennungs-Schalter) statt in ein
+    // Detail-Panel - ein einzelnes "das eine ausloesende Flugzeug" ist im
+    // eventCorner-Zustand nicht als Hex-Code hinterlegt (nur ein Bool),
+    // ein zusaetzliches Flugzeug-Handle nur fuer diesen Sprung anzulegen
+    // waere unverhaeltnismaessig fuer eine rein informative Ecke.
+    if (SettingsStore::eventCornerOverlayEnabled() && eventCornerRect(top).contains(x, y)) {
+        EventCornerType tappedType = currentEventCornerType();
+        if (tappedType != EventCornerType::None) {
+            switch (tappedType) {
+                case EventCornerType::Military:
+                    RadarThemeScreen::run(tft);
+                    break;
+                case EventCornerType::SquawkWatch:
+                    SquawkWatchlistScreen::run(tft);
+                    break;
+                case EventCornerType::CallsignWatch:
+                    AircraftWatchlistScreen::run(tft);
+                    break;
+                case EventCornerType::AirlineFilter:
+                    AirlineFilterScreen::run(tft);
+                    break;
+                default:
+                    break;
+            }
             lastPanel.valid = false;
             headerRedrawNeeded = true;
             return true;
