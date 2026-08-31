@@ -381,9 +381,9 @@ static const char* const I18N_DE[] = {
 
     "in 3h",
 
-    "Ereignis-Ecke",
-    "Über die Ereignis-Ecke",
-    "Zeigt unten rechts ein gedimmtes Symbol oder Kürzel, sobald ein Militär-/Behördenflug, ein Squawk-Wachposten-Treffer, ein Watchlist-Treffer oder eine ausgeblendete (gefilterte) Airline gerade auf dem Radar ist. Treffen mehrere gleichzeitig zu, wechseln sie alle 2 Sekunden durch. Antippen springt direkt zur passenden Ansicht.",
+    "Overlay",
+    "Über das Overlay",
+    "Schaltet drei gedimmte Eckanzeigen auf dem Radarschirm gemeinsam ein oder aus: die 3h-Wettervorschau (oben rechts), Distanz+Peilung zum nächsten Flughafen (oben links) und den rotierenden Ereignis-Hinweis (unten rechts) für Militär-/Behördenflüge, Squawk-Wachposten-, Watchlist- und ausgeblendete-Airline-Treffer. Bei AUS bleiben alle drei leer, für einen aufgeräumteren Bildschirm. Der Update-Verfügbar-Indikator (unten links) ist davon nicht betroffen und läuft in jedem Fall weiter.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

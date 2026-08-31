@@ -2235,6 +2235,12 @@ namespace {
     // Kommentar), damit es das render()-Vollclear ueberlebt, ohne bis zu
     // 80ms lang zu verschwinden/zu flackern.
     void drawForecastCorner(TFT_eSPI& gfx, int16_t top) {
+        // Teil des gemeinsamen "Overlay"-Schalters (Menue > System > Radar-
+        // Darstellung, SettingsStore::eventCornerOverlayEnabled()) - steuert
+        // zusammen mit der Flughafen-Anzeige und der Ereignis-Ecke alle drei
+        // optionalen Eckanzeigen. Der Update-Indikator (andere Funktion,
+        // drawUpdateCornerButton()) haengt bewusst NICHT an diesem Schalter.
+        if (!SettingsStore::eventCornerOverlayEnabled()) return;
         Weather::Forecast fc = Weather::currentForecast();
         Weather::Condition cur = Weather::current();
         if (!fc.available) return;
@@ -2432,6 +2438,9 @@ namespace {
     }
 
     void drawNearestAirportCorner(TFT_eSPI& gfx, int16_t top) {
+        // Teil des gemeinsamen "Overlay"-Schalters, siehe Kommentar in
+        // drawForecastCorner() oben.
+        if (!SettingsStore::eventCornerOverlayEnabled()) return;
         Weather::NearestAirport na = Weather::currentNearestAirport();
         if (!na.available) return;
 
@@ -3544,7 +3553,7 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
     // Ein-Tipp-Weg dort deckt "vorausgefuellt, nur noch bestaetigen"
     // bereits ab (Name/Koordinaten kommen direkt aus AirportLookup, kein
     // manuelles Eintippen).
-    if (Weather::currentNearestAirport().available && nearestAirportCornerRect(top).contains(x, y)) {
+    if (SettingsStore::eventCornerOverlayEnabled() && Weather::currentNearestAirport().available && nearestAirportCornerRect(top).contains(x, y)) {
         LocationPresetsScreen::run(tft);
         lastPanel.valid = false;
         headerRedrawNeeded = true;

@@ -382,9 +382,9 @@ static const char* const I18N_EN[] = {
 
     "in 3h",
 
-    "Event Corner",
-    "About the event corner",
-    "Shows a dimmed symbol or short label in the bottom-right corner whenever a military/government flight, a squawk watchlist match, an aircraft watchlist match, or a hidden (filtered) airline is currently on the radar. If several apply at once, they rotate every 2 seconds. Tap the symbol to jump straight to the matching screen.",
+    "Overlay",
+    "About the overlay",
+    "Turns three dimmed corner displays on the radar screen on or off together: the 3h weather preview (top-right), the nearest-airport distance and bearing (top-left), and the rotating event indicator (bottom-right) for military/government flights, squawk watchlist, aircraft watchlist, and hidden airline matches. Turned off, all three stay empty for a cleaner screen. The update-available indicator (bottom-left) is not affected and keeps working either way.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

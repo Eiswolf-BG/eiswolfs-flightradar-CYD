@@ -381,9 +381,9 @@ static const char* const I18N_FR[] = {
 
     "dans 3h",
 
-    "Coin evenements",
-    "A propos du coin evenements",
-    "Affiche en bas a droite un symbole ou un sigle attenue des qu'un vol militaire/gouvernemental, une correspondance de la liste de surveillance des squawks, une correspondance de la liste de surveillance des avions, ou une compagnie masquee (filtree) se trouve actuellement sur le radar. Si plusieurs cas s'appliquent en meme temps, ils alternent toutes les 2 secondes. Toucher le symbole ouvre directement l'ecran correspondant.",
+    "Overlay",
+    "A propos de l'overlay",
+    "Active ou desactive ensemble trois affichages attenues dans les coins de l'ecran radar : les previsions meteo a 3h (en haut a droite), la distance et le relevement de l'aeroport le plus proche (en haut a gauche), et l'indicateur d'evenement rotatif (en bas a droite) pour les vols militaires/gouvernementaux, la liste de surveillance squawk, la liste de surveillance des avions et les compagnies masquees. Desactive, les trois restent vides pour un ecran plus depouille. L'indicateur de mise a jour disponible (en bas a gauche) n'est pas concerne et continue de fonctionner dans tous les cas.",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

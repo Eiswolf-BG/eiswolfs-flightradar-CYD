@@ -381,9 +381,9 @@ static const char* const I18N_ES[] = {
 
     "en 3h",
 
-    "Esquina de eventos",
-    "Sobre la esquina de eventos",
-    "Muestra en la esquina inferior derecha un símbolo o sigla atenuados en cuanto haya un vuelo militar/gubernamental, una coincidencia en la lista de vigilancia de squawk, una coincidencia en la lista de vigilancia de aviones, o una aerolínea oculta (filtrada) en el radar. Si varios se cumplen a la vez, se alternan cada 2 segundos. Tocar el símbolo abre directamente la pantalla correspondiente.",
+    "Overlay",
+    "Sobre el overlay",
+    "Activa o desactiva juntas tres indicaciones atenuadas en las esquinas de la pantalla del radar: la previsión meteorológica a 3h (arriba a la derecha), la distancia y el rumbo al aeropuerto más cercano (arriba a la izquierda), y el indicador de eventos rotativo (abajo a la derecha) para vuelos militares/gubernamentales, lista de vigilancia de squawk, lista de vigilancia de aviones y aerolíneas ocultas. Desactivado, las tres permanecen vacías para una pantalla más despejada. El indicador de actualización disponible (abajo a la izquierda) no se ve afectado y sigue funcionando en cualquier caso.",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

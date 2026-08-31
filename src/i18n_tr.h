@@ -381,9 +381,9 @@ static const char* const I18N_TR[] = {
 
     "3sa sonra",
 
-    "Olay köşesi",
-    "Olay köşesi hakkında",
-    "Sağ alt köşede, radarda şu anda bir askeri/resmi uçuş, bir squawk izleme listesi eşleşmesi, bir uçak izleme listesi eşleşmesi veya gizlenmiş (filtrelenmiş) bir havayolu bulunduğunda soluk bir simge veya kısa etiket gösterir. Birden fazlası aynı anda geçerliyse, her 2 saniyede bir sırayla değişirler. Simgeye dokunmak doğrudan ilgili ekrana götürür.",
+    "Overlay",
+    "Overlay hakkında",
+    "Radar ekranındaki üç soluk köşe göstergesini birlikte açar veya kapatır: 3 saatlik hava durumu önizlemesi (sağ üst), en yakın havalimanına mesafe ve yön (sol üst) ve askeri/resmi uçuşlar, squawk izleme listesi, uçak izleme listesi ve gizlenmiş havayolu eşleşmeleri için dönen olay göstergesi (sağ alt). Kapalıyken üçü de boş kalır, ekran daha sade görünür. Güncelleme mevcut göstergesi (sol alt) bundan etkilenmez ve her durumda çalışmaya devam eder.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

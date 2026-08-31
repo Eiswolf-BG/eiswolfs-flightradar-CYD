@@ -381,9 +381,9 @@ static const char* const I18N_IT[] = {
 
     "tra 3h",
 
-    "Angolo eventi",
-    "Info sull'angolo eventi",
-    "Mostra in basso a destra un simbolo o una sigla attenuati non appena un volo militare/governativo, una corrispondenza nella lista di controllo squawk, una corrispondenza nella lista di controllo aerei, o una compagnia nascosta (filtrata) e' attualmente sul radar. Se piu' condizioni valgono insieme, si alternano ogni 2 secondi. Toccare il simbolo apre direttamente la schermata corrispondente.",
+    "Overlay",
+    "Info sull'overlay",
+    "Attiva o disattiva insieme tre indicazioni attenuate agli angoli della schermata radar: l'anteprima meteo a 3h (in alto a destra), la distanza e il rilevamento dell'aeroporto più vicino (in alto a sinistra), e l'indicatore eventi a rotazione (in basso a destra) per voli militari/governativi, lista di controllo squawk, lista di controllo aerei e compagnie nascoste. Disattivato, tutte e tre restano vuote per una schermata più pulita. L'indicatore di aggiornamento disponibile (in basso a sinistra) non ne è interessato e continua a funzionare in ogni caso.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,
