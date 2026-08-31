@@ -1969,6 +1969,45 @@ namespace {
         gfx.setTextDatum(TL_DATUM);
     }
 
+    // Echter wortweiser Zeilenumbruch anhand tatsaechlicher Pixel-Breite,
+    // BELIEBIG viele Zeilen (kein hartes 2-Zeilen-Limit wie
+    // drawWrappedCenteredHint() oben) - gleiches Prinzip wie
+    // layoutWrapped() in location_presets_screen.cpp/wifi_manage_screen.cpp,
+    // hier dupliziert statt geteilt (CLAUDE.md-Konvention). Fuer
+    // showAltitudeLegendScreen() eingefuehrt, nachdem
+    // drawWrappedCenteredHint() dort bei einem laengeren deutschen
+    // Einleitungstext (LEGEND_INFO_INTRO) mangels Breitenpruefung der
+    // finalen Zeilen links UND rechts ueber den Bildschirmrand hinaus
+    // gemalt hat (2 Zeilen reichten nicht, eine dritte waere noetig
+    // gewesen). Zeichnet LINKSBUENDIG ab x (kein MC_DATUM), liefert die
+    // naechste freie Y-Position zurueck, damit nachfolgende Elemente
+    // dynamisch statt mit fest verdrahtetem Y-Offset positioniert werden
+    // koennen - CLAUDE.md-Pflicht: jeder neue/geaenderte Text muss in
+    // allen 6 Sprachen ohne Ueberlauf bleiben, siehe dortiger Abschnitt.
+    int16_t layoutWrapped(TFT_eSPI& gfx, int16_t x, int16_t startY, int16_t maxWidth, int16_t lineH,
+                           const String& text) {
+        int16_t y = startY;
+        int32_t start = 0;
+        int32_t len = text.length();
+        while (start < len) {
+            while (start < len && text[start] == ' ') start++;
+            if (start >= len) break;
+
+            String line = text.substring(start, len);
+            while (gfx.textWidth(line) > maxWidth) {
+                int32_t lastSpace = line.lastIndexOf(' ');
+                if (lastSpace <= 0) break;
+                line = line.substring(0, lastSpace);
+            }
+
+            gfx.setCursor(x, y);
+            gfx.print(line);
+            y = (int16_t)(y + lineH);
+            start += line.length();
+        }
+        return y;
+    }
+
     // Vollbild-Info-Screen fuer die antippbare Hoehen-Farb-Legende in der
     // unteren Infoleiste (siehe drawLegend()/handleTap() - legendRowRect()
     // unten deckt die ganze Zeile ab, unabhaengig davon, welchen der drei
@@ -2001,14 +2040,24 @@ namespace {
         gfx.setCursor(10, 14);
         gfx.println(I18n::t(StringId::LEGEND_INFO_TITLE));
 
-        constexpr int16_t INTRO_Y = 46;
-        drawWrappedCenteredHint(gfx, I18n::t(StringId::LEGEND_INFO_INTRO), Config::SCREEN_WIDTH / 2, INTRO_Y,
-                                 (int16_t)(Config::SCREEN_WIDTH - 20), 16);
+        // layoutWrapped() statt der frueheren drawWrappedCenteredHint()
+        // (siehe dortiger Kommentar) - die war auf hoechstens 2 Zeilen
+        // begrenzt und pruefte die finale Zeile nicht erneut auf Breite;
+        // bei einem laengeren deutschen LEGEND_INFO_INTRO-Text (3 Zeilen
+        // noetig) lief der Text dadurch links UND rechts ueber den
+        // Bildschirmrand hinaus. Der Rueckgabewert (naechste freie
+        // Y-Position) bestimmt jetzt dynamisch, wo die Farb-Zeilen
+        // beginnen, statt eines fest verdrahteten Offsets, der bei mehr
+        // als 2 Zeilen nicht mehr gereicht haette.
+        constexpr int16_t INTRO_Y = 34;
+        gfx.setTextColor(TFT_WHITE, TFT_BLACK);
+        int16_t afterIntroY = layoutWrapped(gfx, 10, INTRO_Y, (int16_t)(Config::SCREEN_WIDTH - 20), 16,
+                                             I18n::t(StringId::LEGEND_INFO_INTRO));
 
         constexpr int16_t DOT_X = 30;
         constexpr int16_t LABEL_X = 50;
         constexpr int16_t ROW_H = 30;
-        int16_t rowY = INTRO_Y + 40;
+        int16_t rowY = (int16_t)(afterIntroY + 14);
         gfx.setTextColor(TFT_WHITE, TFT_BLACK);
         for (uint8_t i = 0; i < 3; i++) {
             gfx.fillCircle(DOT_X, rowY, 6, items[i].color);

@@ -77,12 +77,43 @@ Vorsicht bei neuem Code!):**
   Gefahrenzone.
 - Langer, mehrzeiliger Text (z.B. Erklärtexte) NIE mit TFT_eSPI's
   eingebautem Auto-Wrap verlassen — das bricht mitten im Wort ab. Stattdessen
-  den `layoutWrapped()`-Helper verwenden (in `location_presets_screen.cpp`
-  und `wifi_manage_screen.cpp` je einmal implementiert, macht wortweisen
-  Umbruch anhand echter Pixel-Breite plus optionales Scrollen).
+  den `layoutWrapped()`-Helper verwenden (in `location_presets_screen.cpp`,
+  `wifi_manage_screen.cpp` und `radar_screen.cpp` je einmal implementiert,
+  macht wortweisen Umbruch anhand echter Pixel-Breite, meist plus
+  optionales Scrollen). **NIE** eine Variante verwenden, die Text nur bis
+  zu einem festen Zeilenlimit umbricht, ohne JEDE resultierende Zeile
+  erneut auf ihre tatsächliche Pixel-Breite zu prüfen (Beispiel für genau
+  diesen Fehler: `drawWrappedCenteredHint()` in `radar_screen.cpp`, fest
+  auf höchstens 2 Zeilen begrenzt — bei einem längeren deutschen Text im
+  Höhen-Farben-Legende-Overlay lief die Zeile dadurch links UND rechts
+  über den Bildschirmrand hinaus, siehe Git-Historie/Bugfix). Ein
+  festes Zeilenlimit ist nur dann unkritisch, wenn zusätzlich VORHER
+  geprüft wird, dass der Text in ALLEN 6 Sprachen tatsächlich in dieses
+  Limit passt — im Zweifel immer das uneingeschränkte `layoutWrapped()`
+  nehmen.
 
 Falls neue Screens/Textstellen dazukommen: lieber einmal mehr testen (idealerweise
 mit Foto vom echten Display), bevor der Code als fertig gilt.
+
+## Pflichtprüfung: Textbreite/-höhe in ALLEN 6 Sprachen
+
+Jeder neu hinzugefügte oder geänderte Text auf JEDEM Screen muss vor
+Abschluss der Aufgabe nachweislich innerhalb der verfügbaren
+Bildschirmbreite/-höhe bleiben — in ALLEN 6 Sprachen, nicht nur der
+zuletzt getesteten (meist Deutsch/Englisch). Bei jeder neuen
+Text-Ausgabe ist zu prüfen/sicherzustellen, dass `layoutWrapped()`
+(oder ein gleichwertiger, wortweise und pro Zeile pixel-breiten-
+geprüfter Mechanismus, siehe oben) verwendet wird — niemals eine
+Methode, die Text ungeprüft an fester Position zeichnet oder Zeilen
+nach dem Umbruch nicht erneut auf Breite prüft. Diese Prüfung ist
+verpflichtender Teil JEDER Aufgabe, die Text-Ausgaben verändert oder
+neu hinzufügt, unabhängig davon, ob der Auftrag das explizit erwähnt.
+Bei mehrzeiligem Text zusätzlich bedenken: wenn nachfolgende
+UI-Elemente unterhalb des Textes fest positioniert sind, muss deren
+Y-Position dynamisch vom tatsächlichen Ende des (ggf. unterschiedlich
+langen) Textes abhängen, nicht von einem für die kürzeste Sprache
+passenden festen Offset — sonst verschieben sich in längeren Sprachen
+nachfolgende Elemente ineinander oder aus dem sichtbaren Bereich.
 
 ## i18n (6 Sprachen)
 
