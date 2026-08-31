@@ -68,7 +68,6 @@ static const char* const I18N_DE[] = {
     "Bodenfahrzeuge anzeigen: ",
     "Airline-Filter",
     "Beobachtungsliste",
-    "Beobachtungs-Alarm: ",
     "Einstellungen sichern",
     "Einstellungen wiederherstellen",
     "Backup gespeichert.",
@@ -296,7 +295,6 @@ static const char* const I18N_DE[] = {
     "Werkzeuge",
     "Statistik & Flugbuch",
     "LED-Alarme",
-    "Werkzeuge",
     "Neu: Der \"GPS\"-Knopf neben \"Automatisch\" schaltet die Auswertung eines angeschlossenen GPS-Moduls ein/aus. Eingeschaltet folgt dein Standort live deiner Bewegung (z.B. im Auto), statt nur ungefähr per IP bestimmt zu werden. Verkabelung: GPS-Modul-TX an GPIO22, GPS-Modul-RX an GPIO27 (meist ungenutzt), 3,3V und GND, 9600 Baud (NMEA). Ohne angeschlossenes Modul bleibt der Knopf einfach wirkungslos.",
     "Bildschirm drehen (180°): ",
     "Flughafencodes: ",
@@ -383,7 +381,10 @@ static const char* const I18N_DE[] = {
 
     "Overlay",
     "Über das Overlay",
-    "Schaltet drei gedimmte Eckanzeigen auf dem Radarschirm gemeinsam ein oder aus: die 3h-Wettervorschau (oben rechts), Distanz+Peilung zum nächsten Flughafen (oben links) und den rotierenden Ereignis-Hinweis (unten rechts) für Militär-/Behördenflüge, Squawk-Wachposten-, Watchlist- und ausgeblendete-Airline-Treffer. Bei AUS bleiben alle drei leer, für einen aufgeräumteren Bildschirm. Der Update-Verfügbar-Indikator (unten links) ist davon nicht betroffen und läuft in jedem Fall weiter.",
+    "Schaltet drei gedimmte Eckanzeigen auf dem Radarschirm gemeinsam ein oder aus: die 3h-Wettervorschau (oben rechts), Distanz+Peilung zum nächsten Flughafen (oben links) und den rotierenden Ereignis-Hinweis (unten rechts) für Squawk-Wachposten-, Watchlist- und ausgeblendete-Airline-Treffer - nur Ereignisse, die du selbst in einer Liste oder einem Filter eingerichtet hast. Bei AUS bleiben alle drei leer, für einen aufgeräumteren Bildschirm. Der Update-Verfügbar-Indikator (unten links) ist davon nicht betroffen und läuft in jedem Fall weiter.",
+
+    "Militär-/Behördenflugzeug",
+    "Heavy-Flugzeug",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

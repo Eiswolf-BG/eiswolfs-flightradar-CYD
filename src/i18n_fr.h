@@ -68,7 +68,6 @@ static const char* const I18N_FR[] = {
     "Afficher véhicules au sol : ",
     "Filtre compagnies",
     "Liste de surveillance",
-    "Alerte de surveillance : ",
     "Sauvegarder réglages",
     "Restaurer réglages",
     "Sauvegarde enregistrée.",
@@ -296,7 +295,6 @@ static const char* const I18N_FR[] = {
     "Outils",
     "Statistiques et carnet de vol",
     "Alertes LED",
-    "Outils",
     "Nouveau : le bouton \"GPS\" à côté de \"Auto\" active/désactive la lecture d'un module GPS connecté. Activé, ta position suit tes déplacements en direct (par ex. en voiture) au lieu d'être seulement estimée par IP. Câblage : TX du module GPS sur GPIO22, RX du module GPS sur GPIO27 (généralement inutilisé), 3,3V et GND, 9600 bauds (NMEA). Sans module connecté, le bouton n'a simplement aucun effet.",
     "Tourner l'écran (180°) : ",
     "Codes aéroport : ",
@@ -383,7 +381,10 @@ static const char* const I18N_FR[] = {
 
     "Overlay",
     "A propos de l'overlay",
-    "Active ou desactive ensemble trois affichages attenues dans les coins de l'ecran radar : les previsions meteo a 3h (en haut a droite), la distance et le relevement de l'aeroport le plus proche (en haut a gauche), et l'indicateur d'evenement rotatif (en bas a droite) pour les vols militaires/gouvernementaux, la liste de surveillance squawk, la liste de surveillance des avions et les compagnies masquees. Desactive, les trois restent vides pour un ecran plus depouille. L'indicateur de mise a jour disponible (en bas a gauche) n'est pas concerne et continue de fonctionner dans tous les cas.",
+    "Active ou desactive ensemble trois affichages attenues dans les coins de l'ecran radar : les previsions meteo a 3h (en haut a droite), la distance et le relevement de l'aeroport le plus proche (en haut a gauche), et l'indicateur d'evenement rotatif (en bas a droite) pour la liste de surveillance squawk, la liste de surveillance des avions et les compagnies masquees - uniquement des evenements que vous avez vous-meme configures dans une liste ou un filtre. Desactive, les trois restent vides pour un ecran plus depouille. L'indicateur de mise a jour disponible (en bas a gauche) n'est pas concerne et continue de fonctionner dans tous les cas.",
+
+    "Avion militaire/gouvernemental",
+    "Avion Heavy",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

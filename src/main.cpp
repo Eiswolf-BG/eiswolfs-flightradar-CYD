@@ -646,6 +646,169 @@ void drawScreensaverClock() {
     }
 }
 
+// Regen-Effekt fuer den Ruhebildschirm (SettingsStore::rainEffectEnabled(),
+// Menue > System > Radar-Darstellung) - aktiv unter derselben Bedingung wie
+// beim Radarscreen (Schalter an UND Weather::current() zeigt Regen/Gewitter).
+// Tropfenzahl/Fallgeschwindigkeit sind an Weather::RainIntensity gekoppelt,
+// siehe ausfuehrlicher Kommentar bei rainParamsForIntensity() in
+// radar_screen.cpp - dieselben drei Stufen-Werte hier dupliziert (CLAUDE.md-
+// Konvention "jeder Screen unabhaengig lauffaehig"), bitte bei Aenderungen
+// synchron halten. Gleicher visueller Stil wie radar_screen.cpp (Farbe/
+// Deckkraft/Tropfenlaenge).
+//
+// BEWUSST OHNE Windrichtung (Alex' ausdruecklicher Wunsch, nach einem
+// fehlgeschlagenen Versuch mit geclampter Windneigung, der zu kaputt
+// wirkendem Regen fuehrte - siehe Git-Historie): Tropfen fallen hier rein
+// senkrecht ueber die GESAMTE Bildschirmbreite, komplett unabhaengig von
+// Weather::currentWindDirectionDeg(). Anders als Radarscreen/WebUI (volle
+// Windrichtung, dort unproblematisch, weil der Regen quer durch einen KREIS
+// faellt) macht das den Ruhebildschirm-Regen bewusst zum einfachsten der
+// drei - kein Bewegungsvektor, keine Winkelberechnung, nur eine simple
+// Y-Position pro Tropfen.
+//
+// OBERSTE Ebene, direkt vor Logo/Uhrzeit/Datum: Regen wird im Aufrufer ganz
+// bewusst als LETZTES gezeichnet (nach Logo/Uhrzeit/Datum UND den Sternen) -
+// er soll sichtbar ueber allem anderen herfallen, wie echter Regen vor einem
+// Hintergrund, statt sich davor zu verstecken (Alex' Wunsch). Da ein
+// darueberfallender Tropfen beim Loeschen seiner eigenen Vorgaengerposition
+// zwangslaeufig auch darunterliegende Logo-/Text-Pixel mit schwarz
+// uebermalt, heilt der Aufrufer das Logo/die Versionsnummer zusaetzlich
+// einmal pro Sekunde per Neuzeichnen (siehe dortiger Kommentar) - die
+// Uhrzeit/das Datum bleiben bewusst bei ihrer bestehenden, flacker-freien
+// "nur bei Textaenderung neu zeichnen"-Logik, ein kurzzeitig ueberschriebenes
+// Pixel dort heilt spaetestens bei der naechsten echten Textaenderung.
+namespace ScreensaverRain {
+    struct Drop {
+        float x = 0, y = 0; // x bleibt ueber die gesamte Lebensdauer konstant (rein vertikaler Fall)
+        bool active = false;
+        bool hasPrev = false;
+        int16_t prevY1 = 0, prevY2 = 0;
+    };
+    constexpr uint8_t MAX_DROPS = 13; // Array-Kapazitaet = groesste Stufe ("stark")
+    constexpr int16_t DROP_LENGTH = 7; // gleiche Tropfenlaenge wie radar_screen.cpp
+    Drop drops[MAX_DROPS];
+    uint32_t lastTickMs = 0;
+    constexpr uint32_t TICK_INTERVAL_MS = 60; // gleicher Takt wie MenuStars
+
+    struct RainParams {
+        uint8_t count;
+        float speedPxPerSec;
+    };
+    RainParams rainParamsForIntensity(Weather::RainIntensity intensity) {
+        switch (intensity) {
+            case Weather::RainIntensity::Light:    return {4, 45.0f};
+            case Weather::RainIntensity::Heavy:    return {13, 100.0f};
+            case Weather::RainIntensity::Moderate:
+            default:                                return {8, 70.0f};
+        }
+    }
+
+    // Gleicher Skalierungs-Helper wie radar_screen.cpp
+    // (scaleColorBrightness()) - hier dupliziert statt geteilt, siehe
+    // CLAUDE.md-Konvention. Ergibt bei TFT_SKYBLUE/0.45f exakt dieselbe
+    // Tropfenfarbe wie beim Radarscreen-Regen.
+    uint16_t scaleColorBrightness(uint16_t color565, float fraction) {
+        if (fraction < 0.0f) fraction = 0.0f;
+        if (fraction > 1.0f) fraction = 1.0f;
+        uint16_t r5 = (color565 >> 11) & 0x1F;
+        uint16_t g6 = (color565 >> 5) & 0x3F;
+        uint16_t b5 = color565 & 0x1F;
+        r5 = (uint16_t)(r5 * fraction + 0.5f);
+        g6 = (uint16_t)(g6 * fraction + 0.5f);
+        b5 = (uint16_t)(b5 * fraction + 0.5f);
+        return (uint16_t)((r5 << 11) | (g6 << 5) | b5);
+    }
+
+    // Zufaellige X-Position ueber die GESAMTE Bildschirmbreite (Alex'
+    // Wunsch: "verteilt wie bei einem normalen Regeneffekt").
+    void spawn(Drop& d) {
+        d.x = (float)random(0, Config::SCREEN_WIDTH);
+        d.y = -(float)random(0, Config::SCREEN_HEIGHT / 2);
+        d.active = true;
+        d.hasPrev = false;
+    }
+
+    // Wird beim Betreten des Ruhebildschirms aufgerufen (zusammen mit
+    // MenuStars::reset()) - verhindert, dass beim naechsten Tick ein
+    // "Vorgaenger"-Segment auf dem frisch geloeschten (fillScreen)
+    // Bildschirm geloescht wird, das dort gar nicht mehr existiert.
+    void reset() {
+        for (uint8_t i = 0; i < MAX_DROPS; i++) {
+            drops[i] = Drop{};
+        }
+        lastTickMs = 0;
+    }
+
+    void update(TFT_eSPI& tft) {
+        uint32_t now = millis();
+        if (lastTickMs == 0) {
+            // Erster Aufruf nach reset() - keinen riesigen deltaMs-Sprung
+            // seit Systemstart verwenden, sonst wuerden alle Tropfen beim
+            // ersten sichtbaren Tick quer durch den Bildschirm springen.
+            lastTickMs = now;
+            return;
+        }
+        if (now - lastTickMs < TICK_INTERVAL_MS) return;
+        uint32_t deltaMs = now - lastTickMs;
+        lastTickMs = now;
+
+        Weather::Condition cond = Weather::current();
+        bool rainy = SettingsStore::rainEffectEnabled() &&
+                     (cond == Weather::Condition::Rain || cond == Weather::Condition::Thunderstorm);
+
+        // Gleiche Farbe/Deckkraft wie radar_screen.cpp - Regen folgt bewusst
+        // NICHT der Radar-/UI-Akzentfarbe, siehe dortiger Kommentar.
+        uint16_t dropColor = scaleColorBrightness(TFT_SKYBLUE, 0.45f);
+
+        RainParams params = rainParamsForIntensity(Weather::currentRainIntensity());
+        float step = params.speedPxPerSec * (deltaMs / 1000.0f);
+
+        for (uint8_t i = 0; i < MAX_DROPS; i++) {
+            Drop& d = drops[i];
+
+            // Alten sichtbaren Abschnitt IMMER ZUERST loeschen, BEVOR
+            // irgendeine Deaktivierungs-/Neustart-Logik hasPrev anfasst -
+            // siehe ausfuehrlicher Bugfix-Kommentar in einer frueheren
+            // Version dieser Funktion (Git-Historie): sonst bleibt ein
+            // "eingefrorenes" Geist-Segment auf dem Bildschirm stehen.
+            if (d.hasPrev) {
+                tft.drawFastVLine((int16_t)d.x, d.prevY2, (int16_t)(d.prevY1 - d.prevY2 + 1), TFT_BLACK);
+                d.hasPrev = false;
+            }
+
+            // Nur die ersten "params.count" Slots sind bei der aktuellen
+            // Intensitaetsstufe aktiv, siehe radar_screen.cpp-Pendant.
+            if (!rainy || i >= params.count) {
+                d.active = false;
+                continue;
+            }
+            if (!d.active) spawn(d);
+
+            d.y += step;
+            if (d.y - DROP_LENGTH > Config::SCREEN_HEIGHT) {
+                // Unten verlassen - sofort oben an neuer zufaelliger
+                // X-Position neu starten (kontinuierlicher Regen).
+                spawn(d);
+                continue;
+            }
+
+            int16_t y1 = (int16_t)d.y;               // fuehrendes (unteres) Ende
+            int16_t y2 = (int16_t)(d.y - DROP_LENGTH); // hinteres (oberes) Ende
+            int16_t x = (int16_t)d.x;
+
+            bool visible = y1 >= 0 && y2 <= Config::SCREEN_HEIGHT - 1;
+            if (visible) {
+                int16_t clipY1 = constrain(y1, (int16_t)0, (int16_t)(Config::SCREEN_HEIGHT - 1));
+                int16_t clipY2 = constrain(y2, (int16_t)0, (int16_t)(Config::SCREEN_HEIGHT - 1));
+                tft.drawFastVLine(x, clipY2, (int16_t)(clipY1 - clipY2 + 1), dropColor);
+                d.prevY1 = clipY1;
+                d.prevY2 = clipY2;
+                d.hasPrev = true;
+            }
+        }
+    }
+}
+
 void updateWifiIcon() {
     int16_t iconX = Config::SCREEN_WIDTH - WIFI_ICON_W - 2;
     int16_t iconY = 2;
@@ -1389,6 +1552,7 @@ void loop() {
                 ledcWrite(BACKLIGHT_PWM_CHANNEL, screensaverBacklightPwm());
                 tft.fillScreen(TFT_BLACK);
                 MenuStars::reset();
+                ScreensaverRain::reset();
                 drawScreensaverLogo();
                 drawScreensaverVersion();
                 lastScreensaverTimeText = "";
@@ -1411,10 +1575,28 @@ void loop() {
     }
 
     if (screenDimmed && screensaverShowing) {
-        MenuStars::update(tft);
+        // Reihenfolge bewusst: erst Logo/Uhrzeit/Datum, dann Sterne, Regen
+        // ZULETZT - der Regen soll als oberste Ebene sichtbar ueber allem
+        // anderen herfallen (Alex' Wunsch), statt sich davor zu verstecken.
+        // Logo+Versionsnummer werden dafuer jetzt zusaetzlich einmal pro
+        // Sekunde neu gezeichnet (huckepack auf demselben 1s-Takt wie die
+        // Uhrzeit) - heilt kleine Erosion, die ein darueberfallender
+        // Tropfen beim Loeschen seiner eigenen Vorgaengerposition sonst
+        // dauerhaft ins Logo reissen wuerde (Logo wurde bisher nur EINMAL
+        // beim Betreten gezeichnet). Die Uhrzeit/das Datum bleiben bewusst
+        // bei ihrer bestehenden "nur bei tatsaechlicher Textaenderung neu
+        // zeichnen"-Logik (siehe drawScreensaverClock()) - ein Redraw bei
+        // JEDEM Tick wuerde das dort gezielt behobene Flacker-Problem
+        // wieder zurueckbringen; ein vom Regen kurzzeitig ueberschriebenes
+        // Pixel in der Uhrzeit heilt spaetestens bei der naechsten
+        // tatsaechlichen Textaenderung von selbst.
         if (nowMs - lastScreensaverClockMs >= 1000) {
             lastScreensaverClockMs = nowMs;
+            drawScreensaverLogo();
+            drawScreensaverVersion();
             drawScreensaverClock();
         }
+        MenuStars::update(tft);
+        ScreensaverRain::update(tft);
     }
 }

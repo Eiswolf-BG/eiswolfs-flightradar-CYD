@@ -68,7 +68,6 @@ static const char* const I18N_ES[] = {
     "Mostrar vehículos terrestres: ",
     "Filtro de aerolíneas",
     "Lista de seguimiento",
-    "Alerta de seguimiento: ",
     "Copia de seguridad",
     "Restaurar ajustes",
     "Copia guardada.",
@@ -296,7 +295,6 @@ static const char* const I18N_ES[] = {
     "Herramientas",
     "Estadísticas y diario de vuelo",
     "Alertas LED",
-    "Herramientas",
     "Novedad: el botón \"GPS\" junto a \"Automático\" activa/desactiva la lectura de un módulo GPS conectado. Activado, tu ubicación sigue tu movimiento en vivo (p. ej. en coche) en lugar de determinarse solo aproximadamente por IP. Cableado: TX del módulo GPS a GPIO22, RX del módulo GPS a GPIO27 (normalmente sin usar), 3,3V y GND, 9600 baudios (NMEA). Sin módulo conectado, el botón simplemente no tiene efecto.",
     "Girar pantalla (180°): ",
     "Códigos de aeropuerto: ",
@@ -383,7 +381,10 @@ static const char* const I18N_ES[] = {
 
     "Overlay",
     "Sobre el overlay",
-    "Activa o desactiva juntas tres indicaciones atenuadas en las esquinas de la pantalla del radar: la previsión meteorológica a 3h (arriba a la derecha), la distancia y el rumbo al aeropuerto más cercano (arriba a la izquierda), y el indicador de eventos rotativo (abajo a la derecha) para vuelos militares/gubernamentales, lista de vigilancia de squawk, lista de vigilancia de aviones y aerolíneas ocultas. Desactivado, las tres permanecen vacías para una pantalla más despejada. El indicador de actualización disponible (abajo a la izquierda) no se ve afectado y sigue funcionando en cualquier caso.",
+    "Activa o desactiva juntas tres indicaciones atenuadas en las esquinas de la pantalla del radar: la previsión meteorológica a 3h (arriba a la derecha), la distancia y el rumbo al aeropuerto más cercano (arriba a la izquierda), y el indicador de eventos rotativo (abajo a la derecha) para la lista de vigilancia de squawk, la lista de vigilancia de aviones y las aerolíneas ocultas - solo eventos que hayas configurado tú mismo en una lista o filtro. Desactivado, las tres permanecen vacías para una pantalla más despejada. El indicador de actualización disponible (abajo a la izquierda) no se ve afectado y sigue funcionando en cualquier caso.",
+
+    "Avión militar/gubernamental",
+    "Avión Heavy",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

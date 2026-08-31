@@ -68,7 +68,6 @@ enum class StringId : uint16_t {
     MENU_HIDE_GROUND,
     MENU_AIRLINE_FILTER,
     MENU_WATCHLIST,
-    MENU_WATCHLIST_ALERT,
     MENU_BACKUP,
     MENU_RESTORE,
     MENU_BACKUP_SAVED,
@@ -464,15 +463,14 @@ enum class StringId : uint16_t {
     // Neue Kategorie-Untermenues, entstanden beim Aufteilen der Flugoptionen-/
     // System-Seiten in grosse Kategorie-Buttons statt langer Einzelzeilen-
     // Listen (siehe menu_screen.cpp, Page::SystemDisplay/SystemTools/
-    // FlightStatsLogbook/FlightLed/FlightTools).
+    // FlightStatsLogbook/FlightLed).
     MENU_CATEGORY_DISPLAY,
     MENU_CATEGORY_SYSTEM_TOOLS,
     MENU_CATEGORY_STATS_LOGBOOK,
     MENU_CATEGORY_LED,
-    MENU_CATEGORY_TOOLS,
 
     // Siebter Info-Absatz im Standort-Presets-Screen (Menue > Flugoptionen >
-    // Tools > Standort-Presets > "?"), erklaert den neuen "GPS"-Knopf neben
+    // Standort-Presets > "?"), erklaert den neuen "GPS"-Knopf neben
     // "Automatisch" sowie die Verkabelung eines physischen GPS-Moduls -
     // siehe location_presets_screen.cpp und LocationManager::setGpsEnabled().
     // Ans Ende angehaengt, gleicher Grund wie oben.
@@ -523,11 +521,13 @@ enum class StringId : uint16_t {
     RADAR_FILTER_NAME_AIRLINE,
 
     // Menue-Umbau (Flugoptionen-Kategorie-Seite, siehe menu_screen.cpp):
-    // "Werkzeuge" (MENU_CATEGORY_TOOLS) enthaelt jetzt nur noch Standort-
-    // Presets und Beobachtungsalarm - Flugzeugliste/Beobachtungsliste
-    // wanderten in ein neues "Listen"-Untermenue, die reinen
-    // Sichtbarkeitsfilter (Airline/Bodenfahrzeuge/Helikopter/Niedrigflieger)
-    // in ein neues "Anzeigefilter"-Untermenue. Beide neuen Kategorie-Titel:
+    // Flugzeugliste/Beobachtungsliste wanderten in ein neues "Listen"-
+    // Untermenue, die reinen Sichtbarkeitsfilter (Airline/Bodenfahrzeuge/
+    // Helikopter/Niedrigflieger) in ein neues "Anzeigefilter"-Untermenue.
+    // Das fruehere "Werkzeuge"-Untermenue (MENU_CATEGORY_TOOLS) wurde
+    // wieder aufgeloest, da nach Entfernung des Beobachtungsalarm-Schalters
+    // nur noch Standort-Presets uebrig blieb - dieser Punkt sitzt seitdem
+    // direkt in der Flugoptionen-Hauptseite. Beide neuen Kategorie-Titel:
     MENU_CATEGORY_LISTS,
     MENU_CATEGORY_FILTERS,
 
@@ -723,6 +723,14 @@ enum class StringId : uint16_t {
     MENU_EVENT_CORNER_OVERLAY,
     EVENT_CORNER_OVERLAY_INFO_TITLE,
     EVENT_CORNER_OVERLAY_INFO_BODY,
+
+    // Zwei fehlende Eintraege in der antippbaren Hoehen-Farb-Legende
+    // (showAltitudeLegendScreen() in radar_screen.cpp) ergaenzt - Militaer-/
+    // Behoerden-Ring (oranger Kreis, siehe isNotable-Zweig in render()) und
+    // Heavy-Flugzeug-Symbol (groessere Marker-Silhouette, siehe
+    // drawTypedMarker()/heavy-Parameter) fehlten dort bisher komplett.
+    LEGEND_MILITARY_GOV,
+    LEGEND_HEAVY,
 
     COUNT
 };

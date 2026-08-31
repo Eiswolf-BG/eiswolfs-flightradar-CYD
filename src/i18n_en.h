@@ -68,7 +68,6 @@ static const char* const I18N_EN[] = {
     "Show ground vehicles: ",
     "Airline filter",
     "Watchlist",
-    "Watchlist alert: ",
     "Backup settings",
     "Restore settings",
     "Backup saved.",
@@ -297,7 +296,6 @@ static const char* const I18N_EN[] = {
     "Tools",
     "Stats & Logbook",
     "LED Alerts",
-    "Tools",
     "New: the \"GPS\" button next to \"Auto\" turns reading from a connected GPS module on/off. When on, your location follows your movement live (e.g. while driving) instead of only being roughly determined via IP. Wiring: GPS module TX to GPIO22, GPS module RX to GPIO27 (usually unused), 3.3V and GND, 9600 baud (NMEA). Without a connected module, the button simply has no effect.",
     "Rotate screen (180°): ",
     "Airport codes: ",
@@ -384,7 +382,10 @@ static const char* const I18N_EN[] = {
 
     "Overlay",
     "About the overlay",
-    "Turns three dimmed corner displays on the radar screen on or off together: the 3h weather preview (top-right), the nearest-airport distance and bearing (top-left), and the rotating event indicator (bottom-right) for military/government flights, squawk watchlist, aircraft watchlist, and hidden airline matches. Turned off, all three stay empty for a cleaner screen. The update-available indicator (bottom-left) is not affected and keeps working either way.",
+    "Turns three dimmed corner displays on the radar screen on or off together: the 3h weather preview (top-right), the nearest-airport distance and bearing (top-left), and the rotating event indicator (bottom-right) for squawk watchlist, aircraft watchlist, and hidden airline matches - only events you've set up yourself in a list or filter. Turned off, all three stay empty for a cleaner screen. The update-available indicator (bottom-left) is not affected and keeps working either way.",
+
+    "Military/government aircraft",
+    "Heavy aircraft",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

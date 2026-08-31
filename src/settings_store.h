@@ -39,9 +39,6 @@ namespace SettingsStore {
     bool proximityAlertEnabled();
     void setProximityAlertEnabled(bool on);
 
-    bool watchlistAlertEnabled();
-    void setWatchlistAlertEnabled(bool on);
-
     bool flightLogbookEnabled();
     void setFlightLogbookEnabled(bool on);
 

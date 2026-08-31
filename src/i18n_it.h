@@ -68,7 +68,6 @@ static const char* const I18N_IT[] = {
     "Mostra veicoli a terra: ",
     "Filtro compagnie",
     "Lista di controllo",
-    "Allarme di controllo: ",
     "Backup impostazioni",
     "Ripristina impostazioni",
     "Backup salvato.",
@@ -296,7 +295,6 @@ static const char* const I18N_IT[] = {
     "Strumenti",
     "Statistiche e diario di volo",
     "Avvisi LED",
-    "Strumenti",
     "Novità: il pulsante \"GPS\" accanto ad \"Automatico\" attiva/disattiva la lettura di un modulo GPS collegato. Se attivo, la tua posizione segue il tuo movimento in tempo reale (es. in auto) invece di essere determinata solo approssimativamente via IP. Collegamento: TX del modulo GPS su GPIO22, RX del modulo GPS su GPIO27 (di solito inutilizzato), 3,3V e GND, 9600 baud (NMEA). Senza modulo collegato, il pulsante semplicemente non ha alcun effetto.",
     "Ruota schermo (180°): ",
     "Codici aeroportuali: ",
@@ -383,7 +381,10 @@ static const char* const I18N_IT[] = {
 
     "Overlay",
     "Info sull'overlay",
-    "Attiva o disattiva insieme tre indicazioni attenuate agli angoli della schermata radar: l'anteprima meteo a 3h (in alto a destra), la distanza e il rilevamento dell'aeroporto più vicino (in alto a sinistra), e l'indicatore eventi a rotazione (in basso a destra) per voli militari/governativi, lista di controllo squawk, lista di controllo aerei e compagnie nascoste. Disattivato, tutte e tre restano vuote per una schermata più pulita. L'indicatore di aggiornamento disponibile (in basso a sinistra) non ne è interessato e continua a funzionare in ogni caso.",
+    "Attiva o disattiva insieme tre indicazioni attenuate agli angoli della schermata radar: l'anteprima meteo a 3h (in alto a destra), la distanza e il rilevamento dell'aeroporto più vicino (in alto a sinistra), e l'indicatore eventi a rotazione (in basso a destra) per lista di controllo squawk, lista di controllo aerei e compagnie nascoste - solo eventi che hai configurato tu stesso in una lista o un filtro. Disattivato, tutte e tre restano vuote per una schermata più pulita. L'indicatore di aggiornamento disponibile (in basso a sinistra) non ne è interessato e continua a funzionare in ogni caso.",
+
+    "Aereo militare/governativo",
+    "Aereo Heavy",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

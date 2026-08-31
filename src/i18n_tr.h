@@ -68,7 +68,6 @@ static const char* const I18N_TR[] = {
     "Kara araçlarını göster: ",
     "Havayolu filtresi",
     "İzleme listesi",
-    "İzleme uyarısı: ",
     "Ayarları yedekle",
     "Ayarları geri yükle",
     "Yedekleme kaydedildi.",
@@ -296,7 +295,6 @@ static const char* const I18N_TR[] = {
     "Araçlar",
     "İstatistik ve Uçuş Defteri",
     "LED Uyarıları",
-    "Araçlar",
     "Yeni: \"Otomatik\" yanındaki \"GPS\" düğmesi, bağlı bir GPS modülünün okunmasını açar/kapatır. Açıkken konumun (ör. araba kullanırken) hareketini canlı olarak takip eder, sadece IP üzerinden tahmini olarak belirlenmez. Bağlantı: GPS modülü TX'i GPIO22'ye, GPS modülü RX'i GPIO27'ye (genellikle kullanılmaz), 3,3V ve GND, 9600 baud (NMEA). Bağlı modül yoksa düğmenin bir etkisi olmaz.",
     "Ekranı 180° döndür: ",
     "Havalimanı kodları: ",
@@ -383,7 +381,10 @@ static const char* const I18N_TR[] = {
 
     "Overlay",
     "Overlay hakkında",
-    "Radar ekranındaki üç soluk köşe göstergesini birlikte açar veya kapatır: 3 saatlik hava durumu önizlemesi (sağ üst), en yakın havalimanına mesafe ve yön (sol üst) ve askeri/resmi uçuşlar, squawk izleme listesi, uçak izleme listesi ve gizlenmiş havayolu eşleşmeleri için dönen olay göstergesi (sağ alt). Kapalıyken üçü de boş kalır, ekran daha sade görünür. Güncelleme mevcut göstergesi (sol alt) bundan etkilenmez ve her durumda çalışmaya devam eder.",
+    "Radar ekranındaki üç soluk köşe göstergesini birlikte açar veya kapatır: 3 saatlik hava durumu önizlemesi (sağ üst), en yakın havalimanına mesafe ve yön (sol üst) ve squawk izleme listesi, uçak izleme listesi ve gizlenmiş havayolu eşleşmeleri için dönen olay göstergesi (sağ alt) - yalnızca kendi kurduğunuz bir liste veya filtreye ait olaylar. Kapalıyken üçü de boş kalır, ekran daha sade görünür. Güncelleme mevcut göstergesi (sol alt) bundan etkilenmez ve her durumda çalışmaya devam eder.",
+
+    "Askeri/devlet uçağı",
+    "Heavy uçak",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

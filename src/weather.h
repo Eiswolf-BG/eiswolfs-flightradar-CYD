@@ -31,6 +31,20 @@ namespace Weather {
     // Lesen ist unkritisch).
     Condition current();
 
+    // Intensitaetsabstufung fuer den animierten Regen-Effekt (Radarscreen,
+    // Ruhebildschirm, WebUI-Live-Radar - alle drei lesen von hier, damit sie
+    // konsistent auf dieselbe Intensitaet reagieren, siehe currentRainIntensity()
+    // unten). Aus dem ohnehin bereits abgefragten Open-Meteo-"weathercode"
+    // (WMO-Code) abgeleitet, keine zusaetzliche API-Anfrage noetig - siehe
+    // intensityFromWmoCode() in weather.cpp fuer die genaue Code-Zuordnung.
+    // None = kein Regen-Code (bzw. current()!=Rain/Thunderstorm).
+    enum class RainIntensity {
+        None,
+        Light,
+        Moderate,
+        Heavy
+    };
+
     // Windrichtung in Grad (meteorologische Konvention: Richtung, AUS der
     // der Wind weht, 0=Nord, im Uhrzeigersinn) - Teil derselben Open-Meteo-
     // "current_weather"-Antwort wie current() oben (fetchNow() in
@@ -41,6 +55,12 @@ namespace Weather {
     // keine erfolgreiche Abfrage. Wie current() nur vom NetTask
     // geschrieben, vom UI-Thread gelesen - kein Lock noetig.
     float currentWindDirectionDeg();
+
+    // Aktuelle Regenintensitaet (siehe RainIntensity oben) - wie current()
+    // nur vom NetTask geschrieben, vom UI-Thread gelesen, kein Lock noetig.
+    // Liefert RainIntensity::None, solange current() nicht Rain/Thunderstorm
+    // ist (bzw. vor der ersten erfolgreichen Abfrage).
+    RainIntensity currentRainIntensity();
 
     // Roher METAR-Text (Flugwetterbericht) fuer den naechstgelegenen
     // Flughafen (per AirportLookup::findNearest() zum aktuell aktiven

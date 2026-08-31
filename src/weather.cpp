@@ -13,6 +13,7 @@ namespace Weather {
 
 namespace {
     Condition currentCondition = Condition::Unknown;
+    RainIntensity currentRainIntensityVal = RainIntensity::None;
     float currentWindDirDeg = -1.0f;
     uint32_t lastFetchMs = 0;
     double lastLat = 0;
@@ -153,6 +154,35 @@ namespace {
         return Condition::Unknown;
     }
 
+    // Feinere Abstufung DESSELBEN weathercode-Feldes fuer den animierten
+    // Regen-Effekt (Radarscreen/Ruhebildschirm/WebUI) - conditionFromWmoCode()
+    // oben wirft die Intensitaet innerhalb von "Rain"/"Thunderstorm" bewusst
+    // weg (fuer das einfache Header-Icon reicht die grobe Kategorie), hier
+    // wird sie zusaetzlich ausgewertet. Offizielle WMO-Code-Bedeutungen
+    // (siehe https://open-meteo.com/en/docs):
+    //   51/53/55 Nieselregen leicht/maessig/dicht, 56/57 gefrierender
+    //     Nieselregen leicht/dicht, 61 Regen leicht -> alle als "leicht"
+    //     eingestuft (Niesel-Codes und leichter Regen sind vom sichtbaren
+    //     Niederschlag her vergleichbar schwach).
+    //   63 Regen maessig, 66 gefrierender Regen leicht, 80 Regenschauer
+    //     leicht -> "mittel" (Schauer wirken durch ihre Boeen-Natur trotz
+    //     "leicht"-Bezeichnung optisch praesenter als gleichmaessiger
+    //     Nieselregen, daher hier statt bei "leicht" eingeordnet).
+    //   65 Regen stark, 67 gefrierender Regen stark, 81/82 Regenschauer
+    //     maessig/heftig, 95/96/99 Gewitter (mit/ohne Hagel) -> "stark".
+    RainIntensity intensityFromWmoCode(int code) {
+        if (code == 65 || code == 67 || code == 81 || code == 82 || code >= 95) {
+            return RainIntensity::Heavy;
+        }
+        if (code == 63 || code == 66 || code == 80) {
+            return RainIntensity::Moderate;
+        }
+        if ((code >= 51 && code <= 57) || code == 61) {
+            return RainIntensity::Light;
+        }
+        return RainIntensity::None;
+    }
+
     void fetchNow(double lat, double lon) {
         if (WiFi.status() != WL_CONNECTED) return;
 
@@ -231,6 +261,7 @@ namespace {
         if (wmoCode < 0) return;
 
         currentCondition = conditionFromWmoCode(wmoCode);
+        currentRainIntensityVal = intensityFromWmoCode(wmoCode);
         // "winddirection" ist Teil derselben current_weather-Antwort - siehe
         // currentWindDirectionDeg()-Kommentar in weather.h. | -1.0f als
         // Default, falls das Feld ausnahmsweise fehlen sollte (aendert dann
@@ -319,6 +350,8 @@ void update() {
 }
 
 Condition current() { return currentCondition; }
+
+RainIntensity currentRainIntensity() { return currentRainIntensityVal; }
 
 float currentWindDirectionDeg() { return currentWindDirDeg; }
 

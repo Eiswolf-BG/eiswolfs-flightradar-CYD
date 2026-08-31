@@ -18,7 +18,6 @@
 #include "aircraft_watchlist_screen.h"
 #include "squawk_watchlist_screen.h"
 #include "airline_filter_screen.h"
-#include "radar_theme_screen.h"
 #include "i18n.h"
 #include "touch_input.h"
 #include "menu_stars.h"
@@ -165,7 +164,6 @@ namespace {
     // Kommentar dort) neu ermittelt, danach von tick()/render() gleichermassen
     // zum Zeichnen gelesen (gleiches Persistenz-Prinzip wie hitPoints[]).
     struct EventCornerState {
-        bool militaryActive = false;
         bool squawkWatchActive = false;
         bool callsignWatchActive = false;
         bool airlineFilterActive = false;
@@ -691,12 +689,33 @@ namespace {
         bool hasPrev = false;
         int16_t prevX1 = 0, prevY1 = 0, prevX2 = 0, prevY2 = 0;
     };
-    // Bewusst wenige Tropfen ("nicht zu viele", Alex' Wunsch) - klar
-    // erkennbare Einzellinien statt dichtem Gewusel.
-    constexpr uint8_t MAX_RAINDROPS = 8;
+    // Tropfenzahl/Fallgeschwindigkeit sind an die tatsaechliche
+    // Regenintensitaet gekoppelt (Weather::RainIntensity, siehe weather.h/
+    // .cpp - aus dem ohnehin abgefragten WMO-weathercode abgeleitet, keine
+    // zusaetzliche API-Anfrage). "Mittel" entspricht den fruheren festen
+    // Werten (8 Tropfen/70px/s, "nicht zu viele", Alex' urspruenglicher
+    // Wunsch) - "leicht"/"stark" weichen davon spuerbar nach unten/oben ab.
+    // Die drei Stufen sind bewusst in allen drei Regen-Implementierungen
+    // (hier, ScreensaverRain in main.cpp, WebUI-JS in web_export_server.cpp)
+    // mit denselben Werten hinterlegt, damit sie konsistent auf dieselbe
+    // Intensitaet reagieren - dupliziert statt geteilt (siehe CLAUDE.md-
+    // Konvention), aber bitte bei Aenderungen alle drei synchron halten.
+    constexpr uint8_t MAX_RAINDROPS = 13; // Array-Kapazitaet = groesste Stufe ("stark")
     RainDrop rainDrops[MAX_RAINDROPS];
-    constexpr float RAIN_DROP_SPEED_PX_PER_SEC = 70.0f;
     constexpr int16_t RAIN_DROP_LENGTH = 7;
+
+    struct RainParams {
+        uint8_t count;
+        float speedPxPerSec;
+    };
+    RainParams rainParamsForIntensity(Weather::RainIntensity intensity) {
+        switch (intensity) {
+            case Weather::RainIntensity::Light:    return {4, 45.0f};
+            case Weather::RainIntensity::Heavy:    return {13, 100.0f};
+            case Weather::RainIntensity::Moderate:
+            default:                                return {8, 70.0f};
+        }
+    }
 
     // Setzt einen Tropfen an einer zufaelligen Position auf dem Kreisrand
     // neu, gestreut um die Windrichtung-Bearing (±70 Grad) - Bewegung
@@ -2004,7 +2023,26 @@ namespace {
             gfx.fillRect((int16_t)(DOT_X - 6), (int16_t)(rowY - 6), 12, 12, colorForGroundVehicle(gfx));
             gfx.setCursor(LABEL_X, (int16_t)(rowY + 5));
             gfx.print(I18n::t(StringId::LEGEND_GROUND_VEHICLE));
+            rowY = (int16_t)(rowY + ROW_H);
         }
+
+        // Militaer-/Behoerden-Ring - gleicher Stil wie am echten Marker
+        // (tft.drawCircle(hp.x, hp.y, 12, TFT_ORANGE), siehe render()),
+        // hier nur kleiner (Legenden-Radius wie die Farb-Punkte oben) da
+        // reines Legenden-Symbol, kein echter Marker.
+        gfx.drawCircle(DOT_X, rowY, 6, TFT_ORANGE);
+        gfx.setCursor(LABEL_X, (int16_t)(rowY + 5));
+        gfx.print(I18n::t(StringId::LEGEND_MILITARY_GOV));
+        rowY = (int16_t)(rowY + ROW_H);
+
+        // Heavy-Flugzeug-Symbol - dieselbe drawTypedMarker()-Silhouette
+        // (heavy=true) wie am echten Marker, hier stellvertretend als
+        // Airliner-Form mit fester Ausrichtung nach oben, in Weiss (neutral,
+        // nicht an eine Hoehenfarbe gebunden - dies ist eine Formen-, keine
+        // Farb-Legende).
+        drawTypedMarker(gfx, DOT_X, rowY, 0.0f, TFT_WHITE, TypeSilhouette::Airliner, true);
+        gfx.setCursor(LABEL_X, (int16_t)(rowY + 5));
+        gfx.print(I18n::t(StringId::LEGEND_HEAVY));
 
         drawButton(gfx, backBtn, I18n::t(StringId::OK));
 
@@ -2477,22 +2515,27 @@ namespace {
     // Ereignis-Ecke unten rechts (Alex' Wunsch) - zeigt an, ob GERADE ein
     // Militaer-/Behoerdenflug, ein Squawk-Wachposten-Treffer, ein
     // Rufzeichen-Watchlist-Treffer oder ein Airline-Filter-Treffer aktiv
-    // ist (eventCorner-Zustand, siehe render()-Aufbau oben). Bei mehreren
-    // gleichzeitig aktiven Ereignissen rotieren Symbol/Text alle 2s durch,
-    // in fester Prioritaet Militaer > Squawk-Wachposten > Watchlist >
+    // ist (eventCorner-Zustand, siehe render()-Aufbau oben). NUR
+    // Ereignisse, die der Nutzer selbst in einer Liste/einem Filter
+    // eingerichtet hat (Alex' ausdruecklicher Wunsch) - die Militaer-/
+    // Behoerdenflug-Erkennung war hier frueher ebenfalls Teil der
+    // Rotation, wurde aber wieder entfernt: sie wird bereits am
+    // Radar-Marker selbst (oranger Ring) UND in der Detail-Panel-Zeile
+    // angezeigt, ein zusaetzliches Symbol in dieser Ecke war redundant.
+    // Bei mehreren gleichzeitig aktiven Ereignissen rotieren Symbol/Text
+    // alle 3s durch, in fester Prioritaet Squawk-Wachposten > Watchlist >
     // Airline-Filter. currentEventCornerType() ist die EINZIGE Stelle, die
     // "welches Ereignis wird gerade gezeigt" berechnet - sowohl
     // drawEventCorner() als auch der Tap-Handler in handleTap() nutzen
     // exakt diese Funktion, damit ein Tap IMMER zum aktuell sichtbaren
     // Symbol passt, auch waehrend der Rotation.
-    enum class EventCornerType { None, Military, SquawkWatch, CallsignWatch, AirlineFilter };
+    enum class EventCornerType { None, SquawkWatch, CallsignWatch, AirlineFilter };
 
     constexpr uint32_t EVENT_CORNER_ROTATE_MS = 3000;
 
     EventCornerType currentEventCornerType() {
-        EventCornerType active[4];
+        EventCornerType active[3];
         uint8_t n = 0;
-        if (eventCorner.militaryActive) active[n++] = EventCornerType::Military;
         if (eventCorner.squawkWatchActive) active[n++] = EventCornerType::SquawkWatch;
         if (eventCorner.callsignWatchActive) active[n++] = EventCornerType::CallsignWatch;
         if (eventCorner.airlineFilterActive) active[n++] = EventCornerType::AirlineFilter;
@@ -2588,18 +2631,6 @@ namespace {
         gfx.setTextColor(color, TFT_BLACK);
 
         switch (type) {
-            case EventCornerType::Military: {
-                // Ring-Symbol, angelehnt an den bestehenden oranger Ring
-                // (siehe isNotable-Zweig in render()), hier aber in der
-                // gedimmten Themenfarbe statt TFT_ORANGE. Zwei Kreise MIT
-                // deutlich unterschiedlichem Radius (nicht R und R-1 wie
-                // beim fruehen, verworfenen Update-Button-Versuch, der bei
-                // fast gleichen Radien sichtbare Luecken zeigte) - hier nur
-                // EIN drawCircle(), bewusst kein zweiter, um dasselbe
-                // Problem gar nicht erst zu riskieren.
-                gfx.drawCircle(cx, cy, EVENT_CORNER_R, color);
-                break;
-            }
             case EventCornerType::SquawkWatch: {
                 // Generische Flugzeug-Silhouette - dieselbe Funktion wie
                 // fuer normale Flugzeug-Marker auf dem Radar (heading fest
@@ -2831,8 +2862,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         // bedeuten inhaltlich dasselbe ("ein Flugzeug, das mich
         // interessiert, ist da"), daher ein gemeinsames Flag statt eines
         // eigenen Alarm-Modus.
-        bool isWatched = SettingsStore::watchlistAlertEnabled() &&
-                          (AircraftWatchlist::isWatched(a.callsign) || SquawkWatchlist::isWatched(a.squawk));
+        bool isWatched = AircraftWatchlist::isWatched(a.callsign) || SquawkWatchlist::isWatched(a.squawk);
         // Niedrigste Prioritaet der drei Ring-Markierungen (siehe unten) -
         // rein informativ, kein Alarm wie Notfall/Beobachtungsliste. Deckt
         // jetzt zwei unabhaengige Kriterien ab: Militaer-/Regierungs-
@@ -2850,15 +2880,12 @@ void render(TFT_eSPI& tft, int16_t top) {
         // Ereignistypen unterscheiden soll (Alex' Wunsch), waehrend der
         // bestehende Ring auf dem Radar sie bewusst zu einem gemeinsamen
         // "isWatched"-Zustand zusammenfasst.
-        if (SettingsStore::watchlistAlertEnabled() && SquawkWatchlist::isWatched(a.squawk)) {
+        if (SquawkWatchlist::isWatched(a.squawk)) {
             eventCorner.squawkWatchActive = true;
         }
-        if (SettingsStore::watchlistAlertEnabled() && AircraftWatchlist::isWatched(a.callsign)) {
+        if (AircraftWatchlist::isWatched(a.callsign)) {
             eventCorner.callsignWatchActive = true;
             strncpy(eventCorner.watchlistCallsign, a.callsign, sizeof(eventCorner.watchlistCallsign) - 1);
-        }
-        if (SettingsStore::militarySquawkDetectionEnabled() && isMilitaryGovSquawk(a.squawk)) {
-            eventCorner.militaryActive = true;
         }
 
         if (isSelected) {
@@ -3207,12 +3234,16 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
         float windDir = Weather::currentWindDirectionDeg();
         bool rainy = SettingsStore::rainEffectEnabled() &&
                      (cond == Weather::Condition::Rain || cond == Weather::Condition::Thunderstorm) && windDir >= 0.0f;
-        float step = RAIN_DROP_SPEED_PX_PER_SEC * (deltaMs / 1000.0f);
+        RainParams params = rainParamsForIntensity(Weather::currentRainIntensity());
+        float step = params.speedPxPerSec * (deltaMs / 1000.0f);
         uint16_t dropColor = scaleColorBrightness(TFT_SKYBLUE, 0.45f);
 
         for (uint8_t i = 0; i < MAX_RAINDROPS; i++) {
             RainDrop& d = rainDrops[i];
-            if (!rainy) {
+            // Nur die ersten "params.count" Slots sind bei der aktuellen
+            // Intensitaetsstufe aktiv - der Rest des (auf die groesste Stufe
+            // dimensionierten) Arrays bleibt schlicht untaetig.
+            if (!rainy || i >= params.count) {
                 d.active = false;
                 d.hasPrev = false;
                 continue;
@@ -3565,19 +3596,10 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
     // dieselbe Funktion, die auch drawEventCorner() fuer die Rotation
     // nutzt - garantiert, dass ein Tap waehrend der Rotation immer zum
     // gerade sichtbaren Symbol passt) zur passenden Verwaltungsseite.
-    // Militaer springt bewusst in die Radar-Darstellung-Einstellung
-    // (RadarThemeScreen, dort liegt der Erkennungs-Schalter) statt in ein
-    // Detail-Panel - ein einzelnes "das eine ausloesende Flugzeug" ist im
-    // eventCorner-Zustand nicht als Hex-Code hinterlegt (nur ein Bool),
-    // ein zusaetzliches Flugzeug-Handle nur fuer diesen Sprung anzulegen
-    // waere unverhaeltnismaessig fuer eine rein informative Ecke.
     if (SettingsStore::eventCornerOverlayEnabled() && eventCornerRect(top).contains(x, y)) {
         EventCornerType tappedType = currentEventCornerType();
         if (tappedType != EventCornerType::None) {
             switch (tappedType) {
-                case EventCornerType::Military:
-                    RadarThemeScreen::run(tft);
-                    break;
                 case EventCornerType::SquawkWatch:
                     SquawkWatchlistScreen::run(tft);
                     break;
@@ -3638,9 +3660,11 @@ void updateProximityAlert(uint32_t nowMs) {
 
     bool proximityOn = SettingsStore::proximityAlertEnabled();
     bool emergencyOn = SettingsStore::emergencyAlertEnabled();
-    bool watchlistOn = SettingsStore::watchlistAlertEnabled();
 
-    if (proximityOn || emergencyOn || watchlistOn) {
+    // Die Schleife laeuft immer (nicht mehr an proximityOn/emergencyOn
+    // gebunden), da ein Watchlist-Treffer seit Entfernung des frueheren
+    // watchlistAlertEnabled()-Schalters immer geprueft werden muss.
+    {
         AircraftTable::lock();
         Aircraft* table = AircraftTable::raw();
         for (uint8_t i = 0; i < AircraftTable::capacity(); i++) {
@@ -3649,10 +3673,11 @@ void updateProximityAlert(uint32_t nowMs) {
             if (emergencyOn && isEmergencySquawk(table[i].squawk)) anyEmergency = true;
             // Squawk-Wachliste loest denselben WatchlistBlue-Alarm aus wie
             // die Rufzeichen-Beobachtungsliste (siehe squawk_watchlist.h) -
-            // gleicher watchlistAlertEnabled()-Schalter, kein eigenes
-            // Ein/Aus dafuer.
-            if (watchlistOn && (AircraftWatchlist::isWatched(table[i].callsign) ||
-                                 SquawkWatchlist::isWatched(table[i].squawk))) anyWatched = true;
+            // ein Watchlist-Treffer loest den Alarm immer aus, kein Ein/Aus
+            // dafuer (der fruehere watchlistAlertEnabled()-Schalter wurde
+            // entfernt).
+            if (AircraftWatchlist::isWatched(table[i].callsign) ||
+                SquawkWatchlist::isWatched(table[i].squawk)) anyWatched = true;
         }
         AircraftTable::unlock();
     }
@@ -3663,7 +3688,7 @@ void updateProximityAlert(uint32_t nowMs) {
                                        : LedAlert::Mode::Off;
 
     // Update-Verfuegbar-Signal (dreimal kurz Magenta, alle 10s) laeuft
-    // unabhaengig von proximityOn/emergencyOn/watchlistOn immer mit, sofern
+    // unabhaengig von proximityOn/emergencyOn immer mit, sofern
     // OtaUpdate::isUpdateAvailable() true liefert UND der Nutzer das per
     // SettingsStore::updateLedSignalEnabled() nicht abgeschaltet hat (Menue
     // > System) - LedAlert::update() unterdrueckt es zusaetzlich selbst

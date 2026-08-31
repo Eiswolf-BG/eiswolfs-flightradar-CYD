@@ -16,7 +16,6 @@ namespace {
     bool autoBrightnessOn = false;
     bool emergencyAlertOn = true;
     bool proximityAlertOn = true;
-    bool watchlistAlertOn = true;
     // MUSS bei einer frischen Installation aus sein - sonst schreibt sich
     // die SD-Karte unbemerkt voll (siehe Bestaetigungsdialog beim
     // Einschalten in menu_screen.cpp + 24h-Auto-Aus in flight_logbook.cpp).
@@ -91,8 +90,6 @@ namespace {
             emergencyAlertOn = (value.toInt() != 0);
         } else if (key == "proximity_alert") {
             proximityAlertOn = (value.toInt() != 0);
-        } else if (key == "watchlist_alert") {
-            watchlistAlertOn = (value.toInt() != 0);
         } else if (key == "flight_logbook") {
             flightLogbookOn = (value.toInt() != 0);
         } else if (key == "logbook_enabled_at") {
@@ -208,7 +205,6 @@ void save() {
     f.printf("auto_brightness=%d\n", autoBrightnessOn ? 1 : 0);
     f.printf("emergency_alert=%d\n", emergencyAlertOn ? 1 : 0);
     f.printf("proximity_alert=%d\n", proximityAlertOn ? 1 : 0);
-    f.printf("watchlist_alert=%d\n", watchlistAlertOn ? 1 : 0);
     f.printf("flight_logbook=%d\n", flightLogbookOn ? 1 : 0);
     f.printf("logbook_enabled_at=%lu\n", (unsigned long)logbookEnabledAtEpoch);
     f.printf("logbook_session_file=%s\n", logbookSessionFile);
@@ -290,13 +286,6 @@ bool proximityAlertEnabled() { return proximityAlertOn; }
 
 void setProximityAlertEnabled(bool on) {
     proximityAlertOn = on;
-    save();
-}
-
-bool watchlistAlertEnabled() { return watchlistAlertOn; }
-
-void setWatchlistAlertEnabled(bool on) {
-    watchlistAlertOn = on;
     save();
 }
 

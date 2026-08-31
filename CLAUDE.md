@@ -161,14 +161,17 @@ mit Foto vom echten Display), bevor der Code als fertig gilt.
       darf bei künftigen Umbauten nicht vergraben werden)
     - Zurück
 
-  Flugoptionen → 6 Buttons + Zurück:
-    - Flugzeugliste (direkt)
-    - Beobachtungsliste (direkt)
+  Flugoptionen → 5 Buttons + Zurück:
+    - Listen: Flugzeugliste, Beobachtungsliste, Squawk-Wachliste, Zurück
     - Statistik & Logbuch: Statistiken, Statistik-Verlauf, Logbuch-Dateien,
       Flugbuch an/aus, Zurück
     - LED-Alarme: Heartbeat, Notfall-Alarm, Näherungs-LED, Zurück
-    - Tools: Standort-Presets, Airline-Filter, Bodenfahrzeuge ausblenden,
-      Nur Helikopter anzeigen, Beobachtungsalarm, Zurück
+    - Anzeigefilter: Airline-Filter, Bodenfahrzeuge ausblenden,
+      Nur Helikopter anzeigen, Nur Niedrigflieger, ISS-Marker, Zurück
+    - Standort-Presets (direkt, kein eigenes Untermenü mehr - das frühere
+      "Werkzeuge"-Untermenü wurde aufgelöst, da nach Entfernung des
+      Beobachtungsalarm-Schalters nur noch Standort-Presets übrig blieb;
+      ein Watchlist-Treffer löst den LED-Alarm seitdem immer unbedingt aus)
     - Zurück
 
   System und Flugoptionen sind damit selbst auch Kategorie-Seiten

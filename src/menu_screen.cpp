@@ -798,15 +798,17 @@ namespace {
     }
 
     // Neue Untermenues (SystemDisplay/SystemTools/FlightStatsLogbook/
-    // FlightLed/FlightTools) - entstanden beim Aufraeumen der Flugoptionen-/
+    // FlightLed) - entstanden beim Aufraeumen der Flugoptionen-/
     // System-Seiten in grosse Kategorie-Buttons statt langer Einzelzeilen-
     // Listen (Alex' Wunsch, analog zum Hauptmenue). System und Flight sind
     // dadurch selbst jetzt auch Kategorie-Seiten (wie Main), keine flachen
-    // Listen mehr.
+    // Listen mehr. Das fruehere Page::FlightTools (Standort-Presets +
+    // Beobachtungsalarm-Schalter) wurde wieder aufgeloest, siehe
+    // Page::Flight unten.
     enum class Page {
         Main, Region, System, Flight, BackupReset,
         SystemDisplay, SystemTools,
-        FlightLists, FlightStatsLogbook, FlightLed, FlightFilters, FlightTools
+        FlightLists, FlightStatsLogbook, FlightLed, FlightFilters
     };
 }
 
@@ -1294,21 +1296,24 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             // "Listen"-Untermenue (vorher direkt hier als Buttons), die
             // reinen Sichtbarkeitsfilter in einem eigenen "Anzeigefilter"-
             // Untermenue (vorher Teil von "Werkzeuge") - Alex' Wunsch nach
-            // klarerer Trennung. "Werkzeuge" bleibt bestehen, enthaelt aber
-            // nur noch Standort-Presets und Beobachtungsalarm (siehe
-            // Page::FlightLists/Page::FlightFilters/Page::FlightTools unten).
+            // klarerer Trennung. Das fruehere "Werkzeuge"-Untermenue
+            // (Page::FlightTools) wurde wieder aufgeloest, da nach
+            // Entfernung des Beobachtungsalarm-Schalters nur noch
+            // Standort-Presets uebrig blieb - der Button hier springt
+            // deshalb direkt in LocationPresetsScreen::run() statt in ein
+            // eigenes Untermenue.
             Rect listsBtn        = subMenuRowRect(0, 6);
             Rect statsLogbookBtn = subMenuRowRect(1, 6);
             Rect ledBtn          = subMenuRowRect(2, 6);
             Rect filtersBtn      = subMenuRowRect(3, 6);
-            Rect toolsBtn        = subMenuRowRect(4, 6);
+            Rect locationBtn     = subMenuRowRect(4, 6);
             Rect backBtn         = subMenuRowRect(5, 6);
 
             drawButton(tft, listsBtn, I18n::t(StringId::MENU_CATEGORY_LISTS));
             drawButton(tft, statsLogbookBtn, I18n::t(StringId::MENU_CATEGORY_STATS_LOGBOOK));
             drawButton(tft, ledBtn, I18n::t(StringId::MENU_CATEGORY_LED));
             drawButton(tft, filtersBtn, I18n::t(StringId::MENU_CATEGORY_FILTERS));
-            drawButton(tft, toolsBtn, I18n::t(StringId::MENU_CATEGORY_TOOLS));
+            drawButton(tft, locationBtn, I18n::t(StringId::MENU_LOCATION_PRESETS));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -1327,8 +1332,8 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 page = Page::FlightLed;
             } else if (filtersBtn.contains(tap.x, tap.y)) {
                 page = Page::FlightFilters;
-            } else if (toolsBtn.contains(tap.x, tap.y)) {
-                page = Page::FlightTools;
+            } else if (locationBtn.contains(tap.x, tap.y)) {
+                LocationPresetsScreen::run(tft);
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::Main;
             }
@@ -1454,7 +1459,7 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 page = Page::Flight;
             }
 
-        } else if (page == Page::FlightFilters) {
+        } else { // Page::FlightFilters
             tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_FILTERS));
@@ -1518,35 +1523,6 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 SettingsStore::setOnlyLowAltitude(!SettingsStore::onlyLowAltitude());
             } else if (issMarkerBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setIssMarkerEnabled(!SettingsStore::issMarkerEnabled());
-            } else if (backBtn.contains(tap.x, tap.y)) {
-                page = Page::Flight;
-            }
-
-        } else { // Page::FlightTools
-            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
-            tft.setCursor(10, 14);
-            tft.println(I18n::t(StringId::MENU_CATEGORY_TOOLS));
-
-            Rect locationBtn       = subMenuRowRect(0, 3);
-            Rect watchlistAlertBtn = subMenuRowRect(1, 3);
-            Rect backBtn           = subMenuRowRect(2, 3);
-
-            drawButton(tft, locationBtn, I18n::t(StringId::MENU_LOCATION_PRESETS));
-            drawButton(tft, watchlistAlertBtn, I18n::t(StringId::MENU_WATCHLIST_ALERT) + onOff(SettingsStore::watchlistAlertEnabled()));
-            drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
-
-            TouchInput::Point tap;
-            while (true) {
-                if (TouchInput::wasTapped(tap)) break;
-                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
-                MenuStars::update(tft);
-                delay(20);
-            }
-
-            if (locationBtn.contains(tap.x, tap.y)) {
-                LocationPresetsScreen::run(tft);
-            } else if (watchlistAlertBtn.contains(tap.x, tap.y)) {
-                SettingsStore::setWatchlistAlertEnabled(!SettingsStore::watchlistAlertEnabled());
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::Flight;
             }

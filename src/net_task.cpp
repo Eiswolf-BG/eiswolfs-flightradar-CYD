@@ -151,23 +151,20 @@ namespace {
                         // ausgeschaltetem MQTT gefahrlos aufrufbar (reiner
                         // No-Op).
                         {
-                            bool watchlistOn = SettingsStore::watchlistAlertEnabled();
                             bool proximityOn = SettingsStore::proximityAlertEnabled();
                             bool anyWatched = false;
                             bool anyClose = false;
                             AircraftTable::lock();
                             Aircraft* table = AircraftTable::raw();
                             uint8_t aircraftCount = AircraftTable::validCount();
-                            if (watchlistOn || proximityOn) {
-                                for (uint8_t i = 0; i < AircraftTable::capacity(); i++) {
-                                    if (!table[i].valid) continue;
-                                    if (watchlistOn && (AircraftWatchlist::isWatched(table[i].callsign) ||
-                                                         SquawkWatchlist::isWatched(table[i].squawk))) {
-                                        anyWatched = true;
-                                    }
-                                    if (proximityOn && table[i].distanceKm <= Config::LED_ALERT_RADIUS_KM) {
-                                        anyClose = true;
-                                    }
+                            for (uint8_t i = 0; i < AircraftTable::capacity(); i++) {
+                                if (!table[i].valid) continue;
+                                if (AircraftWatchlist::isWatched(table[i].callsign) ||
+                                    SquawkWatchlist::isWatched(table[i].squawk)) {
+                                    anyWatched = true;
+                                }
+                                if (proximityOn && table[i].distanceKm <= Config::LED_ALERT_RADIUS_KM) {
+                                    anyClose = true;
                                 }
                             }
                             AircraftTable::unlock();

@@ -9,6 +9,7 @@
 #include "settings_store.h"
 #include "location_manager.h"
 #include "units.h"
+#include "weather.h"
 #include <WebServer.h>
 #include <ArduinoJson.h>
 #include <SD.h>
@@ -312,6 +313,57 @@ namespace {
         html += "var bright=Math.round(s.phase<128?s.phase*2:(255-s.phase)*2);";
         html += "ctx.fillStyle='rgb('+Math.round(accentRgb[0]*bright/255)+','+Math.round(accentRgb[1]*bright/255)+','+Math.round(accentRgb[2]*bright/255)+')';ctx.fillRect(s.x,s.y,1,1);}}";
 
+        // Regen-Overlay (Alex' Wunsch: "Spiegel des CYD-Radarscreens") - nur
+        // aktiv, wenn data.raining true ist (siehe handleRadarJson():
+        // SettingsStore::rainEffectEnabled() + Weather::current() + gueltige
+        // Windrichtung). Geometrie 1:1 wie radar_screen.cpp::spawnRainDrop():
+        // Tropfen starten am Radarkreis-Rand bei bearing=windDirDeg±70°
+        // (Streuung), fliegen als parallele Sehnen in Richtung
+        // "windDirDeg+180" (= windabwaerts) durch den Kreis, werden beim
+        // Verlassen sofort an neuer Randposition neu gestartet. Gleiche
+        // Kompass-Konvention (0=Norden=oben, im Uhrzeigersinn) wie die
+        // Flugzeug-Positionierung oben (bearing_deg -> sin/cos). Anders als
+        // beim Geraete-Regen (fest TFT_SKYBLUE) zeichnet das WebUI die
+        // Tropfen in der aktuellen Themenfarbe (--accent), passend zum
+        // bestehenden Farbthema-Sync (applyTheme()/THEME_PALETTES oben) -
+        // Alex' ausdruecklicher Wunsch fuer diese Stelle. draw() leert das
+        // gesamte Canvas bei JEDEM Aufruf (ctx.clearRect oben) und zeichnet
+        // alles neu, deshalb ist hier - anders als beim Geraete-Ruhebildschirm
+        // - KEIN manuelles Erase/Redraw einzelner Tropfen noetig.
+        // rainInited/lastRainMs werden zurueckgesetzt, sobald raining=false
+        // ist, damit beim naechsten Aktivwerden (evtl. mit geaenderter
+        // Windrichtung) alle Tropfen sauber neu am Rand gestartet werden statt
+        // von einer veralteten Position aus weiterzufliegen.
+        //
+        // Tropfenzahl/Fallgeschwindigkeit sind an data.rain_intensity
+        // gekoppelt (0=None/1=Light/2=Moderate/3=Heavy, siehe
+        // Weather::RainIntensity + handleRadarJson()) - dieselben drei
+        // Stufen-Werte wie radar_screen.cpp/ScreensaverRain (main.cpp),
+        // dort dupliziert statt geteilt (CLAUDE.md-Konvention), bitte bei
+        // Aenderungen synchron halten. Das Array ist immer auf die groesste
+        // Stufe ("stark", 20 Tropfen) dimensioniert und wird auch bei
+        // niedrigerer Stufe komplett WEITERBEWEGT (nur die ersten
+        // "count" werden tatsaechlich GEZEICHNET) - so faellt kein Tropfen
+        // "eingefroren" beim naechsten Hochstufen ploetzlich aus dem Stand
+        // an, sondern ist schon in Bewegung.
+        html += "var RAIN_LEN=10,RAIN_MAX=20;";
+        html += "function rainParamsFor(level){if(level>=3)return{count:20,speed:130};if(level===1)return{count:6,speed:60};return{count:12,speed:90};}";
+        html += "var rainDrops=[];var rainInited=false;var lastRainMs=null;";
+        html += "function rainSpawn(d,windDirDeg){var spread=Math.random()*140-70;";
+        html += "var entryRad=(windDirDeg+spread)*Math.PI/180;d.x=cx+R*Math.sin(entryRad);d.y=cy-R*Math.cos(entryRad);";
+        html += "var travelRad=(windDirDeg+180)*Math.PI/180;d.vx=Math.sin(travelRad);d.vy=-Math.cos(travelRad);}";
+        html += "function drawRain(windDirDeg,level,accentColor){var p=rainParamsFor(level);";
+        html += "var now=performance.now();var dt=lastRainMs?Math.min(now-lastRainMs,300):16;lastRainMs=now;var step=p.speed*dt/1000;";
+        html += "if(!rainInited){rainDrops=[];for(var i=0;i<RAIN_MAX;i++){var d={};rainSpawn(d,windDirDeg);rainDrops.push(d);}rainInited=true;}";
+        html += "ctx.save();ctx.strokeStyle=accentColor;ctx.globalAlpha=0.45;ctx.lineWidth=1;";
+        html += "for(var i=0;i<rainDrops.length;i++){var d=rainDrops[i];d.x+=d.vx*step;d.y+=d.vy*step;";
+        html += "var ddx=d.x-cx,ddy=d.y-cy;if(ddx*ddx+ddy*ddy>R*R){rainSpawn(d,windDirDeg);}";
+        html += "if(i>=p.count)continue;";
+        html += "var x1=d.x,y1=d.y,x2=d.x-d.vx*RAIN_LEN,y2=d.y-d.vy*RAIN_LEN;";
+        html += "var d1=(x1-cx)*(x1-cx)+(y1-cy)*(y1-cy),d2=(x2-cx)*(x2-cx)+(y2-cy)*(y2-cy);";
+        html += "if(d1<=R*R&&d2<=R*R){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();}}";
+        html += "ctx.restore();}";
+
         // altColor() bildet die Flughoehe ab (Notfall-/Warnfarben) - bleibt
         // AUSDRUECKLICH themenunabhaengig, exakt wie colorForAltitude() am
         // Geraete-Display (radar_screen.cpp) - NICHT anfassen/umfaerben.
@@ -363,6 +415,7 @@ namespace {
         html += "ctx.fillStyle=color;ctx.textAlign='center';ctx.fillText(a.callsign,x,y-8);";
         html += "markers.push({x:x,y:y,a:a});";
         html += "});";
+        html += "if(data.raining){drawRain(data.wind_dir_deg||0,data.rain_intensity||2,accentColor);}else{lastRainMs=null;rainInited=false;}";
         html += "status.textContent=(data.aircraft||[]).length+' aircraft \\u00b7 range '+fmtRange(data.range_km);";
         html += "}";
 
@@ -821,7 +874,6 @@ namespace {
         bool hideGround = SettingsStore::hideGroundVehicles();
         bool onlyHeli = SettingsStore::onlyHelicopters();
         bool emergencyOn = SettingsStore::emergencyAlertEnabled();
-        bool watchOn = SettingsStore::watchlistAlertEnabled();
 
         JsonDocument doc;
         doc["range_km"] = rangeKm;
@@ -833,6 +885,28 @@ namespace {
         // uebernommen wird (siehe applyTheme() in appendRadarSection()),
         // ohne dass die Seite neu geladen werden muss.
         doc["theme_index"] = SettingsStore::radarThemeIndex();
+        // Regen-Overlay im WebUI-Radar (Alex' Wunsch: "Spiegel des CYD-
+        // Radarscreens") - EXAKT dieselbe Bedingung UND Windrichtungs-Logik
+        // wie beim Radarscreen-Regen (radar_screen.cpp::spawnRainDrop()):
+        // Schalter an, Weather::current() zeigt Regen/Gewitter, UND eine
+        // gueltige Windrichtung ist bekannt (windDir >= 0.0f, sonst bleibt
+        // wind_dir_deg auf dem letzten bekannten Wert stehen bzw. -1 vor der
+        // ersten erfolgreichen Wetterabfrage - siehe Weather::update()).
+        // wind_dir_deg wird IMMER mitgeschickt (auch wenn gerade nicht
+        // regnet), das Client-JS nutzt es nur, wenn data.raining true ist.
+        // rain_intensity (0=leicht/1=mittel/2=stark, Weather::RainIntensity)
+        // steuert Tropfenzahl/Fallgeschwindigkeit im Client-JS (rainParamsFor()
+        // dort) - dieselben drei Stufen wie radar_screen.cpp/main.cpp,
+        // siehe Kommentar bei rainParamsForIntensity() in radar_screen.cpp.
+        {
+            Weather::Condition cond = Weather::current();
+            float windDir = Weather::currentWindDirectionDeg();
+            doc["raining"] = SettingsStore::rainEffectEnabled() &&
+                              (cond == Weather::Condition::Rain || cond == Weather::Condition::Thunderstorm) &&
+                              windDir >= 0.0f;
+            doc["wind_dir_deg"] = windDir;
+            doc["rain_intensity"] = (int)Weather::currentRainIntensity(); // 0=None,1=Light,2=Moderate,3=Heavy
+        }
         JsonArray arr = doc["aircraft"].to<JsonArray>();
 
         AircraftTable::lock();
@@ -857,7 +931,7 @@ namespace {
             // Squawk-Wachliste komplett, ein Flugzeug, das nur ueber seinen
             // Squawk-Code (nicht das Rufzeichen) beobachtet wird, waere im
             // WebUI faelschlich als "nicht beobachtet" erschienen.
-            bool isWatched = watchOn && (AircraftWatchlist::isWatched(a.callsign) || SquawkWatchlist::isWatched(a.squawk));
+            bool isWatched = AircraftWatchlist::isWatched(a.callsign) || SquawkWatchlist::isWatched(a.squawk);
             // "notable" (oranger Ring) ist fuer auffaellige Rufzeichen
             // (Militaer/Regierung) reserviert - Heavy-Flugzeuge bekommen
             // stattdessen die eigene Markerform (siehe "heavy" oben). Es
