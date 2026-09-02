@@ -41,6 +41,20 @@ namespace {
     // EINE Boot-Zeile wortweise um, falls sie nicht in die Bildschirmbreite
     // passt, statt sie wie bisher per drawString() einfach ueber den rechten
     // Rand hinauslaufen und abschneiden zu lassen.
+    // Ersetzt ein einfaches delay(ms) durch eine Warteschleife in kleinen
+    // Schritten, die dabei MenuStars::update() mitlaufen laesst (gleiches
+    // Warteschleifen-Pattern wie auf allen Menue-/Splash-Screens) - macht
+    // aus den bisher "toten" Pausen zwischen den Boot-Zeilen den Rahmen
+    // fuer das Sternenfunkeln, ohne die Gesamtdauer der Sequenz zu
+    // veraendern (Summe der Schritte ergibt exakt ms).
+    void delayWithStars(TFT_eSPI& tft, uint32_t ms) {
+        uint32_t start = millis();
+        while (millis() - start < ms) {
+            MenuStars::update(tft);
+            delay(20);
+        }
+    }
+
     int16_t drawWrappedBootLine(TFT_eSPI& tft, const String& text, int16_t startY) {
         int16_t maxWidth = tft.width() - BOOT_START_X - BOOT_RIGHT_MARGIN;
         int16_t y = startY;
@@ -69,13 +83,19 @@ namespace {
 void playBootSequence(TFT_eSPI& tft) {
     tft.fillScreen(TFT_BLACK);
 
+    // Sternenhintergrund wie auf Splash-Screen/Ruhebildschirm/Menues -
+    // reset() einmal beim Betreten dieses Screens, delayWithStars() unten
+    // laesst sie waehrend der ohnehin schon vorhandenen Pausen zwischen
+    // den Boot-Zeilen mitlaufen (kein zusaetzlicher Zeitaufwand).
+    MenuStars::reset();
+
     // Grosser, zentrierter Titel oben - macht den Screen als eigenstaendigen
     // Ladebildschirm erkennbar, statt "nackt" nur mit den Statuszeilen.
     tft.setTextDatum(MC_DATUM);
     tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setTextSize(2);
     tft.drawString(I18n::t(StringId::BOOT_TITLE), tft.width() / 2, BOOT_TITLE_Y);
-    delay(BOOT_TITLE_PAUSE_MS);
+    delayWithStars(tft, BOOT_TITLE_PAUSE_MS);
 
     // Boot-Zeilen bauen sich nacheinander auf ("Split-Flap"-Optik ohne
     // echte Hoch-/Runterschiebe-Animation, siehe Bahnhofstafel-Vorbild) -
@@ -89,9 +109,9 @@ void playBootSequence(TFT_eSPI& tft) {
     for (uint8_t i = 0; i < BOOT_LINE_COUNT; i++) {
         String line = String("> ") + I18n::t(BOOT_LINES[i]);
         y = drawWrappedBootLine(tft, line, y);
-        delay(BOOT_LINE_DELAY_MS);
+        delayWithStars(tft, BOOT_LINE_DELAY_MS);
     }
-    delay(BOOT_FINAL_PAUSE_MS);
+    delayWithStars(tft, BOOT_FINAL_PAUSE_MS);
 }
 
 void begin(TFT_eSPI& tft) {
