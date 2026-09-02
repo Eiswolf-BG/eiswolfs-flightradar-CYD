@@ -128,7 +128,11 @@ namespace {
     constexpr const char* SPEC1[6] = {"Ê", "Í", "Ñ", "Ó", "Ò", "Ô"};
     constexpr const char* SPEC2[6] = {"Ö", "Ù", "Ú", "Ü", "ß", "Ğ"};
     constexpr const char* SPEC3[6] = {"İ", "Ş", "/", ".", "'", "-"};
-    constexpr const char* SPEC4[4] = {"Â", "Î", "Ë", "Û"};
+    // Ï (I-Trema) ergaenzt (Alex' Wunsch, relevant fuer niederlaendische
+    // Ortsnamen wie "IJsselstein") - war bisher nicht auf der Tastatur,
+    // obwohl die Glyphe im Font (ui_font.h) schon vorhanden war (siehe
+    // i18n_nl.h-Font-Pruefung). Ë war bereits vorhanden.
+    constexpr const char* SPEC4[5] = {"Â", "Î", "Ë", "Û", "Ï"};
     constexpr uint8_t SPEC_ROW_COUNT = 5;
 
     // Gibt die eingegebene Adresse zurueck, oder einen leeren String, wenn
@@ -190,7 +194,7 @@ namespace {
         layoutRow((int16_t)(ROW0_Y + 2 * (KEY_H + KEY_GAP)), row2Rects, 9);
         layoutRow((int16_t)(ROW0_Y + 3 * (KEY_H + KEY_GAP)), row3Rects, 9);
 
-        // 5 Sonderzeichen-Zeilen (SPEC0-3 je 6, SPEC4 nur 4 Tasten) - eine
+        // 5 Sonderzeichen-Zeilen (SPEC0-3 je 6, SPEC4 nur 5 Tasten) - eine
         // Zeile mehr als die 4 Buchstaben-Zeilen oben, deshalb haengt die
         // Y-Position der Leertaste/Aktionsleiste unten von der aktuellen
         // Seite ab (siehe contentRows()/layoutTrailingButtons() unten).
@@ -198,7 +202,7 @@ namespace {
         for (uint8_t r = 0; r < 4; r++) {
             layoutRow((int16_t)(ROW0_Y + r * (KEY_H + KEY_GAP)), specRects[r], 6);
         }
-        layoutRow((int16_t)(ROW0_Y + 4 * (KEY_H + KEY_GAP)), specRects[4], 4);
+        layoutRow((int16_t)(ROW0_Y + 4 * (KEY_H + KEY_GAP)), specRects[4], 5);
 
         Rect spaceBtn, backspaceBtn, toggleBtn, cancelBtn, searchBtn;
         constexpr int16_t BTN_W = (Config::SCREEN_WIDTH - 8 - 2 * KEY_GAP) / 3;
@@ -249,7 +253,7 @@ namespace {
                 for (uint8_t i = 0; i < 6; i++) drawButton(tft, specRects[1][i], SPEC1[i]);
                 for (uint8_t i = 0; i < 6; i++) drawButton(tft, specRects[2][i], SPEC2[i]);
                 for (uint8_t i = 0; i < 6; i++) drawButton(tft, specRects[3][i], SPEC3[i]);
-                for (uint8_t i = 0; i < 4; i++) drawButton(tft, specRects[4][i], SPEC4[i]);
+                for (uint8_t i = 0; i < 5; i++) drawButton(tft, specRects[4][i], SPEC4[i]);
             }
 
             drawButton(tft, spaceBtn, I18n::t(StringId::WIFI_SPACE));
@@ -308,7 +312,7 @@ namespace {
                 for (uint8_t i = 0; i < 6 && !handled; i++) {
                     if (specRects[3][i].contains(tap.x, tap.y)) { appendUtf8(buf, len, CAP, SPEC3[i]); handled = true; }
                 }
-                for (uint8_t i = 0; i < 4 && !handled; i++) {
+                for (uint8_t i = 0; i < 5 && !handled; i++) {
                     if (specRects[4][i].contains(tap.x, tap.y)) { appendUtf8(buf, len, CAP, SPEC4[i]); handled = true; }
                 }
             }
@@ -407,7 +411,7 @@ namespace {
         for (uint8_t r = 0; r < 4; r++) {
             layoutRow(nullptr, (int16_t)(ROW0_Y + r * (KEY_H + KEY_GAP)), specRects[r], 6);
         }
-        layoutRow(nullptr, (int16_t)(ROW0_Y + 4 * (KEY_H + KEY_GAP)), specRects[4], 4);
+        layoutRow(nullptr, (int16_t)(ROW0_Y + 4 * (KEY_H + KEY_GAP)), specRects[4], 5);
 
         Rect spaceBtn, backspaceBtn, toggleBtn, skipBtn, confirmBtn;
 
@@ -455,7 +459,7 @@ namespace {
                 for (uint8_t i = 0; i < 6; i++) drawButton(tft, specRects[1][i], SPEC1[i]);
                 for (uint8_t i = 0; i < 6; i++) drawButton(tft, specRects[2][i], SPEC2[i]);
                 for (uint8_t i = 0; i < 6; i++) drawButton(tft, specRects[3][i], SPEC3[i]);
-                for (uint8_t i = 0; i < 4; i++) drawButton(tft, specRects[4][i], SPEC4[i]);
+                for (uint8_t i = 0; i < 5; i++) drawButton(tft, specRects[4][i], SPEC4[i]);
             }
 
             drawButton(tft, spaceBtn, I18n::t(StringId::WIFI_SPACE));
@@ -514,7 +518,7 @@ namespace {
                 for (uint8_t i = 0; i < 6 && !handled; i++) {
                     if (specRects[3][i].contains(tap.x, tap.y)) { appendUtf8(buf, len, CAP, SPEC3[i]); handled = true; }
                 }
-                for (uint8_t i = 0; i < 4 && !handled; i++) {
+                for (uint8_t i = 0; i < 5 && !handled; i++) {
                     if (specRects[4][i].contains(tap.x, tap.y)) { appendUtf8(buf, len, CAP, SPEC4[i]); handled = true; }
                 }
             }

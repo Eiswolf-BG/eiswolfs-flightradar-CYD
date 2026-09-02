@@ -62,6 +62,13 @@ namespace Weather {
     // ist (bzw. vor der ersten erfolgreichen Abfrage).
     RainIntensity currentRainIntensity();
 
+    // Gleiche Idee wie currentRainIntensity(), nur fuer Schnee (Ruhebildschirm-
+    // Schneeeffekt, siehe main.cpp::ScreensaverSnow) - bewusst derselbe
+    // RainIntensity-Enum-Typ wiederverwendet statt eines eigenen "SnowIntensity"
+    // (rein generische Light/Moderate/Heavy-Abstufung, kein Regen-spezifischer
+    // Inhalt). Liefert RainIntensity::None, solange current() nicht Snow ist.
+    RainIntensity currentSnowIntensity();
+
     // Roher METAR-Text (Flugwetterbericht) fuer den naechstgelegenen
     // Flughafen (per AirportLookup::findNearest() zum aktuell aktiven
     // Standort ermittelt) - ergaenzt die einfache Icon-Wetteranzeige um die

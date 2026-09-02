@@ -6,23 +6,25 @@
 #include "i18n_es.h"
 #include "i18n_it.h"
 #include "i18n_pt.h"
+#include "i18n_nl.h"
 #include "settings_store.h"
 
 namespace I18n {
 
 namespace {
-    // PT (brasilianisches Portugiesisch) bewusst ANGEHAENGT (Index 6) statt
-    // mittendrin einsortiert - SettingsStore::language() speichert nur den
-    // numerischen Index auf der SD-Karte; ein Einschieben mitten in die
-    // Reihenfolge wuerde auf bereits konfigurierten Geraeten die Sprache
-    // verschieben (z.B. wuerde ein gespeichertes "5" fuer Italienisch
-    // ploetzlich etwas anderes bedeuten).
+    // PT (brasilianisches Portugiesisch, Index 6) und NL (Niederlaendisch,
+    // Index 7) bewusst ANGEHAENGT statt mittendrin einsortiert -
+    // SettingsStore::language() speichert nur den numerischen Index auf der
+    // SD-Karte; ein Einschieben mitten in die Reihenfolge wuerde auf bereits
+    // konfigurierten Geraeten die Sprache verschieben (z.B. wuerde ein
+    // gespeichertes "5" fuer Italienisch ploetzlich etwas anderes
+    // bedeuten).
     const char* const* TABLES[LANG_COUNT] = {
-        I18N_EN, I18N_DE, I18N_FR, I18N_TR, I18N_ES, I18N_IT, I18N_PT
+        I18N_EN, I18N_DE, I18N_FR, I18N_TR, I18N_ES, I18N_IT, I18N_PT, I18N_NL
     };
 
     const char* const LANGUAGE_NAMES[LANG_COUNT] = {
-        "English", "Deutsch", "Français", "Türkçe", "Español", "Italiano", "Português"
+        "English", "Deutsch", "Français", "Türkçe", "Español", "Italiano", "Português", "Nederlands"
     };
 }
 

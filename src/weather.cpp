@@ -14,6 +14,7 @@ namespace Weather {
 namespace {
     Condition currentCondition = Condition::Unknown;
     RainIntensity currentRainIntensityVal = RainIntensity::None;
+    RainIntensity currentSnowIntensityVal = RainIntensity::None;
     float currentWindDirDeg = -1.0f;
     uint32_t lastFetchMs = 0;
     double lastLat = 0;
@@ -149,7 +150,10 @@ namespace {
         if (code == 1 || code == 2) return Condition::PartlyCloudy;
         if (code == 3 || code == 45 || code == 48) return Condition::Cloudy;
         if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return Condition::Rain;
-        if (code >= 71 && code <= 77) return Condition::Snow;
+        // 85/86 (Schneeschauer leicht/stark) ergaenzt, siehe Alex' Wunsch fuer
+        // den Ruhebildschirm-Schneeeffekt - vorher fielen diese beiden Codes
+        // durch alle Kategorien und landeten faelschlich bei "Unknown".
+        if ((code >= 71 && code <= 77) || code == 85 || code == 86) return Condition::Snow;
         if (code >= 95) return Condition::Thunderstorm;
         return Condition::Unknown;
     }
@@ -178,6 +182,26 @@ namespace {
             return RainIntensity::Moderate;
         }
         if ((code >= 51 && code <= 57) || code == 61) {
+            return RainIntensity::Light;
+        }
+        return RainIntensity::None;
+    }
+
+    // Gleiches Prinzip wie intensityFromWmoCode() oben, nur fuer die
+    // Schnee-Codes (siehe main.cpp::ScreensaverSnow). WMO-Code-Bedeutungen:
+    //   71 Schneefall leicht, 77 Schneegriesel -> "leicht" (Griesel ist
+    //     feiner/duenner Niederschlag, vergleichbar mit leichtem Schneefall).
+    //   73 Schneefall maessig, 85 Schneeschauer leicht -> "mittel" (gleiche
+    //     Boeen-Logik wie bei Regenschauern oben).
+    //   75 Schneefall stark, 86 Schneeschauer stark -> "stark".
+    RainIntensity snowIntensityFromWmoCode(int code) {
+        if (code == 75 || code == 86) {
+            return RainIntensity::Heavy;
+        }
+        if (code == 73 || code == 85) {
+            return RainIntensity::Moderate;
+        }
+        if (code == 71 || code == 77) {
             return RainIntensity::Light;
         }
         return RainIntensity::None;
@@ -262,6 +286,7 @@ namespace {
 
         currentCondition = conditionFromWmoCode(wmoCode);
         currentRainIntensityVal = intensityFromWmoCode(wmoCode);
+        currentSnowIntensityVal = snowIntensityFromWmoCode(wmoCode);
         // "winddirection" ist Teil derselben current_weather-Antwort - siehe
         // currentWindDirectionDeg()-Kommentar in weather.h. | -1.0f als
         // Default, falls das Feld ausnahmsweise fehlen sollte (aendert dann
@@ -352,6 +377,8 @@ void update() {
 Condition current() { return currentCondition; }
 
 RainIntensity currentRainIntensity() { return currentRainIntensityVal; }
+
+RainIntensity currentSnowIntensity() { return currentSnowIntensityVal; }
 
 float currentWindDirectionDeg() { return currentWindDirDeg; }
 

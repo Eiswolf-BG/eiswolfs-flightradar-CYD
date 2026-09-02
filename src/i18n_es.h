@@ -120,7 +120,7 @@ static const char* const I18N_ES[] = {
     "Historial (últimos 7 días)",
     "Aún no hay registros.",
     "Cómo funciona el historial",
-    "Muestra el número de aviones recién registrados por día, para hasta los últimos 7 días con datos de registro. La altura de la barra es relativa al día más ocupado mostrado - una barra más alta significa que se registraron más aviones ese día. El número sobre cada barra es el valor exacto.",
+    "Muestra el número de aviones recién registrados para cada uno de los últimos 7 días calendario (hoy y los 6 días anteriores), una barra por día - los días sin registros también se muestran como una barra propia con \"0\". La altura de la barra es relativa al día más ocupado mostrado - una barra más alta significa que se registraron más aviones ese día. El número sobre cada barra es el valor exacto, y la fecha debajo identifica el día. Los datos se guardan en la tarjeta SD y se conservan tras un reinicio.",
 
     "Archivos del registro",
     "Aún no hay registros.",
@@ -350,9 +350,9 @@ static const char* const I18N_ES[] = {
     "Sobre Brillo automático",
     "Ajusta automáticamente el brillo de la pantalla usando el sensor de luz integrado, en lugar del valor ajustado manualmente - suavizado para evitar parpadeos con luz fluctuante. La calibración exacta es una estimación no verificada en un dispositivo real; si el brillo resulta demasiado extremo o demasiado lento, por favor avisa.",
 
-    "Efecto de lluvia",
-    "Sobre el Efecto de lluvia",
-    "Solo visible cuando los datos meteorológicos muestran realmente lluvia o tormenta. Las gotas se mueven en la dirección real del viento - según el viento, esto puede hacer que parezca que llueve hacia arriba en el radar (p. ej. con viento del sur). Esto es físicamente correcto, no un error.",
+    "Mostrar clima",
+    "Sobre Mostrar clima",
+    "Muestra visualmente el clima actual cuando realmente está lloviendo o nevando: lluvia animada en la pantalla del radar y el salvapantallas (las gotas se mueven en la dirección real del viento - según el viento, esto puede hacer que parezca que llueve hacia arriba en el radar, p. ej. con viento del sur, lo cual es físicamente correcto, no un error), y nieve animada solo en el salvapantallas (pequeños puntos blancos que se mecen ligeramente, siempre cayendo en vertical, sin dirección del viento).",
 
     "MQTT",
     "MQTT",

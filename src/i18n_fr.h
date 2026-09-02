@@ -120,7 +120,7 @@ static const char* const I18N_FR[] = {
     "Historique (7 derniers jours)",
     "Aucune entrée pour le moment.",
     "Comment fonctionne l'historique",
-    "Affiche le nombre d'avions nouvellement enregistrés par jour, pour les 7 derniers jours avec des données de journal. La hauteur de la barre est relative au jour le plus chargé affiché - une barre plus haute signifie plus d'avions enregistrés ce jour-là. Le nombre au-dessus de chaque barre est la valeur exacte.",
+    "Affiche le nombre d'avions nouvellement enregistrés pour chacun des 7 derniers jours calendaires (aujourd'hui et les 6 jours précédents), une barre par jour - les jours sans observation apparaissent aussi comme une barre distincte marquée \"0\". La hauteur de la barre est relative au jour le plus chargé affiché - une barre plus haute signifie plus d'avions enregistrés ce jour-là. Le nombre au-dessus de chaque barre est la valeur exacte, la date en dessous identifie le jour. Les données sont enregistrées sur la carte SD et survivent à un redémarrage.",
 
     "Fichiers du journal",
     "Aucune entrée pour le moment.",
@@ -350,9 +350,9 @@ static const char* const I18N_FR[] = {
     "À propos de Luminosité auto",
     "Ajuste automatiquement la luminosité de l'écran à l'aide du capteur de lumière intégré, au lieu de la valeur réglée manuellement - lissé pour éviter le scintillement en cas de variations de lumière. L'étalonnage exact est une estimation non vérifiée sur un appareil réel ; si la luminosité semble trop extrême ou trop lente, merci de le signaler.",
 
-    "Effet de pluie",
-    "À propos de l'effet de pluie",
-    "Visible uniquement lorsque les données météo indiquent effectivement de la pluie ou un orage. Les gouttes se déplacent dans la direction réelle du vent - selon le vent, cela peut donner l'impression qu'il pleut vers le haut sur le radar (par ex. avec un vent du sud). C'est physiquement correct, pas un bug.",
+    "Afficher la météo",
+    "À propos d'Afficher la météo",
+    "Affiche visuellement la météo actuelle lorsqu'il pleut ou neige réellement : pluie animée sur l'écran radar et l'écran de veille (les gouttes se déplacent dans la direction réelle du vent - selon le vent, cela peut donner l'impression qu'il pleut vers le haut sur le radar, par ex. avec un vent du sud, ce qui est physiquement correct, pas un bug), ainsi que de la neige animée uniquement sur l'écran de veille (petits points blancs qui dérivent légèrement, toujours à la verticale, sans direction du vent).",
 
     "MQTT",
     "MQTT",

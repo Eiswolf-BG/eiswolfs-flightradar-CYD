@@ -7,6 +7,7 @@
 #include "address_search_screen.h"
 #include "touch_input.h"
 #include "menu_stars.h"
+#include "menu_screen.h"
 #include "config.h"
 #include "i18n.h"
 #include "units.h"
@@ -72,14 +73,16 @@ namespace {
     // Gleicher Sonderzeichen-Satz wie address_search_screen.cpp::
     // runAddressKeyboard() (dort auch fuer die Adress-Suche verwendet) -
     // dupliziert statt geteilt, siehe CLAUDE.md-Konvention. SPEC0-3 haben
-    // je 6 Tasten, SPEC4 nur 4 (Â/Î/Ë/Û, seltener gebraucht) - alle Glyphen
+    // je 6 Tasten, SPEC4 5 (Â/Î/Ë/Û/Ï, seltener gebraucht) - alle Glyphen
     // bereits im Font vorhanden (ui_font.h deckt U+0020-U+015F durchgehend
     // ab), keine neuen Pixel-Glyphen noetig.
     constexpr const char* SPEC0[6] = {"À", "Á", "Ä", "Ç", "É", "È"};
     constexpr const char* SPEC1[6] = {"Ê", "Í", "Ñ", "Ó", "Ò", "Ô"};
     constexpr const char* SPEC2[6] = {"Ö", "Ù", "Ú", "Ü", "ß", "Ğ"};
     constexpr const char* SPEC3[6] = {"İ", "Ş", "/", ".", "'", "-"};
-    constexpr const char* SPEC4[4] = {"Â", "Î", "Ë", "Û"};
+    // Ï (I-Trema) ergaenzt (relevant fuer niederlaendische Ortsnamen wie
+    // "IJsselstein") - Ë war bereits vorhanden.
+    constexpr const char* SPEC4[5] = {"Â", "Î", "Ë", "Û", "Ï"};
     constexpr uint8_t SPEC_ROW_COUNT = 5;
 
     String runNumericKeypad(TFT_eSPI& tft, const String& title) {
@@ -242,7 +245,7 @@ namespace {
         for (uint8_t r = 0; r < 4; r++) {
             layoutRow(nullptr, (int16_t)(ROW0_Y + r * (KEY_H + KEY_GAP)), specRects[r], 6);
         }
-        layoutRow(nullptr, (int16_t)(ROW0_Y + 4 * (KEY_H + KEY_GAP)), specRects[4], 4);
+        layoutRow(nullptr, (int16_t)(ROW0_Y + 4 * (KEY_H + KEY_GAP)), specRects[4], 5);
 
         Rect spaceBtn, backspaceBtn, toggleBtn, skipBtn, confirmBtn;
 
@@ -291,7 +294,7 @@ namespace {
                 for (uint8_t i = 0; i < 6; i++) drawButton(tft, specRects[1][i], SPEC1[i]);
                 for (uint8_t i = 0; i < 6; i++) drawButton(tft, specRects[2][i], SPEC2[i]);
                 for (uint8_t i = 0; i < 6; i++) drawButton(tft, specRects[3][i], SPEC3[i]);
-                for (uint8_t i = 0; i < 4; i++) drawButton(tft, specRects[4][i], SPEC4[i]);
+                for (uint8_t i = 0; i < 5; i++) drawButton(tft, specRects[4][i], SPEC4[i]);
             }
 
             drawButton(tft, spaceBtn, I18n::t(StringId::WIFI_SPACE));
@@ -350,7 +353,7 @@ namespace {
                 for (uint8_t i = 0; i < 6 && !handled; i++) {
                     if (specRects[3][i].contains(tap.x, tap.y)) { appendUtf8(buf, len, CAP, SPEC3[i]); handled = true; }
                 }
-                for (uint8_t i = 0; i < 4 && !handled; i++) {
+                for (uint8_t i = 0; i < 5 && !handled; i++) {
                     if (specRects[4][i].contains(tap.x, tap.y)) { appendUtf8(buf, len, CAP, SPEC4[i]); handled = true; }
                 }
             }
@@ -439,36 +442,6 @@ namespace {
         tft.drawString(msg, Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT - 9);
         tft.setTextDatum(TL_DATUM);
         delay(1200);
-    }
-
-    int16_t layoutWrapped(TFT_eSPI& tft, int16_t x, int16_t startY, int16_t maxWidth,
-                          int16_t lineHeight, const String& text, int16_t scrollY,
-                          int16_t viewTop, int16_t viewBottom, bool draw) {
-        int16_t y = startY;
-        int32_t start = 0;
-        int32_t len = text.length();
-        while (start < len) {
-            while (start < len && text[start] == ' ') start++;
-            if (start >= len) break;
-
-            String line = text.substring(start, len);
-            while (tft.textWidth(line) > maxWidth) {
-                int32_t lastSpace = line.lastIndexOf(' ');
-                if (lastSpace <= 0) break;
-                line = line.substring(0, lastSpace);
-            }
-
-            if (draw) {
-                int16_t screenY = y - scrollY;
-                if (screenY >= viewTop && screenY <= viewBottom) {
-                    tft.setCursor(x, screenY);
-                    tft.print(line);
-                }
-            }
-            y += lineHeight;
-            start += line.length();
-        }
-        return y;
     }
 
     // Laufschrift fuer den "Naechster Flughafen"-Text: statt ihn mit "..."
@@ -630,91 +603,24 @@ namespace {
         tft.setTextDatum(TL_DATUM);
     }
 
+    // Nutzt jetzt den gemeinsamen, bereits an anderer Stelle bewaehrten
+    // Info-Screen aus menu_screen.cpp (MenuScreen::showInfoScreen(), siehe
+    // z.B. main.cpp::showWeatherInfo() als Vorbild) statt einer eigenen
+    // Scroll-/Layout-Implementierung - der Titel wird darueber automatisch
+    // umgebrochen bzw. verkleinert, wenn er in einer Sprache nicht in eine
+    // Zeile passt (vorher: festes tft.println() ohne jede Breitenpruefung,
+    // Ueberlaufrisiko z.B. bei laengeren Uebersetzungen).
     void runInfoScreen(TFT_eSPI& tft) {
-        MenuStars::reset();
+        String body = I18n::t(StringId::LOCATION_INFO_PARA1);
+        body += "\n\n"; body += I18n::t(StringId::LOCATION_INFO_PARA2);
+        body += "\n\n"; body += I18n::t(StringId::LOCATION_INFO_PARA3);
+        body += "\n\n"; body += I18n::t(StringId::LOCATION_INFO_PARA4);
+        body += "\n\n"; body += I18n::t(StringId::LOCATION_INFO_PARA5);
+        body += "\n\n"; body += I18n::t(StringId::LOCATION_INFO_PARA6);
+        body += "\n\n"; body += I18n::t(StringId::LOCATION_INFO_PARA7);
 
-        constexpr int16_t textMaxWidth = Config::SCREEN_WIDTH - 20;
-        constexpr int16_t LINE_H = 16;
-        constexpr int16_t VIEW_TOP = 36;
-        constexpr int16_t VIEW_BOTTOM = Config::SCREEN_HEIGHT - 60;
-
-        int16_t totalH = VIEW_TOP;
-        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA1), 0, 0, 0, false);
-        totalH += 8;
-        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA2), 0, 0, 0, false);
-        totalH += 8;
-        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA3), 0, 0, 0, false);
-        totalH += 8;
-        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA4), 0, 0, 0, false);
-        totalH += 8;
-        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA5), 0, 0, 0, false);
-        totalH += 8;
-        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA6), 0, 0, 0, false);
-        totalH += 8;
-        totalH = layoutWrapped(tft, 10, totalH, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA7), 0, 0, 0, false);
-
-        int16_t maxScroll = totalH - VIEW_BOTTOM;
-        if (maxScroll < 0) maxScroll = 0;
-        bool scrollable = maxScroll > 0;
-        int16_t scrollY = 0;
-
-        Rect backBtn = scrollable
-            ? Rect{10, (int16_t)(Config::SCREEN_HEIGHT - 50), 130, 40}
-            : Rect{10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
-        Rect upBtn   = {146, (int16_t)(Config::SCREEN_HEIGHT - 50), 38, 40};
-        Rect downBtn = {190, (int16_t)(Config::SCREEN_HEIGHT - 50), 38, 40};
-        constexpr int16_t SCROLL_STEP = 48;
-
-        auto redraw = [&]() {
-            tft.fillScreen(TFT_BLACK);
-            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
-            tft.setCursor(10, 14);
-            tft.println(I18n::t(StringId::LOCATION_INFO_TITLE));
-
-            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
-            int16_t y = VIEW_TOP;
-            y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA1), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
-            y += 8;
-            y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA2), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
-            y += 8;
-            y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA3), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
-            y += 8;
-            y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA4), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
-            y += 8;
-            y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA5), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
-            y += 8;
-            y = layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA6), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
-            y += 8;
-            layoutWrapped(tft, 10, y, textMaxWidth, LINE_H, I18n::t(StringId::LOCATION_INFO_PARA7), scrollY, VIEW_TOP, VIEW_BOTTOM, true);
-
-            drawButton(tft, backBtn, I18n::t(StringId::BACK));
-            if (scrollable) {
-                drawButton(tft, upBtn, "^");
-                drawButton(tft, downBtn, "v");
-            }
-        };
-
-        redraw();
-
-        while (true) {
-            TouchInput::Point tap;
-            if (TouchInput::wasTapped(tap)) {
-                if (backBtn.contains(tap.x, tap.y)) return;
-                if (scrollable && upBtn.contains(tap.x, tap.y) && scrollY > 0) {
-                    scrollY -= SCROLL_STEP;
-                    if (scrollY < 0) scrollY = 0;
-                    redraw();
-                } else if (scrollable && downBtn.contains(tap.x, tap.y) && scrollY < maxScroll) {
-                    scrollY += SCROLL_STEP;
-                    if (scrollY > maxScroll) scrollY = maxScroll;
-                    redraw();
-                }
-            }
-            // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
-            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return;
-            MenuStars::update(tft);
-            delay(20);
-        }
+        MenuScreen::showInfoScreen(tft, I18n::t(StringId::LOCATION_INFO_TITLE), body,
+                                    UiTheme::accentColor(tft), I18n::t(StringId::BACK));
     }
 }
 

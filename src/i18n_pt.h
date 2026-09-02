@@ -120,7 +120,7 @@ static const char* const I18N_PT[] = {
     "Histórico (últimos 7 dias)",
     "Ainda não há registros.",
     "Como funciona o histórico",
-    "Mostra o número de aviões recém-registrados por dia, para até os últimos 7 dias com dados de registro. A altura da barra é relativa ao dia mais movimentado exibido - uma barra mais alta significa que mais aviões foram registrados naquele dia. O número acima de cada barra é o valor exato.",
+    "Mostra o número de aviões recém-registrados para cada um dos últimos 7 dias do calendário (hoje e os 6 dias anteriores), uma barra por dia - dias sem registros também aparecem como uma barra própria com \"0\". A altura da barra é relativa ao dia mais movimentado exibido - uma barra mais alta significa que mais aviões foram registrados naquele dia. O número acima de cada barra é o valor exato, e a data abaixo identifica o dia. Os dados são salvos no cartão SD e permanecem após uma reinicialização.",
 
     "Arquivos do registro",
     "Ainda não há registros.",
@@ -350,9 +350,9 @@ static const char* const I18N_PT[] = {
     "Sobre o Brilho automático",
     "Ajusta automaticamente o brilho da tela usando o sensor de luz integrado, em vez do valor definido manualmente - suavizado para evitar oscilações com luz variável. A calibração exata é uma estimativa não testada em um dispositivo real; se o brilho ficar extremo demais ou lento demais, por favor avise.",
 
-    "Efeito de chuva",
-    "Sobre o Efeito de chuva",
-    "Só fica visível quando os dados meteorológicos realmente mostram chuva ou tempestade. As gotas se movem na direção real do vento - dependendo do vento, isso pode fazer parecer que está chovendo de baixo para cima no radar (ex. com vento do sul). Isso é fisicamente correto, não é um erro.",
+    "Mostrar clima",
+    "Sobre Mostrar clima",
+    "Mostra visualmente o clima atual quando realmente está chovendo ou nevando: chuva animada na tela do radar e na proteção de tela (as gotas se movem na direção real do vento - dependendo do vento, isso pode fazer parecer que está chovendo de baixo para cima no radar, ex. com vento do sul, o que é fisicamente correto, não um erro), e neve animada apenas na proteção de tela (pequenos pontos brancos que oscilam levemente, sempre caindo na vertical, sem direção do vento).",
 
     "MQTT",
     "MQTT",

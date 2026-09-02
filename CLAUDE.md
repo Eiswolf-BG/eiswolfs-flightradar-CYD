@@ -49,7 +49,7 @@ vorausgesetzt werden.
 
 Die eingebauten TFT_eSPI-Fonts (GLCD, Font2 etc.) sind reines ASCII. Für
 Umlaute/Akzente (Deutsch, Türkisch, Französisch, Spanisch, Italienisch,
-brasilianisches Portugiesisch)
+brasilianisches Portugiesisch, Niederländisch)
 gibt's einen **selbst generierten Font** (`src/ui_font.h`, via
 `tft.setFreeFont(&UiFont11pt)` global in `main.cpp::setup()` aktiviert, gilt
 danach für JEDEN `print()`/`drawString()`-Aufruf in der ganzen App).
@@ -89,18 +89,18 @@ Vorsicht bei neuem Code!):**
   Höhen-Farben-Legende-Overlay lief die Zeile dadurch links UND rechts
   über den Bildschirmrand hinaus, siehe Git-Historie/Bugfix). Ein
   festes Zeilenlimit ist nur dann unkritisch, wenn zusätzlich VORHER
-  geprüft wird, dass der Text in ALLEN 7 Sprachen tatsächlich in dieses
+  geprüft wird, dass der Text in ALLEN 8 Sprachen tatsächlich in dieses
   Limit passt — im Zweifel immer das uneingeschränkte `layoutWrapped()`
   nehmen.
 
 Falls neue Screens/Textstellen dazukommen: lieber einmal mehr testen (idealerweise
 mit Foto vom echten Display), bevor der Code als fertig gilt.
 
-## Pflichtprüfung: Textbreite/-höhe in ALLEN 7 Sprachen
+## Pflichtprüfung: Textbreite/-höhe in ALLEN 8 Sprachen
 
 Jeder neu hinzugefügte oder geänderte Text auf JEDEM Screen muss vor
 Abschluss der Aufgabe nachweislich innerhalb der verfügbaren
-Bildschirmbreite/-höhe bleiben — in ALLEN 7 Sprachen, nicht nur der
+Bildschirmbreite/-höhe bleiben — in ALLEN 8 Sprachen, nicht nur der
 zuletzt getesteten (meist Deutsch/Englisch). Bei jeder neuen
 Text-Ausgabe ist zu prüfen/sicherzustellen, dass `layoutWrapped()`
 (oder ein gleichwertiger, wortweise und pro Zeile pixel-breiten-
@@ -116,21 +116,46 @@ langen) Textes abhängen, nicht von einem für die kürzeste Sprache
 passenden festen Offset — sonst verschieben sich in längeren Sprachen
 nachfolgende Elemente ineinander oder aus dem sichtbaren Bereich.
 
-## i18n (7 Sprachen)
+**Gilt ausdrücklich auch für Titel/Überschriften, nicht nur Fließtext**
+(Lücke, die in der Praxis bereits einmal zu echten Überlauf-Bugs
+geführt hat, siehe Git-Historie/Bugfix bei mehreren Info-Bildschirm-
+Titeln): JEDER Text auf JEDEM Screen — insbesondere auch Titel und
+Info-Bildschirm-Überschriften — MUSS denselben automatischen Wrapping-/
+Verkleinerungs-Mechanismus nutzen, den `MenuScreen::infoScreen()`
+(`menu_screen.cpp`, öffentlich erreichbar über
+`MenuScreen::showInfoScreen()`) bereits vorbildlich vormacht: Titel
+werden dort über `wrapTitleLines()` (öffentliche Hülle:
+`MenuScreen::layoutTitleLines()`) automatisch auf mehrere Zeilen
+umgebrochen und bei Bedarf in der Textgröße reduziert, statt sie per
+festem `tft.println()`/`setCursor()` ungeprüft an eine Position zu
+zeichnen. Ein neuer Screen mit eigenem "?"-Info-Bildschirm SOLL
+`MenuScreen::showInfoScreen()` direkt wiederverwenden statt eine neue,
+eigene Scroll-/Layout-Implementierung zu bauen (Body-Absätze werden
+dafür einfach mit `"\n\n"` zu einem String verkettet, siehe
+`main.cpp::showWeatherInfo()` als Vorbild). Nur wenn ein Screen
+zusätzliches, von `showInfoScreen()` nicht abgedecktes Layout unterhalb
+des Titels braucht (z.B. der QR-Code in `webui_screen.cpp`), wird
+stattdessen NUR `MenuScreen::layoutTitleLines()` für den Titel
+wiederverwendet, statt eine eigene Umbruch-Logik neu zu erfinden. Diese
+Prüfung gilt für ALLE 8 Sprachen bei JEDER neuen oder geänderten
+Textausgabe (Titel wie Fließtext), unabhängig davon, ob der Auftrag das
+explizit erwähnt.
+
+## i18n (8 Sprachen)
 
 - `src/i18n.h`: `enum class StringId` — jeder feste UI-Text hat eine ID.
 - `src/i18n_en.h`, `i18n_de.h`, `i18n_fr.h`, `i18n_tr.h`, `i18n_es.h`,
-  `i18n_it.h`, `i18n_pt.h` (brasilianisches Portugiesisch): je ein
-  `static const char* const[]`-Array, in **exakt derselben Reihenfolge**
-  wie das Enum.
+  `i18n_it.h`, `i18n_pt.h` (brasilianisches Portugiesisch), `i18n_nl.h`
+  (Niederländisch): je ein `static const char* const[]`-Array, in **exakt
+  derselben Reihenfolge** wie das Enum.
 - Jede Datei hat am Ende einen `static_assert`, der die Array-Größe gegen
   `StringId::COUNT` prüft — **wenn der Build wegen eines fehlschlagenden
   static_assert bricht, fehlt in mindestens einer Sprachdatei ein Eintrag
-  oder es ist einer zu viel.** Neue StringId → in ALLEN 7 Dateien an
+  oder es ist einer zu viel.** Neue StringId → in ALLEN 8 Dateien an
   derselben Position ergänzen, sonst verschiebt sich die Zuordnung.
 - Eigennamen der Sprachen (`I18n::languageName()`) sind separat in
   `i18n.cpp` hinterlegt, mit korrekten landessprachlichen Sonderzeichen
-  (z.B. "Français", "Türkçe", "Español", "Português").
+  (z.B. "Français", "Türkçe", "Español", "Português", "Nederlands").
 
 ## UI-Konventionen (bitte einhalten für neue Screens)
 
@@ -182,7 +207,7 @@ nachfolgende Elemente ineinander oder aus dem sichtbaren Bereich.
   Infotext über `MenuScreen::showInfoScreen()`. Gilt für ALLE
   zukünftigen Toggle-Buttons, nicht nur für ausgewählte - auch ohne
   expliziten Auftrag im jeweiligen Prompt. Neue StringIds für Label +
-  Infotext-Titel + Infotext-Body dafür immer in allen 7 Sprachen
+  Infotext-Titel + Infotext-Body dafür immer in allen 8 Sprachen
   ergänzen (siehe i18n-Abschnitt oben).
 - **Sterne-Animation** (`src/menu_stars.h/.cpp`): Läuft im Hintergrund auf
   JEDEM schwarzen Menü-/Splash-Screen. Neue Screens sollten
@@ -276,7 +301,7 @@ wird. Das betrifft insbesondere:
   sichtbar ist (z.B. auf GitHub)
 
 Ausnahme: Die Firmware-UI selbst bleibt mehrsprachig wie gehabt
-(`i18n_de/en/fr/tr/es/it/pt.h`) — diese Regel betrifft NUR die
+(`i18n_de/en/fr/tr/es/it/pt/nl.h`) — diese Regel betrifft NUR die
 Projekt-Außendarstellung (Repo, Release Notes, Webseite), nicht die
 App-Oberfläche auf dem Gerät. Interne Code-Kommentare bleiben ebenfalls
 wie gehabt auf Deutsch (siehe „Code-Stil" oben) — diese Regel gilt nur
@@ -389,13 +414,13 @@ in dieser Reihenfolge:
    Falls im Push-Wunsch keine explizite Versionsnummer genannt wurde, bei
    Alex nachfragen statt zu raten. Zusammen mit `APP_VERSION` IMMER auch
    den Changelog fuer DIESES Release aktualisieren - der ist MEHRSPRACHIG
-   (alle 7 Sprachen wie der Rest der Geraete-UI), liegt in
+   (alle 8 Sprachen wie der Rest der Geraete-UI), liegt in
    `src/changelog.cpp` als sechs Konstanten (`CHANGELOG_EN`, `CHANGELOG_DE`,
    `CHANGELOG_FR`, `CHANGELOG_TR`, `CHANGELOG_ES`, `CHANGELOG_IT`, jeweils
    eine kurze Bullet-Liste), ausgewaehlt ueber `changelogLatest()`
    (deklariert in `src/changelog.h`) nach `SettingsStore::language()`. ALLE
-   7 Sprachen muessen aktualisiert werden, nicht nur Englisch - sonst zeigt
-   das Geraet nach dem naechsten Update fuer 6 von 7 Sprachen noch den
+   8 Sprachen muessen aktualisiert werden, nicht nur Englisch - sonst zeigt
+   das Geraet nach dem naechsten Update fuer 7 von 8 Sprachen noch den
    Changelog des VORHERIGEN Releases. Wird auf dem Geraet nach einem
    erfolgreichen OTA-Update auf dem "Update installiert"-Screen angezeigt.
 

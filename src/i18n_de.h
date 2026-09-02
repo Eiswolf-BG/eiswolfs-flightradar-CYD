@@ -120,7 +120,7 @@ static const char* const I18N_DE[] = {
     "Verlauf (letzte 7 Tage)",
     "Noch keine Flugbuch-Einträge.",
     "Wie der Verlauf funktioniert",
-    "Zeigt die Anzahl neu geloggter Flugzeuge pro Tag, für bis zu die letzten 7 Tage mit Flugbuch-Daten. Die Balkenhöhe ist relativ zum verkehrsreichsten angezeigten Tag - ein höherer Balken bedeutet mehr geloggte Flugzeuge an diesem Tag. Die Zahl über jedem Balken ist der genaue Wert.",
+    "Zeigt die Anzahl neu geloggter Flugzeuge für jeden der letzten 7 Kalendertage (heute und die 6 Tage davor), ein Balken pro Tag - auch Tage ohne Sichtungen werden als eigener Balken mit \"0\" angezeigt. Die Balkenhöhe ist relativ zum verkehrsreichsten angezeigten Tag - ein höherer Balken bedeutet mehr geloggte Flugzeuge an diesem Tag. Die Zahl über jedem Balken ist der genaue Wert, das Datum darunter zeigt den Tag. Die Daten werden auf der SD-Karte gespeichert und überstehen einen Neustart.",
 
     "Logbuch-Dateien",
     "Noch keine Flugbuch-Einträge.",
@@ -350,9 +350,9 @@ static const char* const I18N_DE[] = {
     "Über Auto-Helligkeit",
     "Passt die Bildschirmhelligkeit automatisch anhand des eingebauten Lichtsensors an, statt den manuell eingestellten Wert zu nutzen - mit Glättung gegen Flackern bei schwankendem Licht. Die genaue Kalibrierung ist ein Schätzwert und wurde nicht am echten Gerät abgeglichen; falls die Helligkeit zu extrem oder zu träge wirkt, bitte Rückmeldung geben.",
 
-    "Regen-Effekt",
-    "Über den Regen-Effekt",
-    "Nur sichtbar, wenn die Wetterdaten tatsächlich Regen oder Gewitter zeigen. Die Tropfen bewegen sich in die tatsächliche Windrichtung - je nach Wind kann es deshalb so aussehen, als würde es auf dem Radar nach oben regnen (z.B. bei Wind aus Süden). Das ist physikalisch korrekt und kein Fehler.",
+    "Wetter anzeigen",
+    "Über Wetter anzeigen",
+    "Zeigt das aktuelle Wetter optisch an, wenn es tatsächlich regnet oder schneit: animierter Regen auf dem Radarscreen und dem Ruhebildschirm (die Tropfen bewegen sich in die tatsächliche Windrichtung - je nach Wind kann es deshalb so aussehen, als würde es auf dem Radar nach oben regnen, z.B. bei Wind aus Süden - das ist physikalisch korrekt und kein Fehler), sowie animierter Schnee nur auf dem Ruhebildschirm (kleine, leicht wackelnde weiße Punkte, immer senkrecht fallend, ohne Windrichtung).",
 
     "MQTT",
     "MQTT",

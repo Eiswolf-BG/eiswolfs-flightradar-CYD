@@ -138,12 +138,44 @@ namespace {
         // dass dieses eigenstaendige Skript selbst etwas davon "mitbekommen"
         // muss.
         html += "function hexToRgb(hex){var v=parseInt(hex.replace('#',''),16);return [(v>>16)&255,(v>>8)&255,v&255];}";
+
+        // Schnee-Overlay fuer den GESAMTEN Seitenhintergrund (nicht den
+        // Radar-Canvas - der zeigt weiterhin nur Regen, siehe drawRain() in
+        // appendRadarSection()). Gleiche Optik/Physik wie ScreensaverSnow in
+        // main.cpp: kleine weisse Punkte, langsam fallend, mit seitlichem
+        // sinusfoermigem Wackeln statt einer geraden Linie wie beim Regen -
+        // bewusst IMMER Weiss (nicht --accent), damit Schnee optisch klar
+        // vom themenfarbigen Regen unterscheidbar bleibt, genau wie am
+        // Geraet (dort TFT_WHITE, fest, unabhaengig vom Farbthema). Datenquelle
+        // ist "window.__radarData", das appendRadarSection() bei jedem
+        // /radar.json-Poll setzt (siehe dortiges draw(data), Feld
+        // "snowing"/"snow_intensity") - dieses Skript hier laeuft in einer
+        // eigenen Closure (siehe "(function(){" oben), "lastData" dort ist
+        // NICHT direkt sichtbar, daher der Umweg ueber "window". Auf Seiten
+        // ohne Radar-Canvas (z.B. Listen-Seiten) bleibt "window.__radarData"
+        // undefined, das Overlay bleibt dann einfach inaktiv.
+        html += "var SNOW_MAX=13,SNOW_R=2;var snowFlakes=[];var snowInited=false;var lastSnowMs=null;";
+        html += "function snowParamsFor(level){if(level>=3)return{count:13,speed:35};if(level===1)return{count:4,speed:15};return{count:8,speed:25};}";
+        html += "function snowSpawn(f){f.baseX=Math.random()*canvas.width;f.y=-Math.random()*canvas.height/2;f.phase=Math.random()*6.28;}";
+        html += "function drawSnow(level){var p=snowParamsFor(level);";
+        html += "var now=performance.now();var dt=lastSnowMs?Math.min(now-lastSnowMs,300):16;lastSnowMs=now;var step=p.speed*dt/1000;";
+        html += "if(!snowInited){snowFlakes=[];for(var i=0;i<SNOW_MAX;i++){var f={};snowSpawn(f);snowFlakes.push(f);}snowInited=true;}";
+        html += "ctx.save();ctx.fillStyle='#ffffff';";
+        html += "for(var i=0;i<snowFlakes.length;i++){var f=snowFlakes[i];f.y+=step;f.phase+=2.5*dt/1000;";
+        html += "if(f.y-SNOW_R>canvas.height){snowSpawn(f);}";
+        html += "if(i>=p.count)continue;";
+        html += "var x=f.baseX+10*Math.sin(f.phase);";
+        html += "ctx.beginPath();ctx.arc(x,f.y,SNOW_R,0,Math.PI*2);ctx.fill();}";
+        html += "ctx.restore();}";
+
         html += "function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);";
         html += "var accentHex=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();";
         html += "var rgb=hexToRgb(accentHex||'#39ff14');";
         html += "for(var i=0;i<stars.length;i++){var s=stars[i];s.phase=(s.phase+s.speed)%256;";
         html += "var bright=s.phase<128?s.phase*2:(255-s.phase)*2;";
         html += "ctx.fillStyle='rgb('+Math.round(rgb[0]*bright/255)+','+Math.round(rgb[1]*bright/255)+','+Math.round(rgb[2]*bright/255)+')';ctx.fillRect(s.x,s.y,2,2);}";
+        html += "var rd=window.__radarData;";
+        html += "if(rd&&rd.snowing){drawSnow(rd.snow_intensity||2);}else{lastSnowMs=null;snowInited=false;}";
         html += "requestAnimationFrame(draw);}";
         html += "draw();";
         html += "})();</script>";
@@ -373,6 +405,15 @@ namespace {
 
         html += "function draw(data){";
         html += "lastData=data;";
+        // Zusaetzlich auf "window" gespiegelt (dieser gesamte Block ist in
+        // einer eigenen IIFE gekapselt, siehe "<script>(function(){" oben -
+        // "lastData" ist also NUR innerhalb dieser Closure sichtbar). Das
+        // separate #star-bg-Skript (siehe appendStarBackground(), eigene
+        // IIFE) braucht die "snowing"/"snow_intensity"-Felder aber ebenfalls,
+        // um Schnee auf dem Seitenhintergrund zu zeichnen - "window.__radarData"
+        // ist der bewusst explizite, minimale Kanal dafuer statt beide
+        // Skripte in einer gemeinsamen Closure zusammenzulegen.
+        html += "window.__radarData=data;";
         // Aktuelle Thema-Farben EINMAL pro draw()-Aufruf (nicht pro Stern/
         // Element) aus den CSS-Variablen gelesen - draw() laeuft sowohl bei
         // jedem poll() (8s) als auch bei jedem lokalen 150ms-Redraw, liest
@@ -908,6 +949,23 @@ namespace {
                               windDir >= 0.0f;
             doc["wind_dir_deg"] = windDir;
             doc["rain_intensity"] = (int)Weather::currentRainIntensity(); // 0=None,1=Light,2=Moderate,3=Heavy
+            // Schnee-Overlay (Alex' Wunsch, analog zum Regen-Overlay oben) -
+            // haengt am selben Schalter wie Regen (SettingsStore::
+            // rainEffectEnabled(), "Wetter anzeigen") und derselben
+            // RainIntensity-Stufung wie Weather::currentSnowIntensity() am
+            // Geraet (siehe ScreensaverSnow::snowParamsForIntensity() in
+            // main.cpp). Anders als Regen KEINE Windrichtung noetig (Schnee
+            // faellt beim Geraete-Ruhebildschirm/WebUI gerade, nur mit
+            // seitlichem Wackeln - kein Wind-Vektor). Wird NICHT auf dem
+            // Radar-Canvas selbst gezeichnet (dort bleibt nur der Regen,
+            // "Spiegel des CYD-Radarscreens"), sondern auf dem separaten
+            // Vollbild-Sternenhintergrund (#star-bg, siehe
+            // appendStarBackground()) rund um den Radarkreis - das
+            // Client-JS dort liest dieses Feld ueber "window.__radarData"
+            // mit (siehe appendRadarSection()/appendStarBackground()).
+            doc["snowing"] = SettingsStore::rainEffectEnabled() &&
+                              cond == Weather::Condition::Snow;
+            doc["snow_intensity"] = (int)Weather::currentSnowIntensity(); // 0=None,1=Light,2=Moderate,3=Heavy
         }
         JsonArray arr = doc["aircraft"].to<JsonArray>();
 

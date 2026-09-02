@@ -811,6 +811,168 @@ namespace ScreensaverRain {
     }
 }
 
+// Schnee-Effekt fuer den Ruhebildschirm (Alex' Wunsch) - NUR hier, bewusst
+// NICHT auf dem Radarscreen (anders als der Regen-Effekt, der auf
+// Radarscreen/Ruhebildschirm/WebUI laeuft). Anders als ScreensaverRain oben
+// gibt es dafuer auch KEINEN eigenen Ein/Aus-Schalter - der Effekt ist
+// unbedingt aktiv, sobald Weather::current() gerade Schneefall zeigt
+// (Condition::Snow, siehe conditionFromWmoCode() in weather.cpp), unabhaengig
+// vom bestehenden Regen-Schalter (SettingsStore::rainEffectEnabled(), der
+// semantisch nur fuer Regen gedacht ist).
+//
+// Visuell bewusst klar vom Regen unterschieden (Alex' ausdrueckliche
+// Vorgabe): kleine weisse PUNKTE statt Linien, deutlich langsamer fallend
+// (15/25/35 statt 45/70/100 px/s), UND mit einer sinusfoermigen seitlichen
+// Wackel-Bewegung um die eigentliche Fallachse (kein Wind noetig - rein
+// optisches Trudeln, im Gegensatz zur geraden Linie beim Regen). Gleiches
+// "oberste Ebene"/Erase-zuerst-Redraw-Muster wie ScreensaverRain (siehe
+// dortiger Bugfix-Kommentar) und gleiche Intensitaets-Kopplung (Weather::
+// currentSnowIntensity(), dieselbe RainIntensity-Stufung wie beim Regen).
+namespace ScreensaverSnow {
+    struct Flake {
+        float baseX = 0, y = 0; // baseX = Mittelpunkt der Wackel-Bewegung, aendert sich nur bei spawn()
+        float phase = 0;        // Winkel (rad) fuer die seitliche sinusfoermige Drift
+        bool active = false;
+        bool hasPrev = false;
+        int16_t prevX = 0, prevY = 0;
+    };
+    constexpr uint8_t MAX_FLAKES = 13; // gleiche Array-Kapazitaet wie ScreensaverRain (groesste Stufe "stark")
+    constexpr int16_t FLAKE_RADIUS = 2; // kleiner Punkt statt Linie (Alex' Wunsch: etwas dicker als 1px)
+    Flake flakes[MAX_FLAKES];
+    uint32_t lastTickMs = 0;
+    constexpr uint32_t TICK_INTERVAL_MS = 60; // gleicher Takt wie ScreensaverRain/MenuStars
+
+    struct SnowParams {
+        uint8_t count;
+        float speedPxPerSec;
+    };
+    // Deutlich langsamer als Regen (dort 45/70/100 px/s je Stufe) - Schnee
+    // soll erkennbar geruhsamer fallen als Regen.
+    SnowParams snowParamsForIntensity(Weather::RainIntensity intensity) {
+        switch (intensity) {
+            case Weather::RainIntensity::Light:    return {4, 15.0f};
+            case Weather::RainIntensity::Heavy:    return {13, 35.0f};
+            case Weather::RainIntensity::Moderate:
+            default:                                return {8, 25.0f};
+        }
+    }
+
+    constexpr float DRIFT_AMPLITUDE_PX = 10.0f; // seitlicher Wackel-Ausschlag
+    constexpr float DRIFT_ANGULAR_SPEED = 2.5f; // rad/s - Wackel-Frequenz (ca. 2,5s pro Hin-und-Her)
+
+    // BUGFIX (Alex' Meldung per Foto): Schneeflocken faellten teilweise
+    // Pixel der Uhrzeit-Anzeige weg. Ursache: das Logo wird zwar per
+    // 1s-Heal-Redraw laufend "repariert" (siehe drawScreensaverLogo()-
+    // Aufruf im Aufrufer unten), Uhrzeit/Datum aber bewusst NICHT - die
+    // zeichnen sich nur bei tatsaechlicher Textaenderung neu (siehe
+    // drawScreensaverClock(), extra so gebaut, um genau das dort
+    // ausfuehrlich dokumentierte Flacker-Problem zu vermeiden). Ohne
+    // eigenen Heal-Mechanismus blieb ein von einer Flocke ueberschriebenes
+    // Uhrzeit-Pixel deshalb bis zu 60s (naechste Minutenaenderung) sichtbar
+    // kaputt. Da ein periodischer Zwangs-Redraw der Uhrzeit das Flacker-
+    // Problem wieder zurueckbraechte, wird stattdessen der Uhrzeit-/Datums-
+    // Bereich beim Zeichnen/Loeschen der Flocken einfach ausgespart (wie
+    // urspruenglich beim Regen, bevor der auf "oberste Ebene" umgestellt
+    // wurde) - eine Flocke, die diesen Bereich durchquert, wird fuer die
+    // betroffenen Frames einfach nicht gezeichnet (faellt optisch
+    // "dahinter" durch) und taucht danach wieder normal auf. Der Bereich
+    // deckt GROSSZUEGIG sowohl den manuell geleerten CLOCK_BAND_H/
+    // DATE_BAND_H-Streifen als auch TFT_eSPI's eigenes, groesseres
+    // Hintergrund-Rechteck ab (siehe Kommentar bei drawScreensaverClock():
+    // bei textSize(3) reicht es bis 218..263 statt nur 214..258). Das
+    // Logo selbst bleibt bewusst NICHT ausgespart (heilt ja ohnehin jede
+    // Sekunde von selbst, siehe oben) - Schnee darf weiterhin sichtbar
+    // ueber das Logo fallen.
+    constexpr int16_t CLOCK_DATE_EXCLUDE_TOP = 210;
+    constexpr int16_t CLOCK_DATE_EXCLUDE_BOTTOM = 292;
+    bool overClockOrDate(int16_t y) {
+        return y >= CLOCK_DATE_EXCLUDE_TOP && y <= CLOCK_DATE_EXCLUDE_BOTTOM;
+    }
+
+    // Zufaellige X-Position ueber die GESAMTE Bildschirmbreite, gleiches
+    // Prinzip wie ScreensaverRain::spawn() - die Wackel-Bewegung erfolgt UM
+    // diese Basis-Position herum, nicht als Ersatz dafuer.
+    void spawn(Flake& f) {
+        f.baseX = (float)random(0, Config::SCREEN_WIDTH);
+        f.y = -(float)random(0, Config::SCREEN_HEIGHT / 2);
+        f.phase = (float)random(0, 628) / 100.0f; // zufaellig gestreuter Start-Winkel (0..2*PI)
+        f.active = true;
+        f.hasPrev = false;
+    }
+
+    // Wird beim Betreten des Ruhebildschirms aufgerufen (zusammen mit
+    // MenuStars::reset()/ScreensaverRain::reset()) - gleicher Grund wie dort.
+    void reset() {
+        for (uint8_t i = 0; i < MAX_FLAKES; i++) {
+            flakes[i] = Flake{};
+        }
+        lastTickMs = 0;
+    }
+
+    void update(TFT_eSPI& tft) {
+        uint32_t now = millis();
+        if (lastTickMs == 0) {
+            lastTickMs = now;
+            return;
+        }
+        if (now - lastTickMs < TICK_INTERVAL_MS) return;
+        uint32_t deltaMs = now - lastTickMs;
+        lastTickMs = now;
+
+        // Haengt jetzt am selben Schalter wie der Regen-Effekt
+        // (SettingsStore::rainEffectEnabled(), inzwischen als "Wetter
+        // anzeigen" beschriftet, siehe radar_theme_screen.cpp) - urspruenglich
+        // lief Schnee ohne eigenen Schalter immer automatisch, auf Alex'
+        // Wunsch aber jetzt gemeinsam mit Regen ueber diesen einen Schalter
+        // steuerbar.
+        bool snowy = SettingsStore::rainEffectEnabled() &&
+                     Weather::current() == Weather::Condition::Snow;
+
+        SnowParams params = snowParamsForIntensity(Weather::currentSnowIntensity());
+        float dtSec = deltaMs / 1000.0f;
+        float fallStep = params.speedPxPerSec * dtSec;
+
+        for (uint8_t i = 0; i < MAX_FLAKES; i++) {
+            Flake& f = flakes[i];
+
+            // Alten sichtbaren Punkt IMMER ZUERST loeschen, BEVOR irgendeine
+            // Deaktivierungs-/Neustart-Logik hasPrev anfasst - gleicher
+            // Bugfix wie in ScreensaverRain oben (siehe dortiger Kommentar).
+            if (f.hasPrev) {
+                tft.fillCircle(f.prevX, f.prevY, FLAKE_RADIUS, TFT_BLACK);
+                f.hasPrev = false;
+            }
+
+            if (!snowy || i >= params.count) {
+                f.active = false;
+                continue;
+            }
+            if (!f.active) spawn(f);
+
+            f.y += fallStep;
+            f.phase += DRIFT_ANGULAR_SPEED * dtSec;
+            if (f.y - FLAKE_RADIUS > Config::SCREEN_HEIGHT) {
+                spawn(f);
+                continue;
+            }
+
+            float xf = f.baseX + DRIFT_AMPLITUDE_PX * sinf(f.phase);
+            int16_t x = (int16_t)xf;
+            int16_t y = (int16_t)f.y;
+
+            bool visible = x >= FLAKE_RADIUS && x < Config::SCREEN_WIDTH - FLAKE_RADIUS &&
+                           y >= FLAKE_RADIUS && y < Config::SCREEN_HEIGHT - FLAKE_RADIUS &&
+                           !overClockOrDate(y);
+            if (visible) {
+                tft.fillCircle(x, y, FLAKE_RADIUS, TFT_WHITE);
+                f.prevX = x;
+                f.prevY = y;
+                f.hasPrev = true;
+            }
+        }
+    }
+}
+
 void updateWifiIcon() {
     int16_t iconX = Config::SCREEN_WIDTH - WIFI_ICON_W - 2;
     int16_t iconY = 2;
@@ -1555,6 +1717,7 @@ void loop() {
                 tft.fillScreen(TFT_BLACK);
                 MenuStars::reset();
                 ScreensaverRain::reset();
+                ScreensaverSnow::reset();
                 drawScreensaverLogo();
                 drawScreensaverVersion();
                 lastScreensaverTimeText = "";
@@ -1600,5 +1763,6 @@ void loop() {
         }
         MenuStars::update(tft);
         ScreensaverRain::update(tft);
+        ScreensaverSnow::update(tft);
     }
 }

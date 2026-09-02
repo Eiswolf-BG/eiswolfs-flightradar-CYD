@@ -120,7 +120,7 @@ static const char* const I18N_TR[] = {
     "Geçmiş (son 7 gün)",
     "Henüz kayıt yok.",
     "Geçmiş grafiği nasıl çalışır",
-    "Kayıt defteri verisi bulunan son 7 güne kadar, günlük olarak yeni kaydedilen uçak sayısını gösterir. Çubuk yüksekliği gösterilen en yoğun güne göredir - daha yüksek bir çubuk o gün daha fazla uçak kaydedildiği anlamına gelir. Her çubuğun üzerindeki sayı tam değeri gösterir.",
+    "Son 7 takvim gününün her biri için (bugün ve önceki 6 gün) günlük olarak yeni kaydedilen uçak sayısını gösterir, her gün için bir çubuk - hiç kaydı olmayan günler de \"0\" değeriyle kendi çubuğunda gösterilir. Çubuk yüksekliği gösterilen en yoğun güne göredir - daha yüksek bir çubuk o gün daha fazla uçak kaydedildiği anlamına gelir. Her çubuğun üzerindeki sayı tam değeri, altındaki tarih ise günü gösterir. Veriler SD karta kaydedilir ve yeniden başlatmadan sonra da kalır.",
 
     "Kayıt defteri dosyaları",
     "Henüz kayıt yok.",
@@ -350,9 +350,9 @@ static const char* const I18N_TR[] = {
     "Otomatik Parlaklık Hakkında",
     "Manuel olarak ayarlanan değer yerine dahili ışık sensörünü kullanarak ekran parlaklığını otomatik ayarlar - ışık dalgalanmalarında titremeyi önlemek için yumuşatılmıştır. Kesin kalibrasyon bir tahmindir ve gerçek cihazda doğrulanmamıştır; parlaklık çok aşırı veya çok yavaş hissettiriyorsa lütfen bildirin.",
 
-    "Yağmur Efekti",
-    "Yağmur Efekti Hakkında",
-    "Yalnızca hava durumu verileri gerçekten yağmur veya fırtına gösterdiğinde görünür. Damlalar gerçek rüzgar yönünde hareket eder - rüzgara bağlı olarak radarda yukarı doğru yağıyormuş gibi görünebilir (örn. güneyden esen rüzgarda). Bu fiziksel olarak doğrudur, hata değildir.",
+    "Hava Durumunu Göster",
+    "Hava Durumunu Göster Hakkında",
+    "Gerçekten yağmur yağarken veya kar yağarken mevcut hava durumunu görsel olarak gösterir: radar ekranında ve ekran koruyucuda animasyonlu yağmur (damlalar gerçek rüzgar yönünde hareket eder - rüzgara bağlı olarak radarda yukarı doğru yağıyormuş gibi görünebilir, örn. güneyden esen rüzgarda, bu fiziksel olarak doğrudur, hata değildir) ve yalnızca ekran koruyucuda animasyonlu kar (hafifçe savrulan küçük beyaz noktalar, her zaman dikey iner, rüzgar yönü olmadan).",
 
     "MQTT",
     "MQTT",

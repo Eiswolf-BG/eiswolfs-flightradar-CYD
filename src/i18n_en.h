@@ -121,7 +121,7 @@ static const char* const I18N_EN[] = {
     "History (last 7 days)",
     "No logbook entries yet.",
     "How the history chart works",
-    "Shows the number of newly logged aircraft per day, for up to the last 7 days with logbook data. Bar height is relative to the busiest day shown - a taller bar means more aircraft were logged that day. The number above each bar is the exact count.",
+    "Shows the number of newly logged aircraft for each of the last 7 calendar days (today and the 6 days before), one bar per day - days with zero sightings are still shown as their own bar labeled \"0\". Bar height is relative to the busiest day shown - a taller bar means more aircraft were logged that day. The number above each bar is the exact count, the date below identifies the day. Data is stored on the SD card and survives a restart.",
 
     "Logbook files",
     "No logbook entries yet.",
@@ -351,9 +351,9 @@ static const char* const I18N_EN[] = {
     "About Auto Brightness",
     "Automatically adjusts screen brightness using the built-in light sensor instead of the manually set value - smoothed to avoid flickering when the light level fluctuates. The exact calibration is an estimate and hasn't been verified on real hardware; if the brightness feels too extreme or too sluggish, please report back.",
 
-    "Rain Effect",
-    "About the Rain Effect",
-    "Only visible when the weather data actually shows rain or a thunderstorm. The drops move in the actual wind direction - depending on the wind, this can make it look like it's raining upward on the radar (e.g. with wind from the south). That's physically correct, not a bug.",
+    "Show Weather",
+    "About Show Weather",
+    "Visually shows the current weather when it's actually raining or snowing: animated rain on the radar screen and the idle screensaver (drops move in the actual wind direction - depending on the wind, this can make it look like it's raining upward on the radar, e.g. with wind from the south, which is physically correct, not a bug), and animated snow on the idle screensaver only (small drifting white dots, always falling straight down, no wind direction).",
 
     "MQTT",
     "MQTT",

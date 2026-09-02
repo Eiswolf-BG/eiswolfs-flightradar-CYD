@@ -642,12 +642,19 @@ enum class StringId : uint16_t {
 
     // Fuenfter Schalter auf der "Radar-Darstellung"-Seite (System > Radar-
     // Darstellung, radar_theme_screen.cpp, SettingsStore::
-    // rainEffectEnabled(), AN per Default) - animierter Regen-Effekt, siehe
-    // radar_screen.cpp. RAIN_EFFECT_INFO_BODY erklaert explizit, dass die
-    // Tropfen der TATSAECHLICHEN Windrichtung folgen und das je nach
-    // Windrichtung wie "nach oben regnen" aussehen kann (physikalisch
-    // korrekt, kein Fehler) - Alex' ausdruecklicher Wunsch, damit das nicht
-    // verwirrt.
+    // rainEffectEnabled(), AN per Default) - urspruenglich nur der
+    // animierte Regen-Effekt (radar_screen.cpp), mittlerweile auf
+    // "Wetter anzeigen" umbenannt und steuert ZUSAETZLICH den
+    // Ruhebildschirm-Schneeeffekt (main.cpp::ScreensaverSnow) mit -
+    // beide Effekte (Regen auf Radarscreen+Ruhebildschirm, Schnee NUR auf
+    // dem Ruhebildschirm) haengen jetzt an genau diesem einen Schalter.
+    // Die StringId-Namen (MENU_RAIN_EFFECT/RAIN_EFFECT_INFO_*) blieben
+    // bewusst unveraendert (nur die Anzeigetexte wurden angepasst), um
+    // keine Enum-Positionsverschiebung ueber alle 7 Sprachdateien
+    // hinweg riskieren zu muessen. RAIN_EFFECT_INFO_BODY erklaert
+    // weiterhin explizit, dass Regentropfen der TATSAECHLICHEN
+    // Windrichtung folgen und das je nach Windrichtung wie "nach oben
+    // regnen" aussehen kann (physikalisch korrekt, kein Fehler).
     MENU_RAIN_EFFECT,
     RAIN_EFFECT_INFO_TITLE,
     RAIN_EFFECT_INFO_BODY,
@@ -749,7 +756,7 @@ enum class StringId : uint16_t {
 };
 
 namespace I18n {
-    constexpr uint8_t LANG_COUNT = 7;
+    constexpr uint8_t LANG_COUNT = 8;
     const char* t(StringId id);
     const char* languageName(uint8_t index);
 }

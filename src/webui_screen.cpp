@@ -1,6 +1,7 @@
 #include "webui_screen.h"
 #include "touch_input.h"
 #include "menu_stars.h"
+#include "menu_screen.h"
 #include "config.h"
 #include "i18n.h"
 #include <WiFi.h>
@@ -62,7 +63,21 @@ void run(TFT_eSPI& tft) {
 
     constexpr int16_t textMaxWidth = Config::SCREEN_WIDTH - 20;
     constexpr int16_t LINE_H = 16;
-    constexpr int16_t VIEW_TOP = 36;
+    constexpr int16_t TITLE_Y = 14;
+
+    // Titel-Umbruch ueber denselben bewaehrten Mechanismus wie die anderen
+    // Info-Screens (MenuScreen::layoutTitleLines(), oeffentliche Huelle um
+    // das interne wrapTitleLines() aus menu_screen.cpp) statt eines festen,
+    // ungeprueften tft.println() - dieser Screen kann nicht komplett auf
+    // MenuScreen::showInfoScreen() umsteigen, da darunter zusaetzlich noch
+    // der QR-Code samt IP-Adresse Platz braucht, den showInfoScreen() nicht
+    // kennt. Textgroesse bleibt bei 1 (wie bisher, kein Boxed-Title-Stil),
+    // nur die Zeilenzahl ist jetzt dynamisch statt fest einzeilig.
+    constexpr int MAX_TITLE_LINES = 3;
+    String titleLines[MAX_TITLE_LINES];
+    tft.setTextSize(1);
+    int titleLineCount = MenuScreen::layoutTitleLines(tft, I18n::t(StringId::WEBUI_TITLE), textMaxWidth, titleLines, MAX_TITLE_LINES);
+    int16_t VIEW_TOP = (int16_t)(TITLE_Y + titleLineCount * LINE_H + 6);
 
     // Wenn WLAN verbunden ist, bekommt der Absatztext nur noch ein kleines
     // (bei Bedarf scrollbares) Fenster, weil darunter fest der QR-Code samt
@@ -125,8 +140,10 @@ void run(TFT_eSPI& tft) {
     auto redraw = [&]() {
         tft.fillScreen(TFT_BLACK);
         tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
-        tft.setCursor(10, 14);
-        tft.println(I18n::t(StringId::WEBUI_TITLE));
+        for (int i = 0; i < titleLineCount; i++) {
+            tft.setCursor(10, (int16_t)(TITLE_Y + i * LINE_H));
+            tft.println(titleLines[i]);
+        }
 
         tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         int16_t y = VIEW_TOP;

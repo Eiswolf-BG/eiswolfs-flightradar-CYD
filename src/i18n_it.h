@@ -120,7 +120,7 @@ static const char* const I18N_IT[] = {
     "Cronologia (ultimi 7 giorni)",
     "Ancora nessun dato.",
     "Come funziona la cronologia",
-    "Mostra il numero di aerei registrati di recente per giorno, fino agli ultimi 7 giorni con dati di registro. L'altezza della barra è relativa al giorno più trafficato mostrato - una barra più alta significa che sono stati registrati più aerei quel giorno. Il numero sopra ogni barra è il valore esatto.",
+    "Mostra il numero di aerei registrati di recente per ciascuno degli ultimi 7 giorni di calendario (oggi e i 6 giorni precedenti), una barra per giorno - anche i giorni senza rilevamenti vengono mostrati come barra propria con \"0\". L'altezza della barra è relativa al giorno più trafficato mostrato - una barra più alta significa che sono stati registrati più aerei quel giorno. Il numero sopra ogni barra è il valore esatto, la data sotto indica il giorno. I dati vengono salvati sulla scheda SD e sopravvivono a un riavvio.",
 
     "File del registro",
     "Ancora nessun dato.",
@@ -350,9 +350,9 @@ static const char* const I18N_IT[] = {
     "Info su Luminosità automatica",
     "Regola automaticamente la luminosità dello schermo usando il sensore di luce integrato, invece del valore impostato manualmente - con attenuazione per evitare sfarfallii in caso di luce variabile. La calibrazione esatta è una stima non verificata su un dispositivo reale; se la luminosità sembra troppo estrema o troppo lenta, segnalalo pure.",
 
-    "Effetto pioggia",
-    "Info su Effetto pioggia",
-    "Visibile solo quando i dati meteo mostrano effettivamente pioggia o temporale. Le gocce si muovono nella direzione reale del vento - a seconda del vento, questo può far sembrare che sul radar piova verso l'alto (ad es. con vento da sud). È fisicamente corretto, non un errore.",
+    "Mostra il meteo",
+    "Info su Mostra il meteo",
+    "Mostra visivamente il meteo attuale quando piove o nevica davvero: pioggia animata sulla schermata radar e sullo screensaver (le gocce si muovono nella direzione reale del vento - a seconda del vento, questo può far sembrare che sul radar piova verso l'alto, ad es. con vento da sud, il che è fisicamente corretto, non un errore), e neve animata solo sullo screensaver (piccoli puntini bianchi che ondeggiano leggermente, sempre in caduta verticale, senza direzione del vento).",
 
     "MQTT",
     "MQTT",

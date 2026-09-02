@@ -1535,4 +1535,9 @@ void showInfoScreen(TFT_eSPI& tft, const String& title, const String& body,
     infoScreen(tft, title, body, accentColor, buttonLabel);
 }
 
+int layoutTitleLines(TFT_eSPI& tft, const String& text, int16_t maxWidth,
+                      String* outLines, int maxLines) {
+    return wrapTitleLines(tft, text, maxWidth, outLines, maxLines);
+}
+
 }
