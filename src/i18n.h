@@ -752,6 +752,12 @@ enum class StringId : uint16_t {
     RADAR_THEME_RED,
     RADAR_THEME_PURPLE,
 
+    // Neuer Menuepunkt unter System > Werkzeuge, der den bis dahin
+    // verwaisten GitHub-QR-Screen (main.cpp::runGithubQrScreen(), frueher
+    // ueber den inzwischen entfernten Header-Titel "Eiswolfs FR"
+    // erreichbar) wieder zugaenglich macht.
+    MENU_ABOUT,
+
     COUNT
 };
 

@@ -62,7 +62,33 @@ namespace {
     Layout computeLayout(int16_t top) {
         Layout L;
         L.infoTop = Config::SCREEN_HEIGHT - infoBarHeight();
-        constexpr int16_t TOP_LABEL_MARGIN = 10;
+        // BUGFIX (Alex' Meldung: farbige Rufzeichen-Reste blieben knapp
+        // UNTER der Kopfzeile stehen, sichtbar bis zu mehreren Sekunden,
+        // selbst nach dem contentTop-Clear-Fix im Detail-Panel). Ursache
+        // per TFT_eSPI-Quellcode bestaetigt (TFT_eSPI.cpp::setFreeFont()/
+        // drawString(), BC_DATUM-Zweig): Bei einem GFX-Freefont wird die
+        // Zeilenhoehe fuer die vertikale Textverankerung NICHT aus der
+        // Hoehe des tatsaechlich gezeichneten Zeichens berechnet, sondern
+        // aus glyph_ab/glyph_bb - dem groessten Ascent/Descent-Wert UEBER
+        // ALLE Glyphen des kompletten Fonts (einmalig bei setFreeFont()
+        // ermittelt). Unser Font (ui_font.h, deckt U+0020-U+015F fuer alle
+        // 8 Sprachen ab) hat glyph_ab=12/glyph_bb=3 (worst-case durch
+        // hohe Akzent-Glyphen wie Ğ/İ) - macht 15px reservierte Hoehe,
+        // deutlich mehr als die ~8px, die ein reines Grossbuchstaben-
+        // Rufzeichen wie "DEUAD" eigentlich braucht. Der bisherige
+        // TOP_LABEL_MARGIN=10 ging faelschlich von einer Hoehe nahe der
+        // sichtbaren Zeichenhoehe aus - das Rufzeichen-Label (BC_DATUM,
+        // Anker bei y=Markerposition-8) reichte dadurch real bis zu 7px
+        // UEBER "top" hinaus in den Kopfzeilenbereich, wo es kein
+        // render()/tick()-Pfad je mitloescht (weder der normale
+        // Sweep-Vollclear noch das Detail-Panel raeumen jemals y<top auf -
+        // das ist bewusst alleiniges Terrain der Kopfzeile). Jetzt auf 20
+        // erhoeht (>= 17 rechnerisch noetig, plus Sicherheitspuffer), damit
+        // JEDES Rufzeichen-Label - unabhaengig von Zeichen, Marker-Position
+        // am Kreisrand, und ob das Detail-Panel offen ist oder nicht -
+        // immer vollstaendig unterhalb von "top" bleibt und nie mehr in die
+        // Kopfzeile hineinreicht.
+        constexpr int16_t TOP_LABEL_MARGIN = 20;
         int16_t maxRadiusByWidth = Config::SCREEN_WIDTH / 2 - 6;
         int16_t maxRadiusByHeight = (L.infoTop - top - TOP_LABEL_MARGIN) / 2 - 6;
         L.radius = min(maxRadiusByWidth, maxRadiusByHeight);
@@ -1075,6 +1101,41 @@ namespace {
         }
     }
 
+    // Kleiner, einfarbiger Richtungs-Chevron VOR der Nase jeder Flugzeug-
+    // Silhouette (Airliner/Privatjet/Turboprop/Unknown-Fallback, siehe
+    // die vier Aufrufer unten) - seit der Umstellung von einfachen Punkten
+    // (mit Pfeilkopf-Indikator) auf die Typ-Silhouetten war die
+    // Flugrichtung bei dichtem Verkehr (Alex sieht oft 30+ Flugzeuge
+    // gleichzeitig) nicht mehr auf den ersten Blick erkennbar. Ergaenzt
+    // die Silhouette, ERSETZT sie NICHT - freistehender Chevron mit
+    // kleinem Abstand vor der Nasenspitze, in derselben Farbe wie der
+    // Marker selbst (kein bunter Schweif wie beim verworfenen
+    // Trail-Feature). "rad" ist der bereits in Bogenmass umgerechnete
+    // Headingwinkel (dieselbe Variable, die jede Aufrufer-Funktion für
+    // die Rumpflinie berechnet), "noseLen" die dortige Nasenlaenge -
+    // beide werden hier nicht neu berechnet, um Rundungsabweichungen
+    // zwischen Rumpf und Chevron zu vermeiden.
+    void drawHeadingChevron(TFT_eSPI& gfx, int16_t x, int16_t y, double rad, uint16_t color,
+                             int16_t noseLen, bool heavy) {
+        int16_t gap = heavy ? 4 : 3;
+        int16_t armLen = heavy ? 5 : 4;
+        int16_t armWidth = heavy ? 4 : 3;
+        int16_t baseLen = (int16_t)(noseLen + gap);
+        int16_t tipLen = (int16_t)(baseLen + armLen);
+        int16_t tipX = x + (int16_t)(sin(rad) * tipLen);
+        int16_t tipY = y - (int16_t)(cos(rad) * tipLen);
+        int16_t baseX = x + (int16_t)(sin(rad) * baseLen);
+        int16_t baseY = y - (int16_t)(cos(rad) * baseLen);
+        double wingRad = rad + PI / 2.0;
+        int16_t leftX = baseX + (int16_t)(sin(wingRad) * armWidth);
+        int16_t leftY = baseY - (int16_t)(cos(wingRad) * armWidth);
+        int16_t rightX = baseX - (int16_t)(sin(wingRad) * armWidth);
+        int16_t rightY = baseY + (int16_t)(cos(wingRad) * armWidth);
+
+        gfx.drawLine(tipX, tipY, leftX, leftY, color);
+        gfx.drawLine(tipX, tipY, rightX, rightY, color);
+    }
+
     // Generische Flugzeug-Silhouette - Fallback, wenn der ICAO-Typcode
     // unbekannt/nicht zuordenbar ist (classifyTypeSilhouette() liefert
     // Unknown, siehe drawTypedMarker() unten). Gleicher Aufbau wie
@@ -1105,6 +1166,8 @@ namespace {
         int16_t w2x = x - (int16_t)(sin(wingRad) * wingLen);
         int16_t w2y = y + (int16_t)(cos(wingRad) * wingLen);
         drawThickLine(gfx, w1x, w1y, w2x, w2y, color, halfWidth);
+
+        drawHeadingChevron(gfx, x, y, rad, color, noseLen, heavy);
     }
 
     // Eigener Marker fuer Bodenfahrzeuge (ADS-B-Kategorie "C*") - ein
@@ -1159,6 +1222,8 @@ namespace {
         int16_t w2x = x - (int16_t)(sin(wingRad) * wingLen);
         int16_t w2y = y + (int16_t)(cos(wingRad) * wingLen);
         drawThickLine(gfx, w1x, w1y, w2x, w2y, color, halfWidth);
+
+        drawHeadingChevron(gfx, x, y, rad, color, noseLen, heavy);
     }
 
     // Privatjet-Silhouette - gleicher Aufbau wie drawAirlinerMarker(), aber
@@ -1189,6 +1254,8 @@ namespace {
         int16_t w2x = x - (int16_t)(sin(wingRad) * wingLen);
         int16_t w2y = y + (int16_t)(cos(wingRad) * wingLen);
         drawThickLine(gfx, w1x, w1y, w2x, w2y, color, halfWidth);
+
+        drawHeadingChevron(gfx, x, y, rad, color, noseLen, heavy);
     }
 
     // Turboprop-Silhouette - gleicher Aufbau wie drawAirlinerMarker()
@@ -1227,6 +1294,8 @@ namespace {
         int16_t e2y = y + (int16_t)(cos(wingRad) * engineOffset);
         gfx.fillCircle(e1x, e1y, engineRadius, color);
         gfx.fillCircle(e2x, e2y, engineRadius, color);
+
+        drawHeadingChevron(gfx, x, y, rad, color, noseLen, heavy);
     }
 
     // Dispatcher fuer den generischen Marker-Zweig in render()/tick() (dort
@@ -1571,6 +1640,18 @@ namespace {
     };
     PanelState lastPanel;
 
+    // Zuletzt bekannte Live-Daten (Hoehe, Speed, Squawk, Peilung usw.) des
+    // aktuell ausgewaehlten Flugzeugs - bleibt bestehen, auch wenn das
+    // Flugzeug die AircraftTable verlaesst (z.B. aus der eingestellten
+    // Reichweite herausfliegt). Das Detail-Panel soll sich NUR noch durch
+    // manuelles Antippen schliessen lassen, nicht mehr automatisch, sobald
+    // das Flugzeug im Hintergrund nicht mehr getrackt wird (Alex'
+    // Bugmeldung: das Panel schloss sich vorher waehrend des Lesens bzw.
+    // waehrend der 8-11s dauernden Modell-/Routenaufloesung). Ohne frische
+    // Daten (Flugzeug nicht mehr in der Tabelle) werden diese eingefrorenen
+    // Werte einfach weiterverwendet, siehe render() unten.
+    Aircraft lastKnownAircraft{};
+
     // Siehe consumeHeaderRedrawFlag()/qrButtonRect()-Zweig in handleTap()
     // unten - true, solange der Flug-QR-Code-Screen die Kopfzeile
     // ueberschrieben hat und noch niemand drawHeader()/updateStatusLine()
@@ -1690,7 +1771,7 @@ namespace {
         advanceAndDrawMarqueeLine(gfx, lastPanel.seats);
     }
 
-    void drawDetailPanel(TFT_eSPI& gfx, Aircraft& a) {
+    void drawDetailPanel(TFT_eSPI& gfx, Aircraft& a, int16_t contentTop) {
         AirlineLookup::resolve(a);
         AircraftDetails::Info details = AircraftDetails::get(a.hex);
 
@@ -1700,7 +1781,17 @@ namespace {
 
         bool forceFull = !lastPanel.valid || strcmp(lastPanel.hex, a.hex) != 0;
         if (forceFull) {
-            gfx.fillRect(0, panelTop, Config::SCREEN_WIDTH, DETAIL_PANEL_H, TFT_BLACK);
+            // BUGFIX (Alex' Meldung, sichtbar seit das Panel dauerhaft offen
+            // bleibt statt automatisch zu schliessen): ein Flugzeug-Label
+            // nahe des oberen Radarkreis-Rands reicht laut TOP_LABEL_MARGIN
+            // in computeLayout() bis knapp an contentTop heran - der
+            // schmale Streifen zwischen contentTop und panelTop wurde
+            // bisher NICHT mitgeloescht (nur panelTop.. abwaerts), ein dort
+            // zuvor gezeichnetes Rufzeichen blieb deshalb als Rest sichtbar.
+            // Jetzt wird der GESAMTE Inhaltsbereich ab contentTop
+            // geschwaerzt, der sichtbare Rahmen bleibt trotzdem exakt auf
+            // die Panel-Box (panelTop..) begrenzt.
+            gfx.fillRect(0, contentTop, Config::SCREEN_WIDTH, (int16_t)(Config::SCREEN_HEIGHT - contentTop), TFT_BLACK);
             gfx.drawRect(0, panelTop, Config::SCREEN_WIDTH, DETAIL_PANEL_H, themeBaseColor(gfx));
             lastPanel = PanelState{};
             strncpy(lastPanel.hex, a.hex, sizeof(lastPanel.hex) - 1);
@@ -2744,30 +2835,32 @@ void render(TFT_eSPI& tft, int16_t top) {
     if (panelAlreadyOpen) {
         AircraftTable::lock();
         Aircraft* table = AircraftTable::raw();
-        Aircraft selected{};
-        bool found = false;
         for (uint8_t i = 0; i < AircraftTable::capacity(); i++) {
             if (table[i].valid && strcmp(table[i].hex, selectedHex) == 0) {
-                selected = table[i];
-                found = true;
+                lastKnownAircraft = table[i];
                 break;
             }
         }
         AircraftTable::unlock();
 
-        if (found && selected.distanceKm <= rangeKm * 1.05f) {
-            // Kein drawScanlines() hier: das Detail-Panel ersetzt den
-            // Radarkreis komplett durch eine eigene Text-Ansicht - das
-            // Scanlinien-Overlay ist explizit auf die Radarkreis-Flaeche
-            // begrenzt (siehe drawScanlines()) und haette hier nichts
-            // Sinnvolles zum Ueberlagern.
-            tft.startWrite();
-            drawDetailPanel(tft, selected);
-            tft.endWrite();
-            return;
-        }
-        selectedHex[0] = 0;
-        lastPanel.valid = false;
+        // Panel bleibt IMMER offen, sobald es einmal angetippt wurde -
+        // unabhaengig davon, ob das Flugzeug noch in der AircraftTable
+        // steht oder innerhalb der eingestellten Reichweite liegt (siehe
+        // Kommentar bei lastKnownAircraft oben). Ohne frische Daten oben
+        // (Flugzeug nicht mehr gefunden) bleiben einfach die zuletzt
+        // bekannten Werte in lastKnownAircraft stehen. Schliessen
+        // funktioniert ab jetzt ausschliesslich ueber den manuellen
+        // Schliessen-Tap (siehe handleTap()).
+        //
+        // Kein drawScanlines() hier: das Detail-Panel ersetzt den
+        // Radarkreis komplett durch eine eigene Text-Ansicht - das
+        // Scanlinien-Overlay ist explizit auf die Radarkreis-Flaeche
+        // begrenzt (siehe drawScanlines()) und haette hier nichts
+        // Sinnvolles zum Ueberlagern.
+        tft.startWrite();
+        drawDetailPanel(tft, lastKnownAircraft, top);
+        tft.endWrite();
+        return;
     }
 
     tft.startWrite();
@@ -2808,8 +2901,6 @@ void render(TFT_eSPI& tft, int16_t top) {
     }
     AircraftTable::unlock();
 
-    bool selectionStillPresent = false;
-    Aircraft selected{};
     uint8_t visibleCount = 0; // nach allen Filtern (Reichweite, Bodenfahrzeuge, Airline-Filter)
 
     for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) hitPoints[i].valid = false;
@@ -2877,6 +2968,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         // drawTypedMarker()) - Bodenfahrzeug/Rotorcraft behalten wie
         // gehabt Vorrang vor der Typcode-Silhouette.
         TypeSilhouette typeSilhouette = classifyTypeSilhouette(a.typeCode);
+
         // Der CRT-Phosphor-Effekt betrifft jetzt ALLE Marker-Kategorien
         // gleichermassen (Alex' ausdruecklicher Wunsch - vorher waren nur
         // niedrig fliegende, gruene Flugzeuge betroffen, siehe Kommentar bei
@@ -2941,8 +3033,7 @@ void render(TFT_eSPI& tft, int16_t top) {
 
         if (isSelected) {
             tft.drawCircle(pt.x, pt.y, 9, TFT_WHITE);
-            selectionStillPresent = true;
-            selected = a;
+            lastKnownAircraft = a;
             drawBearingIndicator(tft, L, a.bearingDeg);
         }
         if (isGroundVehicle) {
@@ -2999,9 +3090,20 @@ void render(TFT_eSPI& tft, int16_t top) {
 
     if (visibleCount > 0) lastAircraftSeenMs = millis();
 
-    if (selectionStillPresent) {
+    // selectedHex[0] statt eines "wurde dieses Flugzeug in diesem
+    // Durchlauf gefunden"-Flags: das Panel bleibt offen, auch wenn das
+    // ausgewaehlte Flugzeug in DIESEM Durchlauf nicht (mehr) in der
+    // AircraftTable steht - siehe lastKnownAircraft oben, das in diesem
+    // Fall einfach die zuletzt bekannten Werte behaelt. Dieser Zweig
+    // laeuft ohnehin nur beim ALLERERSTEN Zeichnen eines frisch
+    // ausgewaehlten Flugzeugs (jeder weitere Durchlauf nimmt den
+    // panelAlreadyOpen-Fast-Path weiter oben) - deckt aber zusaetzlich den
+    // theoretischen Sonderfall ab, dass das Flugzeug schon im allerersten
+    // Durchlauf nicht mehr gefunden wird (z.B. verschwindet es exakt
+    // zwischen Antippen und diesem Rendern).
+    if (selectedHex[0]) {
         tft.endWrite();
-        drawDetailPanel(tft, selected);
+        drawDetailPanel(tft, lastKnownAircraft, top);
         // FIX (Alex' Meldung: Scanlinien durchloechern "Modell:
         // unbekannt"/"Typ: unbekannt" im Detail-Panel): hier fehlte ein
         // return - die Ausfuehrung lief bisher ungebremst weiter bis zu

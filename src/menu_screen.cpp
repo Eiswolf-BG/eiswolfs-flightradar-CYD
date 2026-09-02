@@ -28,6 +28,14 @@
 #include <time.h>
 #include "ui_theme.h"
 
+// In main.cpp definiert, ohne eigenen Header (globale Funktion, kein
+// Namespace) - zeigt den GitHub-QR-Code-Screen mit Alex' Avatar-Bild
+// (siehe github_screen_logo_image.h). Frueher ueber den inzwischen
+// entfernten Header-Titel "Eiswolfs FR" erreichbar, seitdem verwaist -
+// wird jetzt ueber den neuen "Über"-Menuepunkt (System > Werkzeuge) wieder
+// erreichbar gemacht, ohne die bestehende Funktion/Logik anzufassen.
+void runGithubQrScreen(TFT_eSPI& tftRef);
+
 namespace MenuScreen {
 
 namespace {
@@ -1177,16 +1185,18 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             // Sicherung & Reset (das bestehende Page::BackupReset-Untermenue
             // bleibt unveraendert, wird jetzt nur eine Ebene tiefer erreicht:
             // System > Werkzeuge > Sicherung & Reset).
-            Rect calibBtn       = subMenuRowRect(0, 5);
-            Rect webuiBtn       = subMenuRowRect(1, 5);
-            Rect mqttBtn        = subMenuRowRect(2, 5);
-            Rect backupResetBtn = subMenuRowRect(3, 5);
-            Rect backBtn        = subMenuRowRect(4, 5);
+            Rect calibBtn       = subMenuRowRect(0, 6);
+            Rect webuiBtn       = subMenuRowRect(1, 6);
+            Rect mqttBtn        = subMenuRowRect(2, 6);
+            Rect backupResetBtn = subMenuRowRect(3, 6);
+            Rect aboutBtn       = subMenuRowRect(4, 6);
+            Rect backBtn        = subMenuRowRect(5, 6);
 
             drawButton(tft, calibBtn, I18n::t(StringId::MENU_CALIBRATE));
             drawButton(tft, webuiBtn, I18n::t(StringId::MENU_LOGBOOK_WEBUI));
             drawButton(tft, mqttBtn, I18n::t(StringId::MENU_MQTT));
             drawButton(tft, backupResetBtn, I18n::t(StringId::MENU_BACKUP_RESET));
+            drawButton(tft, aboutBtn, I18n::t(StringId::MENU_ABOUT));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -1205,6 +1215,8 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 MqttScreen::run(tft);
             } else if (backupResetBtn.contains(tap.x, tap.y)) {
                 page = Page::BackupReset;
+            } else if (aboutBtn.contains(tap.x, tap.y)) {
+                runGithubQrScreen(tft);
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::System;
             }

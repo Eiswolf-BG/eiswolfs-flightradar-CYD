@@ -95,12 +95,13 @@ namespace SettingsStore {
     void setUnitsMode(uint8_t mode);
 
     // Flughafencode-Format fuer die Routenanzeige im Detail-Panel (Menue >
-    // Land/Region > Einheiten) - AUS (ICAO, z.B. "EDDF") per Default, AN
-    // zeigt stattdessen den bei Aviation-Enthusiasten gelaeufigeren
-    // IATA-Code (z.B. "FRA"). Rein kosmetisch: nutzt IATA-Codes, die die
-    // bestehende Routen-Lookup-Kette (aircraft_details.cpp) ohnehin schon
-    // mitliefert, kein zusaetzlicher API-Call. Faellt sauber auf ICAO
-    // zurueck, wenn fuer einen Flughafen kein IATA-Code bekannt ist.
+    // Land/Region > Einheiten) - AN (IATA, z.B. "FRA") per Default, bei
+    // Aviation-Enthusiasten gelaeufiger als ICAO; AUS zeigt stattdessen den
+    // 4-stelligen ICAO-Code (z.B. "EDDF"). Rein kosmetisch: nutzt
+    // IATA-Codes, die die bestehende Routen-Lookup-Kette
+    // (aircraft_details.cpp) ohnehin schon mitliefert, kein zusaetzlicher
+    // API-Call. Faellt sauber auf ICAO zurueck, wenn fuer einen Flughafen
+    // kein IATA-Code bekannt ist.
     bool useIataAirportCodes();
     void setUseIataAirportCodes(bool on);
 

@@ -390,6 +390,7 @@ static const char* const I18N_DE[] = {
     "Farben",
     "Rot",
     "Lila",
+    "Über",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

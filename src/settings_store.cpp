@@ -31,9 +31,12 @@ namespace {
     bool onlyLowAltitudeOn = false;
     uint8_t languageIdx = 0;
     uint8_t unitsModeVal = 0;
-    // AUS per Default (ICAO) - IATA-Anzeige ist ein bewusstes Opt-in ueber
-    // Menue > Land/Region > Einheiten, siehe settings_store.h.
-    bool iataAirportCodesOn = false;
+    // AN per Default (IATA, z.B. "FRA") - bei Aviation-Enthusiasten
+    // gelaeufiger als ICAO, betrifft nur frische/zurueckgesetzte Geraete,
+    // bestehende gespeicherte Einstellungen bleiben davon unberuehrt.
+    // Abschaltbar ueber Menue > Land/Region > Einheiten, siehe
+    // settings_store.h.
+    bool iataAirportCodesOn = true;
     uint8_t radarThemeIdx = 0;
     // Zwei unabhaengige, ankreuzbare Radar-Extras (radar_theme_screen.cpp) -
     // AUS per Default, siehe Kommentar in settings_store.h.
