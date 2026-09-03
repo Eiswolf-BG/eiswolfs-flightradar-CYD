@@ -129,6 +129,14 @@ namespace Weather {
         char name[32] = {0};
         float distanceKm = 0;
         float bearingDeg = 0; // 0-360, 0 = Nord, im Uhrzeigersinn
+        // Koordinaten des Flughafens selbst (nicht des Standorts) - fuer
+        // die Best-Effort-Anflug-Erkennung (aircraft_table.cpp::
+        // postFetchUpdate()), die daraus die Distanz JEDES Flugzeugs zu
+        // diesem Flughafen berechnet, ohne selbst AirportLookup/die SD-
+        // Karte anzufassen (dieser Cache wird ohnehin schon hier alle
+        // WEATHER_FETCH_INTERVAL_MS neu befuellt).
+        double lat = 0;
+        double lon = 0;
     };
 
     // Wie current()/currentMetar() nur vom NetTask geschrieben, vom

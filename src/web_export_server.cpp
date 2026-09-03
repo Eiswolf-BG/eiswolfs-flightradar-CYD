@@ -57,7 +57,7 @@ namespace {
         switch (SettingsStore::radarThemeIndex()) {
             case 1: return {"#ffb000", "#3a2c1a", "#a08a5a"};  // Amber
             case 2: return {"#00c8ff", "#1a2c3a", "#6a90a0"};  // Blau
-            case 3: return {"#ff0202", "#3a1a1a", "#a06a6a"};  // Rot
+            case 3: return {"#ff0000", "#3a1a1a", "#a06a6a"};  // Rot
             case 4: return {"#b400ff", "#2a1a3a", "#8a6aa0"};  // Lila
             default: return {"#39ff14", "#1f3a2b", "#7a9a86"}; // Gruen (Standard)
         }
@@ -183,6 +183,21 @@ namespace {
 
     String htmlHeader(const String& title) {
         String html;
+        // Einmalige, grosszuegige Vorab-Reservierung statt hunderter
+        // einzelner "+="-Reallozierungen: Arduino Strings scheitern bei
+        // einem fehlgeschlagenen realloc() (fragmentierter ESP32-Heap)
+        // STILL - der Rueckgabewert von concat() wird ueberall im Projekt
+        // ungeprueft verworfen, ein einzelner missgluecketer "+=" mitten in
+        // dieser sehr grossen Seite laesst dann klanglos genau das
+        // dahinterstehende Stueck HTML/JS (z.B. den Leaflet-<script>-Tag)
+        // verschwinden, ohne Fehler/Crash - der Browser bekommt dadurch ein
+        // kaputtes <script src="..."> und laedt stattdessen faelschlich die
+        // ESP32-eigene 404-Seite als "JavaScript" (siehe Bugreport: "Map"-
+        // Tab, "Unexpected token '<'" + 404). Eine einzige fruehe grosse
+        // Reservierung (statt vieler kleiner, spaeter im schon
+        // fragmentierteren Heap) macht diesen Fehlschlag deutlich
+        // unwahrscheinlicher.
+        html.reserve(20480);
         WebTheme wt = currentWebTheme();
         html += "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">";
         html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
@@ -232,6 +247,23 @@ namespace {
         // sichtbar reagieren, egal was danach passiert oder wie lange es
         // dauert - siehe gleiche Ueberlegung beim OTA-Neustart-Button.
         html += "#acInfo a:active{background:#ff3b3b;color:#0a0f0d;}";
+        // Umschalter "Radar"/"Map" (siehe appendRadarSection()) - gleicher
+        // Button-Stil wie die restliche Seite, aktiver Tab invertiert
+        // (gefuellte Akzentfarbe, dunkler Text), genau wie aktive Eintraege
+        // ueberall sonst im Projekt (siehe Geraete-UI-Konvention).
+        html += "#viewTabs{margin-bottom:8px;}";
+        html += "#viewTabs button{background:#0a0f0d;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:4px 14px;font-family:inherit;cursor:pointer;margin-right:6px;}";
+        html += "#viewTabs button.active{background:var(--accent);color:#0a0f0d;}";
+        // Leaflet verlangt eine feste Hoehe auf dem Karten-Container (kein
+        // Auto-Sizing wie beim Canvas oben) - gleiche Breite/Rahmen-Optik
+        // wie #radarCanvas, damit beide Ansichten optisch zusammengehoeren.
+        html += "#mapView{display:none;}";
+        html += "#leafletMap{width:100%;max-width:400px;height:340px;border:1px solid var(--accent-border);border-radius:8px;background:#05100a;}";
+        // Leaflets eigene Popup-Box ist per Default hell/weiss - an das
+        // dunkle Seitendesign angeglichen, gleiche Farben wie #acInfo oben.
+        html += ".leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#0a0f0d;color:var(--accent);}";
+        html += ".leaflet-popup-content{font-family:inherit;font-size:13px;line-height:1.7;}";
+        html += ".leaflet-popup-content a{color:#ff3b3b;}";
         // Sternenhintergrund liegt als eigener, fixierter Layer HINTER der
         // eigentlichen Seite (siehe appendStarBackground() oben) - ".page"
         // bekommt deshalb einen eigenen Stacking-Context mit hoeherem
@@ -277,6 +309,17 @@ namespace {
         bool metric = LocationManager::useMetricUnits();
 
         html += "<h2>Live Radar</h2>";
+        // Karten-Tab (Leaflet + OpenStreetMap-Kacheln, beide per CDN aus dem
+        // Browser des Nutzers geladen - NICHT im ESP32-Flash eingebettet,
+        // siehe Alex' ausdruecklicher Vorgabe). Radar-Canvas bleibt
+        // unveraendert der Default-Tab, die Karte ist eine zusaetzliche,
+        // gleichberechtigte Ansicht derselben /radar.json-Daten, kein
+        // Ersatz. Feste Versionsnummer (1.9.4) statt "latest", wie bei
+        // jeder externen Bibliothek im Projekt ueblich.
+        html += "<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css\">";
+        html += "<script src=\"https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js\"></script>";
+        html += "<div id=\"viewTabs\"><button id=\"tabRadar\" class=\"active\" type=\"button\">Radar</button><button id=\"tabMap\" type=\"button\">Map</button></div>";
+        html += "<div id=\"radarView\">";
         html += "<div id=\"radarControls\">Range: <select id=\"radarRange\">";
         for (uint8_t i = 0; i < Config::RANGE_STEP_COUNT; i++) {
             bool isDefault = fabsf(Config::RANGE_STEPS_KM[i] - deviceRangeKm) < 0.5f;
@@ -298,6 +341,8 @@ namespace {
         html += "<canvas id=\"radarCanvas\" width=\"360\" height=\"360\"></canvas>";
         html += "<p id=\"radarStatus\">Loading...</p>";
         html += "<div id=\"acInfo\"></div>";
+        html += "</div>"; // #radarView
+        html += "<div id=\"mapView\"><div id=\"leafletMap\"></div></div>";
         html += "<script>(function(){";
         html += "var canvas=document.getElementById('radarCanvas');";
         html += "var ctx=canvas.getContext('2d');";
@@ -314,7 +359,7 @@ namespace {
         // uebernommen werden kann, ohne die Seite neu laden zu muessen. Bei
         // Aenderung an einer der drei Farben bitte BEIDE Stellen synchron
         // halten.
-        html += "var THEME_PALETTES=[['#39ff14','#1f3a2b','#7a9a86'],['#ffb000','#3a2c1a','#a08a5a'],['#00c8ff','#1a2c3a','#6a90a0'],['#ff0202','#3a1a1a','#a06a6a'],['#b400ff','#2a1a3a','#8a6aa0']];";
+        html += "var THEME_PALETTES=[['#39ff14','#1f3a2b','#7a9a86'],['#ffb000','#3a2c1a','#a08a5a'],['#00c8ff','#1a2c3a','#6a90a0'],['#ff0000','#3a1a1a','#a06a6a'],['#b400ff','#2a1a3a','#8a6aa0']];";
         html += "var lastThemeIndex=" + String(SettingsStore::radarThemeIndex()) + ";";
         html += "function applyTheme(idx){var p=THEME_PALETTES[idx]||THEME_PALETTES[0];var s=document.documentElement.style;";
         html += "s.setProperty('--accent',p[0]);s.setProperty('--accent-border',p[1]);s.setProperty('--accent-muted',p[2]);}";
@@ -571,7 +616,7 @@ namespace {
         // auf (unnoetiges Neusetzen der CSS-Variablen bei jedem Poll waere
         // harmlos, aber unnoetig).
         html += "if(data.theme_index!==undefined&&data.theme_index!==lastThemeIndex){lastThemeIndex=data.theme_index;applyTheme(data.theme_index);}";
-        html += "draw(data);refreshSelectedInfo();updateWatchBadge(data.aircraft);";
+        html += "draw(data);refreshSelectedInfo();updateWatchBadge(data.aircraft);updateMapMarkers(data);";
         html += "lastUpdateMs=Date.now();updateFreshness();updateConnStatus(true);";
         html += "}).catch(function(){status.textContent='Connection lost - retrying...';updateConnStatus(false);});";
         html += "}";
@@ -600,6 +645,98 @@ namespace {
         // Geraete-Display: Flugzeugpositionen aktualisieren sich weiterhin
         // nur alle 8s per poll(), die Sterne twinkeln aber fluessig dazwischen.
         html += "setInterval(function(){draw(lastData);},150);";
+
+        // Kartenansicht (Leaflet + OpenStreetMap) - eigenstaendiger Block,
+        // teilt sich aber lastData/altColor/fmtDist/cssVar mit dem
+        // Radar-Canvas oben (gleiche IIFE-Closure), damit KEIN zweites,
+        // unabhaengiges Polling noetig ist - updateMapMarkers() wird direkt
+        // aus dem bestehenden poll()-Erfolgs-Zweig oben mitaufgerufen.
+        // map() selbst wird bewusst ERST beim allerersten Umschalten auf
+        // den "Map"-Tab angelegt (nicht schon beim Seitenaufbau) - Leaflet
+        // kann seine Kachel-/Kartengroesse nicht zuverlaessig ermitteln,
+        // solange der Container per "display:none" verborgen ist.
+        html += "var map=null,aircraftLayer=null,homeMarker=null;";
+        html += "function popupHtml(a){var lines=[];";
+        html += "lines.push('<b>'+(a.callsign||a.hex)+'</b> ('+a.hex+')');";
+        html += "lines.push('Altitude: '+Math.round(a.alt_ft)+' ft');";
+        html += "if(a.speed_kt){lines.push('Speed: '+Math.round(a.speed_kt)+' kt');}";
+        html += "lines.push('Distance: '+fmtDist(a.dist_km)+', bearing '+Math.round(a.bearing_deg)+'\\u00b0');";
+        html += "lines.push('Heading: '+Math.round(a.track_deg)+'\\u00b0');";
+        html += "if(a.squawk){lines.push('Squawk: '+a.squawk);}";
+        html += "if(a.has_callsign){lines.push('<a href=\"https://flightaware.com/live/flight/'+encodeURIComponent(a.callsign)+'\" target=\"_blank\" rel=\"noopener\">Track &amp; photo on FlightAware &rarr;</a>');}";
+        html += "return lines.join('<br>');}";
+        // Kleiner, in Fluglinie zeigender Pfeil pro Flugzeug (analog zum
+        // neuen Richtungs-Chevron auf dem Geraete-Radar) - per CSS
+        // transform:rotate() gedreht, 0 Grad = Spitze nach Norden/oben,
+        // deckungsgleich mit der Kompasskonvention aus track_deg
+        // (0=Norden, im Uhrzeigersinn), kein Vorzeichen-Umrechnen noetig.
+        // Bodenfahrzeuge bekommen dieselbe Form in Grau statt Hoehenfarbe -
+        // rein kosmetisch, kein eigenes Symbol noetig fuer diese Ansicht.
+        html += "function aircraftIcon(a){var color=a.ground_vehicle?'#aaaaaa':altColor(a.alt_ft);";
+        html += "var html='<div style=\"width:18px;height:18px;transform:rotate('+(a.track_deg||0)+'deg);\">'+";
+        html += "'<svg viewBox=\"0 0 18 18\" width=\"18\" height=\"18\"><polygon points=\"9,1 16,17 9,13 2,17\" fill=\"'+color+'\" stroke=\"#000\" stroke-width=\"0.5\"/></svg></div>';";
+        html += "return L.divIcon({html:html,className:'',iconSize:[18,18],iconAnchor:[9,9]});}";
+        html += "function updateMapMarkers(data){if(!map)return;";
+        html += "aircraftLayer.clearLayers();";
+        html += "(data.aircraft||[]).forEach(function(a){";
+        html += "if(!a.lat&&!a.lon)return;";
+        html += "L.marker([a.lat,a.lon],{icon:aircraftIcon(a)}).bindPopup(popupHtml(a)).addTo(aircraftLayer);";
+        html += "});";
+        html += "if(homeMarker&&(data.home_lat||data.home_lon)){homeMarker.setLatLng([data.home_lat,data.home_lon]);}";
+        html += "}";
+        html += "function initMap(){";
+        html += "map=L.map('leafletMap');";
+        // Offizieller OSM-Standard-Tile-Server mit korrekter Attribution
+        // (OSM-Nutzungsbedingungen) - kein aggressives Vorausladen, Leaflet
+        // holt Kacheln ausschliesslich bei tatsaechlichem Pan/Zoom, genau
+        // wie beim Standardverhalten der Bibliothek vorgesehen.
+        html += "L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\" rel=\"noopener\">OpenStreetMap</a> contributors'}).addTo(map);";
+        html += "aircraftLayer=L.layerGroup().addTo(map);";
+        html += "var hLat=lastData.home_lat||0,hLon=lastData.home_lon||0;";
+        html += "homeMarker=L.circleMarker([hLat,hLon],{radius:7,color:'#ffffff',weight:2,fillColor:cssVar('--accent')||'#39ff14',fillOpacity:1}).addTo(map);";
+        html += "homeMarker.bindTooltip('Home');";
+        // Anfangs-Zoom NUR hier beim allerersten Anlegen der Karte
+        // (initMap() laeuft laut obigem Kommentar genau einmal) automatisch
+        // an die tatsaechlichen Daten anpassen, statt einer festen
+        // Zoomstufe (Alex' Meldung: bei 25km Reichweite und nur 3
+        // sichtbaren Flugzeugen musste man vorher 5x manuell herauszoomen).
+        // updateMapMarkers() ruehrt die Kartenansicht selbst NIE an
+        // (siehe dort) - spaeteres manuelles Zoomen/Pannen des Nutzers
+        // bleibt dadurch bei jedem weiteren Datenupdate unangetastet.
+        html += "var initialAc=(lastData.aircraft||[]).filter(function(a){return a.lat||a.lon;});";
+        html += "if(initialAc.length>0){";
+        // fitBounds() ueber Home-Marker UND alle gerade sichtbaren
+        // Flugzeuge - deckt genau den Fall ab, den Alex gemeldet hat.
+        // maxZoom verhindert ein zu starkes Heranzoomen, falls alle
+        // Flugzeuge zufaellig dicht beieinander (nahe am Home-Marker)
+        // liegen.
+        html += "var pts=[[hLat,hLon]];";
+        html += "initialAc.forEach(function(a){pts.push([a.lat,a.lon]);});";
+        html += "map.fitBounds(pts,{padding:[30,30],maxZoom:13});";
+        html += "}else{";
+        // Fallback bei leerem Himmel: Zoom passend zur eingestellten
+        // Radar-Reichweite waehlen - ein (nie tatsaechlich gezeichneter)
+        // Kreis mit range_km Radius um den Home-Marker liefert per
+        // getBounds() genau die Flaeche, auf die fitBounds() dann zoomt.
+        html += "var rKm=lastData.range_km||25;";
+        html += "map.fitBounds(L.circle([hLat,hLon],{radius:rKm*1000}).getBounds(),{padding:[10,10]});";
+        html += "}";
+        html += "updateMapMarkers(lastData);";
+        html += "}";
+
+        // Tab-Umschalter Radar/Map - zeigt/versteckt die beiden Ansichten,
+        // legt die Karte beim allerersten Wechsel dorthin an (siehe
+        // initMap()-Kommentar oben) und ruft danach nur noch
+        // invalidateSize() auf (Leaflet muss seine Kachel-Groesse neu
+        // berechnen, sobald der zuvor verborgene Container wieder sichtbar
+        // wird, sonst bleiben Kacheln teilweise grau).
+        html += "var radarViewEl=document.getElementById('radarView'),mapViewEl=document.getElementById('mapView');";
+        html += "var tabRadar=document.getElementById('tabRadar'),tabMap=document.getElementById('tabMap');";
+        html += "tabRadar.addEventListener('click',function(){radarViewEl.style.display='block';mapViewEl.style.display='none';tabRadar.classList.add('active');tabMap.classList.remove('active');});";
+        html += "tabMap.addEventListener('click',function(){radarViewEl.style.display='none';mapViewEl.style.display='block';tabMap.classList.add('active');tabRadar.classList.remove('active');";
+        html += "if(!map){initMap();}else{map.invalidateSize();}";
+        html += "});";
+
         html += "})();</script>";
     }
 
@@ -610,6 +747,11 @@ namespace {
         String html = htmlHeader("Eiswolfs Flightradar");
 
         appendRadarSection(html);
+        // Logbuch-Tabelle danach ist variabel lang (bis MAX_DAYS_QUERIED
+        // Tage) - hier nochmal in einem Rutsch nachreservieren statt vieler
+        // weiterer kleiner Reallozierungen weiter unten (siehe Kommentar in
+        // htmlHeader() zum selben Hintergrund).
+        html.reserve(html.length() + 4096);
 
         html += "<nav><a href=\"/lists\">Manage Airline Filter &amp; Watchlist &rarr;</a></nav>";
 
@@ -712,6 +854,14 @@ namespace {
         html += "</footer>";
 
         html += "</div></body></html>";
+        // TESTWEISE: Diagnose fuer den Map-Tab-Bug (fehlgeschlagener
+        // Leaflet-<script>-Tag) - falls das Problem trotz der Vorab-
+        // Reservierung oben nochmal auftritt, zeigt dieser Log-Eintrag, ob
+        // html.length() plausibel ist und wie knapp der freie Heap zum
+        // Sendezeitpunkt tatsaechlich war. Wieder entfernen, sobald der Fix
+        // bestaetigt ist.
+        Serial.printf("[WebUI] handleRoot: html.length()=%u freeHeap=%u\n",
+                      (unsigned)html.length(), (unsigned)ESP.getFreeHeap());
         server.send(200, "text/html", html);
     }
 
@@ -920,6 +1070,17 @@ namespace {
 
         JsonDocument doc;
         doc["range_km"] = rangeKm;
+        // Fuer die neue Kartenansicht (Leaflet, siehe appendRadarSection()) -
+        // der eigene Standort als Kartenmittelpunkt/Home-Marker. Wird bei
+        // jedem Poll mitgeschickt (nicht nur einmalig beim Seitenaufbau),
+        // falls sich der aktive Standort waehrend die Seite offen ist
+        // aendert (z.B. Standort-Preset am Geraet gewechselt).
+        {
+            double homeLat = 0, homeLon = 0;
+            LocationManager::getHomeLocation(homeLat, homeLon);
+            doc["home_lat"] = homeLat;
+            doc["home_lon"] = homeLon;
+        }
         // Fuer das WebUI-Farbthema (Alex' Wunsch) - dieselbe SettingsStore::
         // radarThemeIndex(), aus der auch WebTheme::currentWebTheme() beim
         // Seitenaufbau die :root-CSS-Variablen ableitet (siehe htmlHeader()).
@@ -1006,6 +1167,13 @@ namespace {
             o["callsign"] = a.callsign[0] ? a.callsign : a.hex;
             o["dist_km"] = a.distanceKm;
             o["bearing_deg"] = a.bearingDeg;
+            // Fuer die Kartenansicht (siehe appendRadarSection()) - echte
+            // WGS84-Koordinaten, unabhaengig von der Peilung/Distanz-Polar-
+            // Darstellung des Radar-Canvas oben. Steht im Aircraft-Snapshot
+            // ohnehin schon zur Verfuegung (aus dem ADS-B-Feed), kein
+            // zusaetzlicher Rechen-/Netzwerkaufwand.
+            o["lat"] = a.lat;
+            o["lon"] = a.lon;
             o["alt_ft"] = a.altBaroFt;
             o["track_deg"] = a.headingDeg;
             o["ground_vehicle"] = isGroundVehicle;

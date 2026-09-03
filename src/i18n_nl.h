@@ -135,6 +135,7 @@ static const char* const I18N_NL[] = {
 
     "Tik op een vliegtuig voor meer details",
     "Lege lucht sinds ",
+    "Geen verbinding - laatste bekende stand wordt getoond",
     "1 vliegtuig",
     " vliegtuigen",
 
@@ -370,6 +371,10 @@ static const char* const I18N_NL[] = {
 
     "= Overheid/militair (best effort)",
 
+    "Waarschijnlijk naderend naar ",
+    " - ETA ~",
+    " min (schatting)",
+
     "LED-melding bij update: ",
     "Over de updateknop",
     "Controleert of er een nieuwere firmwareversie beschikbaar is op GitHub en toont deze hier. Tik op deze knop om hem rechtstreeks via WiFi te downloaden en installeren - geen kabel of webflasher nodig.",
@@ -385,6 +390,7 @@ static const char* const I18N_NL[] = {
     "Schakelt drie gedimde hoekweergaven op het radarscherm samen in of uit: de 3-uurs weersverwachting (rechtsboven), de afstand en peiling tot de dichtstbijzijnde luchthaven (linksboven), en de roterende gebeurtenisindicator (rechtsonder) voor squawk-volglijst-, vliegtuig-volglijst- en verborgen-maatschappij-treffers - alleen gebeurtenissen die je zelf in een lijst of filter hebt ingesteld. Uitgeschakeld blijven alle drie leeg voor een rustiger scherm. De update-beschikbaar-indicator (linksonder) wordt hierdoor niet beïnvloed en blijft in elk geval werken.",
 
     "Militair/overheidsvliegtuig",
+
     "Heavy-vliegtuig",
 
     "Kleuren",
@@ -392,6 +398,13 @@ static const char* const I18N_NL[] = {
     "Rood",
     "Paars",
     "Over",
+    "Logboek automatisch uitgeschakeld",
+    "Het vluchtlogboek schakelt zichzelf na 24 uur automatisch uit om te voorkomen dat de SD-kaart ongemerkt volloopt. Het staat momenteel om deze reden uit, niet omdat je het zelf hebt uitgeschakeld. Zet het hierboven weer aan als je wilt blijven registreren.",
+    "Alarmmodus: ",
+    "Eenvoudig",
+    "Slim",
+    "Hoe het slimme alarm werkt",
+    "In plaats van één enkele afstandsdrempel gebruikt het slimme alarm drie geneste zones - Geel (<20 km), Oranje (<10 km), Rood (<5 km) - en gaat alleen af wanneer een vliegtuig daadwerkelijk nadert, dus opnieuw een dichterbij gelegen zone binnenkomt, niet zolang het daar blijft of zich weer verwijdert. Om valse alarmen door hoog overvliegend langeafstandsverkeer te verminderen, moet de hoogte van het vliegtuig bovendien onder 3000 ft liggen. Alle drie de zones gebruiken dezelfde LED-kleur als het eenvoudige alarm (je huidige themakleur), maar knipperen steeds sneller - langzaam bij Geel, gemiddeld bij Oranje, snel bij Rood - en blijven per gebeurtenis maar een paar seconden branden in plaats van continu.",
 };
 
 static_assert(sizeof(I18N_NL) / sizeof(I18N_NL[0]) == (size_t)StringId::COUNT,

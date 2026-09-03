@@ -16,12 +16,19 @@ namespace {
     bool autoBrightnessOn = false;
     bool emergencyAlertOn = true;
     bool proximityAlertOn = true;
+    // AUS per Default = "Einfach"-Modus (bisheriges Verhalten unveraendert).
+    bool proximityAlertSmartOn = false;
     // MUSS bei einer frischen Installation aus sein - sonst schreibt sich
     // die SD-Karte unbemerkt voll (siehe Bestaetigungsdialog beim
     // Einschalten in menu_screen.cpp + 24h-Auto-Aus in flight_logbook.cpp).
     bool flightLogbookOn = false;
     uint32_t logbookEnabledAtEpoch = 0;
     char logbookSessionFile[16] = {0};
+    // AUS per Default - wird nur von FlightLogbook::checkAutoOff() auf AN
+    // gesetzt, wenn die 24h-Sicherheitsabschaltung tatsaechlich greift, und
+    // von jedem manuellen Antippen des Flugbuch-Schalters wieder auf AUS
+    // zurueckgesetzt (siehe menu_screen.cpp).
+    bool logbookAutoOffTriggered = false;
     bool ledHeartbeatOn = true;
     uint8_t screenTimeoutMin = 0;
     bool nightDimmingOn = true;
@@ -93,6 +100,8 @@ namespace {
             emergencyAlertOn = (value.toInt() != 0);
         } else if (key == "proximity_alert") {
             proximityAlertOn = (value.toInt() != 0);
+        } else if (key == "proximity_alert_smart") {
+            proximityAlertSmartOn = (value.toInt() != 0);
         } else if (key == "flight_logbook") {
             flightLogbookOn = (value.toInt() != 0);
         } else if (key == "logbook_enabled_at") {
@@ -100,6 +109,8 @@ namespace {
         } else if (key == "logbook_session_file") {
             strncpy(logbookSessionFile, value.c_str(), sizeof(logbookSessionFile) - 1);
             logbookSessionFile[sizeof(logbookSessionFile) - 1] = 0;
+        } else if (key == "logbook_auto_off_triggered") {
+            logbookAutoOffTriggered = (value.toInt() != 0);
         } else if (key == "led_heartbeat") {
             ledHeartbeatOn = (value.toInt() != 0);
         } else if (key == "screen_timeout_min") {
@@ -208,9 +219,11 @@ void save() {
     f.printf("auto_brightness=%d\n", autoBrightnessOn ? 1 : 0);
     f.printf("emergency_alert=%d\n", emergencyAlertOn ? 1 : 0);
     f.printf("proximity_alert=%d\n", proximityAlertOn ? 1 : 0);
+    f.printf("proximity_alert_smart=%d\n", proximityAlertSmartOn ? 1 : 0);
     f.printf("flight_logbook=%d\n", flightLogbookOn ? 1 : 0);
     f.printf("logbook_enabled_at=%lu\n", (unsigned long)logbookEnabledAtEpoch);
     f.printf("logbook_session_file=%s\n", logbookSessionFile);
+    f.printf("logbook_auto_off_triggered=%d\n", logbookAutoOffTriggered ? 1 : 0);
     f.printf("led_heartbeat=%d\n", ledHeartbeatOn ? 1 : 0);
     f.printf("screen_timeout_min=%d\n", screenTimeoutMin);
     f.printf("night_dimming=%d\n", nightDimmingOn ? 1 : 0);
@@ -292,6 +305,13 @@ void setProximityAlertEnabled(bool on) {
     save();
 }
 
+bool proximityAlertSmartMode() { return proximityAlertSmartOn; }
+
+void setProximityAlertSmartMode(bool on) {
+    proximityAlertSmartOn = on;
+    save();
+}
+
 bool flightLogbookEnabled() { return flightLogbookOn; }
 
 void setFlightLogbookEnabled(bool on) {
@@ -311,6 +331,13 @@ String flightLogbookSessionFile() { return String(logbookSessionFile); }
 void setFlightLogbookSessionFile(const String& label) {
     strncpy(logbookSessionFile, label.c_str(), sizeof(logbookSessionFile) - 1);
     logbookSessionFile[sizeof(logbookSessionFile) - 1] = 0;
+    save();
+}
+
+bool flightLogbookAutoOffTriggered() { return logbookAutoOffTriggered; }
+
+void setFlightLogbookAutoOffTriggered(bool on) {
+    logbookAutoOffTriggered = on;
     save();
 }
 

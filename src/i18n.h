@@ -135,6 +135,16 @@ enum class StringId : uint16_t {
     RADAR_TAP_FOR_DETAILS,
     RADAR_EMPTY_SKY_PREFIX,
 
+    // Offline-/Stale-Data-Modus (radar_screen.cpp, InfoMsgKind::Offline) -
+    // ersetzt die normale Infozeile (RADAR_TAP_FOR_DETAILS/
+    // RADAR_EMPTY_SKY_PREFIX), sobald der letzte ADS-B-Abruf laenger als
+    // Config::STALE_DATA_OFFLINE_THRESHOLD_MS zurueckliegt (AircraftTable::
+    // msSinceLastSuccessfulFetch()) - macht sichtbar, dass die gerade
+    // angezeigten Flugzeuge (ausgegraut, siehe drawTypedMarker()-Aufrufer
+    // in tick()) keine Live-Positionen mehr sind, sondern der zuletzt
+    // bekannte Stand.
+    RADAR_OFFLINE_STALE_HINT,
+
     // Anzahl aktuell sichtbarer Flugzeuge, der Hinweiszeile RADAR_TAP_FOR_DETAILS
     // vorangestellt (radar_screen.cpp, "kind == TapForDetails"-Zweig) - z.B.
     // "5 Flugzeuge - Für mehr Details ein Flugzeug antippen". SINGULAR ist der
@@ -686,6 +696,26 @@ enum class StringId : uint16_t {
     // Hoehen-Legende.
     DETAIL_MILITARY_LEGEND,
 
+    // Anflug-Erkennung (Best-Effort, rein geometrisch aus Live-Daten
+    // abgeleitet, siehe aircraft_table.cpp::postFetchUpdate() und
+    // Aircraft::approachLikely/approachEtaMin in aircraft.h) - teilt sich
+    // dieselbe letzte Panel-Zeile mit DETAIL_MILITARY_LEGEND/
+    // DETAIL_TAP_CLOSE (drawDetailPanel(), radar_screen.cpp): Prioritaet
+    // Militaer-/Behoerden-Legende > Anflug-Hinweis > "Antippen zum
+    // Schliessen", da fuer eine echte zwoelfte Zeile im 286px hohen Panel
+    // kein Platz mehr ist (siehe Kommentar bei DETAIL_MILITARY_LEGEND
+    // oben). Drei Teile statt einem einzigen Format-String, damit Distanz-
+    // Code (dynamisch, kommt aus Weather::currentNearestAirport()) und
+    // ETA-Minutenzahl (per snprintf %d eingefuegt, siehe drawDetailPanel())
+    // dazwischen passen - Einheit "min" bleibt bewusst wie ueberall sonst
+    // im Projekt (ft/min, km/h etc.) unuebersetzt, nur die umgebenden
+    // Woerter werden uebersetzt. DETAIL_APPROACH_PREFIX endet mit einem
+    // Leerzeichen (direkt gefolgt vom Flughafencode), DETAIL_APPROACH_ETA
+    // beginnt/endet ebenfalls mit Leerzeichen (umschliesst die Zahl).
+    DETAIL_APPROACH_PREFIX,
+    DETAIL_APPROACH_ETA,
+    DETAIL_APPROACH_SUFFIX,
+
     // Schalter auf der System-Seite (Page::System, menu_screen.cpp),
     // direkt unter dem "Nach Update suchen"-Button - steuert NUR das
     // LED-Blinken bei verfuegbarem Update (dreimal kurz Magenta, siehe
@@ -757,6 +787,25 @@ enum class StringId : uint16_t {
     // ueber den inzwischen entfernten Header-Titel "Eiswolfs FR"
     // erreichbar) wieder zugaenglich macht.
     MENU_ABOUT,
+
+    // Hinweis-Info-Screen (kleiner roter Punkt + "?"-Button an der
+    // Flugbuch-Zeile, siehe menu_screen.cpp), der NUR erscheint, wenn die
+    // 24h-Sicherheitsabschaltung das Flugbuch automatisch ausgeschaltet
+    // hat (nicht bei bewusstem manuellem Ausschalten), siehe
+    // SettingsStore::flightLogbookAutoOffTriggered().
+    FLIGHT_LOGBOOK_AUTO_OFF_TITLE,
+    FLIGHT_LOGBOOK_AUTO_OFF_BODY,
+
+    // "Intelligenter" Naeherungsalarm (SettingsStore::
+    // proximityAlertSmartMode(), siehe radar_screen.cpp::
+    // updateProximityAlert()) - alternative Auswertungslogik zum
+    // bestehenden einfachen Naeherungsalarm, waehlbar per Umschalter im
+    // "LED-Alarme"-Untermenue (Page::FlightLed in menu_screen.cpp).
+    MENU_PROXIMITY_ALERT_MODE,
+    PROXIMITY_ALERT_MODE_SIMPLE,
+    PROXIMITY_ALERT_MODE_SMART,
+    PROXIMITY_SMART_INFO_TITLE,
+    PROXIMITY_SMART_INFO_BODY,
 
     COUNT
 };

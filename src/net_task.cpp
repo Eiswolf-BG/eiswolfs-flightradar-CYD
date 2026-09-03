@@ -131,10 +131,40 @@ namespace {
                                                      tempTable, Config::MAX_TRACKED_AIRCRAFT);
 
                     if (result.ok) {
+                        // Offline-/Stale-Data-Modus (radar_screen.cpp) - haelt
+                        // fest, WANN zuletzt ein ADS-B-Abruf erfolgreich war,
+                        // unabhaengig vom "letzten bekannten Wert"-Tracking
+                        // einzelner Flugzeuge weiter unten.
+                        AircraftTable::markFetchSuccess(millis());
+
                         AircraftTable::lock();
                         memcpy(AircraftTable::raw(), tempTable,
                                sizeof(Aircraft) * Config::MAX_TRACKED_AIRCRAFT);
                         AircraftTable::postFetchUpdate(lat, lon);
+                        // postFetchUpdate() schreibt seine "letzter bekannter
+                        // Wert"-Felder (proximityZone, NEU auch
+                        // prevAirportDistKm/approachLikely/approachEtaMin fuer
+                        // die Best-Effort-Anflug-Erkennung, siehe aircraft.h)
+                        // NUR in AircraftTable::raw() - tempTable bekommt das
+                        // ohne diese Rueckkopie nie zu sehen und wuerde beim
+                        // naechsten Zyklus wieder mit dem alten (bzw. fuer
+                        // prevAirportDistKm: dem Default-)Wert ueberschrieben,
+                        // sobald memcpy() oben erneut komplett von tempTable
+                        // nach raw() kopiert. proximityZone "ueberlebt" das in
+                        // der Praxis nur, weil radar_screen.cpp::
+                        // updateProximityAlert() denselben raw()-Speicher
+                        // zusaetzlich viel haeufiger (jeden UI-Tick auf Core 1)
+                        // direkt liest/schreibt, ausserhalb dieses Zyklus -
+                        // prevAirportDistKm hat kein solches Aequivalent
+                        // (postFetchUpdate() ist die einzige Stelle, die es
+                        // liest/schreibt) und muss deshalb explizit
+                        // zurueckkopiert werden, sonst wuerde "Distanz zum
+                        // Flughafen sinkt ueber die letzten Zyklen" nie
+                        // erkannt (mit einer TESTWEISE simulierten, stetig
+                        // sinkenden Distanz bestaetigt und behoben).
+                        memcpy(tempTable, AircraftTable::raw(),
+                               sizeof(Aircraft) * Config::MAX_TRACKED_AIRCRAFT);
+
                         AircraftTable::unlock();
 
                         FlightLogbook::update();

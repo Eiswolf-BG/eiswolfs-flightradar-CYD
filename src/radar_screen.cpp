@@ -144,6 +144,21 @@ namespace {
         float bearingDeg;
         bool crtFadeEligible;
         uint16_t baseColor;
+        // Fuer den Offline-/Stale-Data-Modus (siehe tick()-Redraw-Block
+        // unten) - derselbe "letzten bekannten Wert merken"-Zeitstempel wie
+        // Aircraft::lastSeenMs (aircraft.h), hier zusaetzlich in hitPoints[]
+        // gespiegelt, damit tick() ihn auch dann noch lesen kann, wenn
+        // render() (und damit ein frischer AircraftTable-Zugriff) wegen
+        // eines fehlgeschlagenen ADS-B-Abrufs gerade gar nicht mehr laeuft.
+        uint32_t lastSeenMs;
+        // Zuletzt tatsaechlich gezeichneter Label-Text (Rufzeichen, ggf. mit
+        // angehaengter "vor Xs"-Sekundenzahl waehrend des Offline-/Stale-
+        // Data-Modus) - noetig, um bei einer Aenderung (z.B. "42s" ->
+        // "43s", unterschiedliche Textbreite) den ALTEN Text an derselben
+        // Stelle sauber schwarz zu uebermalen, bevor der neue gezeichnet
+        // wird (siehe tick()-Redraw-Block unten). Leer = noch nichts
+        // gezeichnet (frisch aus render() uebernommen).
+        char staleLabelCache[20];
     };
     constexpr uint8_t MAX_HIT_POINTS = Config::MAX_TRACKED_AIRCRAFT;
     HitPoint hitPoints[MAX_HIT_POINTS];
@@ -248,7 +263,7 @@ namespace {
     };
     InfoMarquee infoMarquee;
 
-    enum class InfoMsgKind { None, TapForDetails, EmptySky };
+    enum class InfoMsgKind { None, TapForDetails, EmptySky, Offline };
     InfoMsgKind infoMarqueeKind = InfoMsgKind::None;
 
     constexpr uint32_t INFO_MARQUEE_STEP_MS = 200; // alle 200ms ein Zeichen weiter
@@ -999,6 +1014,18 @@ namespace {
         return nightDimActiveNow() ? gfx.color565(0, 0, 160) : TFT_BLUE;
     }
 
+    // Offline-/Stale-Data-Modus (siehe tick()-Redraw-Block unten) - bewusst
+    // TFT_LIGHTGREY statt TFT_DARKGREY (das bereits fuer das Radar-
+    // Hintergrundgitter genutzt wird, siehe drawStaticBackground() - ein
+    // gleich dunkles Grau wuerde dort optisch untergehen). Deutlich
+    // abgedunkelt gegenueber JEDER normalen Hoehen-/Kategorie-Farbe, aber
+    // weiterhin klar auf dem schwarzen Hintergrund erkennbar, wie von
+    // Alex gewuenscht. Bei Nachtdimmung zusaetzlich gedaempft, gleiches
+    // Muster wie colorForAltitude()/colorForGroundVehicle() oben.
+    uint16_t staleMarkerColor(TFT_eSPI& gfx) {
+        return nightDimActiveNow() ? gfx.color565(90, 90, 90) : TFT_LIGHTGREY;
+    }
+
     // Zeigt die PEILUNG (nicht zu verwechseln mit der Flugrichtung/heading)
     // zum aktuell ausgewaehlten Flugzeug: eine duenne, gepunktete Linie vom
     // Radar-Zentrum zum Kreisrand in Richtung bearingDeg, plus die Gradzahl
@@ -1134,6 +1161,78 @@ namespace {
 
         gfx.drawLine(tipX, tipY, leftX, leftY, color);
         gfx.drawLine(tipX, tipY, rightX, rightY, color);
+    }
+
+    // Position/Verankerung des Rufzeichen-Labels neben einem Marker -
+    // frueher IMMER 8px senkrecht ueber dem Marker-Zentrum (BC_DATUM,
+    // feste Position unabhaengig von der Flugrichtung). Bei Flugzeugen,
+    // deren Heading zufaellig "nach oben" zeigte, geriet das Label dadurch
+    // genau in den Bereich des Richtungs-Chevrons (drawHeadingChevron()
+    // oben) und verdeckte ihn komplett (Alex' Bugmeldung - sah aus wie ein
+    // fehlender Chevron, war tatsaechlich nur eine Ueberdeckung; bei allen
+    // anderen Flugrichtungen fiel es dagegen nicht auf, wirkte dadurch wie
+    // eine "zufaellige" Positionierung).
+    //
+    // Neue Regel: die Label-Position wird aus fuenf bildschirmrelativen
+    // Kandidatenrichtungen gewaehlt (oben, oben-links, oben-rechts, links,
+    // rechts - in dieser Prioritaet), die erste, die ausserhalb des
+    // "Nasenkegels" um die Flugrichtung liegt (NOSE_EXCLUSION_DEG, deutlich
+    // grosszuegiger als der optisch schmale Chevron selbst, deckt auch die
+    // Marker-Silhouette mit ab), gewinnt. "Unten" bzw. untere Diagonalen
+    // sind bewusst KEIN Kandidat: computeLayout()/TOP_LABEL_MARGIN rechnet
+    // nur fuer "Label oben" einen vollen 20px-Randpuffer durch, unten
+    // steht dafuer nur ein knapper 6px-Puffer zur Verfuegung (siehe
+    // dortiger Kommentar) - alle fuenf Kandidaten hier haben deshalb
+    // bewusst einen Y-Versatz <= 0 (nie nach unten), damit die bestehende,
+    // fuer den oberen Rand durchgerechnete Sicherheitsmarge unveraendert
+    // gueltig bleibt. Da mindestens einer der fuenf Kandidaten IMMER
+    // ausserhalb eines bis zu 100 Grad breiten Ausschlusskegels liegt
+    // (die fuenf Kandidaten decken zusammen 180 Grad um "oben" ab, siehe
+    // Kommentar unten bei NOSE_EXCLUSION_DEG), gibt es fuer jede denkbare
+    // Flugrichtung mindestens eine gueltige Wahl.
+    struct LabelAnchor { int16_t x, y; uint8_t datum; };
+
+    LabelAnchor computeLabelAnchor(int16_t markerX, int16_t markerY, float headingDeg) {
+        // Deutlich grosszuegiger als der Chevron-Oeffnungswinkel selbst
+        // (drawHeadingChevron() spannt real nur ~15-20 Grad auf) - deckt
+        // zusaetzlich die Marker-Silhouette (Rumpf/Fluegel) mit ab und
+        // laesst Luft fuer Antipp-Ungenauigkeit beim Betrachten.
+        constexpr float NOSE_EXCLUSION_DEG = 50.0f;
+
+        struct Candidate { float angleDeg; int16_t dx, dy; uint8_t datum; };
+        // Reihenfolge = Prioritaet. "Oben" zuerst (einzige Variante mit
+        // vollstaendig durchgerechnetem Randpuffer, siehe Funktions-
+        // kommentar). Links/rechts als naechstes (Y-Versatz leicht nach
+        // oben gezogen, bleibt also innerhalb derselben Marge). Die beiden
+        // oberen Diagonalen zuletzt (seltener gebraucht, decken nur die
+        // Faelle ab, in denen sowohl "oben" als auch eine Seite durch den
+        // Ausschlusskegel blockiert sind).
+        static const Candidate candidates[] = {
+            {0.0f,   0,  -8, BC_DATUM},
+            {270.0f, -10, -4, MR_DATUM},
+            {90.0f,   10, -4, ML_DATUM},
+            {315.0f, -8,  -6, BR_DATUM},
+            {45.0f,   8,  -6, BL_DATUM},
+        };
+
+        for (const auto& cand : candidates) {
+            float diff = fabsf(headingDeg - cand.angleDeg);
+            if (diff > 180.0f) diff = 360.0f - diff;
+            if (diff > NOSE_EXCLUSION_DEG) {
+                // Horizontal an den Bildschirmrand geklemmt (gleiches
+                // einfache constrain()-Muster wie beim Peilungs-Label in
+                // drawBearingIndicator()) - die reine "oben"-Variante
+                // (dx=0) bleibt davon unberuehrt, nur die seitlich/
+                // diagonal verschobenen Varianten koennen das ueberhaupt
+                // brauchen.
+                int16_t x = constrain((int16_t)(markerX + cand.dx), (int16_t)16, (int16_t)(Config::SCREEN_WIDTH - 16));
+                int16_t y = (int16_t)(markerY + cand.dy);
+                return {x, y, cand.datum};
+            }
+        }
+        // Kann rechnerisch nie erreicht werden (siehe Funktionskommentar),
+        // Fallback nur zur Sicherheit: alte, immer-oben-Position.
+        return {(int16_t)(markerX), (int16_t)(markerY - 8), BC_DATUM};
     }
 
     // Generische Flugzeug-Silhouette - Fallback, wenn der ICAO-Typcode
@@ -1617,6 +1716,12 @@ namespace {
         uint16_t fg = TFT_GREEN;
     };
 
+    // Die drei moeglichen Inhalte der letzten Panel-Zeile (siehe
+    // drawDetailPanel()) - als uint8_t in PanelState::lastLineKind
+    // gespeichert statt als Enum-Member direkt, um die Struct-Definition
+    // nicht von dieser Enum-Deklaration abhaengig zu machen.
+    enum class LastLineKind : uint8_t { Notable, Approach, TapClose };
+
     struct PanelState {
         bool valid = false;
         char hex[7] = {0};
@@ -1629,13 +1734,22 @@ namespace {
         char callsign[9] = {0};
         char reg[9] = {0};
         LineMarquee airline, model, type, route, alt, speed, climb, distHeading, squawk, seats;
+        // Marquee-Zustand fuer den Best-Effort-Anflug-Hinweis (siehe
+        // drawDetailPanel(), LastLineKind::Approach) - eigenes Feld statt
+        // Wiederverwendung eines der zehn Felder oben, da diese Zeile eine
+        // von DREI moeglichen Inhalten derselben letzten Panel-Zeile ist
+        // (Militaer-/Behoerden-Legende > Anflug-Hinweis > "Antippen zum
+        // Schliessen", siehe dortiger Kommentar) und ihr eigenes
+        // Marquee-Timing braucht, unabhaengig davon, ob sie gerade aktiv
+        // ist.
+        LineMarquee approach;
         // Verfolgt den zuletzt gezeichneten Zustand der letzten Panel-Zeile
-        // (Militaer-/Behoerden-Legende vs. "Antippen zum Schliessen"-Hinweis,
-        // siehe drawDetailPanel()) - ermoeglicht ein Neuzeichnen dieser einen
+        // (jetzt drei statt zwei moegliche Inhalte, siehe LastLineKind in
+        // drawDetailPanel()) - ermoeglicht ein Neuzeichnen dieser einen
         // Zeile, wenn sich z.B. der Squawk waehrend der Anzeige aendert,
         // ohne bei JEDEM Aufruf pauschal neu zu zeichnen (gleiches
         // Sparsamkeits-Prinzip wie bei den LineMarquee-Feldern oben).
-        bool notable = false;
+        uint8_t lastLineKind = 0xFF; // Sentinel: noch nie gezeichnet
         bool notableInitialized = false;
     };
     PanelState lastPanel;
@@ -1769,6 +1883,7 @@ namespace {
         advanceAndDrawMarqueeLine(gfx, lastPanel.distHeading);
         advanceAndDrawMarqueeLine(gfx, lastPanel.squawk);
         advanceAndDrawMarqueeLine(gfx, lastPanel.seats);
+        advanceAndDrawMarqueeLine(gfx, lastPanel.approach);
     }
 
     void drawDetailPanel(TFT_eSPI& gfx, Aircraft& a, int16_t contentTop) {
@@ -1985,49 +2100,93 @@ namespace {
         updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.seats, seatsLine, forceFull);
         y += 22;
 
-        // Letzte Panel-Zeile: entweder die neue Militaer-/Behoerden-Legende
-        // (nur wenn dieser Flug ueber isNotableCallsign()/
-        // isMilitaryGovSquawk() als solcher erkannt wurde - derselbe
-        // Zustand, der auf dem Radar selbst den oranger Ring ergibt, siehe
-        // render()/tick()) ODER wie bisher der "Antippen zum Schliessen"-
-        // Hinweis. BEWUSST gegenseitig ausschliessend statt einer
-        // zusaetzlichen zwoelften Zeile: das Panel ist bereits jetzt bis auf
-        // wenige Pixel randvoll (DETAIL_PANEL_H=286 reicht bis exakt zum
-        // unteren Bildschirmrand, y=310 fuer die letzte Zeile liegt schon
-        // nur 10px vor Config::SCREEN_HEIGHT=320) - eine echte zusaetzliche
-        // Zeile wuerde ueber den Bildschirmrand hinauslaufen. Der "Antippen
-        // zum Schliessen"-Hinweis entfaellt dadurch bei erkannten Militaer-/
-        // Behoerdenfluegen, was aber unkritisch ist (das Panel schliesst
-        // sich weiterhin per Antippen, nur der Hinweis fehlt dann).
+        // Letzte Panel-Zeile: DREI moegliche Inhalte, strikt gegenseitig
+        // ausschliessend (Prioritaet Militaer-/Behoerden-Legende > Best-
+        // Effort-Anflug-Hinweis > "Antippen zum Schliessen"-Hinweis) statt
+        // einer zusaetzlichen zwoelften Zeile: das Panel ist bereits jetzt
+        // bis auf wenige Pixel randvoll (DETAIL_PANEL_H=286 reicht bis
+        // exakt zum unteren Bildschirmrand, y=310 fuer die letzte Zeile
+        // liegt schon nur 10px vor Config::SCREEN_HEIGHT=320) - eine echte
+        // zusaetzliche Zeile wuerde ueber den Bildschirmrand hinauslaufen.
+        // Militaer-Erkennung wie bisher (isNotableCallsign()/
+        // isMilitaryGovSquawk(), derselbe Zustand, der auf dem Radar selbst
+        // den orangen Ring ergibt, siehe render()/tick()). Der Anflug-
+        // Hinweis (a.approachLikely, siehe aircraft_table.cpp::
+        // postFetchUpdate()) tritt nur an die Stelle des "Antippen zum
+        // Schliessen"-Hinweises, NIE an die der wichtigeren Militaer-
+        // Legende - beide entfallen dadurch fuer den jeweils
+        // niedrigerprioren Fall, was unkritisch ist (das Panel schliesst
+        // sich weiterhin per Antippen).
         bool notable = isNotableCallsign(a.callsign) ||
                        (SettingsStore::militarySquawkDetectionEnabled() && isMilitaryGovSquawk(a.squawk));
-        bool notableChanged = forceFull || !lastPanel.notableInitialized || lastPanel.notable != notable;
-        if (notableChanged) {
-            // Zeile komplett loeschen, bevor sie neu gezeichnet wird - sonst
-            // koennte beim Wechsel zwischen den beiden unterschiedlich
-            // langen Texten (z.B. Squawk-Aenderung waehrend das Panel offen
-            // bleibt) ein Textrest des vorherigen Inhalts stehen bleiben.
-            gfx.fillRect(0, (int16_t)(y - 16), Config::SCREEN_WIDTH, 20, TFT_BLACK);
-            if (notable) {
-                // Mini-Ring in derselben Farbe/Form wie der Marker-Ring auf
-                // dem Radar selbst (siehe isNotable-Zweig in render()/
-                // tick(), dort Radius 12, TFT_ORANGE) - hier deutlich
-                // kleiner, da reines Legenden-Symbol, kein echter Marker.
-                constexpr int16_t RING_R = 4;
-                int16_t ringCx = 8 + RING_R;
-                int16_t ringCy = (int16_t)(y - 5);
-                gfx.drawCircle(ringCx, ringCy, RING_R, TFT_ORANGE);
-                gfx.setTextColor(TFT_ORANGE, TFT_BLACK);
-                gfx.setCursor((int16_t)(ringCx + RING_R + 6), y);
-                gfx.print(I18n::t(StringId::DETAIL_MILITARY_LEGEND));
-            } else {
-                gfx.setTextColor(themeDimColor(gfx), TFT_BLACK);
-                gfx.setCursor(8, y);
-                gfx.print(I18n::t(StringId::DETAIL_TAP_CLOSE));
-            }
-            lastPanel.notable = notable;
-            lastPanel.notableInitialized = true;
+        bool showApproach = !notable && a.approachLikely && a.approachEtaMin > 0;
+        LastLineKind kind = notable ? LastLineKind::Notable
+                           : showApproach ? LastLineKind::Approach
+                                          : LastLineKind::TapClose;
+
+        // Anflug-Text vorab bilden (fuer den Vergleich UND fuer
+        // updateMarqueeLine() unten) - Flughafencode im eingestellten
+        // IATA/ICAO-Format (SettingsStore::useIataAirportCodes()), Fallback
+        // auf ICAO ohne ermittelten IATA-Code - exakt dieselbe Logik/
+        // Referenz wie die "Naechster Flughafen"-Eckanzeige
+        // (drawNearestAirportCorner() oben).
+        String approachText;
+        if (kind == LastLineKind::Approach) {
+            Weather::NearestAirport na = Weather::currentNearestAirport();
+            bool useIata = SettingsStore::useIataAirportCodes() && na.iata[0];
+            const char* code = useIata ? na.iata : na.icao;
+            char apBuf[80];
+            snprintf(apBuf, sizeof(apBuf), "%s%s%s%u%s",
+                     I18n::t(StringId::DETAIL_APPROACH_PREFIX), code,
+                     I18n::t(StringId::DETAIL_APPROACH_ETA), (unsigned)a.approachEtaMin,
+                     I18n::t(StringId::DETAIL_APPROACH_SUFFIX));
+            approachText = apBuf;
         }
+
+        bool kindChanged = forceFull || !lastPanel.notableInitialized || lastPanel.lastLineKind != (uint8_t)kind;
+
+        if (kind == LastLineKind::Approach) {
+            // updateMarqueeLine() uebernimmt Loeschen/Scrollen selbst (auch
+            // fuer laengere Uebersetzungen/lange Flughafennamen-Codes, siehe
+            // CLAUDE.md Textbreiten-Pflichtpruefung) - kein manuelles
+            // fillRect noetig.
+            updateMarqueeLine(gfx, y, 20, textMaxWidth, themeBaseColor(gfx), lastPanel.approach, approachText, kindChanged);
+        } else {
+            if (lastPanel.lastLineKind == (uint8_t)LastLineKind::Approach) {
+                // Verlaesst den Anflug-Zustand - Marquee-Timer zuruecksetzen,
+                // sonst wuerde tickDetailPanelMarquees() diese Zeile weiter
+                // ueberschreiben, obwohl sie jetzt Militaer-Legende/Tap-
+                // Close-Hinweis zeigt.
+                lastPanel.approach = LineMarquee{};
+            }
+            if (kindChanged) {
+                // Zeile komplett loeschen, bevor sie neu gezeichnet wird -
+                // sonst koennte beim Wechsel zwischen unterschiedlich
+                // langen Texten ein Textrest des vorherigen Inhalts stehen
+                // bleiben.
+                gfx.fillRect(0, (int16_t)(y - 16), Config::SCREEN_WIDTH, 20, TFT_BLACK);
+                if (kind == LastLineKind::Notable) {
+                    // Mini-Ring in derselben Farbe/Form wie der Marker-Ring
+                    // auf dem Radar selbst (siehe isNotable-Zweig in
+                    // render()/tick(), dort Radius 12, TFT_ORANGE) - hier
+                    // deutlich kleiner, da reines Legenden-Symbol, kein
+                    // echter Marker.
+                    constexpr int16_t RING_R = 4;
+                    int16_t ringCx = 8 + RING_R;
+                    int16_t ringCy = (int16_t)(y - 5);
+                    gfx.drawCircle(ringCx, ringCy, RING_R, TFT_ORANGE);
+                    gfx.setTextColor(TFT_ORANGE, TFT_BLACK);
+                    gfx.setCursor((int16_t)(ringCx + RING_R + 6), y);
+                    gfx.print(I18n::t(StringId::DETAIL_MILITARY_LEGEND));
+                } else {
+                    gfx.setTextColor(themeDimColor(gfx), TFT_BLACK);
+                    gfx.setCursor(8, y);
+                    gfx.print(I18n::t(StringId::DETAIL_TAP_CLOSE));
+                }
+            }
+        }
+        lastPanel.lastLineKind = (uint8_t)kind;
+        lastPanel.notableInitialized = true;
 
         lastPanel.valid = true;
     }
@@ -3052,10 +3211,18 @@ void render(TFT_eSPI& tft, int16_t top) {
             tft.drawCircle(pt.x, pt.y, 12, TFT_ORANGE);
         }
 
+        // Bodenfahrzeuge/Hubschrauber haben keinen Richtungs-Chevron
+        // (siehe drawGroundVehicleMarker()/drawHelicopterMarker() - kein
+        // aussagekraeftiger Kurs), die neue Ausweichlogik ist fuer sie
+        // gegenstandslos und bleibt bei der bewaehrten festen
+        // "oben"-Position.
+        LabelAnchor labelAnchor = (isGroundVehicle || isRotorcraft)
+            ? LabelAnchor{pt.x, (int16_t)(pt.y - 8), BC_DATUM}
+            : computeLabelAnchor(pt.x, pt.y, a.headingDeg);
         tft.setTextColor(color);
-        tft.setTextDatum(BC_DATUM);
+        tft.setTextDatum(labelAnchor.datum);
         const char* label = a.callsign[0] ? a.callsign : a.hex;
-        tft.drawString(label, pt.x, pt.y - 8);
+        tft.drawString(label, labelAnchor.x, labelAnchor.y);
         tft.setTextDatum(TL_DATUM);
 
         hitPoints[i].x = pt.x;
@@ -3074,6 +3241,10 @@ void render(TFT_eSPI& tft, int16_t top) {
         hitPoints[i].bearingDeg = a.bearingDeg;
         hitPoints[i].crtFadeEligible = crtFadeEligible;
         hitPoints[i].baseColor = ownColor;
+        hitPoints[i].lastSeenMs = a.lastSeenMs;
+        // Frisch aus AircraftTable uebernommen - noch kein Stale-Label
+        // gezeichnet, siehe Kommentar bei HitPoint::staleLabelCache.
+        hitPoints[i].staleLabelCache[0] = 0;
         strncpy(hitPoints[i].hex, a.hex, sizeof(hitPoints[i].hex) - 1);
         strncpy(hitPoints[i].callsign, a.callsign, sizeof(hitPoints[i].callsign) - 1);
     }
@@ -3462,6 +3633,87 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             }
         }
 
+        // Offline-/Stale-Data-Modus (Config::STALE_DATA_OFFLINE_THRESHOLD_MS/
+        // STALE_DATA_REMOVAL_MS) - reine Rendering-Entscheidung hier in
+        // tick(), OHNE AircraftTable::raw() anzufassen: laeuft (anders als
+        // render(), das nur bei einem erfolgreichen Abruf/neuer
+        // AircraftTable::version() aufgerufen wird) kontinuierlich weiter,
+        // auch waehrend der ADS-B-Abruf selbst fehlschlaegt. Nutzt dafuer
+        // denselben "letzten bekannten Wert merken"-Zeitstempel wie die
+        // Anflug-Erkennung/der intelligente Naeherungsalarm
+        // (Aircraft::lastSeenMs, hier als hp.lastSeenMs gespiegelt, siehe
+        // HitPoint-Kommentar oben) - keine neue Datenstruktur noetig.
+        uint32_t ageMs = nowMs - hp.lastSeenMs;
+        if (ageMs > Config::STALE_DATA_REMOVAL_MS) {
+            // Endgueltig entfernen: alles schwarz uebermalen, was hier
+            // zuletzt sichtbar war (Marker, Ring, Label inkl. ggf. noch
+            // angezeigtem "vor Xs"-Text), dann den Slot deaktivieren -
+            // ab dem naechsten Tick wird er oben per "if (!valid) continue"
+            // uebersprungen. Kehrt die Verbindung zwischenzeitlich zurueck
+            // und meldet der naechste erfolgreiche Abruf dieses Flugzeug
+            // erneut, legt render() ganz normal einen frischen Eintrag an.
+            if (hp.isGroundVehicle) {
+                drawGroundVehicleMarker(tft, hp.x, hp.y, TFT_BLACK);
+            } else if (hp.isRotorcraft) {
+                drawHelicopterMarker(tft, hp.x, hp.y, TFT_BLACK);
+            } else {
+                drawTypedMarker(tft, hp.x, hp.y, hp.headingDeg, TFT_BLACK, hp.typeSilhouette, hp.isHeavy);
+            }
+            if (hp.isEmergency || hp.isWatched || hp.isNotable) {
+                tft.drawCircle(hp.x, hp.y, 12, TFT_BLACK);
+            }
+            LabelAnchor eraseAnchor = (hp.isGroundVehicle || hp.isRotorcraft)
+                ? LabelAnchor{hp.x, (int16_t)(hp.y - 8), BC_DATUM}
+                : computeLabelAnchor(hp.x, hp.y, hp.headingDeg);
+            tft.setTextColor(TFT_BLACK);
+            tft.setTextDatum(eraseAnchor.datum);
+            tft.drawString(hp.staleLabelCache[0] ? hp.staleLabelCache : (hp.callsign[0] ? hp.callsign : hp.hex),
+                            eraseAnchor.x, eraseAnchor.y);
+            tft.setTextDatum(TL_DATUM);
+            hp.valid = false;
+            continue;
+        }
+
+        // "offline" gilt einheitlich fuer ALLE gerade angezeigten Flugzeuge
+        // gemeinsam (nicht pro Flugzeug per ageMs) - sobald der letzte
+        // ADS-B-Abruf insgesamt zu lange her ist, ist per Definition KEINE
+        // der aktuell angezeigten Positionen mehr live, unabhaengig davon,
+        // wie lange das jeweilige Flugzeug schon nicht mehr gemeldet wurde.
+        bool stale = AircraftTable::msSinceLastSuccessfulFetch(nowMs) > Config::STALE_DATA_OFFLINE_THRESHOLD_MS;
+        uint16_t effectiveColor = stale ? staleMarkerColor(tft) : hp.color;
+
+        // Label-Text: bei Stale-Zustand die "vor Xs"-Sekundenzahl anhaengen
+        // (Alex' Wunsch) - Einheit bewusst wie ueberall sonst im Projekt
+        // unuebersetzt (ft/min, km/h etc., siehe CLAUDE.md Code-Stil).
+        char labelBuf[20];
+        const char* baseLabel = hp.callsign[0] ? hp.callsign : hp.hex;
+        if (stale) {
+            snprintf(labelBuf, sizeof(labelBuf), "%s %lus", baseLabel, (unsigned long)(ageMs / 1000));
+        } else {
+            strncpy(labelBuf, baseLabel, sizeof(labelBuf) - 1);
+            labelBuf[sizeof(labelBuf) - 1] = 0;
+        }
+
+        LabelAnchor anchor = (hp.isGroundVehicle || hp.isRotorcraft)
+            ? LabelAnchor{hp.x, (int16_t)(hp.y - 8), BC_DATUM}
+            : computeLabelAnchor(hp.x, hp.y, hp.headingDeg);
+
+        // Falls sich der Label-Text seit dem letzten Tick geaendert hat
+        // (z.B. "42s" -> "43s", je nach Textbreite unterschiedlich lang),
+        // zuerst den ALTEN Text an genau derselben Stelle schwarz
+        // uebermalen - sonst blieben Ziffern-Reste stehen. Position/Datum
+        // sind fuer ein und dasselbe Flugzeug zwischen zwei Ticks stabil
+        // (haengen nur von x/y/headingDeg ab, die sich ohne einen neuen
+        // render()-Aufruf nicht aendern), nur der Text selbst variiert.
+        if (hp.staleLabelCache[0] && strcmp(hp.staleLabelCache, labelBuf) != 0) {
+            tft.setTextColor(TFT_BLACK);
+            tft.setTextDatum(anchor.datum);
+            tft.drawString(hp.staleLabelCache, anchor.x, anchor.y);
+            tft.setTextDatum(TL_DATUM);
+        }
+        strncpy(hp.staleLabelCache, labelBuf, sizeof(hp.staleLabelCache) - 1);
+        hp.staleLabelCache[sizeof(hp.staleLabelCache) - 1] = 0;
+
         bool inAlertRange = hp.distanceKm <= Config::LED_ALERT_RADIUS_KM;
         if (inAlertRange && !ledBlinkOn) {
             if (hp.isGroundVehicle) {
@@ -3474,20 +3726,23 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             if (hp.isEmergency || hp.isWatched || hp.isNotable) {
                 tft.drawCircle(hp.x, hp.y, 12, TFT_BLACK);
             }
+            // Muss exakt dieselbe Position/denselben Text wie beim
+            // urspruenglichen Zeichnen treffen (siehe oben), sonst bleibt
+            // hier ein farbiger Rest stehen statt sauber geloescht zu
+            // werden.
             tft.setTextColor(TFT_BLACK);
-            tft.setTextDatum(BC_DATUM);
-            const char* blinkLabel = hp.callsign[0] ? hp.callsign : hp.hex;
-            tft.drawString(blinkLabel, hp.x, hp.y - 8);
+            tft.setTextDatum(anchor.datum);
+            tft.drawString(labelBuf, anchor.x, anchor.y);
             tft.setTextDatum(TL_DATUM);
             continue;
         }
 
         if (hp.isGroundVehicle) {
-            drawGroundVehicleMarker(tft, hp.x, hp.y, hp.color);
+            drawGroundVehicleMarker(tft, hp.x, hp.y, effectiveColor);
         } else if (hp.isRotorcraft) {
-            drawHelicopterMarker(tft, hp.x, hp.y, hp.color);
+            drawHelicopterMarker(tft, hp.x, hp.y, effectiveColor);
         } else {
-            drawTypedMarker(tft, hp.x, hp.y, hp.headingDeg, hp.color, hp.typeSilhouette, hp.isHeavy);
+            drawTypedMarker(tft, hp.x, hp.y, hp.headingDeg, effectiveColor, hp.typeSilhouette, hp.isHeavy);
         }
 
         if (hp.isEmergency) {
@@ -3498,10 +3753,9 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             tft.drawCircle(hp.x, hp.y, 12, TFT_ORANGE);
         }
 
-        tft.setTextColor(hp.color);
-        tft.setTextDatum(BC_DATUM);
-        const char* label = hp.callsign[0] ? hp.callsign : hp.hex;
-        tft.drawString(label, hp.x, hp.y - 8);
+        tft.setTextColor(effectiveColor);
+        tft.setTextDatum(anchor.datum);
+        tft.drawString(labelBuf, anchor.x, anchor.y);
         tft.setTextDatum(TL_DATUM);
     }
 
@@ -3567,7 +3821,16 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
 
     String infoText;
     InfoMsgKind kind;
-    if (visibleCountNow == 0) {
+    // Offline-/Stale-Data-Modus (siehe Config::STALE_DATA_OFFLINE_THRESHOLD_MS) -
+    // hat Vorrang vor EmptySky/TapForDetails: macht sichtbar, dass die
+    // gerade angezeigten (ausgegrauten, siehe tick()-Redraw-Block weiter
+    // unten) Flugzeuge keine Live-Positionen mehr sind, egal ob gerade
+    // zufaellig welche sichtbar sind oder nicht.
+    bool offlineNow = AircraftTable::msSinceLastSuccessfulFetch(millis()) > Config::STALE_DATA_OFFLINE_THRESHOLD_MS;
+    if (offlineNow) {
+        kind = InfoMsgKind::Offline;
+        infoText = I18n::t(StringId::RADAR_OFFLINE_STALE_HINT);
+    } else if (visibleCountNow == 0) {
         kind = InfoMsgKind::EmptySky;
         uint32_t emptySec = (millis() - lastAircraftSeenMs) / 1000;
         char buf[16];
@@ -3598,7 +3861,11 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     // Anfang, da es hinter dem jeweiligen Haupttext angehaengt wird.
     int32_t redStart = 0;
     int32_t redLen = 0;
-    if (infoTextHasFilterHint) {
+    // Im Offline-Zustand bewusst KEIN Filter-Hinweis angehaengt - waere an
+    // dieser Stelle nur verwirrend ("keine Verbindung" + "Filter aktiv" in
+    // einer Zeile), der Filter-Hinweis kommt ohnehin zurueck, sobald die
+    // Verbindung wiederhergestellt ist und die normale Infozeile greift.
+    if (infoTextHasFilterHint && kind != InfoMsgKind::Offline) {
         String hintWord = I18n::t(StringId::RADAR_FILTER_HINT_WORD);
         redStart = (int32_t)infoText.length() + 3; // " - " davor, siehe unten
         redLen = (int32_t)hintWord.length();
@@ -3806,13 +4073,37 @@ void selectAircraft(const char* hex, const char* callsign) {
     lastPanel.valid = false;
 }
 
+// Ordnet eine Distanz einer der drei "Intelligenten" Naeherungsalarm-Zonen
+// zu (0=keine, 1=Gelb, 2=Orange, 3=Rot - siehe Config::SMART_PROXIMITY_*_KM).
+// Hoehere Zahl = naeher/dringlicher, damit sich "aktuelle Zone > zuletzt
+// bekannte Zone" (siehe updateProximityAlert() unten) direkt als einfacher
+// Zahlenvergleich fuer "hat sich angenaehert" auswerten laesst.
+uint8_t smartProximityZone(float distanceKm) {
+    if (distanceKm < Config::SMART_PROXIMITY_RED_KM) return 3;
+    if (distanceKm < Config::SMART_PROXIMITY_ORANGE_KM) return 2;
+    if (distanceKm < Config::SMART_PROXIMITY_YELLOW_KM) return 1;
+    return 0;
+}
+
 void updateProximityAlert(uint32_t nowMs) {
     bool anyClose = false;
     bool anyEmergency = false;
     bool anyWatched = false;
 
     bool proximityOn = SettingsStore::proximityAlertEnabled();
+    bool smartOn = SettingsStore::proximityAlertSmartMode();
     bool emergencyOn = SettingsStore::emergencyAlertEnabled();
+
+    // Haelt die zuletzt ausgeloeste Zonen-Eskalation fest (0=keine), damit
+    // sie fuer Config::SMART_PROXIMITY_BURST_MS auf der LED sichtbar
+    // bleibt, statt wie der einfache Alarm dauerhaft zu leuchten, solange
+    // ein Flugzeug in Reichweite ist (siehe Kommentar bei proximityZone in
+    // aircraft.h - das ist bewusst ein einmaliges "hat sich gerade
+    // angenaehert"-Ereignis, kein Dauerzustand). Function-static statt
+    // eines Namensraum-Members, da dieser Zustand ausschliesslich hier
+    // gebraucht wird.
+    static uint8_t smartAlertZone = 0;
+    static uint32_t smartAlertStartMs = 0;
 
     // Die Schleife laeuft immer (nicht mehr an proximityOn/emergencyOn
     // gebunden), da ein Watchlist-Treffer seit Entfernung des frueheren
@@ -3822,7 +4113,7 @@ void updateProximityAlert(uint32_t nowMs) {
         Aircraft* table = AircraftTable::raw();
         for (uint8_t i = 0; i < AircraftTable::capacity(); i++) {
             if (!table[i].valid) continue;
-            if (proximityOn && table[i].distanceKm <= Config::LED_ALERT_RADIUS_KM) anyClose = true;
+            if (proximityOn && !smartOn && table[i].distanceKm <= Config::LED_ALERT_RADIUS_KM) anyClose = true;
             if (emergencyOn && isEmergencySquawk(table[i].squawk)) anyEmergency = true;
             // Squawk-Wachliste loest denselben WatchlistBlue-Alarm aus wie
             // die Rufzeichen-Beobachtungsliste (siehe squawk_watchlist.h) -
@@ -3831,12 +4122,50 @@ void updateProximityAlert(uint32_t nowMs) {
             // entfernt).
             if (AircraftWatchlist::isWatched(table[i].callsign) ||
                 SquawkWatchlist::isWatched(table[i].squawk)) anyWatched = true;
+
+            if (!proximityOn || !smartOn) continue;
+
+            // "Intelligenter" Alarm: Zone wird IMMER rein geometrisch
+            // aktualisiert (auch ausserhalb des Hoehenfilters unten) -
+            // sonst wuerde ein Flugzeug, das die Zone waehrend eines
+            // Hoehenflugs durchquert hat, bei einem SPAETEREN echten
+            // Sinkflug in dieselbe (dann schon "bekannte") Zone faelschlich
+            // NICHT mehr als Annaeherung erkannt. Der Alarm selbst loest
+            // nur aus, wenn die Zone GESTIEGEN ist (= von aussen nach innen
+            // durchquert, nicht nur "immer noch drin" oder "wieder
+            // raus") UND der Hoehenfilter zusaetzlich erfuellt ist.
+            uint8_t zone = smartProximityZone(table[i].distanceKm);
+            bool climbedIntoZone = zone > table[i].proximityZone;
+            table[i].proximityZone = zone;
+            if (!climbedIntoZone || zone == 0) continue;
+            if (abs(table[i].altBaroFt) >= Config::SMART_PROXIMITY_ALT_DIFF_FT) continue;
+
+            // Bei mehreren gleichzeitigen Ereignissen gewinnt die
+            // schwerwiegendere (oder eine gleich schwere neue) Zone -
+            // verhindert, dass ein neu hereinkommendes Gelb-Ereignis einen
+            // bereits laufenden, dringlicheren Rot-Alarm-Burst vorzeitig
+            // "herunterstuft".
+            if (zone >= smartAlertZone) {
+                smartAlertZone = zone;
+                smartAlertStartMs = nowMs;
+            }
         }
         AircraftTable::unlock();
     }
 
+    // Aktiver Zonen-Alarm-Burst nur fuer Config::SMART_PROXIMITY_BURST_MS
+    // sichtbar, siehe Kommentar bei smartAlertZone oben - danach faellt er
+    // von selbst wieder auf "keine Zone" zurueck (kein manuelles
+    // Zuruecksetzen noetig, rein zeitbasiert wie die uebrigen Burst-Muster
+    // in led_alert.cpp).
+    bool smartBurstActive = smartOn && smartAlertZone > 0 && (nowMs - smartAlertStartMs) < Config::SMART_PROXIMITY_BURST_MS;
+    LedAlert::Mode smartMode = smartAlertZone == 3 ? LedAlert::Mode::ProximitySmartRed
+                              : smartAlertZone == 2 ? LedAlert::Mode::ProximitySmartOrange
+                                                     : LedAlert::Mode::ProximitySmartYellow;
+
     LedAlert::Mode mode = anyEmergency ? LedAlert::Mode::EmergencyRed
                          : anyWatched  ? LedAlert::Mode::WatchlistBlue
+                         : smartBurstActive ? smartMode
                          : anyClose    ? LedAlert::Mode::ProximityGreen
                                        : LedAlert::Mode::Off;
 

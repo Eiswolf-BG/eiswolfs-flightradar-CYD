@@ -1323,6 +1323,17 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
 
             drawButton(tft, listsBtn, I18n::t(StringId::MENU_CATEGORY_LISTS));
             drawButton(tft, statsLogbookBtn, I18n::t(StringId::MENU_CATEGORY_STATS_LOGBOOK));
+            if (!SettingsStore::flightLogbookEnabled() && SettingsStore::flightLogbookAutoOffTriggered()) {
+                // Gleicher kleiner roter Punkt wie beim Update-Verfuegbar-
+                // Hinweis (siehe Page::System oben) - zeigt schon auf dieser
+                // Kategorie-Seite, dass sich das Flugbuch unbemerkt selbst
+                // abgeschaltet hat (24h-Sicherheitsabschaltung), statt dass
+                // Alex das erst beim Durchklicken bemerkt. Verschwindet
+                // sobald der Schalter manuell angetippt wird (aus ODER an),
+                // siehe SettingsStore::setFlightLogbookAutoOffTriggered().
+                tft.fillCircle((int16_t)(statsLogbookBtn.x + statsLogbookBtn.w - 8), (int16_t)(statsLogbookBtn.y + 8), 4, TFT_RED);
+                tft.drawCircle((int16_t)(statsLogbookBtn.x + statsLogbookBtn.w - 8), (int16_t)(statsLogbookBtn.y + 8), 4, TFT_BLACK);
+            }
             drawButton(tft, ledBtn, I18n::t(StringId::MENU_CATEGORY_LED));
             drawButton(tft, filtersBtn, I18n::t(StringId::MENU_CATEGORY_FILTERS));
             drawButton(tft, locationBtn, I18n::t(StringId::MENU_LOCATION_PRESETS));
@@ -1403,6 +1414,18 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             drawButton(tft, statsHistoryBtn, I18n::t(StringId::MENU_STATS_HISTORY));
             drawButton(tft, logFilesBtn, I18n::t(StringId::MENU_LOGBOOK_FILES));
             drawButton(tft, logbookBtn, I18n::t(StringId::MENU_FLIGHT_LOGBOOK) + onOff(SettingsStore::flightLogbookEnabled()));
+            // Hinweis auf die 24h-Sicherheitsabschaltung, NUR solange sie
+            // tatsaechlich (und nicht durch bewusstes manuelles Ausschalten)
+            // gegriffen hat, siehe SettingsStore::flightLogbookAutoOffTriggered().
+            // Punkt oben LINKS (wie beim Update-Hinweis in Page::System) UND
+            // "?"-Button oben RECHTS (wie beim ISS-Marker) - bewusst
+            // getrennte Ecken, damit sich beide nicht ueberlappen.
+            bool logbookAutoOffHint = !SettingsStore::flightLogbookEnabled() && SettingsStore::flightLogbookAutoOffTriggered();
+            if (logbookAutoOffHint) {
+                tft.fillCircle((int16_t)(logbookBtn.x + 8), (int16_t)(logbookBtn.y + 8), 4, TFT_RED);
+                tft.drawCircle((int16_t)(logbookBtn.x + 8), (int16_t)(logbookBtn.y + 8), 4, TFT_BLACK);
+                drawRowInfoButton(tft, logbookBtn);
+            }
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -1419,12 +1442,23 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 StatsHistoryScreen::run(tft);
             } else if (logFilesBtn.contains(tap.x, tap.y)) {
                 LogbookFilesScreen::run(tft);
+            } else if (logbookAutoOffHint && rowInfoBtnRect(logbookBtn).contains(tap.x, tap.y)) {
+                // "?"-Info-Button zuerst pruefen (kleine Flaeche innerhalb
+                // der Flugbuch-Zeile) - sonst wuerde ein Tap darauf
+                // faelschlich als Tap auf die ganze Zeile (Schalter
+                // umlegen) gewertet, gleiches Prinzip wie beim ISS-Marker.
+                infoScreen(tft, I18n::t(StringId::FLIGHT_LOGBOOK_AUTO_OFF_TITLE),
+                           I18n::t(StringId::FLIGHT_LOGBOOK_AUTO_OFF_BODY),
+                           UiTheme::accentColor(tft), I18n::t(StringId::OK));
             } else if (logbookBtn.contains(tap.x, tap.y)) {
                 if (SettingsStore::flightLogbookEnabled()) {
                     // Ausschalten ist immer unbedenklich - keine Bestaetigung noetig.
                     SettingsStore::setFlightLogbookEnabled(false);
                     SettingsStore::setFlightLogbookEnabledAtEpoch(0);
                     SettingsStore::setFlightLogbookSessionFile("");
+                    // Bewusstes manuelles Ausschalten - kein Hinweis-Punkt
+                    // noetig (siehe SettingsStore::flightLogbookAutoOffTriggered()).
+                    SettingsStore::setFlightLogbookAutoOffTriggered(false);
                 } else if (confirmWarningScreen(tft, I18n::t(StringId::MENU_LOGBOOK_WARNING_TITLE),
                                                  I18n::t(StringId::MENU_LOGBOOK_WARNING_BODY))) {
                     SettingsStore::setFlightLogbookEnabled(true);
@@ -1433,6 +1467,9 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                     // naechsten FlightLogbook::update() statt eine evtl. noch
                     // vorhandene alte Datei weiterzuschreiben.
                     SettingsStore::setFlightLogbookSessionFile("");
+                    // Bewusstes manuelles Wiedereinschalten - Hinweis-Punkt
+                    // einer evtl. vorherigen Auto-Abschaltung zuruecksetzen.
+                    SettingsStore::setFlightLogbookAutoOffTriggered(false);
                 }
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::Flight;
@@ -1443,14 +1480,23 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_LED));
 
-            Rect heartbeatBtn = subMenuRowRect(0, 4);
-            Rect emergencyBtn = subMenuRowRect(1, 4);
-            Rect proximityBtn = subMenuRowRect(2, 4);
-            Rect backBtn      = subMenuRowRect(3, 4);
+            Rect heartbeatBtn = subMenuRowRect(0, 5);
+            Rect emergencyBtn = subMenuRowRect(1, 5);
+            Rect proximityBtn = subMenuRowRect(2, 5);
+            Rect proximityModeBtn = subMenuRowRect(3, 5);
+            Rect backBtn      = subMenuRowRect(4, 5);
 
             drawButton(tft, heartbeatBtn, I18n::t(StringId::MENU_LED_HEARTBEAT) + onOff(SettingsStore::ledHeartbeatEnabled()));
             drawButton(tft, emergencyBtn, I18n::t(StringId::MENU_EMERGENCY_ALERT) + onOff(SettingsStore::emergencyAlertEnabled()));
             drawButton(tft, proximityBtn, I18n::t(StringId::MENU_PROXIMITY_LED) + onOff(SettingsStore::proximityAlertEnabled()));
+            // "Einfach"/"Intelligent"-Umschalter fuer die Naeherungsalarm-
+            // Auswertungslogik (SettingsStore::proximityAlertSmartMode(),
+            // siehe radar_screen.cpp::updateProximityAlert()) - wirkt nur,
+            // wenn proximityBtn oben ebenfalls an ist, bleibt aber immer
+            // sichtbar/bedienbar (keine dynamische Ein-/Ausblendung noetig).
+            drawButton(tft, proximityModeBtn, String(I18n::t(StringId::MENU_PROXIMITY_ALERT_MODE)) +
+                       I18n::t(SettingsStore::proximityAlertSmartMode() ? StringId::PROXIMITY_ALERT_MODE_SMART : StringId::PROXIMITY_ALERT_MODE_SIMPLE));
+            drawRowInfoButton(tft, proximityModeBtn);
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -1467,6 +1513,15 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 SettingsStore::setEmergencyAlertEnabled(!SettingsStore::emergencyAlertEnabled());
             } else if (proximityBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setProximityAlertEnabled(!SettingsStore::proximityAlertEnabled());
+            } else if (rowInfoBtnRect(proximityModeBtn).contains(tap.x, tap.y)) {
+                // "?"-Info-Button zuerst pruefen (kleine Flaeche innerhalb
+                // der Zeile) - sonst wuerde ein Tap darauf faelschlich als
+                // Tap auf die ganze Zeile (Modus umschalten) gewertet,
+                // gleiches Prinzip wie beim ISS-Marker/Flugbuch-Hinweis.
+                infoScreen(tft, I18n::t(StringId::PROXIMITY_SMART_INFO_TITLE), I18n::t(StringId::PROXIMITY_SMART_INFO_BODY),
+                           UiTheme::accentColor(tft), I18n::t(StringId::OK));
+            } else if (proximityModeBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setProximityAlertSmartMode(!SettingsStore::proximityAlertSmartMode());
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::Flight;
             }

@@ -103,6 +103,36 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
         return result;
     }
 
+    // Schnappschuss von prevAirportDistKm (Best-Effort-Anflug-Erkennung,
+    // siehe aircraft.h/aircraft_table.cpp::postFetchUpdate()) je Hex-Code,
+    // BEVOR die Schleife unten beginnt, einzelne table[]-Eintraege per
+    // "a = Aircraft{}" zurueckzusetzen. table[] ist tempTable aus
+    // net_task.cpp, bleibt zwischen Aufrufen bestehen und enthaelt zu
+    // Beginn dieses Aufrufs noch die Werte vom VORHERIGEN Abfragezyklus -
+    // ohne diesen Schnappschuss wuerde "a = Aircraft{}" weiter unten
+    // prevAirportDistKm bei JEDEM Zyklus auf den Default (-1) zuruecksetzen,
+    // NOCH BEVOR aircraft_table.cpp::postFetchUpdate() (aufgerufen direkt
+    // nach diesem fetch()) ueberhaupt pruefen kann, ob die Distanz zum
+    // naechstgelegenen Flughafen sinkt - die Anflug-Erkennung wuerde dadurch
+    // nie ausloesen (in einer Simulation mit stetig sinkender Distanz
+    // bestaetigt: approachLikely blieb ueber alle Zyklen 0). Der Schnapp-
+    // schuss wird bewusst VOR der Haupt-Schleife komplett erstellt statt
+    // erst waehrend ihres Durchlaufs nachgeschlagen, weil sonst bereits in
+    // diesem Zyklus ueberschriebene Slots fuer noch nicht bearbeitete
+    // Hex-Codes falsche (schon geloeschte) Werte liefern wuerden.
+    struct PrevAirportDist { char hex[7]; float dist; };
+    PrevAirportDist prevAirportDistByHex[Config::MAX_TRACKED_AIRCRAFT];
+    uint8_t prevAirportDistCount = 0;
+    for (uint8_t j = 0; j < tableCapacity && j < Config::MAX_TRACKED_AIRCRAFT; j++) {
+        if (table[j].hex[0] != '\0') {
+            strncpy(prevAirportDistByHex[prevAirportDistCount].hex, table[j].hex,
+                    sizeof(prevAirportDistByHex[0].hex) - 1);
+            prevAirportDistByHex[prevAirportDistCount].hex[sizeof(prevAirportDistByHex[0].hex) - 1] = 0;
+            prevAirportDistByHex[prevAirportDistCount].dist = table[j].prevAirportDistKm;
+            prevAirportDistCount++;
+        }
+    }
+
     JsonArray acArray = doc["ac"].as<JsonArray>();
     uint8_t idx = 0;
     for (JsonObject ac : acArray) {
@@ -135,6 +165,18 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
         a = Aircraft{};
 
         strncpy(a.hex, hex, sizeof(a.hex) - 1);
+
+        // prevAirportDistKm aus dem oben erstellten Schnappschuss
+        // wiederherstellen, falls dieses Flugzeug schon im vorherigen Zyklus
+        // bekannt war (siehe Kommentar dort) - alle anderen Felder bleiben
+        // bewusst beim Aircraft{}-Default, nur dieser eine Tracking-Wert
+        // muss ueber den Reset hinweg erhalten bleiben.
+        for (uint8_t j = 0; j < prevAirportDistCount; j++) {
+            if (strcmp(prevAirportDistByHex[j].hex, hex) == 0) {
+                a.prevAirportDistKm = prevAirportDistByHex[j].dist;
+                break;
+            }
+        }
 
         const char* flight = ac["flight"] | "";
         strncpy(a.callsign, flight, sizeof(a.callsign) - 1);

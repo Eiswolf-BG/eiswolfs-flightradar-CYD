@@ -7,10 +7,14 @@ uint16_t accentColor(TFT_eSPI& gfx) {
     switch (SettingsStore::radarThemeIndex()) {
         case 1: return gfx.color565(255, 176, 0);  // Amber
         case 2: return gfx.color565(0, 200, 255);  // Blau
-        // Iteriert nach mehreren Rueckmeldungen: reines TFT_RED (255,0,0)
-        // zu dunkel, (255,60,60)/(255,20,20) zu hell/rosa, (255,5,5) schon
-        // besser - (255,2,2) als naechster, noch feinerer Schritt.
-        case 3: return gfx.color565(255, 2, 2);     // Rot
+        // Iteriert nach mehreren Rueckmeldungen: (255,60,60)/(255,20,20)
+        // zu hell/rosa, (255,5,5)/(255,2,2) auf dem Display zwar besser,
+        // wirkte in der Web-UI (echtes 24-Bit-Hex statt RGB565-
+        // Quantisierung) aber weiterhin zu rosastichig - zurueck auf reines
+        // TFT_RED (255,0,0), das in RGB565 ohnehin identisch zu (255,2,2)
+        // gerastert wird (G/B-Kanal faellt beide Male unter die
+        // Rundungsschwelle), in der Web-UI aber sauber neutral Rot bleibt.
+        case 3: return gfx.color565(255, 0, 0);     // Rot
         case 4: return gfx.color565(180, 0, 255);  // Lila
         default: return TFT_GREEN;                  // Gruen (Standard)
     }

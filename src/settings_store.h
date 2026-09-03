@@ -39,6 +39,16 @@ namespace SettingsStore {
     bool proximityAlertEnabled();
     void setProximityAlertEnabled(bool on);
 
+    // AUS per Default = "Einfach" (fester Distanz-Schwellenwert,
+    // Config::LED_ALERT_RADIUS_KM, unveraendertes bisheriges Verhalten). AN
+    // = "Intelligent" (gestaffelte Gelb/Orange/Rot-Zonen, nur bei
+    // Annaeherung, mit Hoehenfilter - siehe radar_screen.cpp::
+    // updateProximityAlert()). Wirkt nur, wenn proximityAlertEnabled()
+    // ebenfalls an ist - reine Auswahl DER Auswertungslogik, kein
+    // zusaetzlicher Ein/Aus-Schalter.
+    bool proximityAlertSmartMode();
+    void setProximityAlertSmartMode(bool on);
+
     bool flightLogbookEnabled();
     void setFlightLogbookEnabled(bool on);
 
@@ -55,6 +65,18 @@ namespace SettingsStore {
     // Datei anlegen). Siehe FlightLogbook::ensureSessionFile().
     String flightLogbookSessionFile();
     void setFlightLogbookSessionFile(const String& label);
+
+    // Merkt sich, ob das Flugbuch zuletzt durch die 24h-Sicherheits-
+    // abschaltung (siehe FlightLogbook::checkAutoOff()) ausgeschaltet wurde,
+    // statt durch bewusstes manuelles Antippen des Schalters - AUS blieb
+    // dadurch bisher voellig unbemerkt (Alex' Meldung: Flugbuch war
+    // wochenlang unbemerkt aus). Steuert einen kleinen roten Hinweis-Punkt
+    // an "Statistik & Logbuch" bzw. am Flugbuch-Schalter selbst (siehe
+    // menu_screen.cpp), NUR wenn dieses Flag gesetzt ist UND das Flugbuch
+    // aktuell aus ist - manuelles Aus-/Einschalten setzt das Flag immer
+    // zurueck.
+    bool flightLogbookAutoOffTriggered();
+    void setFlightLogbookAutoOffTriggered(bool on);
 
     bool ledHeartbeatEnabled();
     void setLedHeartbeatEnabled(bool on);

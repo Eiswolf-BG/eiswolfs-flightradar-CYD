@@ -134,6 +134,7 @@ static const char* const I18N_IT[] = {
 
     "Tocca un aereo per maggiori dettagli",
     "Cielo vuoto da ",
+    "Nessuna connessione - mostrato l'ultimo stato noto",
     "1 aereo",
     " aerei",
 
@@ -369,6 +370,10 @@ static const char* const I18N_IT[] = {
 
     "= Governativo/Militare (stima)",
 
+    "Probabile avvicinamento a ",
+    " - ETA ~",
+    " min (stima)",
+
     "Avviso LED aggiornamento: ",
     "Info sul pulsante di aggiornamento",
     "Verifica se su GitHub è disponibile una versione firmware più recente e la mostra qui. Tocca questo pulsante per scaricarla e installarla direttamente via WiFi - non serve alcun cavo o flasher web.",
@@ -391,6 +396,13 @@ static const char* const I18N_IT[] = {
     "Rosso",
     "Viola",
     "Informazioni",
+    "Diario di volo disattivato automaticamente",
+    "Il diario di volo si spegne automaticamente dopo 24 ore per evitare che la scheda SD si riempia senza che tu te ne accorga. Al momento è spento per questo motivo, non perché lo hai spento tu. Riattivalo qui sopra se vuoi continuare a registrare.",
+    "Modalità allarme: ",
+    "Semplice",
+    "Intelligente",
+    "Come funziona l'allarme intelligente",
+    "Invece di una singola soglia di distanza, l'allarme intelligente usa tre zone annidate - Giallo (<20 km), Arancione (<10 km), Rosso (<5 km) - e si attiva solo quando un aereo si sta effettivamente avvicinando, cioè entra di nuovo in una zona più vicina, non mentre vi rimane o si allontana di nuovo. Per ridurre i falsi allarmi dovuti a voli a lungo raggio che volano molto in alto, richiede anche che l'altitudine dell'aereo sia inferiore a 3000 ft. Tutte e tre le zone usano lo stesso colore LED dell'allarme semplice (il tuo colore tema attuale), ma lampeggiano sempre più velocemente - lento per il giallo, medio per l'arancione, veloce per il rosso - e restano accese solo per pochi secondi per evento, non in modo continuo.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

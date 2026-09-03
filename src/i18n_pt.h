@@ -134,6 +134,7 @@ static const char* const I18N_PT[] = {
 
     "Toque em um avião para ver mais detalhes",
     "Céu vazio há ",
+    "Sem conexão - mostrando o último estado conhecido",
     "1 avião",
     " aviões",
 
@@ -369,6 +370,10 @@ static const char* const I18N_PT[] = {
 
     "= Governamental/Militar (estimativa)",
 
+    "Provavelmente em aproximação a ",
+    " - ETA ~",
+    " min (estimativa)",
+
     "Aviso de LED de atualização: ",
     "Sobre o botão de atualização",
     "Verifica se há uma versão mais recente do firmware disponível no GitHub e a exibe aqui. Toque neste botão para baixá-la e instalá-la diretamente pelo WiFi - não é necessário cabo nem flasher web.",
@@ -391,6 +396,13 @@ static const char* const I18N_PT[] = {
     "Vermelho",
     "Roxo",
     "Sobre",
+    "Diário de bordo desativado automaticamente",
+    "O diário de bordo se desliga automaticamente após 24 horas para evitar que o cartão SD fique cheio sem você perceber. No momento está desligado por esse motivo, não porque você o desligou. Ative-o novamente acima se quiser continuar registrando.",
+    "Modo de alarme: ",
+    "Simples",
+    "Inteligente",
+    "Como funciona o alarme inteligente",
+    "Em vez de um único limite de distância, o alarme inteligente usa três zonas aninhadas - Amarela (<20 km), Laranja (<10 km), Vermelha (<5 km) - e só é acionado quando uma aeronave está realmente se aproximando, ou seja, entra recém-agora em uma zona mais próxima, não enquanto permanece nela ou se afasta novamente. Para reduzir alarmes falsos causados por voos de longo curso voando muito alto, também exige que a altitude da aeronave esteja abaixo de 3000 ft. As três zonas usam a mesma cor de LED do alarme simples (sua cor de tema atual), mas piscam cada vez mais rápido - devagar no amarelo, médio no laranja, rápido no vermelho - e ficam acesas apenas alguns segundos por evento, não continuamente.",
 };
 
 static_assert(sizeof(I18N_PT) / sizeof(I18N_PT[0]) == (size_t)StringId::COUNT,

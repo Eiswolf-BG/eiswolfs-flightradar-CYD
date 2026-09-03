@@ -134,6 +134,7 @@ static const char* const I18N_DE[] = {
 
     "Für mehr Details ein Flugzeug antippen",
     "Leerer Himmel seit ",
+    "Keine Verbindung - zeige letzten bekannten Stand",
     "1 Flugzeug",
     " Flugzeuge",
 
@@ -369,6 +370,10 @@ static const char* const I18N_DE[] = {
 
     "= Behörden/Militär (Best-Effort)",
 
+    "Vermutlich im Anflug auf ",
+    " - ETA ca. ",
+    " Min (Best-Effort)",
+
     "LED-Hinweis bei Update: ",
     "Über den Update-Button",
     "Prüft, ob auf GitHub eine neuere Firmware-Version verfügbar ist, und zeigt sie hier an. Antippen lädt sie herunter und installiert sie direkt über WLAN - kein Kabel oder Web-Flasher nötig.",
@@ -391,6 +396,13 @@ static const char* const I18N_DE[] = {
     "Rot",
     "Lila",
     "Über",
+    "Flugbuch automatisch abgeschaltet",
+    "Das Flugbuch schaltet sich nach 24 Stunden automatisch selbst aus, um die SD-Karte vor unbemerktem Vollschreiben zu schützen. Es ist aktuell aus diesem Grund aus, nicht weil du es selbst ausgeschaltet hast. Schalte es oben wieder ein, wenn du weiter aufzeichnen möchtest.",
+    "Alarm-Modus: ",
+    "Einfach",
+    "Intelligent",
+    "Wie der intelligente Alarm funktioniert",
+    "Statt eines einzelnen Distanz-Schwellenwerts nutzt der intelligente Alarm drei gestaffelte Zonen - Gelb (<20 km), Orange (<10 km), Rot (<5 km) - und löst nur aus, wenn sich ein Flugzeug tatsächlich annähert, also neu in eine engere Zone wechselt, nicht solange es dort bleibt oder sich wieder entfernt. Um Fehlalarme durch hoch überfliegende Langstreckenflüge zu vermeiden, muss die Flughöhe zusätzlich unter 3000 ft liegen. Alle drei Zonen nutzen dieselbe LED-Farbe wie der einfache Alarm (deine aktuelle Themenfarbe), blinken aber zunehmend schneller - langsam bei Gelb, mittel bei Orange, schnell bei Rot - und leuchten pro Ereignis nur für wenige Sekunden statt dauerhaft.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

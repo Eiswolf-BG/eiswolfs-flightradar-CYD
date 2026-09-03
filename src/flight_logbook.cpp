@@ -156,12 +156,33 @@ namespace {
     // Loest die Datei der aktuellen Sitzung auf (einmalig pro Sitzung) bzw.
     // uebernimmt sie nach einem Neustart erneut aus den Einstellungen -
     // nur aufrufen, wenn das Flugbuch gerade eingeschaltet ist.
+    //
+    // BUGFIX (Alex' Meldung: der 7-Tage-Verlauf zeigte wochenlang nur einen
+    // einzigen, uralten Tageseintrag - alle Sichtungen seitdem landeten
+    // faelschlich weiter in genau dieser einen Datei): Diese Funktion hat
+    // bisher NIE geprueft, ob sich das Kalenderdatum gegenueber der
+    // persistierten Sitzungsdatei geaendert hat - eine einmal angelegte
+    // Datei wurde fuer immer weiterverwendet, bis das Flugbuch manuell aus-
+    // und wieder eingeschaltet wurde (menu_screen.cpp loescht den Eintrag
+    // dabei bewusst) oder die 24h-Sicherheitsabschaltung griff. Lief das
+    // Geraet einfach durch (oder wurde - wie waehrend dieser Testphase -
+    // oft neu gestartet, was den 24h-Timer via enabledAt==0-Zweig in
+    // checkAutoOff() jedesmal neu startete, ohne je 24h zu erreichen),
+    // blieb es dauerhaft bei derselben Datei stehen. Jetzt wird bei JEDEM
+    // Aufruf das Datum der persistierten Datei mit dem tatsaechlichen
+    // heutigen Datum verglichen - weicht es ab, wird genau wie beim
+    // allerersten Einschalten eine neue Datei fuer HEUTE angelegt.
     void ensureSessionFile() {
         time_t now = time(nullptr);
         if (now <= 8 * 3600 * 2) return; // Uhrzeit noch nicht synchronisiert
 
+        char todayStr[11];
+        formatDateFromEpoch((uint32_t)now, todayStr, sizeof(todayStr));
+
         String persisted = SettingsStore::flightLogbookSessionFile();
-        if (persisted.length() > 0) {
+        bool sameDay = persisted.length() >= 10 && persisted.substring(0, 10) == String(todayStr);
+
+        if (persisted.length() > 0 && sameDay) {
             if (strcmp(currentSessionFile, persisted.c_str()) != 0) {
                 strncpy(currentSessionFile, persisted.c_str(), sizeof(currentSessionFile) - 1);
                 currentSessionFile[sizeof(currentSessionFile) - 1] = 0;
@@ -170,13 +191,14 @@ namespace {
             return;
         }
 
-        // Keine Sitzungsdatei hinterlegt - entweder frisches Einschalten
-        // (menu_screen.cpp loescht den Eintrag beim Umschalten bewusst) oder
-        // Migration von einer alten Firmware ohne Sitzungslogik. In beiden
-        // Faellen jetzt eine neue, garantiert einzigartige Datei anlegen.
-        uint32_t enabledAt = SettingsStore::flightLogbookEnabledAtEpoch();
-        if (enabledAt == 0) enabledAt = (uint32_t)now;
-        resolveSessionFilename(enabledAt, currentSessionFile, sizeof(currentSessionFile));
+        // Keine (gueltige, tagesaktuelle) Sitzungsdatei hinterlegt -
+        // frisches Einschalten, Migration von einer alten Firmware ohne
+        // Sitzungslogik, oder ein neuer Kalendertag hat begonnen (siehe
+        // Tageswechsel-Check oben). In jedem Fall jetzt eine neue,
+        // garantiert einzigartige Datei fuer HEUTE anlegen - "now" statt
+        // des potenziell tagealten "enabledAt", damit das Dateidatum immer
+        // dem tatsaechlichen Anlegezeitpunkt entspricht.
+        resolveSessionFilename((uint32_t)now, currentSessionFile, sizeof(currentSessionFile));
         SettingsStore::setFlightLogbookSessionFile(currentSessionFile);
         seenCount = 0;
     }
@@ -242,6 +264,11 @@ bool checkAutoOff() {
         SettingsStore::setFlightLogbookEnabled(false);
         SettingsStore::setFlightLogbookEnabledAtEpoch(0);
         SettingsStore::setFlightLogbookSessionFile("");
+        // Markiert, dass diese Abschaltung automatisch (nicht durch
+        // bewusstes Antippen) erfolgte - steuert einen kleinen Hinweis-Punkt
+        // im Menue (siehe menu_screen.cpp), damit das nicht mehr unbemerkt
+        // bleibt (Alex' Meldung: Flugbuch war wochenlang unbemerkt aus).
+        SettingsStore::setFlightLogbookAutoOffTriggered(true);
         return false;
     }
 

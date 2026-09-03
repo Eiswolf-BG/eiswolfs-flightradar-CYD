@@ -340,6 +340,8 @@ namespace {
             strncpy(na.name, nearest.name, sizeof(na.name) - 1);
             na.distanceKm = nearest.distanceKm;
             na.bearingDeg = RadarMath::toPolar(lat, lon, nearest.lat, nearest.lon).bearingDeg;
+            na.lat = nearest.lat;
+            na.lon = nearest.lon;
             fetchAirportIata(client, nearest.icao, na.iata, sizeof(na.iata));
             currentNearestAirportData = na;
         } else {

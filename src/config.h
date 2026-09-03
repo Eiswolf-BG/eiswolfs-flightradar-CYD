@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "5.1.0";
+    constexpr const char* APP_VERSION = "5.5.0";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -153,6 +153,74 @@ namespace Config {
 
     constexpr float LED_ALERT_RADIUS_KM = 3.0f;
     constexpr uint32_t ALERT_RETRIGGER_COOLDOWN_MS = 30000;
+
+    // "Intelligenter" Naeherungsalarm (SettingsStore::
+    // proximityAlertSmartMode(), siehe radar_screen.cpp::
+    // updateProximityAlert()) - alternative Zonen-basierte Auswertung
+    // statt des einfachen LED_ALERT_RADIUS_KM-Schwellenwerts oben. Drei
+    // gestaffelte Zonen, jeweils die Nachfolgestufe der vorherigen (Rot
+    // liegt also automatisch auch innerhalb Orange und Gelb).
+    constexpr float SMART_PROXIMITY_YELLOW_KM = 20.0f;
+    constexpr float SMART_PROXIMITY_ORANGE_KM = 10.0f;
+    constexpr float SMART_PROXIMITY_RED_KM    = 5.0f;
+    // Zusaetzlicher Hoehenfilter, um Fehlalarme durch hoch ueberfliegende
+    // Langstreckenfluege zu vermeiden - reduziert Fehlalarme spuerbar,
+    // ist aber KEINE echte "Hoehe ueber dem Beobachter" (das Projekt kennt
+    // die eigene Gelaende-/Meereshoehe nirgends), sondern eine bewusste
+    // Naeherung: die barometrische ADS-B-Flughoehe (altBaroFt, ueber
+    // Meeresspiegel) direkt als Schwellenwert - fuer die allermeisten
+    // Nutzer (die nicht in extremer Hoehenlage wohnen) eine brauchbare
+    // Annaeherung an "niedrig fliegend in der Naehe".
+    constexpr int32_t SMART_PROXIMITY_ALT_DIFF_FT = 3000;
+
+    // Best-Effort-Anflug-Erkennung auf den naechstgelegenen Flughafen
+    // (aircraft_table.cpp::postFetchUpdate(), Anzeige in radar_screen.cpp::
+    // drawDetailPanel()) - rein geometrisch aus Live-Daten abgeleitet, KEIN
+    // Routen-Lookup. Alle vier Kriterien (sinkende Distanz zum Flughafen
+    // ueber die letzten Zyklen, Distanz unter APPROACH_MAX_DISTANCE_KM,
+    // Sinkflug, Geschwindigkeit unter APPROACH_MAX_SPEED_KT, Hoehe unter
+    // APPROACH_MAX_ALT_FT) muessen gleichzeitig erfuellt sein.
+    constexpr float APPROACH_MAX_DISTANCE_KM = 50.0f;
+    constexpr float APPROACH_MAX_SPEED_KT    = 250.0f;
+    constexpr int32_t APPROACH_MAX_ALT_FT    = 10000;
+    // ETA (Distanz/Geschwindigkeit) wird nur angezeigt, wenn sie in diesem
+    // Bereich liegt - bei sehr niedriger Geschwindigkeit waere die
+    // rechnerische ETA unsinnig hoch, bei extrem kurzer Distanz/hoher
+    // Geschwindigkeit unsinnig niedrig (z.B. 0min).
+    constexpr uint16_t APPROACH_ETA_MIN_PLAUSIBLE_MIN = 1;
+    constexpr uint16_t APPROACH_ETA_MAX_PLAUSIBLE_MIN = 60;
+
+    // Offline-/Stale-Data-Modus (radar_screen.cpp) - wenn der ADS-B-Abruf
+    // laenger als dieser Schwellenwert nicht mehr erfolgreich war
+    // (AircraftTable::msSinceLastSuccessfulFetch()), gilt das Geraet als
+    // "offline": die zuletzt bekannten Flugzeuge werden ausgegraut mit
+    // "zuletzt gesehen vor Xs" weitergezeigt statt sofort zu verschwinden,
+    // und der Status-Hinweis im Radar-Infobereich wechselt entsprechend.
+    // Bewusst deutlich ueber FETCH_RETRY_DELAY_MS (18s) - ein einzelner
+    // fehlgeschlagener Abrufversuch loest noch KEINEN Offline-Hinweis aus
+    // (der naechste planmaessige Versuch koennte ja schon wieder klappen),
+    // erst wenn auch dieser nicht durchkommt, ist die Verbindung
+    // erkennbar laenger gestoert.
+    constexpr uint32_t STALE_DATA_OFFLINE_THRESHOLD_MS = 30000;
+    // Danach wird ein einzelnes Flugzeug endgueltig aus der Radaranzeige
+    // entfernt (Aircraft::lastSeenMs, derselbe "letzten bekannten Wert
+    // merken"-Zeitstempel, den auch die Anflug-Erkennung/der intelligente
+    // Naeherungsalarm bereits nutzen) - auch wenn die Verbindung bis dahin
+    // noch nicht wiederhergestellt ist. Alex' Vorschlag war 60-90s, hier
+    // die Mitte gewaehlt; deutlich ueber dem theoretischen Maximalalter
+    // eines Flugzeugs waehrend GANZ NORMALEN Betriebs (bis knapp unter
+    // 2x STALE_TIMEOUT_MS in aircraft_table.cpp, also ~40s, bevor die
+    // bestehende Eviction dort ohnehin greift) - dieser Schwellenwert
+    // kommt in der Praxis also nur bei einem echten laengeren
+    // Verbindungsausfall ueberhaupt zum Tragen.
+    constexpr uint32_t STALE_DATA_REMOVAL_MS = 75000;
+    // Dauer, die eine ausgeloeste Zonen-Eskalation auf der LED sichtbar
+    // bleibt, bevor sie von selbst wieder erlischt (sofern keine neue,
+    // mindestens gleich schwere Eskalation nachkommt) - deutlich laenger
+    // als ein einzelner ADS-B-Abrufzyklus (8s), damit der Alarm sicher
+    // wahrgenommen wird, aber kein dauerhafter Zustand wie beim einfachen
+    // Alarm.
+    constexpr uint32_t SMART_PROXIMITY_BURST_MS = 6000;
 
     constexpr uint8_t MAX_TRACKED_AIRCRAFT = 40;
 

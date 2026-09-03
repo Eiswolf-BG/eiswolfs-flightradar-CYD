@@ -22,6 +22,28 @@ namespace {
 
     constexpr uint32_t GREEN_BLINK_INTERVAL_MS = 400;
 
+    // Blink-Geschwindigkeiten fuer die drei Zonen des "Intelligenten"
+    // Naeherungsalarms (siehe Mode::ProximitySmart* in led_alert.h) - da
+    // alle drei dieselbe (Themen-)Farbe wie ProximityGreen nutzen,
+    // uebernimmt hier allein die STEIGENDE Blink-Geschwindigkeit die
+    // Signalwirkung "je naeher/dringlicher, desto schneller", ein in
+    // Warnsystemen uebliches, intuitiv verstaendliches Muster (analog
+    // Einparkhilfe-Piepton). Rot bewusst deutlich schneller als der
+    // bestehende einfache Alarm (400ms), damit der Dringlichkeitssprung
+    // klar wahrnehmbar ist.
+    constexpr uint32_t SMART_YELLOW_BLINK_INTERVAL_MS = 600;
+    constexpr uint32_t SMART_ORANGE_BLINK_INTERVAL_MS = 300;
+    constexpr uint32_t SMART_RED_BLINK_INTERVAL_MS    = 120;
+
+    uint32_t blinkIntervalForMode(Mode mode) {
+        switch (mode) {
+            case Mode::ProximitySmartYellow: return SMART_YELLOW_BLINK_INTERVAL_MS;
+            case Mode::ProximitySmartOrange: return SMART_ORANGE_BLINK_INTERVAL_MS;
+            case Mode::ProximitySmartRed:    return SMART_RED_BLINK_INTERVAL_MS;
+            default:                          return GREEN_BLINK_INTERVAL_MS;
+        }
+    }
+
     // blinkState/lastToggleMs/lastMode/initialized werden AUSSCHLIESSLICH
     // von update()/begin() aus gelesen/geschrieben, und die werden beide nur
     // von Core 1 aufgerufen (radar_screen.cpp::updateProximityAlert(), aus
@@ -291,9 +313,12 @@ bool update(Mode mode, uint32_t nowMs, bool updateAvailable) {
     // Notfall bleibt fest Rot, Watchlist bleibt fest CYAN (Gruen+Blau) -
     // beide UNABHAENGIG vom Systemthema, wie von Alex ausdruecklich
     // gewuenscht (Watchlist muss sich auch bei aktivem Blau-Thema klar vom
-    // dann ebenfalls blauen Naeherungsalarm unterscheiden). Nur
-    // ProximityGreen folgt dem Thema (siehe themeLedChannels() oben) - der
-    // Enum-Wert heisst weiterhin "WatchlistBlue" (nur interner Name, siehe
+    // dann ebenfalls blauen Naeherungsalarm unterscheiden). ProximityGreen
+    // UND alle drei ProximitySmart*-Zonen folgen dem Thema (siehe
+    // themeLedChannels() oben, faellt hier gemeinsam in den else-Zweig) -
+    // die drei Zonen unterscheiden sich stattdessen per Blink-
+    // Geschwindigkeit (siehe blinkIntervalForMode() oben). Der Enum-Wert
+    // heisst weiterhin "WatchlistBlue" (nur interner Name, siehe
     // led_alert.h), die tatsaechliche LED-Farbe ist jetzt aber Cyan.
     bool chR = false, chG = false, chB = false;
     if (mode == Mode::EmergencyRed) {
@@ -315,7 +340,7 @@ bool update(Mode mode, uint32_t nowMs, bool updateAvailable) {
     // noetig dafuer.
     if (mode == Mode::EmergencyRed) {
         blinkState = sosBlinkOn(nowMs);
-    } else if (nowMs - lastToggleMs >= GREEN_BLINK_INTERVAL_MS) {
+    } else if (nowMs - lastToggleMs >= blinkIntervalForMode(mode)) {
         lastToggleMs = nowMs;
         blinkState = !blinkState;
     }

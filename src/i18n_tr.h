@@ -134,6 +134,7 @@ static const char* const I18N_TR[] = {
 
     "Daha fazla ayrıntı için bir uçağa dokunun",
     "Boş gökyüzü: ",
+    "Bağlantı yok - son bilinen durum gösteriliyor",
     "1 uçak",
     " uçak",
 
@@ -369,6 +370,10 @@ static const char* const I18N_TR[] = {
 
     "= Resmi/Askeri (tahmini)",
 
+    "Muhtemelen iniş yaklaşmasında: ",
+    " - Tahmini varış ~",
+    " dk (tahmini)",
+
     "Güncelleme LED uyarısı: ",
     "Güncelleme düğmesi hakkında",
     "GitHub'da daha yeni bir ürün yazılımı sürümü olup olmadığını kontrol eder ve burada gösterir. Bu düğmeye dokunarak doğrudan WiFi üzerinden indirip kurabilirsiniz - kablo veya web flaşlayıcı gerekmez.",
@@ -391,6 +396,13 @@ static const char* const I18N_TR[] = {
     "Kırmızı",
     "Mor",
     "Hakkında",
+    "Kayıt defteri otomatik olarak kapatıldı",
+    "Uçuş kayıt defteri, SD kartın fark edilmeden dolmasını önlemek için 24 saat sonra kendini otomatik olarak kapatır. Şu anda bu nedenle kapalı, siz kendiniz kapatmadınız. Kaydetmeye devam etmek isterseniz yukarıdan tekrar açın.",
+    "Alarm modu: ",
+    "Basit",
+    "Akıllı",
+    "Akıllı alarm nasıl çalışır",
+    "Tek bir mesafe eşiği yerine, akıllı alarm iç içe geçmiş üç bölge kullanır - Sarı (<20 km), Turuncu (<10 km), Kırmızı (<5 km) - ve yalnızca bir uçak gerçekten yaklaştığında, yani daha yakın bir bölgeye yeni girdiğinde tetiklenir; orada kaldığı veya tekrar uzaklaştığı sürece tetiklenmez. Yüksekte uçan uzun menzilli uçuşlardan kaynaklanan yanlış alarmları azaltmak için uçağın irtifasının da 3000 ft'nin altında olması gerekir. Üç bölge de basit alarmla aynı LED rengini kullanır (mevcut tema renginiz), ancak gittikçe hızlanan bir şekilde yanıp söner - Sarı'da yavaş, Turuncu'da orta, Kırmızı'da hızlı - ve sürekli değil, her olayda yalnızca birkaç saniye yanar.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

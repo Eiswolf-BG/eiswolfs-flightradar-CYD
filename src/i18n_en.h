@@ -135,6 +135,7 @@ static const char* const I18N_EN[] = {
 
     "Tap an aircraft for more details",
     "Empty sky for ",
+    "No connection - showing last known data",
     "1 aircraft",
     " aircraft",
 
@@ -370,6 +371,10 @@ static const char* const I18N_EN[] = {
 
     "= Government/Military (best-effort)",
 
+    "Likely approaching ",
+    " - ETA ~",
+    " min (best effort)",
+
     "LED alert on update: ",
     "About the update button",
     "Checks whether a newer firmware version is available on GitHub and shows it here. Tap this button to download and install it directly over WiFi - no cable or web flasher needed.",
@@ -392,6 +397,13 @@ static const char* const I18N_EN[] = {
     "Red",
     "Purple",
     "About",
+    "Logbook turned off automatically",
+    "The flight logbook switches itself off automatically after 24 hours to protect the SD card from filling up unnoticed. It's currently off for this reason, not because you turned it off yourself. Turn it back on above if you'd like to keep logging.",
+    "Alert mode: ",
+    "Simple",
+    "Smart",
+    "How the Smart alert works",
+    "Instead of a single distance threshold, the Smart alert uses three nested zones - Yellow (<20 km), Orange (<10 km), Red (<5 km) - and only triggers when an aircraft is actually approaching, i.e. newly crossing into a closer zone, not while it stays there or moves away again. To cut down on false alarms from high-flying long-haul traffic, it also requires the aircraft's altitude to be below 3000 ft. All three zones use the same LED color as the Simple alert (your current theme color), but blink at increasing speed - slow for Yellow, medium for Orange, fast for Red - and stay lit for a few seconds per event instead of continuously.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

@@ -415,14 +415,26 @@ in dieser Reihenfolge:
    Alex nachfragen statt zu raten. Zusammen mit `APP_VERSION` IMMER auch
    den Changelog fuer DIESES Release aktualisieren - der ist MEHRSPRACHIG
    (alle 8 Sprachen wie der Rest der Geraete-UI), liegt in
-   `src/changelog.cpp` als sechs Konstanten (`CHANGELOG_EN`, `CHANGELOG_DE`,
-   `CHANGELOG_FR`, `CHANGELOG_TR`, `CHANGELOG_ES`, `CHANGELOG_IT`, jeweils
-   eine kurze Bullet-Liste), ausgewaehlt ueber `changelogLatest()`
-   (deklariert in `src/changelog.h`) nach `SettingsStore::language()`. ALLE
-   8 Sprachen muessen aktualisiert werden, nicht nur Englisch - sonst zeigt
-   das Geraet nach dem naechsten Update fuer 7 von 8 Sprachen noch den
-   Changelog des VORHERIGEN Releases. Wird auf dem Geraet nach einem
-   erfolgreichen OTA-Update auf dem "Update installiert"-Screen angezeigt.
+   `src/changelog.cpp` als acht Konstanten (`CHANGELOG_EN`, `CHANGELOG_DE`,
+   `CHANGELOG_FR`, `CHANGELOG_TR`, `CHANGELOG_ES`, `CHANGELOG_IT`,
+   `CHANGELOG_PT`, `CHANGELOG_NL`, jeweils eine kurze Bullet-Liste),
+   ausgewaehlt ueber `changelogLatest()` (deklariert in `src/changelog.h`)
+   nach `SettingsStore::language()`. ALLE 8 Sprachen muessen aktualisiert
+   werden, nicht nur Englisch - sonst zeigt das Geraet nach dem naechsten
+   Update fuer 7 von 8 Sprachen noch den Changelog des VORHERIGEN
+   Releases. Wird auf dem Geraet nach einem erfolgreichen OTA-Update auf
+   dem "Update installiert"-Screen angezeigt.
+
+   FESTE REIHENFOLGE innerhalb jedes Changelog-Eintrags (gilt ab sofort
+   fuer alle 8 Sprachen und alle zukuenftigen Releases, Alex' ausdruecklicher
+   Wunsch seit v5.5.0): zuerst ALLE "Neu"-Punkte (in der jeweiligen Sprache:
+   "New"/"Neu"/"Nouveau"/"Yeni"/"Novedad"/"Novità"/"Novo"/"Nieuw"), danach,
+   klar abgetrennt, ALLE "Fix"-Punkte (bzw. "Fix"/"Correction"/"Düzeltme"/
+   "Corrección"/"Correzione"/"Correção"/"Fix") - NICHT gemischt in freier
+   Reihenfolge, wie es vor v5.5.0 gehandhabt wurde. Diese Reihenfolge gilt
+   pro Sprachversion identisch (die uebersetzten Bullet-Texte selbst
+   koennen je nach Release natuerlich variieren, die Neu-vor-Fix-Struktur
+   nicht).
 
    WICHTIG - Versionsnummer NUR an dieser Stelle im Code eintragen, nicht
    frueher: Waehrend des vorherigen Entwickelns/Testens (Build+Flash-Zyklen

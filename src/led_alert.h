@@ -11,6 +11,23 @@ namespace LedAlert {
         ProximityGreen,
         WatchlistBlue,
         EmergencyRed,
+        // "Intelligenter" Naeherungsalarm (SettingsStore::
+        // proximityAlertSmartMode(), siehe radar_screen.cpp::
+        // updateProximityAlert()) - ALTERNATIVE zu ProximityGreen, nie
+        // gleichzeitig aktiv. Folgt wie ProximityGreen dem Systemthema
+        // (themeLedChannels(), siehe led_alert.cpp) statt einer fest
+        // zugewiesenen Farbe - alle Grundfarben sind bereits an andere
+        // Zustaende vergeben (Rot=Notfall, Cyan=Watchlist, Weiss=Heartbeat/
+        // Update), daher unterscheiden sich die drei Zonen NICHT per
+        // Farbe, sondern per Blink-Geschwindigkeit (langsam/mittel/
+        // schnell = Gelb/Orange/Rot), genau wie der bestehende einfache
+        // Alarm sich per Blink-MUSTER (statt Farbe) vom Notfall-Alarm
+        // abhebt, wenn beide zufaellig dieselbe Themenfarbe haben. Die
+        // Namen (Yellow/Orange/Red) beschreiben die Zonen-BEDEUTUNG, NICHT
+        // die tatsaechliche LED-Farbe.
+        ProximitySmartYellow,
+        ProximitySmartOrange,
+        ProximitySmartRed,
     };
 
     void begin();

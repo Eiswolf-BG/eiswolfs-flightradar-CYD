@@ -134,6 +134,7 @@ static const char* const I18N_FR[] = {
 
     "Touchez un avion pour plus de détails",
     "Ciel vide depuis ",
+    "Pas de connexion - affichage des dernières données connues",
     "1 avion",
     " avions",
 
@@ -369,6 +370,10 @@ static const char* const I18N_FR[] = {
 
     "= Gouvernemental/Militaire (estimation)",
 
+    "En approche probable de ",
+    " - ETA ~",
+    " min (estimation)",
+
     "Alerte LED sur mise a jour : ",
     "A propos du bouton de mise a jour",
     "Verifie si une version de firmware plus recente est disponible sur GitHub et l'affiche ici. Appuyez sur ce bouton pour la telecharger et l'installer directement via le WiFi - aucun cable ni flasheur web necessaire.",
@@ -391,6 +396,13 @@ static const char* const I18N_FR[] = {
     "Rouge",
     "Violet",
     "À propos",
+    "Journal de vol désactivé automatiquement",
+    "Le journal de vol s'éteint automatiquement au bout de 24 heures pour éviter que la carte SD ne se remplisse sans que vous vous en rendiez compte. Il est actuellement éteint pour cette raison, pas parce que vous l'avez éteint vous-même. Réactivez-le ci-dessus si vous souhaitez continuer l'enregistrement.",
+    "Mode d'alarme : ",
+    "Simple",
+    "Intelligent",
+    "Comment fonctionne l'alarme intelligente",
+    "Au lieu d'un seul seuil de distance, l'alarme intelligente utilise trois zones imbriquées - Jaune (<20 km), Orange (<10 km), Rouge (<5 km) - et ne se déclenche que lorsqu'un avion se rapproche réellement, c'est-à-dire qu'il passe nouvellement dans une zone plus proche, pas tant qu'il y reste ou s'éloigne à nouveau. Pour réduire les fausses alertes dues aux vols long-courriers volant haut, l'altitude de l'avion doit en plus être inférieure à 3000 ft. Les trois zones utilisent la même couleur LED que l'alarme simple (votre couleur de thème actuelle), mais clignotent de plus en plus vite - lentement pour le jaune, moyennement pour l'orange, rapidement pour le rouge - et restent allumées quelques secondes par événement au lieu d'en continu.",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,
