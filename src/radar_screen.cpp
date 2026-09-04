@@ -1204,18 +1204,46 @@ namespace {
     // bewusst einen Y-Versatz <= 0 (nie nach unten), damit die bestehende,
     // fuer den oberen Rand durchgerechnete Sicherheitsmarge unveraendert
     // gueltig bleibt. Da mindestens einer der fuenf Kandidaten IMMER
-    // ausserhalb eines bis zu 100 Grad breiten Ausschlusskegels liegt
+    // ausserhalb eines bis zu 60 Grad breiten Ausschlusskegels liegt
     // (die fuenf Kandidaten decken zusammen 180 Grad um "oben" ab, siehe
     // Kommentar unten bei NOSE_EXCLUSION_DEG), gibt es fuer jede denkbare
     // Flugrichtung mindestens eine gueltige Wahl.
     struct LabelAnchor { int16_t x, y; uint8_t datum; };
 
-    LabelAnchor computeLabelAnchor(int16_t markerX, int16_t markerY, float headingDeg) {
-        // Deutlich grosszuegiger als der Chevron-Oeffnungswinkel selbst
-        // (drawHeadingChevron() spannt real nur ~15-20 Grad auf) - deckt
-        // zusaetzlich die Marker-Silhouette (Rumpf/Fluegel) mit ab und
-        // laesst Luft fuer Antipp-Ungenauigkeit beim Betrachten.
-        constexpr float NOSE_EXCLUSION_DEG = 50.0f;
+    LabelAnchor computeLabelAnchor(TFT_eSPI& gfx, int16_t markerX, int16_t markerY, float headingDeg, const char* label) {
+        // War vorher 50 Grad (100-Grad-Ausschlusskegel) - das war Alex'
+        // Meldung nach spuerbar zu grosszuegig: der real nur ~15-20 Grad
+        // breite Chevron zwang dadurch schon bei Kursen bis zu 50 Grad
+        // neben "oben" auf die seitlichen/diagonalen Kandidaten (dx/dy
+        // unten) aus, obwohl der Chevron dort laengst keine Ueberdeckung
+        // mehr riskiert hatte - das Label wich dadurch fuer einen grossen
+        // Teil aller Flugrichtungen unnoetig weit vom engsten "oben"-
+        // Kandidaten ab und wirkte isoliert vom Marker. 30 Grad deckt den
+        // Chevron weiterhin mit klarer Marge ab, laesst die engste Position
+        // aber fuer deutlich mehr Kurse zu.
+        constexpr float NOSE_EXCLUSION_DEG = 30.0f;
+
+        // Bei den seitlichen/diagonalen Kandidaten (MR_DATUM/ML_DATUM/
+        // BR_DATUM/BL_DATUM) verankert TFT_eSPI den Text an GENAU EINER
+        // Kante (die dem Marker zugewandte) - die GEGENUEBERLIEGENDE Kante
+        // waechst mit der Textlaenge vom Anker weg. Bei kurzen Rufzeichen
+        // fiel das kaum auf, bei langen (z.B. "DEWZ", "DEUAD", siehe Alex'
+        // Screenshot) machte der dadurch insgesamt viel breitere,
+        // einseitig vom Marker wegwachsende Textblock den Bezug zum Marker
+        // optisch kaum noch erkennbar, obwohl die Marker-zugewandte Kante
+        // selbst technisch immer exakt am Anker blieb. Gegenmittel: der
+        // Kantenabstand selbst haengt jetzt von der ueber tft.textWidth()
+        // ermittelten tatsaechlichen Breite ab - bei kurzen Rufzeichen
+        // bleibt er wie zuvor (4px), bei laengeren wird er nochmal auf 2px
+        // verkleinert. Das verschiebt die GESAMTE, dem Marker zugewandte
+        // Kante ein Stueck naeher an den Marker heran und mildert so den
+        // Laengeneffekt spuerbar ab, ohne die Kandidaten-Auswahl (Winkel-
+        // Ausschluss) oder die Y-Positionierung anzutasten.
+        int16_t textW = gfx.textWidth(label);
+        constexpr int16_t LONG_LABEL_THRESHOLD_PX = 40;
+        constexpr int16_t SIDE_GAP_SHORT = 4;
+        constexpr int16_t SIDE_GAP_LONG = 2;
+        int16_t sideGap = (textW > LONG_LABEL_THRESHOLD_PX) ? SIDE_GAP_LONG : SIDE_GAP_SHORT;
 
         struct Candidate { float angleDeg; int16_t dx, dy; uint8_t datum; };
         // Reihenfolge = Prioritaet. "Oben" zuerst (einzige Variante mit
@@ -1225,25 +1253,49 @@ namespace {
         // oberen Diagonalen zuletzt (seltener gebraucht, decken nur die
         // Faelle ab, in denen sowohl "oben" als auch eine Seite durch den
         // Ausschlusskegel blockiert sind).
-        static const Candidate candidates[] = {
+        //
+        // dx der seitlichen/diagonalen Kandidaten kommt jetzt aus sideGap
+        // (s.o.) statt aus festen Literalen - dieselbe Grundidee wie vorher
+        // (so nah wie moeglich an der alten, einheitlichen 8px-"immer
+        // oben"-Position, siehe Funktionskommentar), nur jetzt zusaetzlich
+        // an die tatsaechliche Textbreite angepasst. Der kleine Y-Versatz
+        // bei den seitlichen Kandidaten bleibt bewusst erhalten, sonst
+        // wuerde das Label bei Kursen nahe Nord/Sued genau auf der
+        // Fluegelspitze des Markers landen (Fluegel stehen quer zum Kurs).
+        const Candidate candidates[] = {
             {0.0f,   0,  -8, BC_DATUM},
-            {270.0f, -10, -4, MR_DATUM},
-            {90.0f,   10, -4, ML_DATUM},
-            {315.0f, -8,  -6, BR_DATUM},
-            {45.0f,   8,  -6, BL_DATUM},
+            {270.0f, (int16_t)(-sideGap),     -3, MR_DATUM},
+            {90.0f,  sideGap,                 -3, ML_DATUM},
+            {315.0f, (int16_t)(-sideGap - 1), -5, BR_DATUM},
+            {45.0f,  (int16_t)(sideGap + 1),  -5, BL_DATUM},
         };
 
         for (const auto& cand : candidates) {
             float diff = fabsf(headingDeg - cand.angleDeg);
             if (diff > 180.0f) diff = 360.0f - diff;
             if (diff > NOSE_EXCLUSION_DEG) {
-                // Horizontal an den Bildschirmrand geklemmt (gleiches
-                // einfache constrain()-Muster wie beim Peilungs-Label in
-                // drawBearingIndicator()) - die reine "oben"-Variante
-                // (dx=0) bleibt davon unberuehrt, nur die seitlich/
-                // diagonal verschobenen Varianten koennen das ueberhaupt
-                // brauchen.
-                int16_t x = constrain((int16_t)(markerX + cand.dx), (int16_t)16, (int16_t)(Config::SCREEN_WIDTH - 16));
+                // Horizontal an den Bildschirmrand geklemmt - Marge bewusst
+                // NUR 2px (nicht die 16px, die hier frueher analog zum
+                // Peilungs-Label in drawBearingIndicator() verwendet
+                // wurden). Der Radarkreis (computeLayout()) laesst Marker
+                // bis auf 6px an den Bildschirmrand heran - eine 16px-Marge
+                // konnte den Anker bei einem Marker nahe des Kreisrands
+                // dadurch nicht nur ueber den beabsichtigten dx-Versatz
+                // hinaus verschieben, sondern regelrecht auf die
+                // GEGENUEBERLIEGENDE Seite des Markers zwingen (Alex'
+                // Meldung: Label "EWG1EV" nahe dem linken Kreisrand wirkte
+                // dadurch isoliert vom Marker, weil der Anker von der
+                // beabsichtigten linken Seite auf die rechte Seite
+                // "gesprungen" war, waehrend der Text ueber sein Datum -
+                // MR_DATUM bei diesem Kandidaten - weiterhin nach links
+                // ausgerichtet blieb). 2px liegt sicher unter der minimal
+                // moeglichen Marker-Position (6px), der Anker bleibt damit
+                // in jedem Fall auf derselben Seite des Markers wie vom
+                // gewaehlten Kandidaten beabsichtigt - hoechstens minimal
+                // naeher am Marker als der volle dx-Versatz, nie weiter weg
+                // oder auf der falschen Seite. Die reine "oben"-Variante
+                // (dx=0) bleibt davon ohnehin unberuehrt.
+                int16_t x = constrain((int16_t)(markerX + cand.dx), (int16_t)2, (int16_t)(Config::SCREEN_WIDTH - 2));
                 int16_t y = (int16_t)(markerY + cand.dy);
                 return {x, y, cand.datum};
             }
@@ -3382,12 +3434,12 @@ void render(TFT_eSPI& tft, int16_t top) {
         // aussagekraeftiger Kurs), die neue Ausweichlogik ist fuer sie
         // gegenstandslos und bleibt bei der bewaehrten festen
         // "oben"-Position.
+        const char* label = a.callsign[0] ? a.callsign : a.hex;
         LabelAnchor labelAnchor = (isGroundVehicle || isRotorcraft)
             ? LabelAnchor{pt.x, (int16_t)(pt.y - 8), BC_DATUM}
-            : computeLabelAnchor(pt.x, pt.y, a.headingDeg);
+            : computeLabelAnchor(tft, pt.x, pt.y, a.headingDeg, label);
         tft.setTextColor(color);
         tft.setTextDatum(labelAnchor.datum);
-        const char* label = a.callsign[0] ? a.callsign : a.hex;
         tft.drawString(label, labelAnchor.x, labelAnchor.y);
         tft.setTextDatum(TL_DATUM);
 
@@ -3828,13 +3880,13 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             if (hp.isEmergency || hp.isWatched || hp.isNotable) {
                 tft.drawCircle(hp.x, hp.y, 12, TFT_BLACK);
             }
+            const char* eraseLabel = hp.staleLabelCache[0] ? hp.staleLabelCache : (hp.callsign[0] ? hp.callsign : hp.hex);
             LabelAnchor eraseAnchor = (hp.isGroundVehicle || hp.isRotorcraft)
                 ? LabelAnchor{hp.x, (int16_t)(hp.y - 8), BC_DATUM}
-                : computeLabelAnchor(hp.x, hp.y, hp.headingDeg);
+                : computeLabelAnchor(tft, hp.x, hp.y, hp.headingDeg, eraseLabel);
             tft.setTextColor(TFT_BLACK);
             tft.setTextDatum(eraseAnchor.datum);
-            tft.drawString(hp.staleLabelCache[0] ? hp.staleLabelCache : (hp.callsign[0] ? hp.callsign : hp.hex),
-                            eraseAnchor.x, eraseAnchor.y);
+            tft.drawString(eraseLabel, eraseAnchor.x, eraseAnchor.y);
             tft.setTextDatum(TL_DATUM);
             hp.valid = false;
             continue;
@@ -3862,19 +3914,25 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
 
         LabelAnchor anchor = (hp.isGroundVehicle || hp.isRotorcraft)
             ? LabelAnchor{hp.x, (int16_t)(hp.y - 8), BC_DATUM}
-            : computeLabelAnchor(hp.x, hp.y, hp.headingDeg);
+            : computeLabelAnchor(tft, hp.x, hp.y, hp.headingDeg, labelBuf);
 
         // Falls sich der Label-Text seit dem letzten Tick geaendert hat
         // (z.B. "42s" -> "43s", je nach Textbreite unterschiedlich lang),
         // zuerst den ALTEN Text an genau derselben Stelle schwarz
-        // uebermalen - sonst blieben Ziffern-Reste stehen. Position/Datum
-        // sind fuer ein und dasselbe Flugzeug zwischen zwei Ticks stabil
-        // (haengen nur von x/y/headingDeg ab, die sich ohne einen neuen
-        // render()-Aufruf nicht aendern), nur der Text selbst variiert.
+        // uebermalen - sonst blieben Ziffern-Reste stehen. Der Anker haengt
+        // jetzt (siehe computeLabelAnchor()) auch von der Textbreite ab -
+        // fuer den ALTEN Text wird deshalb bewusst ein SEPARATER Anker aus
+        // hp.staleLabelCache berechnet statt einfach den neuen "anchor"
+        // wiederzuverwenden, sonst wuerde bei einem Laengenwechsel (z.B.
+        // Uebergang in den Stale-Zustand, der die " Xs"-Sekundenzahl
+        // anhaengt) am FALSCHEN Ort geloescht und Reste blieben stehen.
         if (hp.staleLabelCache[0] && strcmp(hp.staleLabelCache, labelBuf) != 0) {
+            LabelAnchor oldAnchor = (hp.isGroundVehicle || hp.isRotorcraft)
+                ? LabelAnchor{hp.x, (int16_t)(hp.y - 8), BC_DATUM}
+                : computeLabelAnchor(tft, hp.x, hp.y, hp.headingDeg, hp.staleLabelCache);
             tft.setTextColor(TFT_BLACK);
-            tft.setTextDatum(anchor.datum);
-            tft.drawString(hp.staleLabelCache, anchor.x, anchor.y);
+            tft.setTextDatum(oldAnchor.datum);
+            tft.drawString(hp.staleLabelCache, oldAnchor.x, oldAnchor.y);
             tft.setTextDatum(TL_DATUM);
         }
         strncpy(hp.staleLabelCache, labelBuf, sizeof(hp.staleLabelCache) - 1);
