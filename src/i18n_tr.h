@@ -251,6 +251,7 @@ static const char* const I18N_TR[] = {
     "Güncelleme başarısız",
     "Güncelleme yüklendi",
     "Yeni donanım yazılımı başarıyla yüklendi. Kullanmaya başlamak için lütfen şimdi yeniden başlatın.",
+    "Bu projeyi beğendiyseniz, GitHub'da bir yıldız bırakırsanız çok sevinirim: github.com/Eiswolf-BG/eiswolfs-flightradar-CYD",
     "Şimdi yeniden başlat",
     "Bu sürümdeki yenilikler:",
     "Güncelleme indirilemedi veya yüklenemedi. Cihaz değişmeden önceki donanım yazılımıyla çalışmaya devam ediyor. Lütfen WiFi bağlantınızı kontrol edip daha sonra tekrar deneyin.",

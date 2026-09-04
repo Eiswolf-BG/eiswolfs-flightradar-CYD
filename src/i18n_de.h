@@ -251,6 +251,7 @@ static const char* const I18N_DE[] = {
     "Update fehlgeschlagen",
     "Update installiert",
     "Die neue Firmware wurde erfolgreich installiert. Bitte jetzt neu starten, um sie zu verwenden.",
+    "Wenn dir dieses Projekt gefällt, freue ich mich über einen Stern auf GitHub: github.com/Eiswolf-BG/eiswolfs-flightradar-CYD",
     "Jetzt neu starten",
     "Neu in dieser Version:",
     "Das Update konnte nicht heruntergeladen oder installiert werden. Das Gerät läuft unverändert mit der bisherigen Firmware weiter. Bitte WLAN-Verbindung prüfen und es später erneut versuchen.",

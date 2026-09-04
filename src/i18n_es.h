@@ -251,6 +251,7 @@ static const char* const I18N_ES[] = {
     "Error al actualizar",
     "Actualización instalada",
     "El nuevo firmware se instaló correctamente. Reinicia ahora para empezar a usarlo.",
+    "Si te gusta este proyecto, me encantaría que le dejaras una estrella en GitHub: github.com/Eiswolf-BG/eiswolfs-flightradar-CYD",
     "Reiniciar ahora",
     "Novedades de esta versión:",
     "No se pudo descargar o instalar la actualización. El dispositivo sigue funcionando sin cambios con el firmware anterior. Comprueba tu conexión WiFi e inténtalo de nuevo más tarde.",

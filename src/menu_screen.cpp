@@ -787,7 +787,13 @@ namespace {
             // starten" war, den Button-Text ueberlaufen lassen (Alex'
             // Meldung). Der Button zeigt jetzt einfach durchgehend nur noch
             // "Jetzt neu starten".
-            infoScreen(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), I18n::t(StringId::OTA_SUCCESS_BODY),
+            // GitHub-Stern-Hinweis als zusaetzlicher Absatz angehaengt
+            // (gleiches "\n\n"-Absatz-Muster wie main.cpp::showWeatherInfo())
+            // - dezent unterhalb des Haupttexts, verdraengt den Button nicht,
+            // da auf diesem Screen laut Screenshot reichlich freier Platz war.
+            String successBody = String(I18n::t(StringId::OTA_SUCCESS_BODY)) + "\n\n" +
+                                  I18n::t(StringId::OTA_GITHUB_STAR_HINT);
+            infoScreen(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), successBody.c_str(),
                        UiTheme::accentColor(tft), I18n::t(StringId::OTA_RESTART_BUTTON));
             // Setzt das Flag, das main.cpp::showWhatsNewIfNeeded() beim
             // naechsten Boot ausliest - siehe settings_store.h fuer die

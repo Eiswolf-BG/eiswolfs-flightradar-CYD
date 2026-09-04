@@ -251,6 +251,7 @@ static const char* const I18N_IT[] = {
     "Aggiornamento fallito",
     "Aggiornamento installato",
     "Il nuovo firmware è stato installato correttamente. Riavvia ora per iniziare a usarlo.",
+    "Se questo progetto ti piace, sarei felice di ricevere una stella su GitHub: github.com/Eiswolf-BG/eiswolfs-flightradar-CYD",
     "Riavvia ora",
     "Novità di questa versione:",
     "Non è stato possibile scaricare o installare l'aggiornamento. Il dispositivo continua a funzionare senza modifiche con il firmware precedente. Controlla la connessione WiFi e riprova più tardi.",

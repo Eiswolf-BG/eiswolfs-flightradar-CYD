@@ -997,6 +997,45 @@ void updateWifiIcon() {
 // ui_theme.h) - frueher war das nur dem persistenten Menu-Header-Button
 // vorbehalten, alle anderen Screens blieben fest gruen; das wurde auf
 // Alex' ausdruecklichen Wunsch aufgehoben.
+// Entpackt/zeichnet das RLE-komprimierte GitHub-Avatar-Bild (siehe
+// github_screen_logo_image.h fuer das genaue Byte-Format) zeilenweise statt
+// es komplett in einen 115.200-Byte-RAM-Puffer zu entpacken - bei aktuell
+// ~29% RAM-Auslastung waere ein Vollbild-Puffer zwar rechnerisch noch
+// machbar, angesichts der von diesem Projekt bekannten Heap-Fragmentierungs-
+// Empfindlichkeit (siehe CLAUDE.md "Bekannte Probleme") aber unnoetiges
+// Risiko fuer eine reine Deko-Grafik. Der Zeilenpuffer braucht nur 480 Byte
+// (240 Pixel a 2 Byte) statt 115.200 - der RLE-Datenstrom wird dafuer
+// einfach fortlaufend gelesen, OHNE auf Zeilengrenzen zu achten (ein
+// einzelner Lauf kann ueber eine Zeilengrenze hinausreichen, siehe
+// Kommentar in github_screen_logo_image.h) - der Zeilenpuffer wird
+// trotzdem korrekt gefuellt, weil ein zu langer Lauf einfach ueber mehrere
+// pushImage()-Aufrufe verteilt wird.
+void drawGithubScreenLogo(TFT_eSPI& gfx, int16_t x, int16_t topY) {
+    uint16_t lineBuf[GITHUB_SCREEN_LOGO_W];
+    int16_t lineFill = 0;
+    int16_t row = 0;
+    size_t pos = 0;
+    while (row < GITHUB_SCREEN_LOGO_H && pos + 2 < GITHUB_SCREEN_LOGO_RLE_LEN) {
+        uint8_t count = GITHUB_SCREEN_LOGO_RLE[pos];
+        uint16_t value = (uint16_t)GITHUB_SCREEN_LOGO_RLE[pos + 1] |
+                          ((uint16_t)GITHUB_SCREEN_LOGO_RLE[pos + 2] << 8);
+        pos += 3;
+
+        while (count > 0) {
+            int16_t spaceInLine = GITHUB_SCREEN_LOGO_W - lineFill;
+            int16_t take = count < spaceInLine ? count : spaceInLine;
+            for (int16_t i = 0; i < take; i++) lineBuf[lineFill + i] = value;
+            lineFill += take;
+            count -= take;
+            if (lineFill == GITHUB_SCREEN_LOGO_W) {
+                gfx.pushImage(x, (int16_t)(topY + row), GITHUB_SCREEN_LOGO_W, 1, lineBuf);
+                lineFill = 0;
+                row++;
+            }
+        }
+    }
+}
+
 void runGithubQrScreen(TFT_eSPI& tftRef) {
     MenuStars::reset();
     tftRef.setTextSize(1);
@@ -1043,7 +1082,7 @@ void runGithubQrScreen(TFT_eSPI& tftRef) {
     // false zurueckgesetzt, damit alle anderen Zeichenoperationen (Text,
     // fillRect etc.) unveraendert bleiben.
     tftRef.setSwapBytes(true);
-    tftRef.pushImage(0, LOGO_TOP, GITHUB_SCREEN_LOGO_W, GITHUB_SCREEN_LOGO_H, GITHUB_SCREEN_LOGO);
+    drawGithubScreenLogo(tftRef, 0, LOGO_TOP);
     tftRef.setSwapBytes(false);
 
     tftRef.fillRect(QR_X, QR_Y, QR_PIXEL_SIZE, QR_PIXEL_SIZE, TFT_WHITE);

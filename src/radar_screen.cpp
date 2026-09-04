@@ -1637,11 +1637,31 @@ namespace {
         }
     }
 
+    // Startpunkt bewusst NICHT (L.cx,L.cy) selbst, sondern ein paar Pixel
+    // weiter aussen (INNER_RADIUS) - sonst zeichnet/loescht die Sweep-Linie
+    // bei JEDEM Tick (alle 80ms, unabhaengig vom aktuellen Winkel) exakt
+    // durch den Mittelpunkt. Ein Flugzeug direkt ueber dem eigenen Standort
+    // (Distanz nahe 0) faellt mit seinem Marker praktisch auf genau diesen
+    // Punkt - die Sweep-Linie ueberschrieb ihn dadurch bei jedem einzelnen
+    // Tick kurz, bevor die spaeter im selben tick()-Aufruf laufende
+    // Marker-Neuzeichnung ihn wiederherstellte. Da alle Zeichenschritte
+    // sofort per SPI geschrieben werden (kein Framebuffer), war dieser
+    // kurze Zwischenzustand als staendiges Blinken statt einer stabilen
+    // Silhouette sichtbar (Alex' Meldung) - bei Flugzeugen ausserhalb des
+    // Zentrums faellt das nicht auf, weil die Sweep-Linie ihre Position nur
+    // einmal pro Umdrehung kurz kreuzt. INNER_RADIUS=4 liegt knapp
+    // ausserhalb des 3px-weissen Mittelpunkt-Markers (siehe
+    // tft.fillCircle(L.cx, L.cy, 3, TFT_WHITE) in render()/tick()), der
+    // optische Uebergang bleibt dadurch nahtlos.
+    constexpr int16_t SWEEP_INNER_RADIUS = 4;
+
     void drawSweepLine(TFT_eSPI& gfx, const Layout& L, float angleDeg, uint16_t color) {
         double rad = angleDeg * DEG_TO_RAD;
+        int16_t x1 = L.cx + (int16_t)(SWEEP_INNER_RADIUS * sin(rad));
+        int16_t y1 = L.cy - (int16_t)(SWEEP_INNER_RADIUS * cos(rad));
         int16_t x2 = L.cx + (int16_t)(L.radius * sin(rad));
         int16_t y2 = L.cy - (int16_t)(L.radius * cos(rad));
-        gfx.drawLine(L.cx, L.cy, x2, y2, color);
+        gfx.drawLine(x1, y1, x2, y2, color);
     }
 
     // "Klassik-Radar", Teil 1: Kometenschweif hinter der Sweep-Linie

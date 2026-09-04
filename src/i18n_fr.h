@@ -251,6 +251,7 @@ static const char* const I18N_FR[] = {
     "Échec de la mise à jour",
     "Mise à jour installée",
     "Le nouveau micrologiciel a été installé avec succès. Veuillez redémarrer maintenant pour l'utiliser.",
+    "Si ce projet vous plaît, une étoile sur GitHub me ferait très plaisir : github.com/Eiswolf-BG/eiswolfs-flightradar-CYD",
     "Redémarrer maintenant",
     "Nouveautés de cette version :",
     "La mise à jour n'a pas pu être téléchargée ou installée. L'appareil continue de fonctionner normalement avec le micrologiciel précédent. Merci de vérifier votre connexion WiFi et de réessayer plus tard.",

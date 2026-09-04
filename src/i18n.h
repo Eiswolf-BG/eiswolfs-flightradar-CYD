@@ -369,6 +369,11 @@ enum class StringId : uint16_t {
     // einem Firmware-Update IMMER aktiv informiert werden und selbst
     // bestaetigen, siehe menu_screen.cpp::infoScreen().
     OTA_SUCCESS_BODY,
+    // Dezenter, zusaetzlicher Absatz auf demselben Erfolgs-Screen (siehe
+    // menu_screen.cpp) - bittet um einen GitHub-Stern, ohne den
+    // Haupttext/Button zu verdraengen (per "\n\n" als eigener Absatz
+    // angehaengt, gleiches Muster wie main.cpp::showWeatherInfo()).
+    OTA_GITHUB_STAR_HINT,
     OTA_RESTART_BUTTON,
     // Feste Beschriftung ueber dem Changelog-Text auf dem Erfolgs-Screen
     // (Config::CHANGELOG_LATEST, siehe changelog.h) - bewusst regulaer

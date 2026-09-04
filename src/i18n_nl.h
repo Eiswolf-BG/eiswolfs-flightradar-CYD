@@ -252,6 +252,7 @@ static const char* const I18N_NL[] = {
     "Update mislukt",
     "Update geïnstalleerd",
     "De nieuwe firmware is succesvol geïnstalleerd. Start nu opnieuw op om deze te gebruiken.",
+    "Als je dit project leuk vindt, zou ik een ster op GitHub erg waarderen: github.com/Eiswolf-BG/eiswolfs-flightradar-CYD",
     "Nu opnieuw opstarten",
     "Wat is er nieuw in deze versie:",
     "De update kon niet worden gedownload of geïnstalleerd. Het apparaat draait nog steeds ongewijzigd op de vorige firmware. Controleer je WiFi-verbinding en probeer het later opnieuw.",
