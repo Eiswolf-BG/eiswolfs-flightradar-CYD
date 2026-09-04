@@ -384,6 +384,12 @@ static const char* const I18N_DE[] = {
 
     "in 3h",
 
+    "Wettervorschau",
+    "Jetzt",
+    "Wind: ",
+    "Regenwahrscheinlichkeit: ",
+    "Vorhersagedaten noch nicht verfügbar.",
+
     "Overlay",
     "Über das Overlay",
     "Schaltet drei gedimmte Eckanzeigen auf dem Radarschirm gemeinsam ein oder aus: die 3h-Wettervorschau (oben rechts), Distanz+Peilung zum nächsten Flughafen (oben links) und den rotierenden Ereignis-Hinweis (unten rechts) für Squawk-Wachposten-, Watchlist- und ausgeblendete-Airline-Treffer - nur Ereignisse, die du selbst in einer Liste oder einem Filter eingerichtet hast. Bei AUS bleiben alle drei leer, für einen aufgeräumteren Bildschirm. Der Update-Verfügbar-Indikator (unten links) ist davon nicht betroffen und läuft in jedem Fall weiter.",

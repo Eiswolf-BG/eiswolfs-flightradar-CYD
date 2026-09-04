@@ -384,6 +384,12 @@ static const char* const I18N_ES[] = {
 
     "en 3h",
 
+    "Previsión meteorológica",
+    "Ahora",
+    "Viento: ",
+    "Probabilidad de lluvia: ",
+    "Datos de previsión aún no disponibles.",
+
     "Overlay",
     "Sobre el overlay",
     "Activa o desactiva juntas tres indicaciones atenuadas en las esquinas de la pantalla del radar: la previsión meteorológica a 3h (arriba a la derecha), la distancia y el rumbo al aeropuerto más cercano (arriba a la izquierda), y el indicador de eventos rotativo (abajo a la derecha) para la lista de vigilancia de squawk, la lista de vigilancia de aviones y las aerolíneas ocultas - solo eventos que hayas configurado tú mismo en una lista o filtro. Desactivado, las tres permanecen vacías para una pantalla más despejada. El indicador de actualización disponible (abajo a la izquierda) no se ve afectado y sigue funcionando en cualquier caso.",

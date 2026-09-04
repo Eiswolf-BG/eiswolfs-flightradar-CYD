@@ -2585,34 +2585,16 @@ namespace {
         }
     }
 
-    // Nur sichtbar, wenn eine 3h-Vorhersage vorliegt UND sie sich vom
-    // AKTUELLEN Wetter unterscheidet (Alex' ausdruecklicher Wunsch - bei
-    // gleichbleibender Lage keine Anzeige). Wird wie updateBgStars() aus
-    // tick() heraus im 80ms-Takt neu gezeichnet (siehe dortiger
-    // Kommentar), damit es das render()-Vollclear ueberlebt, ohne bis zu
-    // 80ms lang zu verschwinden/zu flackern.
-    void drawForecastCorner(TFT_eSPI& gfx, int16_t top) {
-        // Teil des gemeinsamen "Overlay"-Schalters (Menue > System > Radar-
-        // Darstellung, SettingsStore::eventCornerOverlayEnabled()) - steuert
-        // zusammen mit der Flughafen-Anzeige und der Ereignis-Ecke alle drei
-        // optionalen Eckanzeigen. Der Update-Indikator (andere Funktion,
-        // drawUpdateCornerButton()) haengt bewusst NICHT an diesem Schalter.
-        if (!SettingsStore::eventCornerOverlayEnabled()) return;
-        Weather::Forecast fc = Weather::currentForecast();
-        Weather::Condition cur = Weather::current();
-        if (!fc.available) return;
-        if (cur == Weather::Condition::Unknown || fc.condition == Weather::Condition::Unknown) return;
-        if (fc.condition == cur) return;
-
-        int16_t cx = FORECAST_ICON_CX;
-        int16_t cy = (int16_t)(top + FORECAST_ICON_CY_OFFSET);
-        // Deutlich gedimmt statt volle Themenfarbe (Alex' Wunsch: "kaum
-        // sichtbar/sehr dezent" - 0.45 war noch genauso kraeftig wie
-        // normale UI-Elemente, jetzt auf ~18% reduziert) - gleicher Dimm-
-        // Mechanismus wie drawWorldMap()/updateBgStars() oben.
-        uint16_t color = UiTheme::accentColorDimmed(gfx, 0.18f);
-
-        switch (fc.condition) {
+    // Eine der sechs Wetterlagen als kleines Symbol - urspruenglich nur
+    // Teil von drawForecastCorner() unten, jetzt als eigene Funktion
+    // herausgezogen, damit showForecastTimelineInfo() (neuer Info-Screen
+    // beim Antippen der Wettervorschau-Ecke, siehe dort) dieselben Formen
+    // fuer die vier Zeitpunkte des Stundenverlaufs wiederverwenden kann,
+    // statt die Formen ein zweites Mal nachzubauen - beide Aufrufer sind
+    // im selben File, kein Bruch der sonstigen Pro-Screen-Unabhaengigkeit
+    // (die betrifft nur getrennte Screen-Dateien, siehe CLAUDE.md).
+    void drawWeatherConditionIcon(TFT_eSPI& gfx, int16_t cx, int16_t cy, Weather::Condition condition, uint16_t color) {
+        switch (condition) {
             case Weather::Condition::Clear:
                 drawForecastSunShape(gfx, cx, cy, 9, color);
                 break;
@@ -2642,8 +2624,38 @@ namespace {
                 gfx.drawLine((int16_t)(cx + 1), (int16_t)(cy + 10), (int16_t)(cx - 3), (int16_t)(cy + 16), color);
                 break;
             default:
-                return;
+                break;
         }
+    }
+
+    // Nur sichtbar, wenn eine 3h-Vorhersage vorliegt UND sie sich vom
+    // AKTUELLEN Wetter unterscheidet (Alex' ausdruecklicher Wunsch - bei
+    // gleichbleibender Lage keine Anzeige). Wird wie updateBgStars() aus
+    // tick() heraus im 80ms-Takt neu gezeichnet (siehe dortiger
+    // Kommentar), damit es das render()-Vollclear ueberlebt, ohne bis zu
+    // 80ms lang zu verschwinden/zu flackern.
+    void drawForecastCorner(TFT_eSPI& gfx, int16_t top) {
+        // Teil des gemeinsamen "Overlay"-Schalters (Menue > System > Radar-
+        // Darstellung, SettingsStore::eventCornerOverlayEnabled()) - steuert
+        // zusammen mit der Flughafen-Anzeige und der Ereignis-Ecke alle drei
+        // optionalen Eckanzeigen. Der Update-Indikator (andere Funktion,
+        // drawUpdateCornerButton()) haengt bewusst NICHT an diesem Schalter.
+        if (!SettingsStore::eventCornerOverlayEnabled()) return;
+        Weather::Forecast fc = Weather::currentForecast();
+        Weather::Condition cur = Weather::current();
+        if (!fc.available) return;
+        if (cur == Weather::Condition::Unknown || fc.condition == Weather::Condition::Unknown) return;
+        if (fc.condition == cur) return;
+
+        int16_t cx = FORECAST_ICON_CX;
+        int16_t cy = (int16_t)(top + FORECAST_ICON_CY_OFFSET);
+        // Deutlich gedimmt statt volle Themenfarbe (Alex' Wunsch: "kaum
+        // sichtbar/sehr dezent" - 0.45 war noch genauso kraeftig wie
+        // normale UI-Elemente, jetzt auf ~18% reduziert) - gleicher Dimm-
+        // Mechanismus wie drawWorldMap()/updateBgStars() oben.
+        uint16_t color = UiTheme::accentColorDimmed(gfx, 0.18f);
+
+        drawWeatherConditionIcon(gfx, cx, cy, fc.condition, color);
 
         // "in 3h" fett (1px-Offset-Technik, gleiches Muster wie
         // drawCenteredWrappedBold() in first_run_welcome_screen.cpp).
@@ -2653,6 +2665,142 @@ namespace {
         gfx.drawString(I18n::t(StringId::FORECAST_CORNER_LABEL), cx, textY);
         gfx.drawString(I18n::t(StringId::FORECAST_CORNER_LABEL), (int16_t)(cx + 1), textY);
         gfx.setTextDatum(TL_DATUM);
+    }
+
+    // Antippbare Flaeche fuer die 3h-Wettervorschau-Ecke (Icon + Text,
+    // siehe drawForecastCorner() oben) - grosszuegig bemessen, deckt beide
+    // Elemente plus etwas Rand ab, damit ein Tap nicht pixelgenau treffen
+    // muss (gleiches Prinzip wie nearestAirportCornerRect()/eventCornerRect()).
+    Rect forecastCornerRect(int16_t top) {
+        int16_t x0 = (int16_t)(FORECAST_ICON_CX - 24);
+        return {x0, top, (int16_t)(Config::SCREEN_WIDTH - x0), 48};
+    }
+
+    // Eigener Info-Screen beim Antippen der 3h-Wettervorschau-Ecke (siehe
+    // forecastCornerRect()/drawForecastCorner() oben) - zeigt einen kurzen
+    // Stundenverlauf (jetzt/+3h/+6h/+9h) plus Zusatzdetails (Wind,
+    // Niederschlagswahrscheinlichkeit) zum aktuellen Zeitpunkt, alles aus
+    // denselben bereits abgefragten Open-Meteo-Daten wie die bestehende
+    // Kurzvorhersage (Weather::currentHourlyTimeline(), siehe dortiger
+    // Kommentar in weather.h/.cpp - keine zusaetzliche Netzwerkanfrage).
+    // Vollbild-Stil wie showAltitudeLegendScreen() oben (kein Boxed-
+    // Overlay wie MenuScreen::showInfoScreen(), da hier zusaetzlich zum
+    // Text noch die vier Wetter-Icons Platz brauchen, die
+    // showInfoScreen() nicht kennt - siehe CLAUDE.md-Ausnahmeregel dazu).
+    void showForecastTimelineInfo(TFT_eSPI& gfx) {
+        MenuStars::reset();
+        gfx.setTextSize(1);
+
+        constexpr int16_t textMaxWidth = Config::SCREEN_WIDTH - 20;
+        constexpr int16_t LINE_H = 16;
+        constexpr int16_t TITLE_Y = 14;
+        constexpr int MAX_TITLE_LINES = 2;
+        String titleLines[MAX_TITLE_LINES];
+        int titleLineCount = MenuScreen::layoutTitleLines(gfx, I18n::t(StringId::WEATHER_FORECAST_INFO_TITLE),
+                                                            textMaxWidth, titleLines, MAX_TITLE_LINES);
+
+        Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+
+        gfx.fillScreen(TFT_BLACK);
+        gfx.setTextDatum(MC_DATUM);
+        gfx.setTextColor(themeBaseColor(gfx), TFT_BLACK);
+        for (int i = 0; i < titleLineCount; i++) {
+            gfx.drawString(titleLines[i], Config::SCREEN_WIDTH / 2, (int16_t)(TITLE_Y + i * LINE_H));
+        }
+        gfx.setTextDatum(TL_DATUM);
+
+        int16_t y = (int16_t)(TITLE_Y + titleLineCount * LINE_H + 10);
+
+        Weather::HourlyTimeline timeline = Weather::currentHourlyTimeline();
+        bool anyAvailable = false;
+        for (uint8_t i = 0; i < Weather::HOURLY_TIMELINE_COUNT; i++) {
+            if (timeline.points[i].available) anyAvailable = true;
+        }
+
+        if (!anyAvailable) {
+            // Noch keine erfolgreiche Wetterabfrage (z.B. kurz nach dem
+            // Boot) - Hinweistext statt leerer Flaeche, ueber layoutWrapped()
+            // statt eines ungeprueften println() (CLAUDE.md-Pflicht).
+            gfx.setTextColor(TFT_WHITE, TFT_BLACK);
+            layoutWrapped(gfx, 10, (int16_t)(y + 6), textMaxWidth, LINE_H,
+                           I18n::t(StringId::WEATHER_FORECAST_INFO_UNAVAILABLE));
+        } else {
+            // Stundenverlauf: vier gleich breite Spalten (Icon, grobe
+            // Uhrzeit bzw. "Jetzt" fuer die erste Spalte, Temperatur in der
+            // eingestellten Einheit - LocationManager::useMetricUnits(),
+            // gleiche Umschaltung wie ueberall sonst im Projekt).
+            constexpr int16_t COL_W = Config::SCREEN_WIDTH / Weather::HOURLY_TIMELINE_COUNT;
+            int16_t iconCy = (int16_t)(y + 16);
+            int16_t timeCy = (int16_t)(iconCy + 20);
+            int16_t tempCy = (int16_t)(timeCy + 16);
+            bool metric = LocationManager::useMetricUnits();
+
+            gfx.setTextDatum(MC_DATUM);
+            for (uint8_t i = 0; i < Weather::HOURLY_TIMELINE_COUNT; i++) {
+                const Weather::HourlyPoint& p = timeline.points[i];
+                if (!p.available) continue;
+                int16_t cx = (int16_t)(COL_W * i + COL_W / 2);
+
+                drawWeatherConditionIcon(gfx, cx, iconCy, p.condition, themeBaseColor(gfx));
+
+                gfx.setTextColor(themeBaseColor(gfx), TFT_BLACK);
+                if (i == 0) {
+                    gfx.drawString(I18n::t(StringId::WEATHER_FORECAST_INFO_NOW_LABEL), cx, timeCy);
+                } else {
+                    char timeBuf[8];
+                    snprintf(timeBuf, sizeof(timeBuf), "%02u:00", (unsigned)p.localHour);
+                    gfx.drawString(timeBuf, cx, timeCy);
+                }
+
+                float displayTemp = metric ? p.temperatureC : (p.temperatureC * 9.0f / 5.0f + 32.0f);
+                char tempBuf[10];
+                snprintf(tempBuf, sizeof(tempBuf), "%.0f°%s", displayTemp, metric ? "C" : "F");
+                gfx.setTextColor(TFT_WHITE, TFT_BLACK);
+                gfx.drawString(tempBuf, cx, tempCy);
+            }
+            gfx.setTextDatum(TL_DATUM);
+
+            // Zusatzdetails zum aktuellen Zeitpunkt: Windrichtung (Kompass-
+            // Kuerzel, dieselbe compassLabel()-Funktion wie beim
+            // Peilungs-Label) + -geschwindigkeit, sowie Niederschlags-
+            // wahrscheinlichkeit - beide nur, wenn tatsaechlich verfuegbar
+            // (Wind ist Teil derselben current_weather-Antwort wie die
+            // Regen-Effekt-Windrichtung, Niederschlagswahrscheinlichkeit
+            // ein neu ergaenztes hourly-Feld, siehe weather.cpp). Aktuelle
+            // Temperatur bewusst nicht nochmal wiederholt - steht bereits
+            // gut sichtbar in der "Jetzt"-Spalte oben.
+            int16_t detailY = (int16_t)(tempCy + 24);
+            gfx.setTextColor(TFT_WHITE, TFT_BLACK);
+
+            float windSpeed = Weather::currentWindSpeedKmh();
+            float windDir = Weather::currentWindDirectionDeg();
+            if (windSpeed >= 0.0f && windDir >= 0.0f) {
+                String windLine = String(I18n::t(StringId::WEATHER_FORECAST_INFO_WIND_PREFIX)) +
+                                   compassLabel(windDir) + ", " + String(windSpeed, 0) + " km/h";
+                detailY = layoutWrapped(gfx, 10, detailY, textMaxWidth, LINE_H, windLine);
+                detailY += 4;
+            }
+
+            int8_t precipProb = Weather::currentPrecipitationProbabilityPercent();
+            if (precipProb >= 0) {
+                String precipLine = String(I18n::t(StringId::WEATHER_FORECAST_INFO_PRECIP_PREFIX)) +
+                                     String(precipProb) + "%";
+                layoutWrapped(gfx, 10, detailY, textMaxWidth, LINE_H, precipLine);
+            }
+        }
+
+        drawButton(gfx, backBtn, I18n::t(StringId::OK));
+
+        while (true) {
+            TouchInput::Point tap;
+            if (TouchInput::wasTapped(tap)) {
+                if (backBtn.contains(tap.x, tap.y)) return;
+            }
+            // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return;
+            MenuStars::update(gfx);
+            delay(20);
+        }
     }
 
     // Antippbares "!"-in-Kreis-Icon in der unteren linken Radarecke - NUR
@@ -4010,6 +4158,26 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
         lastPanel.valid = false;
         headerRedrawNeeded = true;
         return true;
+    }
+
+    // Antippbare 3h-Wettervorschau-Ecke oben rechts (siehe
+    // drawForecastCorner()/forecastCornerRect() oben) - oeffnet den neuen
+    // Stundenverlauf-Info-Screen (showForecastTimelineInfo()). Dieselbe
+    // Sichtbarkeitsbedingung wie drawForecastCorner() selbst (nur wenn das
+    // Symbol dort auch tatsaechlich gezeichnet wird), damit kein Tap auf
+    // eine unsichtbare Flaeche reagiert.
+    {
+        Weather::Forecast fc = Weather::currentForecast();
+        Weather::Condition cur = Weather::current();
+        bool forecastIconVisible = SettingsStore::eventCornerOverlayEnabled() && fc.available &&
+                                    cur != Weather::Condition::Unknown && fc.condition != Weather::Condition::Unknown &&
+                                    fc.condition != cur;
+        if (forecastIconVisible && forecastCornerRect(top).contains(x, y)) {
+            showForecastTimelineInfo(tft);
+            lastPanel.valid = false;
+            headerRedrawNeeded = true;
+            return true;
+        }
     }
 
     // Antippbare "Naechster Flughafen"-Anzeige in der oberen linken

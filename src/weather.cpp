@@ -16,6 +16,8 @@ namespace {
     RainIntensity currentRainIntensityVal = RainIntensity::None;
     RainIntensity currentSnowIntensityVal = RainIntensity::None;
     float currentWindDirDeg = -1.0f;
+    float currentWindSpeedKmhVal = -1.0f;
+    int8_t currentPrecipProbVal = -1;
     uint32_t lastFetchMs = 0;
     double lastLat = 0;
     double lastLon = 0;
@@ -23,6 +25,7 @@ namespace {
 
     Metar currentMetarData;
     Forecast currentForecastData;
+    HourlyTimeline currentHourlyTimelineData;
     NearestAirport currentNearestAirportData;
 
     // Kurzer, eigener Timeout fuer den hexdb.io-Flughafen-Endpunkt (siehe
@@ -227,32 +230,34 @@ namespace {
         client.setInsecure();
         client.setTimeout(Config::HTTP_TIMEOUT_MS);
 
-        // Kurzvorhersage (siehe Weather::Forecast) fuer genau EINEN
-        // stuendlichen Zeitpunkt ("jetzt + FORECAST_HOURS_AHEAD Stunden")
-        // ueber Open-Meteo's start_hour/end_hour-Parameter angefragt (beide
-        // auf dieselbe volle Stunde gesetzt), statt ueber den einfacheren
-        // forecast_hours-Parameter, der ab der aktuellen Tagesstunde 00:00
-        // zaehlt und damit mehrere Datenpunkte liefern wuerde, aus denen der
-        // richtige erst noch herausgesucht werden muesste. So liefert die
-        // Antwort direkt genau einen Eintrag - weniger Speicher, kein
-        // Zeitstempel-Abgleich noetig. Ohne "timezone"-Parameter interpretiert
-        // Open-Meteo start_hour/end_hour als UTC, exakt wie gmtime_r() hier
-        // rechnet - kein zusaetzlicher Standort-Zeitzonen-Versatz noetig.
-        // Bleibt leer (und die Vorhersage damit unverfuegbar), solange die
-        // Uhrzeit noch nicht per NTP synchronisiert ist (gleiche Pruefung
-        // wie bei isNightDimHours()) - ohne verlässliche Uhrzeit liesse sich
-        // "in 3 Stunden" gar nicht berechnen.
-        char forecastParams[100] = "";
+        // Stundenverlauf (siehe Weather::HourlyTimeline) fuer den neuen "3h-
+        // Wettervorschau antippen"-Screen (radar_screen.cpp) - EIN
+        // Abfragefenster von "jetzt" (aktuelle volle Stunde) bis +9h liefert
+        // sowohl die vier Zeitpunkte des neuen Verlaufs (jetzt/+3h/+6h/+9h)
+        // als auch weiterhin den einzelnen Punkt fuer die bestehende
+        // Kurzvorhersage (Forecast, FORECAST_HOURS_AHEAD=3) - keine zweite
+        // Anfrage noetig, nur ein breiteres Zeitfenster derselben Anfrage.
+        // precipitation_probability ist neu ergaenzt (fuer die
+        // "Zusatzdetails"-Zeile im neuen Screen), war vorher nicht Teil der
+        // Abfrage. Ohne "timezone"-Parameter interpretiert Open-Meteo
+        // start_hour/end_hour als UTC, exakt wie gmtime_r() hier rechnet -
+        // kein zusaetzlicher Standort-Zeitzonen-Versatz noetig. Bleibt leer
+        // (alle Werte damit unverfuegbar), solange die Uhrzeit noch nicht
+        // per NTP synchronisiert ist (gleiche Pruefung wie bei
+        // isNightDimHours()) - ohne verlaessliche Uhrzeit liessen sich die
+        // Zielstunden gar nicht berechnen.
+        char forecastParams[150] = "";
         time_t nowEpoch = time(nullptr);
         if (nowEpoch > 8 * 3600 * 2) {
-            time_t target = nowEpoch + (time_t)FORECAST_HOURS_AHEAD * 3600;
-            struct tm tmTarget;
-            gmtime_r(&target, &tmTarget);
+            time_t endTarget = nowEpoch + 9 * 3600;
+            struct tm tmStart, tmEnd;
+            gmtime_r(&nowEpoch, &tmStart);
+            gmtime_r(&endTarget, &tmEnd);
             snprintf(forecastParams, sizeof(forecastParams),
-                     "&hourly=temperature_2m,weathercode"
+                     "&hourly=temperature_2m,weathercode,precipitation_probability"
                      "&start_hour=%04d-%02d-%02dT%02d:00&end_hour=%04d-%02d-%02dT%02d:00",
-                     tmTarget.tm_year + 1900, tmTarget.tm_mon + 1, tmTarget.tm_mday, tmTarget.tm_hour,
-                     tmTarget.tm_year + 1900, tmTarget.tm_mon + 1, tmTarget.tm_mday, tmTarget.tm_hour);
+                     tmStart.tm_year + 1900, tmStart.tm_mon + 1, tmStart.tm_mday, tmStart.tm_hour,
+                     tmEnd.tm_year + 1900, tmEnd.tm_mon + 1, tmEnd.tm_mday, tmEnd.tm_hour);
         }
 
         HTTPClient http;
@@ -293,25 +298,65 @@ namespace {
         // nichts an einem vorherigen gueltigen Wert).
         float windDir = doc["current_weather"]["winddirection"] | -1.0f;
         if (windDir >= 0.0f) currentWindDirDeg = windDir;
+        // "windspeed" ist ebenfalls Teil derselben current_weather-Antwort
+        // (Open-Meteo liefert es standardmaessig mit, in km/h) - bisher
+        // nicht ausgelesen, jetzt fuer den neuen Wettervorschau-Screen
+        // gebraucht (siehe currentWindSpeedKmh()-Kommentar in weather.h).
+        float windSpeed = doc["current_weather"]["windspeed"] | -1.0f;
+        if (windSpeed >= 0.0f) currentWindSpeedKmhVal = windSpeed;
 
-        // Kurzvorhersage aus dem "hourly"-Teil derselben Antwort - dank
-        // start_hour/end_hour oben enthaelt jedes der beiden Arrays hoechstens
-        // einen einzigen Eintrag. Fehlt der "hourly"-Teil (z.B. weil oben
+        // Stundenverlauf aus dem "hourly"-Teil derselben Antwort - dank des
+        // jetzt breiteren start_hour/end_hour-Fensters (siehe oben)
+        // enthaelt jedes Array bis zu 10 Eintraege (Index 0 = aktuelle
+        // Stunde, Index 9 = +9h). Fehlt der "hourly"-Teil (z.B. weil oben
         // mangels NTP-Zeit gar nicht erst danach gefragt wurde), liefert
         // ArduinoJson fuer .as<JsonArray>() auf einem fehlenden Feld einfach
-        // ein leeres Array zurueck - currentForecastData wird dann korrekt
-        // auf "nicht verfuegbar" gesetzt statt mit einem veralteten Wert
-        // stehen zu bleiben.
-        Forecast forecast;
+        // ein leeres Array zurueck - alle folgenden Werte werden dann
+        // korrekt auf "nicht verfuegbar" gesetzt statt mit einem veralteten
+        // Wert stehen zu bleiben.
         JsonArray hourlyTemp = doc["hourly"]["temperature_2m"].as<JsonArray>();
         JsonArray hourlyCode = doc["hourly"]["weathercode"].as<JsonArray>();
-        if (hourlyTemp.size() > 0 && hourlyCode.size() > 0) {
+        JsonArray hourlyPrecip = doc["hourly"]["precipitation_probability"].as<JsonArray>();
+
+        // Bestehende Einzelpunkt-Kurzvorhersage (main.cpp::showWeatherInfo())
+        // - unveraendert der Punkt bei FORECAST_HOURS_AHEAD (=3), jetzt aus
+        // demselben breiteren Array statt einer eigenen Anfrage entnommen.
+        Forecast forecast;
+        if (hourlyTemp.size() > FORECAST_HOURS_AHEAD && hourlyCode.size() > FORECAST_HOURS_AHEAD) {
             forecast.available = true;
-            forecast.temperatureC = hourlyTemp[0].as<float>();
-            forecast.condition = conditionFromWmoCode(hourlyCode[0].as<int>());
+            forecast.temperatureC = hourlyTemp[FORECAST_HOURS_AHEAD].as<float>();
+            forecast.condition = conditionFromWmoCode(hourlyCode[FORECAST_HOURS_AHEAD].as<int>());
             forecast.hoursAhead = FORECAST_HOURS_AHEAD;
         }
         currentForecastData = forecast;
+
+        // Niederschlagswahrscheinlichkeit fuer die aktuelle Stunde (Index 0)
+        // - fuer die "Zusatzdetails"-Zeile im neuen Wettervorschau-Screen.
+        if (hourlyPrecip.size() > 0) {
+            currentPrecipProbVal = (int8_t)hourlyPrecip[0].as<int>();
+        }
+
+        // Vier-Punkte-Stundenverlauf (jetzt/+3h/+6h/+9h) fuer denselben
+        // Screen - "localHour" wird direkt aus nowEpoch+Offset berechnet
+        // (nicht aus dem Array-Index abgeleitet), exakt dieselbe Rechnung,
+        // die vorher schon fuer den einzelnen Forecast-Punkt oben genutzt
+        // wurde, nur fuer vier Offsets statt einem.
+        HourlyTimeline timeline;
+        constexpr uint8_t TIMELINE_OFFSETS[HOURLY_TIMELINE_COUNT] = {0, 3, 6, 9};
+        for (uint8_t i = 0; i < HOURLY_TIMELINE_COUNT; i++) {
+            uint8_t off = TIMELINE_OFFSETS[i];
+            if (hourlyTemp.size() <= off || hourlyCode.size() <= off) continue;
+            HourlyPoint& p = timeline.points[i];
+            p.available = true;
+            p.hoursAhead = off;
+            p.temperatureC = hourlyTemp[off].as<float>();
+            p.condition = conditionFromWmoCode(hourlyCode[off].as<int>());
+            time_t pointEpoch = nowEpoch + (time_t)off * 3600;
+            struct tm tmPoint;
+            gmtime_r(&pointEpoch, &tmPoint);
+            p.localHour = (uint8_t)tmPoint.tm_hour;
+        }
+        currentHourlyTimelineData = timeline;
 
         // METAR-Flugwetterbericht fuer den naechstgelegenen Flughafen - im
         // selben Aufruf/Intervall wie das Icon-Wetter oben, damit dafuer
@@ -384,9 +429,15 @@ RainIntensity currentSnowIntensity() { return currentSnowIntensityVal; }
 
 float currentWindDirectionDeg() { return currentWindDirDeg; }
 
+float currentWindSpeedKmh() { return currentWindSpeedKmhVal; }
+
+int8_t currentPrecipitationProbabilityPercent() { return currentPrecipProbVal; }
+
 Metar currentMetar() { return currentMetarData; }
 
 Forecast currentForecast() { return currentForecastData; }
+
+HourlyTimeline currentHourlyTimeline() { return currentHourlyTimelineData; }
 
 NearestAirport currentNearestAirport() { return currentNearestAirportData; }
 

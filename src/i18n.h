@@ -751,6 +751,31 @@ enum class StringId : uint16_t {
     // jeder Sprache neben dem kleinen Symbol in die Ecke passt.
     FORECAST_CORNER_LABEL,
 
+    // Neuer, eigener Info-Screen beim Antippen der 3h-Wettervorschau-Ecke
+    // (radar_screen.cpp::showForecastTimelineInfo()) - zeigt einen kurzen
+    // Stundenverlauf (jetzt/+3h/+6h/+9h, aus denselben bereits
+    // abgefragten Open-Meteo-Daten wie die bestehende Kurzvorhersage,
+    // keine zusaetzliche Netzwerkanfrage) plus Zusatzdetails (Wind,
+    // Niederschlagswahrscheinlichkeit) zum aktuellen Zeitpunkt. Gleicher
+    // visueller Stil wie showAltitudeLegendScreen() (Vollbild, kein
+    // Boxed-Overlay), mit "OK"-Button zum Schliessen.
+    WEATHER_FORECAST_INFO_TITLE,
+    // Ersetzt die Uhrzeit-Spalte fuer den allerersten (aktuellen)
+    // Zeitpunkt im Stundenverlauf - die uebrigen drei Spalten zeigen
+    // stattdessen eine grobe, auf volle Stunden gerundete Uhrzeit
+    // (z.B. "17:00", unuebersetzte Ziffern, kein eigener StringId noetig).
+    WEATHER_FORECAST_INFO_NOW_LABEL,
+    // Vorangestellt vor Windrichtung (Himmelsrichtungs-Kuerzel, siehe
+    // compassLabel()) + -geschwindigkeit, z.B. "Wind: NE, 14 km/h".
+    WEATHER_FORECAST_INFO_WIND_PREFIX,
+    // Vorangestellt vor der Niederschlagswahrscheinlichkeit in Prozent
+    // fuer die aktuelle Stunde, z.B. "Rain chance: 40%".
+    WEATHER_FORECAST_INFO_PRECIP_PREFIX,
+    // Angezeigt anstelle des Stundenverlaufs/der Zusatzdetails, solange
+    // noch keine erfolgreiche Wetterabfrage vorliegt (z.B. kurz nach dem
+    // Boot, bevor NTP-Zeit und erster Open-Meteo-Abruf durch sind).
+    WEATHER_FORECAST_INFO_UNAVAILABLE,
+
     // Schalter im "Mode"-Menue (radar_theme_screen.cpp, dort wo bereits
     // Klassik-Radar/CRT-Phosphor/Radar-Puls/Regen-Effekt liegen) fuer die
     // neue Ereignis-Ecke unten rechts (Militaer/Squawk-Wachposten/

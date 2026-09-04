@@ -384,6 +384,12 @@ static const char* const I18N_TR[] = {
 
     "3sa sonra",
 
+    "Hava Durumu Tahmini",
+    "Şimdi",
+    "Rüzgar: ",
+    "Yağış olasılığı: ",
+    "Tahmin verileri henüz mevcut değil.",
+
     "Overlay",
     "Overlay hakkında",
     "Radar ekranındaki üç soluk köşe göstergesini birlikte açar veya kapatır: 3 saatlik hava durumu önizlemesi (sağ üst), en yakın havalimanına mesafe ve yön (sol üst) ve squawk izleme listesi, uçak izleme listesi ve gizlenmiş havayolu eşleşmeleri için dönen olay göstergesi (sağ alt) - yalnızca kendi kurduğunuz bir liste veya filtreye ait olaylar. Kapalıyken üçü de boş kalır, ekran daha sade görünür. Güncelleme mevcut göstergesi (sol alt) bundan etkilenmez ve her durumda çalışmaya devam eder.",

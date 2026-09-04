@@ -48,13 +48,19 @@ namespace Weather {
     // Windrichtung in Grad (meteorologische Konvention: Richtung, AUS der
     // der Wind weht, 0=Nord, im Uhrzeigersinn) - Teil derselben Open-Meteo-
     // "current_weather"-Antwort wie current() oben (fetchNow() in
-    // weather.cpp). Aktuell von keinem Aufrufer genutzt (ein testweise
-    // gebauter Regenfront-Layer auf dem Radar wurde wieder entfernt, da er
-    // keinen Mehrwert zum bestehenden Header-Wetter-Icon brachte) - bewusst
-    // als Rohdaten-Zugriff fuer spaetere Zwecke stehen gelassen. -1 = noch
-    // keine erfolgreiche Abfrage. Wie current() nur vom NetTask
-    // geschrieben, vom UI-Thread gelesen - kein Lock noetig.
+    // weather.cpp). Steuert den Neigungswinkel des Regen-/Schnee-Effekts
+    // auf Radarscreen, Ruhebildschirm und WebUI (siehe radar_screen.cpp/
+    // web_export_server.cpp). -1 = noch keine erfolgreiche Abfrage. Wie
+    // current() nur vom NetTask geschrieben, vom UI-Thread gelesen - kein
+    // Lock noetig.
     float currentWindDirectionDeg();
+
+    // Windgeschwindigkeit in km/h - Teil derselben current_weather-Antwort
+    // wie currentWindDirectionDeg() oben (Open-Meteo liefert "windspeed"
+    // dort standardmaessig mit), bisher aber nicht ausgelesen - jetzt fuer
+    // den neuen Wettervorschau-Screen (radar_screen.cpp, Antippen der 3h-
+    // Vorschau-Ecke) gebraucht. -1 = noch keine erfolgreiche Abfrage.
+    float currentWindSpeedKmh();
 
     // Aktuelle Regenintensitaet (siehe RainIntensity oben) - wie current()
     // nur vom NetTask geschrieben, vom UI-Thread gelesen, kein Lock noetig.
@@ -106,6 +112,39 @@ namespace Weather {
     // Wie current()/currentMetar() nur vom NetTask geschrieben, vom
     // UI-Thread gelesen - gleiche Begruendung, kein Lock noetig.
     Forecast currentForecast();
+
+    // Niederschlagswahrscheinlichkeit (%) fuer die aktuelle Stunde - neues
+    // hourly-Feld (siehe fetchNow()), zusammen mit dem erweiterten
+    // Stundenverlauf unten abgefragt (kein zusaetzlicher API-Aufruf, nur
+    // ein zusaetzlicher Parameter derselben ohnehin schon laufenden
+    // Anfrage). -1 = nicht verfuegbar (z.B. noch keine erfolgreiche
+    // Abfrage).
+    int8_t currentPrecipitationProbabilityPercent();
+
+    // Kurzer Stundenverlauf (jetzt/+3h/+6h/+9h) fuer den neuen, eigenen
+    // Info-Screen beim Antippen der 3h-Wettervorschau-Ecke
+    // (radar_screen.cpp) - im GLEICHEN fetchNow()-Aufruf/Intervall wie
+    // die einzelne Forecast oben ermittelt (erweitert deren hourly-
+    // Abfragefenster lediglich von einem einzelnen Zeitpunkt auf zehn
+    // Stunden, aus denen hier vier herausgegriffen werden), keine
+    // zusaetzliche Netzwerkanfrage. "localHour" ist eine grobe,
+    // auf volle Stunden gerundete lokale Uhrzeit (0-23) - siehe
+    // fetchNow()-Kommentar zur UTC/Lokalzeit-Handhabung.
+    struct HourlyPoint {
+        bool available = false;
+        uint8_t hoursAhead = 0; // 0, 3, 6 oder 9
+        uint8_t localHour = 0;
+        float temperatureC = 0;
+        Condition condition = Condition::Unknown;
+    };
+    constexpr uint8_t HOURLY_TIMELINE_COUNT = 4;
+    struct HourlyTimeline {
+        HourlyPoint points[HOURLY_TIMELINE_COUNT];
+    };
+
+    // Wie current()/currentMetar() nur vom NetTask geschrieben, vom
+    // UI-Thread gelesen - gleiche Begruendung, kein Lock noetig.
+    HourlyTimeline currentHourlyTimeline();
 
     // Naechstgelegener Flughafen zum aktuell aktiven Standort - wird im
     // selben fetchNow()-Zyklus wie die METAR-Abfrage ermittelt (siehe

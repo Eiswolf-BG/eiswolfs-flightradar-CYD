@@ -384,6 +384,12 @@ static const char* const I18N_IT[] = {
 
     "tra 3h",
 
+    "Previsioni meteo",
+    "Adesso",
+    "Vento: ",
+    "Probabilità di pioggia: ",
+    "Dati di previsione non ancora disponibili.",
+
     "Overlay",
     "Info sull'overlay",
     "Attiva o disattiva insieme tre indicazioni attenuate agli angoli della schermata radar: l'anteprima meteo a 3h (in alto a destra), la distanza e il rilevamento dell'aeroporto più vicino (in alto a sinistra), e l'indicatore eventi a rotazione (in basso a destra) per lista di controllo squawk, lista di controllo aerei e compagnie nascoste - solo eventi che hai configurato tu stesso in una lista o un filtro. Disattivato, tutte e tre restano vuote per una schermata più pulita. L'indicatore di aggiornamento disponibile (in basso a sinistra) non ne è interessato e continua a funzionare in ogni caso.",

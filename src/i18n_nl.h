@@ -385,6 +385,12 @@ static const char* const I18N_NL[] = {
 
     "over 3u",
 
+    "Weersverwachting",
+    "Nu",
+    "Wind: ",
+    "Regenkans: ",
+    "Voorspellingsgegevens nog niet beschikbaar.",
+
     "Overlay",
     "Over de overlay",
     "Schakelt drie gedimde hoekweergaven op het radarscherm samen in of uit: de 3-uurs weersverwachting (rechtsboven), de afstand en peiling tot de dichtstbijzijnde luchthaven (linksboven), en de roterende gebeurtenisindicator (rechtsonder) voor squawk-volglijst-, vliegtuig-volglijst- en verborgen-maatschappij-treffers - alleen gebeurtenissen die je zelf in een lijst of filter hebt ingesteld. Uitgeschakeld blijven alle drie leeg voor een rustiger scherm. De update-beschikbaar-indicator (linksonder) wordt hierdoor niet beïnvloed en blijft in elk geval werken.",

@@ -384,6 +384,12 @@ static const char* const I18N_FR[] = {
 
     "dans 3h",
 
+    "Prévisions météo",
+    "Maintenant",
+    "Vent : ",
+    "Probabilité de pluie : ",
+    "Données de prévision pas encore disponibles.",
+
     "Overlay",
     "A propos de l'overlay",
     "Active ou desactive ensemble trois affichages attenues dans les coins de l'ecran radar : les previsions meteo a 3h (en haut a droite), la distance et le relevement de l'aeroport le plus proche (en haut a gauche), et l'indicateur d'evenement rotatif (en bas a droite) pour la liste de surveillance squawk, la liste de surveillance des avions et les compagnies masquees - uniquement des evenements que vous avez vous-meme configures dans une liste ou un filtre. Desactive, les trois restent vides pour un ecran plus depouille. L'indicateur de mise a jour disponible (en bas a gauche) n'est pas concerne et continue de fonctionner dans tous les cas.",

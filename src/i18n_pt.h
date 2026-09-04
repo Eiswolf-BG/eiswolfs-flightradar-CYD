@@ -384,6 +384,12 @@ static const char* const I18N_PT[] = {
 
     "em 3h",
 
+    "Previsão do Tempo",
+    "Agora",
+    "Vento: ",
+    "Chance de chuva: ",
+    "Dados de previsão ainda não disponíveis.",
+
     "Overlay",
     "Sobre o overlay",
     "Ativa ou desativa juntos três indicadores discretos nos cantos da tela do radar: a previsão do tempo para 3h (canto superior direito), a distância e direção até o aeroporto mais próximo (canto superior esquerdo), e o indicador de eventos rotativo (canto inferior direito) para a lista de observação de squawk, a lista de observação de aviões e companhias aéreas ocultas - apenas eventos que você mesmo configurou em uma lista ou filtro. Desativado, os três permanecem vazios para uma tela mais limpa. O indicador de atualização disponível (canto inferior esquerdo) não é afetado e continua funcionando de qualquer forma.",

@@ -385,6 +385,12 @@ static const char* const I18N_EN[] = {
 
     "in 3h",
 
+    "Weather Forecast",
+    "Now",
+    "Wind: ",
+    "Rain chance: ",
+    "Forecast data not available yet.",
+
     "Overlay",
     "About the overlay",
     "Turns three dimmed corner displays on the radar screen on or off together: the 3h weather preview (top-right), the nearest-airport distance and bearing (top-left), and the rotating event indicator (bottom-right) for squawk watchlist, aircraft watchlist, and hidden airline matches - only events you've set up yourself in a list or filter. Turned off, all three stay empty for a cleaner screen. The update-available indicator (bottom-left) is not affected and keeps working either way.",
