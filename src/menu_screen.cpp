@@ -844,8 +844,25 @@ namespace {
             // Bei Timeout wird der Screen einfach erneut angezeigt statt
             // automatisch neuzustarten - der Neustart bleibt eine bewusste
             // Nutzer-Aktion.
-            while (!infoScreen(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), successBody.c_str(),
-                                UiTheme::accentColor(tft), I18n::t(StringId::OTA_RESTART_BUTTON))) {
+            //
+            // delay(50) im Schleifenkoerper ist Pflicht, kein optionales
+            // Detail: ist msSinceLastTap() beim Eintritt in infoScreen()
+            // BEREITS ueber dem Timeout (z.B. weil der 2-Minuten-Timer schon
+            // waehrend des vorherigen Downloads/Flashens fast ganz verbraucht
+            // wurde), kehrt infoScreen() sofort mit false zurueck, OHNE
+            // jemals das eigene interne delay(20) (siehe dortige
+            // Timeout-Pruefung, die VOR dem delay() liegt) zu erreichen -
+            // ohne diese Pause hier waere das eine enge Dauerschleife ganz
+            // ohne delay()/yield() zwischen den Aufrufen, die auf dem ESP32
+            // den Task-Watchdog des laufenden Cores ausloesen und zu einem
+            // unkontrollierten Reset fuehren kann (Alex' Meldung: Geraet
+            // startete "von selbst" neu, ohne echten Tap - per Diagnose
+            // reproduziert, siehe Chat-Verlauf).
+            bool tapped = false;
+            while (!tapped) {
+                tapped = infoScreen(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), successBody.c_str(),
+                                     UiTheme::accentColor(tft), I18n::t(StringId::OTA_RESTART_BUTTON));
+                if (!tapped) delay(50);
             }
             // Setzt das Flag, das main.cpp::showWhatsNewIfNeeded() beim
             // naechsten Boot ausliest - siehe settings_store.h fuer die
