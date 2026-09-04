@@ -214,6 +214,7 @@ static const char* const I18N_TR[] = {
     "Bu konumu kullan",
     "Tekrar dene",
     "İptal",
+    "Birden fazla sonuç - birini seçin:",
     "Tam Konumunuzu Ayarlayın",
     "Otomatik IP konumu 20-30 km sapabilir. Tam koordinatlar için adresinizi girin - yakınlık LED'i o zaman gerçekten üstünüzdeki uçakla aynı ritimde yanıp söner. Daha sonra Konum ön ayarları üzerinden de yapılabilir.",
     "Adres Gir",

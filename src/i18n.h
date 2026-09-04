@@ -258,6 +258,12 @@ enum class StringId : uint16_t {
     ADDRESS_SEARCH_USE_THIS,
     ADDRESS_SEARCH_TRY_AGAIN,
     ADDRESS_SEARCH_CANCEL,
+    // Titel des neuen Auswahl-Screens (address_search_screen.cpp::
+    // runCandidatePickScreen()), der erscheint, wenn Nominatim mehrere
+    // moegliche Orte fuer dieselbe Sucheingabe liefert (z.B. "Cambridge" -
+    // UK, Massachusetts, Ontario, ...) - vorher wurde immer blind der
+    // erste/best bewertete Treffer uebernommen.
+    ADDRESS_SEARCH_MULTIPLE_TITLE,
 
     // Grosser Hinweis-Screen beim allerersten Start (nur einmalig, nach der
     // Sprachauswahl) - erklaert den Genauigkeitsvorteil eines per Adresse

@@ -214,6 +214,7 @@ static const char* const I18N_FR[] = {
     "Utiliser cette position",
     "Réessayer",
     "Annuler",
+    "Plusieurs résultats - choisissez-en un :",
     "Définissez votre position exacte",
     "La localisation automatique par IP peut se tromper de 20 à 30 km. Entrez votre adresse pour des coordonnées exactes - la LED de proximité clignotera alors vraiment en rythme avec l'avion au-dessus de vous. Possible plus tard via Positions enregistrées.",
     "Entrer l'adresse",

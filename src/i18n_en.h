@@ -215,6 +215,7 @@ static const char* const I18N_EN[] = {
     "Use this location",
     "Try again",
     "Cancel",
+    "Multiple matches - choose one:",
     "Set Your Exact Location",
     "Automatic IP-based location can be 20-30 km off. Enter your address for exact coordinates - the proximity LED will then really blink in sync with the aircraft above you. You can do this later anytime via Location Presets.",
     "Enter Address",

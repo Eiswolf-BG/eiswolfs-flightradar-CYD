@@ -214,6 +214,7 @@ static const char* const I18N_IT[] = {
     "Usa questa posizione",
     "Riprova",
     "Annulla",
+    "Più risultati - scegline uno:",
     "Imposta la tua posizione esatta",
     "La geolocalizzazione IP può sbagliare di 20-30 km. Inserisci il tuo indirizzo per coordinate esatte - il LED di prossimità lampeggerà al ritmo dell'aereo sopra di te. Puoi farlo anche più tardi da Posizioni salvate.",
     "Inserisci indirizzo",

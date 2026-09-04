@@ -214,6 +214,7 @@ static const char* const I18N_DE[] = {
     "Diesen Standort verwenden",
     "Erneut versuchen",
     "Abbrechen",
+    "Mehrere Treffer - bitte auswählen:",
     "Exakten Standort einrichten",
     "Automatische IP-Ortung kann 20-30 km danebenliegen. Adresse eintragen für exakte Koordinaten - die Näherungs-LED blinkt dann wirklich im Takt mit dem Flugzeug über dir. Später jederzeit über Standort-Presets nachholbar.",
     "Adresse eingeben",

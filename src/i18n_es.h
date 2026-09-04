@@ -214,6 +214,7 @@ static const char* const I18N_ES[] = {
     "Usar esta ubicación",
     "Intentar de nuevo",
     "Cancelar",
+    "Varios resultados - elige uno:",
     "Configura tu ubicación exacta",
     "La geolocalización por IP puede fallar por 20-30 km. Introduce tu dirección para coordenadas exactas - el LED de proximidad parpadeará al ritmo del avión que tienes encima. Puedes hacerlo después desde Ubicaciones guardadas.",
     "Introducir dirección",

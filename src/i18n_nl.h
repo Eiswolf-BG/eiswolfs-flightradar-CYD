@@ -215,6 +215,7 @@ static const char* const I18N_NL[] = {
     "Deze locatie gebruiken",
     "Opnieuw proberen",
     "Annuleren",
+    "Meerdere resultaten - kies er een:",
     "Stel je exacte locatie in",
     "Automatische IP-locatiebepaling kan 20-30 km afwijken. Voer je adres in voor exacte coördinaten - de nabijheids-LED knippert dan echt synchroon met het vliegtuig boven je. Dit kun je later altijd nog doen via Locatievoorinstellingen.",
     "Adres invoeren",

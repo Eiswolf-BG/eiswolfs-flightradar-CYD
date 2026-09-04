@@ -556,17 +556,37 @@ namespace {
 
     // ISO-639-1-Codes in derselben Reihenfolge wie I18n::TABLES (siehe
     // i18n.cpp) - fuer staerker lokalisierte display_name-Ergebnisse
-    // (Nominatim accept-language-Parameter).
-    constexpr const char* NOMINATIM_LANG_CODES[6] = {"en", "de", "fr", "tr", "es", "it"};
+    // (Nominatim accept-language-Parameter). War bei der Erweiterung auf
+    // 8 Sprachen (Portugiesisch/Niederlaendisch, v4.9.0) nicht mitgewachsen
+    // (blieb bei 6 Eintraegen) - fuer diese beiden Sprachen wurde dadurch
+    // gar kein accept-language-Parameter mitgeschickt (siehe "lang < 6"-
+    // Pruefung unten, jetzt "lang < I18n::LANG_COUNT").
+    constexpr const char* NOMINATIM_LANG_CODES[8] = {"en", "de", "fr", "tr", "es", "it", "pt", "nl"};
 
     enum class GeocodeResult { Ok, NoResults, NetworkError };
+
+    // Bis zu MAX_GEOCODE_CANDIDATES Treffer statt blind nur den ersten zu
+    // uebernehmen (Alex' Bugmeldung "Cambridge" - Nominatim kennt mehrere
+    // gleichnamige Orte weltweit, z.B. Cambridge UK/MA-USA/Ontario-Kanada,
+    // vorher entschied ausschliesslich Nominatims eigenes Ranking, ohne
+    // dass der Nutzer das sehen oder korrigieren konnte). Bei genau einem
+    // Treffer bleibt der Ablauf wie bisher (direkt zum Bestaetigungs-
+    // Screen), bei mehreren zeigt runCandidatePickScreen() (siehe unten)
+    // eine Auswahlliste.
+    constexpr uint8_t MAX_GEOCODE_CANDIDATES = 5;
+    struct GeocodeCandidate {
+        double lat = 0;
+        double lon = 0;
+        String displayName;
+    };
 
     // Kostenloser, anmeldefreier Geokodierungs-Dienst (OpenStreetMap
     // Nominatim, siehe Config::NOMINATIM_HOST). Blockierender Aufruf,
     // ausgeloest durch Nutzer-Interaktion (Tap auf "Suchen") - laeuft im
     // Vordergrund auf Core 1, exakt wie der bestehende Flugzeug-Detail-
     // Abruf in aircraft_details.cpp.
-    GeocodeResult geocode(const String& query, double& lat, double& lon, String& displayName) {
+    GeocodeResult geocode(const String& query, GeocodeCandidate* candidates, uint8_t& count) {
+        count = 0;
         if (WiFi.status() != WL_CONNECTED) return GeocodeResult::NetworkError;
 
         WiFiClientSecure client;
@@ -574,9 +594,10 @@ namespace {
         client.setTimeout(Config::HTTP_TIMEOUT_MS);
 
         String url = "https://" + String(Config::NOMINATIM_HOST) +
-                     "/search?format=json&limit=1&q=" + urlEncode(query);
+                     "/search?format=json&limit=" + String(MAX_GEOCODE_CANDIDATES) +
+                     "&q=" + urlEncode(query);
         uint8_t lang = SettingsStore::language();
-        if (lang < 6) url += "&accept-language=" + String(NOMINATIM_LANG_CODES[lang]);
+        if (lang < I18n::LANG_COUNT) url += "&accept-language=" + String(NOMINATIM_LANG_CODES[lang]);
 
         HTTPClient http;
         http.setTimeout(Config::HTTP_TIMEOUT_MS);
@@ -602,16 +623,52 @@ namespace {
         JsonArray arr = doc.as<JsonArray>();
         if (arr.isNull() || arr.size() == 0) return GeocodeResult::NoResults;
 
-        JsonObject first = arr[0];
-        const char* latStr = first["lat"] | "";
-        const char* lonStr = first["lon"] | "";
-        if (!latStr[0] || !lonStr[0]) return GeocodeResult::NoResults;
+        for (JsonObject obj : arr) {
+            if (count >= MAX_GEOCODE_CANDIDATES) break;
+            const char* latStr = obj["lat"] | "";
+            const char* lonStr = obj["lon"] | "";
+            if (!latStr[0] || !lonStr[0]) continue;
 
-        lat = atof(latStr);
-        lon = atof(lonStr);
-        const char* dn = first["display_name"] | "";
-        displayName = String(dn);
+            candidates[count].lat = atof(latStr);
+            candidates[count].lon = atof(lonStr);
+            const char* dn = obj["display_name"] | "";
+            candidates[count].displayName = String(dn);
+            count++;
+        }
+        if (count == 0) return GeocodeResult::NoResults;
         return GeocodeResult::Ok;
+    }
+
+    // Kuerzt Nominatims oft sehr langen display_name (z.B. "Cambridge,
+    // Cambridgeshire, Cambridgeshire and Peterborough, England, United
+    // Kingdom") auf "Ort, Land" (erstes und letztes Komma-Segment) fuer
+    // die Auswahlliste - der volle Text bleibt auf dem nachfolgenden
+    // Bestaetigungs-Screen (runConfirmScreen()) weiterhin sichtbar.
+    // Zusaetzlich zeichenweise gekuerzt, falls selbst diese kurze Fassung
+    // die Zeilenbreite sprengt (beliebiger, nicht uebersetzter Ortsname -
+    // CLAUDE.md-Pflicht: darf nie ungeprueft ueberlaufen), gleiches
+    // Prinzip wie drawTruncatedLeft() in radar_screen.cpp.
+    String shortCandidateLabel(TFT_eSPI& tft, const String& displayName, int16_t maxWidth) {
+        int32_t firstComma = displayName.indexOf(',');
+        int32_t lastComma = displayName.lastIndexOf(',');
+        String label;
+        if (firstComma < 0) {
+            label = displayName;
+        } else {
+            String first = displayName.substring(0, firstComma);
+            first.trim();
+            if (lastComma > firstComma) {
+                String last = displayName.substring(lastComma + 1);
+                last.trim();
+                label = last.length() > 0 ? (first + ", " + last) : first;
+            } else {
+                label = first;
+            }
+        }
+        while (label.length() > 1 && tft.textWidth(label) > maxWidth) {
+            label.remove(label.length() - 1);
+        }
+        return label;
     }
 
     // Fehler-/Kein-Ergebnis-Screen mit "Erneut versuchen"/"Abbrechen".
@@ -710,6 +767,59 @@ namespace {
     }
 }
 
+// Auswahl-Screen bei mehreren Nominatim-Treffern (siehe geocode()-
+// Kommentar oben) - gleiches dynamisches Zeilenlayout wie
+// LanguageScreen::run() (ROW_H haengt von der tatsaechlichen Zeilenzahl
+// ab: bis zu MAX_GEOCODE_CANDIDATES Treffer + ein "Erneut versuchen"-
+// Button). Jede Zeile zeigt eine gekuerzte "Ort, Land"-Fassung
+// (shortCandidateLabel()) statt des oft sehr langen vollen display_name -
+// der wird erst auf dem nachfolgenden Bestaetigungs-Screen
+// (runConfirmScreen()) komplett angezeigt, genau wie beim bisherigen
+// Einzeltreffer-Ablauf. Gibt den gewaehlten Index zurueck, oder -1 bei
+// "Erneut versuchen"/Timeout (fuehrt zurueck zur Adress-Tastatur, wie
+// showErrorRetry()).
+int runCandidatePickScreen(TFT_eSPI& tft, const GeocodeCandidate* candidates, uint8_t count) {
+    MenuStars::reset();
+
+    constexpr int16_t ROW_GAP = 6;
+    constexpr int16_t START_Y = 30;
+    constexpr int16_t BOTTOM_MARGIN = 10;
+    uint8_t rowCount = (uint8_t)(count + 1); // Treffer + "Erneut versuchen"
+    int16_t rowH = (int16_t)((Config::SCREEN_HEIGHT - START_Y - BOTTOM_MARGIN - (rowCount - 1) * ROW_GAP) / rowCount);
+
+    auto rowRect = [&](uint8_t index) -> Rect {
+        return {10, (int16_t)(START_Y + index * (rowH + ROW_GAP)),
+                (int16_t)(Config::SCREEN_WIDTH - 20), rowH};
+    };
+
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+    tft.setCursor(10, 14);
+    tft.println(I18n::t(StringId::ADDRESS_SEARCH_MULTIPLE_TITLE));
+
+    tft.setTextSize(1);
+    int16_t labelMaxWidth = (int16_t)(Config::SCREEN_WIDTH - 20 - 16); // Rand innerhalb der Buttons
+    for (uint8_t i = 0; i < count; i++) {
+        drawButton(tft, rowRect(i), shortCandidateLabel(tft, candidates[i].displayName, labelMaxWidth));
+    }
+    Rect tryAgainBtn = rowRect(count);
+    drawButton(tft, tryAgainBtn, I18n::t(StringId::ADDRESS_SEARCH_TRY_AGAIN));
+
+    while (true) {
+        TouchInput::Point tap;
+        if (TouchInput::wasTapped(tap)) {
+            for (uint8_t i = 0; i < count; i++) {
+                if (rowRect(i).contains(tap.x, tap.y)) return (int)i;
+            }
+            if (tryAgainBtn.contains(tap.x, tap.y)) return -1;
+        }
+        // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+        if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return -1;
+        MenuStars::update(tft);
+        delay(20);
+    }
+}
+
 bool run(TFT_eSPI& tft) {
     while (true) {
         String address = runAddressKeyboard(tft);
@@ -721,9 +831,9 @@ bool run(TFT_eSPI& tft) {
         tft.drawString(I18n::t(StringId::ADDRESS_SEARCH_SEARCHING), Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
         tft.setTextDatum(TL_DATUM);
 
-        double lat = 0, lon = 0;
-        String displayName;
-        GeocodeResult result = geocode(address, lat, lon, displayName);
+        GeocodeCandidate candidates[MAX_GEOCODE_CANDIDATES];
+        uint8_t candidateCount = 0;
+        GeocodeResult result = geocode(address, candidates, candidateCount);
 
         if (result == GeocodeResult::NetworkError) {
             if (!showErrorRetry(tft, StringId::ADDRESS_SEARCH_ERROR)) return false;
@@ -733,6 +843,16 @@ bool run(TFT_eSPI& tft) {
             if (!showErrorRetry(tft, StringId::ADDRESS_SEARCH_NO_RESULTS)) return false;
             continue;
         }
+
+        uint8_t selected = 0;
+        if (candidateCount > 1) {
+            int picked = runCandidatePickScreen(tft, candidates, candidateCount);
+            if (picked < 0) continue;
+            selected = (uint8_t)picked;
+        }
+        double lat = candidates[selected].lat;
+        double lon = candidates[selected].lon;
+        const String& displayName = candidates[selected].displayName;
 
         int choice = runConfirmScreen(tft, displayName);
         if (choice == 0) continue;

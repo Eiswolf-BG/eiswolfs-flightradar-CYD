@@ -90,10 +90,18 @@ namespace {
     // Tatsaechliche SSID, mit der am Ende verbunden/gespeichert wird -
     // entweder aus der Scan-Liste uebernommen (ssidList[selectedIndex]) oder
     // manuell eingetippt (manualSsidBuf) - EIN gemeinsamer String statt
-    // Sonderfall-Logik weiter unten (Alex' ausdruecklicher Wunsch: "kein
-    // Sonderfall in der Speicherlogik noetig, nur der Eingabeweg
-    // unterscheidet sich").
+    // getrennter Variablen fuer Passwort-Tastatur/Verbindungsaufbau weiter
+    // unten.
     String pendingSsid;
+    // NEU (Bugfix: verstecktes WLAN verbindet nach Neustart nicht mehr,
+    // siehe wifi_manager.h::addNetwork()-Kommentar) - true, wenn
+    // pendingSsid gerade ueber den manuellen "Andere/versteckte SSID"-
+    // Pfad gesetzt wurde (Zeile bei manualSsidBuf unten), false bei einer
+    // Scan-Auswahl. An WifiMgr::addNetwork() durchgereicht, sobald die
+    // Verbindung erfolgreich war - steuert dort, ob beginConnect()/
+    // tryReconnectAsync() spaeter einen Scan-Treffer voraussetzen oder
+    // direkt per WiFi.begin() verbinden.
+    bool pendingSsidIsHidden = false;
 
     char passwordBuf[64] = {0};
     uint8_t passwordLen = 0;
@@ -276,6 +284,7 @@ bool run(TFT_eSPI& tft) {
     selectedIndex = -1;
     scrollOffset = 0;
     pendingSsid = "";
+    pendingSsidIsHidden = false;
     resetKeyboardState();
     needsRedraw = true;
     scanDotPhase = 0;
@@ -326,7 +335,7 @@ bool run(TFT_eSPI& tft) {
             WifiMgr::update();
             if (WifiMgr::getState() == WifiMgr::State::Connected) {
                 connectSucceeded = true;
-                WifiMgr::addNetwork(pendingSsid.c_str(), passwordBuf);
+                WifiMgr::addNetwork(pendingSsid.c_str(), passwordBuf, pendingSsidIsHidden);
                 stage = Stage::Done;
                 tft.fillScreen(TFT_BLACK);
                 tft.setCursor(10, 14);
@@ -359,6 +368,7 @@ bool run(TFT_eSPI& tft) {
                     if (r.contains(tap.x, tap.y)) {
                         selectedIndex = idx;
                         pendingSsid = ssidList[idx];
+                        pendingSsidIsHidden = false;
                         resetKeyboardState();
                         stage = Stage::EnterPassword;
                         needsRedraw = true;
@@ -428,6 +438,7 @@ bool run(TFT_eSPI& tft) {
                         // sieht ja direkt, dass sich nichts tut).
                         if (manualSsidLen > 0) {
                             pendingSsid = String(manualSsidBuf);
+                            pendingSsidIsHidden = true;
                             resetKeyboardState();
                             stage = Stage::EnterPassword;
                             needsRedraw = true;
