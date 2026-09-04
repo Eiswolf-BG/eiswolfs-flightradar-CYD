@@ -205,8 +205,39 @@ namespace {
             String line = text.substring(start, segEnd);
             while (tft.textWidth(line) > maxWidth) {
                 int32_t lastSpace = line.lastIndexOf(' ');
-                if (lastSpace <= 0) break;
-                line = line.substring(0, lastSpace);
+                if (lastSpace > 0) {
+                    line = line.substring(0, lastSpace);
+                    continue;
+                }
+                // Kein Leerzeichen mehr zum Umbrechen uebrig - typischerweise
+                // eine lange URL ohne Leerzeichen (z.B. "github.com/Eiswolf-
+                // BG/eiswolfs-flightradar-CYD" im GitHub-Stern-Hinweis, Alex'
+                // Meldung: lief vorher ueber den Rand, mit einem Zeichen
+                // mitten im Wort abgeschnitten). Zusaetzlich an Bindestrichen
+                // umbrechbar - der Bindestrich bleibt dabei am Ende der
+                // oberen Zeile stehen (uebliche Umbruch-Konvention), die
+                // naechste Zeile beginnt direkt mit dem Folgezeichen. Bei
+                // mehreren Bindestrichen wiederholt sich diese Schleife
+                // automatisch, bis die Zeile passt oder kein Bindestrich mehr
+                // uebrig ist (dann bricht sie wie zuvor einfach ab).
+                //
+                // WICHTIG: die Suche nach dem naechsten Bindestrich muss den
+                // bereits am Zeilenende STEHENDEN Bindestrich (aus dem
+                // vorherigen Schleifendurchlauf) ausklammern - sonst findet
+                // lastIndexOf() bei jedem weiteren Durchlauf immer wieder
+                // GENAU diesen einen, die Zeile bleibt dadurch unveraendert
+                // und die Schleife haengt sich endlos auf (per Diagnose-Log
+                // real reproduziert: das Geraet blieb beim Rendern des
+                // GitHub-Stern-Hinweises stehen). Deshalb wird der bereits
+                // vorhandene Bindestrich am Ende vor der Suche entfernt.
+                String searchIn = line;
+                if (searchIn.endsWith("-")) searchIn.remove(searchIn.length() - 1);
+                int32_t lastHyphen = searchIn.lastIndexOf('-');
+                if (lastHyphen > 0) {
+                    line = line.substring(0, lastHyphen + 1);
+                    continue;
+                }
+                break;
             }
 
             if (draw) {
