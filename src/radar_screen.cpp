@@ -1128,6 +1128,18 @@ namespace {
         }
     }
 
+    // Einheitliche Chevron-Farbe (Alex' Meldung: bei rot dargestellten
+    // Flugzeugen - Hoehe >9100m - war der duenne Chevron auf dem kleinen
+    // CYD-Display kaum erkennbar, Rot wirkt fuer filigrane Details zu
+    // dunkel/kontrastarm) - bewusst IMMER Gelb, unabhaengig von der
+    // Hoehenkategorie-Farbe des jeweiligen Markers (die Silhouette selbst
+    // behaelt ihre normale Gruen/Gelb/Rot-Faerbung, NUR der Chevron ist
+    // jetzt fest). Bei Nachtdimmung gedaempft, gleiches Muster/derselbe
+    // gedaempfte Gelbton wie die mittlere Hoehenstufe in colorForAltitude().
+    uint16_t chevronColor(TFT_eSPI& gfx) {
+        return nightDimActiveNow() ? gfx.color565(160, 160, 0) : TFT_YELLOW;
+    }
+
     // Kleiner, einfarbiger Richtungs-Chevron VOR der Nase jeder Flugzeug-
     // Silhouette (Airliner/Privatjet/Turboprop/Unknown-Fallback, siehe
     // die vier Aufrufer unten) - seit der Umstellung von einfachen Punkten
@@ -1135,15 +1147,21 @@ namespace {
     // Flugrichtung bei dichtem Verkehr (Alex sieht oft 30+ Flugzeuge
     // gleichzeitig) nicht mehr auf den ersten Blick erkennbar. Ergaenzt
     // die Silhouette, ERSETZT sie NICHT - freistehender Chevron mit
-    // kleinem Abstand vor der Nasenspitze, in derselben Farbe wie der
-    // Marker selbst (kein bunter Schweif wie beim verworfenen
+    // kleinem Abstand vor der Nasenspitze, in einheitlichem Gelb statt
+    // (wie fruehers) in der Farbe des Markers selbst (siehe
+    // chevronColor() oben - kein bunter Schweif wie beim verworfenen
     // Trail-Feature). "rad" ist der bereits in Bogenmass umgerechnete
     // Headingwinkel (dieselbe Variable, die jede Aufrufer-Funktion für
     // die Rumpflinie berechnet), "noseLen" die dortige Nasenlaenge -
     // beide werden hier nicht neu berechnet, um Rundungsabweichungen
-    // zwischen Rumpf und Chevron zu vermeiden.
-    void drawHeadingChevron(TFT_eSPI& gfx, int16_t x, int16_t y, double rad, uint16_t color,
+    // zwischen Rumpf und Chevron zu vermeiden. Nimmt die Marker-eigene
+    // Farbe bewusst NICHT mehr als Parameter entgegen (siehe
+    // chevronColor() oben) - die vier Aufrufer unten reichen weiterhin
+    // ihre eigene "color" fuer die Silhouette selbst durch, nur eben
+    // nicht mehr an diese Funktion hier.
+    void drawHeadingChevron(TFT_eSPI& gfx, int16_t x, int16_t y, double rad,
                              int16_t noseLen, bool heavy) {
+        uint16_t color = chevronColor(gfx);
         int16_t gap = heavy ? 4 : 3;
         int16_t armLen = heavy ? 5 : 4;
         int16_t armWidth = heavy ? 4 : 3;
@@ -1266,7 +1284,7 @@ namespace {
         int16_t w2y = y + (int16_t)(cos(wingRad) * wingLen);
         drawThickLine(gfx, w1x, w1y, w2x, w2y, color, halfWidth);
 
-        drawHeadingChevron(gfx, x, y, rad, color, noseLen, heavy);
+        drawHeadingChevron(gfx, x, y, rad, noseLen, heavy);
     }
 
     // Eigener Marker fuer Bodenfahrzeuge (ADS-B-Kategorie "C*") - ein
@@ -1322,7 +1340,7 @@ namespace {
         int16_t w2y = y + (int16_t)(cos(wingRad) * wingLen);
         drawThickLine(gfx, w1x, w1y, w2x, w2y, color, halfWidth);
 
-        drawHeadingChevron(gfx, x, y, rad, color, noseLen, heavy);
+        drawHeadingChevron(gfx, x, y, rad, noseLen, heavy);
     }
 
     // Privatjet-Silhouette - gleicher Aufbau wie drawAirlinerMarker(), aber
@@ -1354,7 +1372,7 @@ namespace {
         int16_t w2y = y + (int16_t)(cos(wingRad) * wingLen);
         drawThickLine(gfx, w1x, w1y, w2x, w2y, color, halfWidth);
 
-        drawHeadingChevron(gfx, x, y, rad, color, noseLen, heavy);
+        drawHeadingChevron(gfx, x, y, rad, noseLen, heavy);
     }
 
     // Turboprop-Silhouette - gleicher Aufbau wie drawAirlinerMarker()
@@ -1394,7 +1412,7 @@ namespace {
         gfx.fillCircle(e1x, e1y, engineRadius, color);
         gfx.fillCircle(e2x, e2y, engineRadius, color);
 
-        drawHeadingChevron(gfx, x, y, rad, color, noseLen, heavy);
+        drawHeadingChevron(gfx, x, y, rad, noseLen, heavy);
     }
 
     // Dispatcher fuer den generischen Marker-Zweig in render()/tick() (dort
