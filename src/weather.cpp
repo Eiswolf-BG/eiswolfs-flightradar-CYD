@@ -368,8 +368,8 @@ namespace {
         // Icon-Wetter oben.
         AirportLookup::Nearest nearest = AirportLookup::findNearest(lat, lon);
         if (nearest.found) {
-            Serial.printf("[Weather] Naechster Flughafen: %s (%s), %.0f km entfernt - frage METAR ab...\n",
-                          nearest.icao, nearest.name, nearest.distanceKm);
+            Serial.printf("[Weather] Naechster Flughafen: %s, %.0f km entfernt - frage METAR ab...\n",
+                          nearest.icao, nearest.distanceKm);
             fetchMetarFor(client, nearest.icao);
 
             // NearestAirport-Cache (siehe weather.h) - Peilung per
@@ -382,7 +382,6 @@ namespace {
             NearestAirport na;
             na.available = true;
             strncpy(na.icao, nearest.icao, sizeof(na.icao) - 1);
-            strncpy(na.name, nearest.name, sizeof(na.name) - 1);
             na.distanceKm = nearest.distanceKm;
             na.bearingDeg = RadarMath::toPolar(lat, lon, nearest.lat, nearest.lon).bearingDeg;
             na.lat = nearest.lat;

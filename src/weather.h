@@ -165,7 +165,6 @@ namespace Weather {
         bool available = false;
         char icao[5] = {0};
         char iata[4] = {0};
-        char name[32] = {0};
         float distanceKm = 0;
         float bearingDeg = 0; // 0-360, 0 = Nord, im Uhrzeigersinn
         // Koordinaten des Flughafens selbst (nicht des Standorts) - fuer

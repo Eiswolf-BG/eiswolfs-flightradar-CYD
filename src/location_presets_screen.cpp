@@ -788,9 +788,9 @@ void run(TFT_eSPI& tft) {
                 // Einheiten) - vorher immer "(XX km)", auch bei Imperial.
                 char buf[48];
                 if (LocationManager::useMetricUnits()) {
-                    snprintf(buf, sizeof(buf), "%s %s (%.0f km)", code, nearest.name, nearest.distanceKm);
+                    snprintf(buf, sizeof(buf), "%s (%.0f km)", code, nearest.distanceKm);
                 } else {
-                    snprintf(buf, sizeof(buf), "%s %s (%.0f nm)", code, nearest.name, Units::kmToNm(nearest.distanceKm));
+                    snprintf(buf, sizeof(buf), "%s (%.0f nm)", code, Units::kmToNm(nearest.distanceKm));
                 }
                 String line = String(I18n::t(StringId::LOCATION_NEAREST_AIRPORT_PREFIX)) + buf;
                 setupMarquee(tft, line, AIRPORT_LINE_W);
@@ -848,7 +848,7 @@ void run(TFT_eSPI& tft) {
         }
         if (!handled && nearest.found && airportRect.contains(tap.x, tap.y)) {
             if (canAdd) {
-                if (LocationPresets::addPreset(nearest.lat, nearest.lon, nearest.name)) {
+                if (LocationPresets::addPreset(nearest.lat, nearest.lon, nearest.icao)) {
                     // Gleiches Verhalten wie bei den anderen beiden Wegen,
                     // ein Preset anzulegen - sofort aktivieren.
                     LocationPresets::setActiveIndex((int8_t)(LocationPresets::count() - 1));
