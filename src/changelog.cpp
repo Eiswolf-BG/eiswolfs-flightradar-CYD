@@ -25,6 +25,9 @@ namespace {
         "the last known aircraft stay visible, dimmed, with a "
         "\"last seen Xs ago\" hint, instead of disappearing "
         "immediately\n"
+        "- New: tap the 3h-forecast corner icon to open a weather "
+        "detail screen with a short now/+3h/+6h/+9h timeline plus "
+        "current wind and rain-chance info\n"
         "- Fix: the callsign label is no longer placed directly in "
         "front of an aircraft's nose, where it used to occasionally "
         "cover the heading indicator\n"
@@ -37,7 +40,11 @@ namespace {
         "hint now shows when the automatic shutoff has triggered\n"
         "- Fix: an internal translation ordering bug occasionally "
         "made a wrong, long piece of text appear across the middle "
-        "of the radar screen";
+        "of the radar screen\n"
+        "- Fix: the heading chevron in front of aircraft silhouettes "
+        "is now always a consistent yellow instead of the "
+        "altitude-category color, which was hard to see (especially "
+        "on red-colored aircraft)";
 
     const char* const CHANGELOG_DE =
         "- Neu: Das Web-Live-Radar hat jetzt eine echte "
@@ -56,6 +63,10 @@ namespace {
         "Verbindungsausfall bleiben zuletzt bekannte Flugzeuge "
         "ausgegraut mit \"zuletzt gesehen vor Xs\" sichtbar, "
         "statt sofort zu verschwinden\n"
+        "- Neu: Die 3h-Wettervorschau-Ecke antippen öffnet einen "
+        "Wetter-Detail-Screen mit kurzem Jetzt/+3h/+6h/+9h-"
+        "Stundenverlauf plus aktuellem Wind und "
+        "Regenwahrscheinlichkeit\n"
         "- Fix: Das Rufzeichen-Label wird nicht mehr direkt vor "
         "der Nase eines Flugzeugs positioniert, wo es zuvor "
         "gelegentlich den Richtungsindikator verdeckte\n"
@@ -69,7 +80,11 @@ namespace {
         "Abschaltung gegriffen hat\n"
         "- Fix: Ein interner Übersetzungs-Reihenfolgefehler ließ "
         "gelegentlich einen falschen, langen Text mitten auf dem "
-        "Radarschirm erscheinen";
+        "Radarschirm erscheinen\n"
+        "- Fix: Der Richtungs-Chevron vor Flugzeug-Silhouetten ist "
+        "jetzt immer einheitlich gelb statt in der schwer "
+        "erkennbaren Höhenkategorie-Farbe (besonders bei rot "
+        "dargestellten Flugzeugen)";
 
     const char* const CHANGELOG_FR =
         "- Nouveau : le radar en direct sur le Web dispose "
@@ -91,6 +106,10 @@ namespace {
         "de coupure de connexion, les derniers avions connus "
         "restent visibles, atténués, avec l'indication \"vu il y "
         "a Xs\", au lieu de disparaître immédiatement\n"
+        "- Nouveau : toucher l'icône de prévision à 3h ouvre un "
+        "écran météo détaillé avec un court historique "
+        "maintenant/+3h/+6h/+9h, ainsi que le vent actuel et la "
+        "probabilité de pluie\n"
         "- Correction : l'indicatif n'est plus placé directement "
         "devant le nez d'un avion, où il masquait parfois "
         "l'indicateur de direction\n"
@@ -105,7 +124,11 @@ namespace {
         "déclenché\n"
         "- Correction : une erreur interne d'ordre de traduction "
         "faisait parfois apparaître un texte long et incorrect au "
-        "milieu de l'écran radar";
+        "milieu de l'écran radar\n"
+        "- Correction : le chevron de direction devant les "
+        "silhouettes d'avions est désormais toujours d'un jaune "
+        "uniforme au lieu de la couleur d'altitude, difficile à "
+        "voir (surtout sur les avions rouges)";
 
     const char* const CHANGELOG_TR =
         "- Yeni: Web canlı radar artık mevcut radarın yanında "
@@ -124,6 +147,10 @@ namespace {
         "kesildiğinde, son bilinen uçaklar hemen kaybolmak "
         "yerine soluk renkte ve \"Xs önce görüldü\" bilgisiyle "
         "görünür kalır\n"
+        "- Yeni: 3sa hava durumu köşe simgesine dokunmak, kısa bir "
+        "şimdi/+3sa/+6sa/+9sa zaman çizelgesi ile güncel rüzgar ve "
+        "yağış olasılığı bilgisini gösteren bir hava durumu detay "
+        "ekranı açar\n"
         "- Düzeltme: çağrı işareti etiketi artık bir uçağın "
         "burnunun tam önüne yerleştirilmiyor; önceden bu, yön "
         "göstergesini bazen gizliyordu\n"
@@ -137,7 +164,10 @@ namespace {
         "yeni bir uyarı gösteriliyor\n"
         "- Düzeltme: dahili bir çeviri sıralama hatası, radar "
         "ekranının ortasında zaman zaman yanlış, uzun bir metnin "
-        "görünmesine neden oluyordu";
+        "görünmesine neden oluyordu\n"
+        "- Düzeltme: uçak silüetlerinin önündeki yön göstergesi "
+        "artık zor görünen irtifa kategorisi rengi yerine her zaman "
+        "sabit sarı renkte (özellikle kırmızı uçaklarda)";
 
     const char* const CHANGELOG_ES =
         "- Novedad: el radar en vivo de la web ahora tiene una "
@@ -159,6 +189,10 @@ namespace {
         "permanecen visibles, atenuados, con la indicación "
         "\"visto hace Xs\", en lugar de desaparecer de "
         "inmediato\n"
+        "- Novedad: tocar el icono de previsión a 3h abre una "
+        "pantalla de detalles del tiempo con un breve historial "
+        "ahora/+3h/+6h/+9h, además del viento actual y la "
+        "probabilidad de lluvia\n"
         "- Corrección: la etiqueta del indicativo ya no se coloca "
         "directamente delante del morro de un avión, donde antes "
         "a veces tapaba el indicador de dirección\n"
@@ -172,7 +206,11 @@ namespace {
         "aviso cuando se activa el apagado automático\n"
         "- Corrección: un error interno en el orden de traducción "
         "hacía aparecer ocasionalmente un texto largo e "
-        "incorrecto en medio de la pantalla del radar";
+        "incorrecto en medio de la pantalla del radar\n"
+        "- Corrección: el indicador de dirección delante de las "
+        "siluetas de los aviones ahora es siempre de un amarillo "
+        "uniforme en lugar del color de la categoría de altitud, "
+        "difícil de ver (sobre todo en aviones rojos)";
 
     const char* const CHANGELOG_IT =
         "- Novità: il radar live sul web ora dispone di una vera "
@@ -193,6 +231,10 @@ namespace {
         "caso di interruzione della connessione, gli ultimi aerei "
         "noti restano visibili, attenuati, con l'indicazione "
         "\"visto Xs fa\", invece di sparire immediatamente\n"
+        "- Novità: toccare l'icona di previsione a 3h apre una "
+        "schermata con i dettagli meteo, un breve andamento "
+        "adesso/+3h/+6h/+9h, oltre a vento attuale e probabilità "
+        "di pioggia\n"
         "- Correzione: l'etichetta del nominativo non viene più "
         "posizionata direttamente davanti al muso di un aereo, "
         "dove in precedenza a volte copriva l'indicatore di "
@@ -208,7 +250,11 @@ namespace {
         "scattato\n"
         "- Correzione: un errore interno nell'ordine delle "
         "traduzioni faceva occasionalmente apparire un testo "
-        "lungo ed errato al centro dello schermo radar";
+        "lungo ed errato al centro dello schermo radar\n"
+        "- Correzione: la freccia di direzione davanti alle "
+        "sagome degli aerei ora è sempre di un giallo uniforme "
+        "invece del colore della categoria altitudine, difficile "
+        "da vedere (specialmente sugli aerei rossi)";
 
     const char* const CHANGELOG_PT =
         "- Novo: o radar ao vivo na web agora tem uma "
@@ -229,6 +275,9 @@ namespace {
         "cair, as últimas aeronaves conhecidas permanecem "
         "visíveis, esmaecidas, com a indicação \"visto há Xs\", "
         "em vez de desaparecer imediatamente\n"
+        "- Novo: tocar no ícone de previsão de 3h abre uma tela de "
+        "detalhes do tempo com um breve histórico agora/+3h/+6h/"
+        "+9h, além do vento atual e da chance de chuva\n"
         "- Correção: o rótulo do indicativo não é mais "
         "posicionado diretamente à frente do nariz de uma "
         "aeronave, onde antes às vezes cobria o indicador de "
@@ -243,7 +292,11 @@ namespace {
         "quando o desligamento automático é acionado\n"
         "- Correção: um erro interno na ordem de tradução fazia "
         "ocasionalmente aparecer um texto longo e incorreto no "
-        "meio da tela do radar";
+        "meio da tela do radar\n"
+        "- Correção: o indicador de direção à frente das silhuetas "
+        "das aeronaves agora é sempre amarelo uniforme em vez da "
+        "cor da categoria de altitude, difícil de ver (especialmente "
+        "em aeronaves vermelhas)";
 
     const char* const CHANGELOG_NL =
         "- Nieuw: de live webradar heeft nu een echte "
@@ -264,6 +317,9 @@ namespace {
         "vliegtuigen gedimd zichtbaar met \"voor het laatst "
         "gezien Xs geleden\", in plaats van meteen te "
         "verdwijnen\n"
+        "- Nieuw: tik op het 3u-weersverwachtingsicoon voor een "
+        "weerdetailscherm met een kort nu/+3u/+6u/+9u-overzicht "
+        "plus actuele wind en regenkans\n"
         "- Fix: het roepnaamlabel wordt niet meer direct voor de "
         "neus van een vliegtuig geplaatst, waar het voorheen "
         "soms de richtingsindicator bedekte\n"
@@ -277,7 +333,11 @@ namespace {
         "wanneer de automatische uitschakeling is geactiveerd\n"
         "- Fix: een interne vertaalvolgorde-fout zorgde er af en "
         "toe voor dat een verkeerde, lange tekst midden op het "
-        "radarscherm verscheen";
+        "radarscherm verscheen\n"
+        "- Fix: de richtingschevron voor vliegtuigsilhouetten is "
+        "nu altijd egaal geel in plaats van de moeilijk zichtbare "
+        "hoogtecategoriekleur (vooral bij rood weergegeven "
+        "vliegtuigen)";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT, CHANGELOG_PT, CHANGELOG_NL
