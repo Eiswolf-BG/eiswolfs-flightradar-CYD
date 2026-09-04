@@ -457,7 +457,18 @@ namespace {
     // umgeschaltet (z.B. "Bitte warten, Geraet startet neu..."), bevor
     // infoScreen() zurueckkehrt und der Aufrufer seine (dauernde) Aktion
     // startet - der Tipp wurde also sichtbar registriert.
-    void infoScreen(TFT_eSPI& tft, const String& title, const String& body, uint16_t accentColor,
+    // Rueckgabewert (Alex' Meldung, ungewollter automatischer Neustart nach
+    // dem OTA-Erfolgs-Screen): true = per echtem Tap auf den Button beendet,
+    // false = per Inaktivitaets-Timeout (Config::MENU_IDLE_TIMEOUT_MS)
+    // zurueckgekehrt, OHNE dass der Nutzer tatsaechlich getippt hat. Vorher
+    // gab es keine Unterscheidung - ein Aufrufer, der danach ungeprueft eine
+    // "gefaehrliche" Aktion wie ESP.restart() ausloeste (siehe
+    // runOtaUpdateScreen() unten), tat das dadurch auch im Timeout-Fall,
+    // ohne dass der Nutzer den Text ueberhaupt gelesen hatte. Die meisten
+    // bestehenden Aufrufer brauchen den Rueckgabewert nicht und koennen ihn
+    // wie bisher ignorieren (in C++ gefahrlos moeglich) - nur Aufrufer mit
+    // einer unbedingten Folgeaktion muessen ihn jetzt auswerten.
+    bool infoScreen(TFT_eSPI& tft, const String& title, const String& body, uint16_t accentColor,
                      const String& buttonLabel, const String& tappedLabel = "") {
         constexpr int16_t BOX_X = 4;
         constexpr int16_t BOX_Y = 4;
@@ -547,7 +558,7 @@ namespace {
                     if (tappedLabel.length() > 0) {
                         drawButton(tft, okBtn, tappedLabel);
                     }
-                    return;
+                    return true;
                 }
                 if (scrollable && upBtn.contains(tap.x, tap.y) && scrollY > 0) {
                     scrollY -= SCROLL_STEP;
@@ -560,7 +571,7 @@ namespace {
                 }
             }
             // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
-            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return;
+            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return false;
             MenuStars::update(tft);
             delay(20);
         }
@@ -824,8 +835,18 @@ namespace {
             // da auf diesem Screen laut Screenshot reichlich freier Platz war.
             String successBody = String(I18n::t(StringId::OTA_SUCCESS_BODY)) + "\n\n" +
                                   I18n::t(StringId::OTA_GITHUB_STAR_HINT);
-            infoScreen(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), successBody.c_str(),
-                       UiTheme::accentColor(tft), I18n::t(StringId::OTA_RESTART_BUTTON));
+            // In einer Schleife anzeigen, bis infoScreen() per ECHTEM Tap
+            // (nicht per Inaktivitaets-Timeout) beendet wird (Alex' Meldung:
+            // das Geraet startete bisher auch dann automatisch neu, wenn der
+            // 2-Minuten-Timeout waehrend des Downloads/Flashens schon fast
+            // abgelaufen war und der Nutzer den Erfolgs-Text dadurch gar
+            // nicht mehr lesen konnte, bevor ESP.restart() unbedingt lief).
+            // Bei Timeout wird der Screen einfach erneut angezeigt statt
+            // automatisch neuzustarten - der Neustart bleibt eine bewusste
+            // Nutzer-Aktion.
+            while (!infoScreen(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), successBody.c_str(),
+                                UiTheme::accentColor(tft), I18n::t(StringId::OTA_RESTART_BUTTON))) {
+            }
             // Setzt das Flag, das main.cpp::showWhatsNewIfNeeded() beim
             // naechsten Boot ausliest - siehe settings_store.h fuer die
             // Begruendung (Changelog-Screen soll NUR nach einem echten
@@ -1634,9 +1655,9 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
     }
 }
 
-void showInfoScreen(TFT_eSPI& tft, const String& title, const String& body,
+bool showInfoScreen(TFT_eSPI& tft, const String& title, const String& body,
                      uint16_t accentColor, const String& buttonLabel) {
-    infoScreen(tft, title, body, accentColor, buttonLabel);
+    return infoScreen(tft, title, body, accentColor, buttonLabel);
 }
 
 int layoutTitleLines(TFT_eSPI& tft, const String& text, int16_t maxWidth,

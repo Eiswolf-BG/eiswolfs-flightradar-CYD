@@ -24,7 +24,12 @@ namespace MenuScreen {
     // setup() gedacht, um den "Was ist neu?"-Changelog-Screen nach einem
     // Firmware-Update anzuzeigen (siehe dortige showWhatsNewIfNeeded()) -
     // ohne dafuer das komplette Scroll-/Box-Layout ein zweites Mal zu bauen.
-    void showInfoScreen(TFT_eSPI& tft, const String& title, const String& body,
+    // Rueckgabe: true = per echtem Tap auf den Button beendet, false = per
+    // Inaktivitaets-Timeout (Config::MENU_IDLE_TIMEOUT_MS) zurueckgekehrt,
+    // ohne dass tatsaechlich getippt wurde - siehe Kommentar bei infoScreen()
+    // in menu_screen.cpp. Aufrufer ohne gefaehrliche Folgeaktion (Neustart
+    // o.ae.) koennen den Rueckgabewert wie bisher ignorieren.
+    bool showInfoScreen(TFT_eSPI& tft, const String& title, const String& body,
                          uint16_t accentColor, const String& buttonLabel);
 
     // Oeffentliche Huelle um das interne wrapTitleLines() (siehe
