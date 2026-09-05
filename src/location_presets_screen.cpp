@@ -472,14 +472,14 @@ namespace {
     // setzt den Scroll-Fortschritt zurueck.
     void setupMarquee(TFT_eSPI& tft, const String& text, int16_t viewportW) {
         // WICHTIG: textWidth() haengt von der aktuell gesetzten Textgroesse
-        // ab. Der Marquee wird in Size 2 gezeichnet (siehe drawMarquee),
-        // also muss hier ebenfalls Size 2 aktiv sein, sonst wird die
-        // Breite falsch (zu schmal) gemessen und der Text ragt beim
-        // Zeichnen ueber den verfuegbaren Platz hinaus.
-        tft.setTextSize(2);
+        // ab. Der Marquee wird in Size 1 gezeichnet (siehe drawMarquee, auf
+        // Wunsch von Size 2 auf eine kleinere, dezentere Groesse reduziert),
+        // also muss hier ebenfalls Size 1 aktiv sein, sonst wird die Breite
+        // falsch gemessen und der Text ragt beim Zeichnen ueber den
+        // verfuegbaren Platz hinaus.
+        tft.setTextSize(1);
         airportMarquee.text = text;
         airportMarquee.needsScroll = tft.textWidth(text) > viewportW;
-        tft.setTextSize(1);
         String withGap = text + "   "; // 3 Leerzeichen Luecke vor der Wiederholung
         airportMarquee.ring = withGap + withGap;
         airportMarquee.charOffset = 0;
@@ -502,25 +502,25 @@ namespace {
         if (airportMarquee.text.length() == 0) return;
 
         // Der geloeschte Bereich muss zur tatsaechlichen Texthoehe bei
-        // Size 2 passen (~16px), nicht zur alten Size-1-Hoehe - sonst
-        // bleiben oben Reste vom vorherigen Frame stehen (sichtbar als
-        // Strich ueber dem Text). Etwas grosszuegiger nach oben (start
-        // bei y-20) als vorher, da ein einzelner Frame-Ausreisser sonst
-        // noch sichtbar blieb.
-        constexpr int16_t MARQUEE_CLEAR_TOP = 20;
-        constexpr int16_t MARQUEE_CLEAR_H = 26;
+        // Size 1 passen (~9px Ascent) - kleiner als vorher (Size 2), da die
+        // Schrift auf Wunsch verkleinert wurde. Etwas grosszuegiger als das
+        // Minimum, damit ein einzelner Frame-Ausreisser nicht sichtbar
+        // bleibt.
+        // Muss zur Rechteck-Geometrie in run() passen (airportRect/
+        // airportLineY - dort wird die Baseline bewusst 18px unterhalb der
+        // Rechteck-Oberkante gesetzt, bei einer Rechteckhoehe von 24px), da
+        // hier kein Zugriff auf diese lokalen Konstanten besteht.
+        constexpr int16_t MARQUEE_CLEAR_TOP = 18;
+        constexpr int16_t MARQUEE_CLEAR_H = 24;
         tft.fillRect(x, y - MARQUEE_CLEAR_TOP, w, MARQUEE_CLEAR_H, TFT_BLACK);
         tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.5f), TFT_BLACK);
-        // Groessere Schrift fuer den Nearest-Airport-Marquee (auf Wunsch
-        // vergroessert von Size 1 auf Size 2) - nach dem Zeichnen wieder auf
-        // Size 1 zurueckstellen, damit nachfolgender Code (z.B. der
-        // "Zurueck"-Button) nicht versehentlich auch vergroessert wird.
-        tft.setTextSize(2);
+        // Dezentere, kleinere Schrift fuer den Nearest-Airport-Marquee (auf
+        // Wunsch von Size 2 auf Size 1 reduziert).
+        tft.setTextSize(1);
         tft.setCursor(x, y);
 
         if (!airportMarquee.needsScroll) {
             tft.print(airportMarquee.text);
-            tft.setTextSize(1);
             return;
         }
 
@@ -535,7 +535,6 @@ namespace {
         }
 
         tft.print(marqueeWindow(tft, airportMarquee.ring, airportMarquee.charOffset, w));
-        tft.setTextSize(1);
     }
 
     // Laufschrift-Zustand pro Preset-Zeile, analog zu airportMarquee oben,
@@ -743,13 +742,22 @@ void run(TFT_eSPI& tft) {
 
         constexpr int16_t AIRPORT_LINE_X = 10;
         constexpr int16_t AIRPORT_LINE_W = Config::SCREEN_WIDTH - 20;
-        int16_t airportLineY = (int16_t)(Config::SCREEN_HEIGHT - 60);
-        // Deckt denselben Bereich ab, den drawMarquee() bei jedem Frame
-        // loescht (siehe MARQUEE_CLEAR_TOP/-H) - dient sowohl als Tap-Zone
-        // als auch als sichtbarer Rahmen, der anzeigt, dass man hier
-        // antippen kann, um den Flughafen als neuen Preset zu uebernehmen.
-        Rect airportRect = {(int16_t)(AIRPORT_LINE_X - 4), (int16_t)(airportLineY - 20),
-                             (int16_t)(AIRPORT_LINE_W + 8), 26};
+        // Rechteck sauber vertikal zwischen der Unterkante des "Hinzufuegen"-
+        // Buttons (addBtn) und der Oberkante des "Zurueck"-Buttons (backBtn,
+        // dessen y hier per gleicher Formel wie unten vorgezogen wird, da er
+        // selbst erst spaeter im Code deklariert wird) zentrieren, statt wie
+        // vorher an einem festen Abstand vom Bildschirmrand.
+        constexpr int16_t AIRPORT_RECT_H = 24;
+        int16_t addBtnBottom = (int16_t)(addBtn.y + addBtn.h);
+        int16_t backBtnTop = (int16_t)(Config::SCREEN_HEIGHT - 50);
+        int16_t airportGapCenter = (int16_t)((addBtnBottom + backBtnTop) / 2);
+        Rect airportRect = {(int16_t)(AIRPORT_LINE_X - 4),
+                             (int16_t)(airportGapCenter - AIRPORT_RECT_H / 2),
+                             (int16_t)(AIRPORT_LINE_W + 8), AIRPORT_RECT_H};
+        // Baseline (siehe Grundlinien-Font-Hinweis in CLAUDE.md) 18px
+        // unterhalb der Rechteck-Oberkante - muss zu MARQUEE_CLEAR_TOP/-H in
+        // drawMarquee() passen.
+        int16_t airportLineY = (int16_t)(airportRect.y + 18);
         AirportLookup::Nearest nearest;
         {
             double activeLat = 0, activeLon = 0;
@@ -792,7 +800,8 @@ void run(TFT_eSPI& tft) {
                 } else {
                     snprintf(buf, sizeof(buf), "%s (%.0f nm)", code, Units::kmToNm(nearest.distanceKm));
                 }
-                String line = String(I18n::t(StringId::LOCATION_NEAREST_AIRPORT_PREFIX)) + buf;
+                String line = String(I18n::t(StringId::LOCATION_NEAREST_AIRPORT_PREFIX)) + buf
+                            + " - " + I18n::t(StringId::LOCATION_NEAREST_AIRPORT_TAP_HINT);
                 setupMarquee(tft, line, AIRPORT_LINE_W);
                 drawMarquee(tft, AIRPORT_LINE_X, airportLineY, AIRPORT_LINE_W, 20);
                 tft.drawRoundRect(airportRect.x, airportRect.y, airportRect.w, airportRect.h, 4, UiTheme::accentColorDimmed(tft, 0.5f));

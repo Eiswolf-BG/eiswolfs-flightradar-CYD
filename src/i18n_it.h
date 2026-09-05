@@ -432,6 +432,8 @@ static const char* const I18N_IT[] = {
     "Picco odierno: ",
     " aerei",
     " alle ",
+
+    "Tocca per impostare come preset",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

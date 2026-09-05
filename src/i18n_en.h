@@ -433,6 +433,8 @@ static const char* const I18N_EN[] = {
     "Today's peak: ",
     " aircraft",
     " at ",
+
+    "Tap to set as preset",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

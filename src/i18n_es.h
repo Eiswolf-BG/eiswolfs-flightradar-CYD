@@ -432,6 +432,8 @@ static const char* const I18N_ES[] = {
     "Pico de hoy: ",
     " aviones",
     " a las ",
+
+    "Toca para establecer como preset",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

@@ -928,6 +928,12 @@ enum class StringId : uint16_t {
     PEAK_TRAFFIC_UNIT,
     PEAK_TRAFFIC_AT_TIME,
 
+    // Wird an das Ende des scrollenden "Naechster Flughafen"-Marquee-Texts
+    // auf dem Standort-Presets-Screen angehaengt (location_presets_screen.cpp),
+    // damit beim Durchlaufen sichtbar wird, dass ein Tap auf die Zeile den
+    // Flughafen als neuen Preset uebernimmt.
+    LOCATION_NEAREST_AIRPORT_TAP_HINT,
+
     COUNT
 };
 

@@ -432,6 +432,8 @@ static const char* const I18N_FR[] = {
     "Pic du jour : ",
     " avions",
     " à ",
+
+    "Appuyez pour définir comme préréglage",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,
