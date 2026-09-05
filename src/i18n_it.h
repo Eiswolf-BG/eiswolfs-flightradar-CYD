@@ -257,6 +257,7 @@ static const char* const I18N_IT[] = {
     "Non è stato possibile scaricare o installare l'aggiornamento. Il dispositivo continua a funzionare senza modifiche con il firmware precedente. Controlla la connessione WiFi e riprova più tardi.",
     "Timeout schermo",
     "Dopo questo tempo senza tocchi, lo schermo si spegne per risparmiare energia. Con il salvaschermo attivo, mostra invece un cielo stellato attenuato con l'orario.",
+    "Il più vicino: ",
 
     "Visualizzazione radar",
     "Visualizzazione radar",
@@ -287,6 +288,9 @@ static const char* const I18N_IT[] = {
     "Temporale",
 
     "Rilevamento: ",
+    "In avvicinamento",
+    "In allontanamento",
+    "Sta transitando",
     "N", "NE", "E", "SE", "S", "SO", "O", "NO",
 
     "Attendere, riavvio in corso...",
@@ -410,7 +414,7 @@ static const char* const I18N_IT[] = {
     "Semplice",
     "Intelligente",
     "Come funziona l'allarme intelligente",
-    "Invece di una singola soglia di distanza, l'allarme intelligente usa tre zone annidate - Giallo (<20 km), Arancione (<10 km), Rosso (<5 km) - e si attiva solo quando un aereo si sta effettivamente avvicinando, cioè entra di nuovo in una zona più vicina, non mentre vi rimane o si allontana di nuovo. Per ridurre i falsi allarmi dovuti a voli a lungo raggio che volano molto in alto, richiede anche che l'altitudine dell'aereo sia inferiore a 3000 ft. Tutte e tre le zone usano lo stesso colore LED dell'allarme semplice (il tuo colore tema attuale), ma lampeggiano sempre più velocemente - lento per il giallo, medio per l'arancione, veloce per il rosso - e restano accese solo per pochi secondi per evento, non in modo continuo.",
+    "Invece di una singola soglia di distanza, l'allarme intelligente usa tre zone annidate - Giallo (<20 km), Arancione (<10 km), Rosso (<5 km) - e si attiva solo quando un aereo si sta effettivamente avvicinando, cioè entra di nuovo in una zona più vicina, non mentre vi rimane o si allontana di nuovo. Tutte e tre le zone usano lo stesso colore LED dell'allarme semplice (il tuo colore tema attuale), ma lampeggiano sempre più velocemente - lento per il giallo, medio per l'arancione, veloce per il rosso - e restano accese solo per pochi secondi per evento, non in modo continuo.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

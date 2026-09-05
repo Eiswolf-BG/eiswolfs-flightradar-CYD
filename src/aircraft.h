@@ -50,6 +50,17 @@ struct Aircraft {
     // ueberhaupt gesetzt, siehe postFetchUpdate().
     uint16_t approachEtaMin    = 0;
 
+    // Naeherungs-/Entfernungs-Trend ("Naehert sich"/"Entfernt sich"/"Fliegt
+    // vorbei") fuers Detail-Panel (radar_screen.cpp::drawDetailPanel()) -
+    // rein geometrisch aus der Distanz zum eigenen Standort ueber die
+    // letzten Zyklen abgeleitet, siehe aircraft_table.cpp::
+    // postFetchUpdate(). Gleiches "vorherige Messung merken"-Muster wie
+    // prevAirportDistKm oben. prevDistanceKm = -1 bedeutet "noch keine
+    // vorherige Messung" (erster Zyklus dieses Flugzeugs).
+    enum class DistanceTrend : uint8_t { Unknown = 0, Approaching, Departing, Passing };
+    float          prevDistanceKm = -1;
+    DistanceTrend  distanceTrend  = DistanceTrend::Unknown;
+
     bool     valid          = false;
 
     char     airlineName[24] = {0};

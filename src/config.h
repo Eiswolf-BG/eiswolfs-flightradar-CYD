@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "5.5.4";
+    constexpr const char* APP_VERSION = "5.5.5";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -163,15 +163,19 @@ namespace Config {
     constexpr float SMART_PROXIMITY_YELLOW_KM = 20.0f;
     constexpr float SMART_PROXIMITY_ORANGE_KM = 10.0f;
     constexpr float SMART_PROXIMITY_RED_KM    = 5.0f;
-    // Zusaetzlicher Hoehenfilter, um Fehlalarme durch hoch ueberfliegende
-    // Langstreckenfluege zu vermeiden - reduziert Fehlalarme spuerbar,
-    // ist aber KEINE echte "Hoehe ueber dem Beobachter" (das Projekt kennt
-    // die eigene Gelaende-/Meereshoehe nirgends), sondern eine bewusste
-    // Naeherung: die barometrische ADS-B-Flughoehe (altBaroFt, ueber
-    // Meeresspiegel) direkt als Schwellenwert - fuer die allermeisten
-    // Nutzer (die nicht in extremer Hoehenlage wohnen) eine brauchbare
-    // Annaeherung an "niedrig fliegend in der Naehe".
-    constexpr int32_t SMART_PROXIMITY_ALT_DIFF_FT = 3000;
+
+    // Naeherungs-/Entfernungs-Trend im Detail-Panel (aircraft.h::
+    // DistanceTrend, aircraft_table.cpp::postFetchUpdate()) - Mindest-
+    // Distanzaenderung pro Abrufzyklus (siehe FETCH_INTERVAL_MS oben,
+    // aktuell 10s), unterhalb derer die Distanzaenderung als Rauschen/
+    // Positionsungenauigkeit gilt statt als echte Annaeherung/Entfernung
+    // ("Fliegt vorbei"). 0,2km/10s entspricht einer radialen Geschwindig-
+    // keitskomponente von 72 km/h - ein rein tangential (seitlich)
+    // vorbeifliegendes Flugzeug hat dort naeherungsweise 0 radiale
+    // Geschwindigkeit, waehrend selbst ein langsames, sich tatsaechlich
+    // annaeherndes/entfernendes Flugzeug (typische Geschwindigkeiten
+    // liegen deutlich darueber) diesen Schwellenwert klar ueberschreitet.
+    constexpr float DISTANCE_TREND_THRESHOLD_KM = 0.2f;
 
     // Best-Effort-Anflug-Erkennung auf den naechstgelegenen Flughafen
     // (aircraft_table.cpp::postFetchUpdate(), Anzeige in radar_screen.cpp::

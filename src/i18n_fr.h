@@ -257,6 +257,7 @@ static const char* const I18N_FR[] = {
     "La mise à jour n'a pas pu être téléchargée ou installée. L'appareil continue de fonctionner normalement avec le micrologiciel précédent. Merci de vérifier votre connexion WiFi et de réessayer plus tard.",
     "Délai d'inactivité",
     "Après ce délai sans contact, l'écran s'éteint pour économiser l'énergie. Avec l'écran de veille activé, il affiche à la place un ciel étoilé tamisé avec l'heure.",
+    "Le plus proche : ",
 
     "Affichage radar",
     "Affichage radar",
@@ -287,6 +288,9 @@ static const char* const I18N_FR[] = {
     "Orage",
 
     "Relèvement : ",
+    "S'approche",
+    "S'éloigne",
+    "Passe à proximité",
     "N", "NE", "E", "SE", "S", "SO", "O", "NO",
 
     "Veuillez patienter, redémarrage...",
@@ -410,7 +414,7 @@ static const char* const I18N_FR[] = {
     "Simple",
     "Intelligent",
     "Comment fonctionne l'alarme intelligente",
-    "Au lieu d'un seul seuil de distance, l'alarme intelligente utilise trois zones imbriquées - Jaune (<20 km), Orange (<10 km), Rouge (<5 km) - et ne se déclenche que lorsqu'un avion se rapproche réellement, c'est-à-dire qu'il passe nouvellement dans une zone plus proche, pas tant qu'il y reste ou s'éloigne à nouveau. Pour réduire les fausses alertes dues aux vols long-courriers volant haut, l'altitude de l'avion doit en plus être inférieure à 3000 ft. Les trois zones utilisent la même couleur LED que l'alarme simple (votre couleur de thème actuelle), mais clignotent de plus en plus vite - lentement pour le jaune, moyennement pour l'orange, rapidement pour le rouge - et restent allumées quelques secondes par événement au lieu d'en continu.",
+    "Au lieu d'un seul seuil de distance, l'alarme intelligente utilise trois zones imbriquées - Jaune (<20 km), Orange (<10 km), Rouge (<5 km) - et ne se déclenche que lorsqu'un avion se rapproche réellement, c'est-à-dire qu'il passe nouvellement dans une zone plus proche, pas tant qu'il y reste ou s'éloigne à nouveau. Les trois zones utilisent la même couleur LED que l'alarme simple (votre couleur de thème actuelle), mais clignotent de plus en plus vite - lentement pour le jaune, moyennement pour l'orange, rapidement pour le rouge - et restent allumées quelques secondes par événement au lieu d'en continu.",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

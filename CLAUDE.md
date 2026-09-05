@@ -278,6 +278,12 @@ explizit erwähnt.
   Umlaute verwenden, siehe oben).
 - Build-Check nach JEDER Änderung: `pio run` im Projektverzeichnis, auf
   Warnungen UND Errors prüfen (nicht nur "compiles").
+- Nach JEDER umgesetzten Aufgabe, die den Firmware-Code ändert (neues
+  Feature, Bugfix, Refactoring), MUSS die Zusammenfassung den aktuellen
+  Flash-Speicherstand (Bytes + Prozent, aus dem `pio run`-Build-Output)
+  enthalten - auch wenn die Änderung vermutlich nur minimal ist. Das gilt
+  für jede Aufgabe, unabhängig davon, ob der Auftrag das explizit
+  verlangt.
 - Immer least-invasive Änderungen bevorzugen — bestehende Funktionen/Namen
   nicht ohne Grund umbenennen.
 - Commits enthalten KEINEN "Co-Authored-By: Claude"-Trailer (siehe

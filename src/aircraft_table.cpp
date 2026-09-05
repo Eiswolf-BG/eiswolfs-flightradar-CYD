@@ -82,6 +82,26 @@ void postFetchUpdate(double homeLat, double homeLon) {
         }
 
         auto polar = RadarMath::toPolar(homeLat, homeLon, a.lat, a.lon);
+
+        // Naeherungs-/Entfernungs-Trend (aircraft.h::DistanceTrend) - exakt
+        // dasselbe "vorherige Distanz merken und vergleichen"-Muster wie
+        // die Anflug-Erkennung unten (prevAirportDistKm), nur bezogen auf
+        // die Distanz zum eigenen Standort statt zum naechsten Flughafen.
+        // Schwellenwert siehe Config::DISTANCE_TREND_THRESHOLD_KM.
+        if (a.prevDistanceKm >= 0) {
+            float delta = polar.distanceKm - a.prevDistanceKm;
+            if (delta <= -Config::DISTANCE_TREND_THRESHOLD_KM) {
+                a.distanceTrend = Aircraft::DistanceTrend::Approaching;
+            } else if (delta >= Config::DISTANCE_TREND_THRESHOLD_KM) {
+                a.distanceTrend = Aircraft::DistanceTrend::Departing;
+            } else {
+                a.distanceTrend = Aircraft::DistanceTrend::Passing;
+            }
+        } else {
+            a.distanceTrend = Aircraft::DistanceTrend::Unknown;
+        }
+        a.prevDistanceKm = polar.distanceKm;
+
         a.distanceKm = polar.distanceKm;
         a.bearingDeg = polar.bearingDeg;
 

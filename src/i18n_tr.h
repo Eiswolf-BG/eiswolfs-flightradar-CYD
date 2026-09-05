@@ -257,6 +257,7 @@ static const char* const I18N_TR[] = {
     "Güncelleme indirilemedi veya yüklenemedi. Cihaz değişmeden önceki donanım yazılımıyla çalışmaya devam ediyor. Lütfen WiFi bağlantınızı kontrol edip daha sonra tekrar deneyin.",
     "Ekran Zaman Aşımı",
     "Bu süre boyunca dokunulmazsa ekran güç tasarrufu için kapanır. Ekran koruyucu açıksa, bunun yerine saatli, sönük bir yıldızlı gökyüzü gösterir.",
+    "En yakın: ",
 
     "Radar Görünümü",
     "Radar Görünümü",
@@ -287,6 +288,9 @@ static const char* const I18N_TR[] = {
     "Fırtına",
 
     "Yön: ",
+    "Yaklaşıyor",
+    "Uzaklaşıyor",
+    "Yandan geçiyor",
     "K", "KD", "D", "GD", "G", "GB", "B", "KB",
 
     "Lütfen bekleyin, yeniden başlatılıyor...",
@@ -410,7 +414,7 @@ static const char* const I18N_TR[] = {
     "Basit",
     "Akıllı",
     "Akıllı alarm nasıl çalışır",
-    "Tek bir mesafe eşiği yerine, akıllı alarm iç içe geçmiş üç bölge kullanır - Sarı (<20 km), Turuncu (<10 km), Kırmızı (<5 km) - ve yalnızca bir uçak gerçekten yaklaştığında, yani daha yakın bir bölgeye yeni girdiğinde tetiklenir; orada kaldığı veya tekrar uzaklaştığı sürece tetiklenmez. Yüksekte uçan uzun menzilli uçuşlardan kaynaklanan yanlış alarmları azaltmak için uçağın irtifasının da 3000 ft'nin altında olması gerekir. Üç bölge de basit alarmla aynı LED rengini kullanır (mevcut tema renginiz), ancak gittikçe hızlanan bir şekilde yanıp söner - Sarı'da yavaş, Turuncu'da orta, Kırmızı'da hızlı - ve sürekli değil, her olayda yalnızca birkaç saniye yanar.",
+    "Tek bir mesafe eşiği yerine, akıllı alarm iç içe geçmiş üç bölge kullanır - Sarı (<20 km), Turuncu (<10 km), Kırmızı (<5 km) - ve yalnızca bir uçak gerçekten yaklaştığında, yani daha yakın bir bölgeye yeni girdiğinde tetiklenir; orada kaldığı veya tekrar uzaklaştığı sürece tetiklenmez. Üç bölge de basit alarmla aynı LED rengini kullanır (mevcut tema renginiz), ancak gittikçe hızlanan bir şekilde yanıp söner - Sarı'da yavaş, Turuncu'da orta, Kırmızı'da hızlı - ve sürekli değil, her olayda yalnızca birkaç saniye yanar.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

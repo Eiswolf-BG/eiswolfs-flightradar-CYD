@@ -1920,17 +1920,41 @@ namespace {
 
         if (!forceFull && m.text == newText) return;
 
+        // Scroll-Fortschritt NICHT bei jeder Textaenderung auf 0
+        // zuruecksetzen (Alex' Meldung: die Distanz/Kurs/Peilungs-Zeile
+        // aendert sich durch die Fliesskomma-Werte praktisch bei JEDEM
+        // ADS-B-Update - alle ~10s, FETCH_INTERVAL_MS - obwohl eine
+        // komplette Scroll-Runde bei 200ms/Zeichen (INFO_MARQUEE_STEP_MS)
+        // und ueber 70 Zeichen Laenge ca. 15s braucht. Der bisherige
+        // bedingungslose Reset unterbrach die Runde dadurch systematisch
+        // immer an praktisch derselben fruehen Stelle, bevor der Distanz-
+        // Wert bzw. der Rest der Zeile je sichtbar wurde. Reset bleibt nur
+        // fuer die Faelle sinnvoll/noetig, in denen der bisherige
+        // Fortschritt gar nicht mehr zur neuen Zeile passt: komplett neu
+        // aufgebautes Panel (forceFull), eine Zeile, die vorher NICHT
+        // scrollen musste (kein sinnvoller Fortschritt vorhanden), oder ein
+        // Fortschritt, der wegen einer jetzt kuerzeren Zeile ausserhalb des
+        // gueltigen Bereichs laege.
+        bool wasScrolling = m.needsScroll;
+        int32_t preservedOffset = m.charOffset;
+
         m.text = newText;
         m.needsScroll = gfx.textWidth(newText) > maxWidth;
         String withGap = newText + "   "; // 3 Leerzeichen Luecke vor der Wiederholung
         m.ring = withGap + withGap;
-        m.charOffset = 0;
         m.lastStepMs = millis();
+
+        if (forceFull || !wasScrolling || !m.needsScroll) {
+            m.charOffset = 0;
+        } else {
+            int32_t singleLen = (int32_t)m.text.length() + 3;
+            m.charOffset = (preservedOffset < singleLen) ? preservedOffset : 0;
+        }
 
         gfx.fillRect(0, y - 14, Config::SCREEN_WIDTH, h, TFT_BLACK);
         gfx.setTextColor(fg, TFT_BLACK);
         gfx.setCursor(8, y);
-        gfx.print(m.needsScroll ? infoMarqueeWindow(gfx, m.ring, 0, maxWidth) : newText);
+        gfx.print(m.needsScroll ? infoMarqueeWindow(gfx, m.ring, m.charOffset, maxWidth) : newText);
     }
 
     // Laesst eine einzelne Detail-Panel-Zeile weiterscrollen, falls sie zu
@@ -2171,12 +2195,39 @@ namespace {
         // groesserer lokaler Puffer statt des sonst hier wiederverwendeten
         // "buf" (nur 48 Byte, reicht fuer die laengeren Uebersetzungen mit
         // allen drei Werten nicht mehr aus).
-        char distBuf[96];
-        snprintf(distBuf, sizeof(distBuf), "%s%.0fkm / %.0fnm / %.0fmi  %s%.0f  %s%.0f° %s",
+        // Naeherungs-/Entfernungs-Trend (a.distanceTrend, siehe aircraft.h/
+        // aircraft_table.cpp::postFetchUpdate()) haengt aus demselben
+        // Platzgrund wie die Peilung oben an dieser Zeile an, statt eine
+        // eigene, zwoelfte Zeile zu bekommen - das Panel ist bereits jetzt
+        // randvoll (siehe Kommentar bei der letzten Panel-Zeile weiter
+        // unten). Bewusst KEIN Unicode-Pfeil (Font deckt nur U+0020-U+015F
+        // ab, siehe CLAUDE.md) - stattdessen dieselben einfachen ASCII-
+        // Symbole, die im Projekt bereits an anderer Stelle fuer Richtung
+        // stehen ("v"/"^" wie die Scroll-Pfeile in menu_screen.cpp,
+        // "->" wie im Routen-Text oben). Bei "Unknown" (erster Zyklus
+        // dieses Flugzeugs, noch keine Vorwert-Messung) wird nichts
+        // angehaengt, statt einen falschen Zustand zu suggerieren.
+        const char* trendSymbol = "";
+        const char* trendText = "";
+        switch (a.distanceTrend) {
+            case Aircraft::DistanceTrend::Approaching:
+                trendSymbol = "v"; trendText = I18n::t(StringId::DETAIL_APPROACHING); break;
+            case Aircraft::DistanceTrend::Departing:
+                trendSymbol = "^"; trendText = I18n::t(StringId::DETAIL_DEPARTING); break;
+            case Aircraft::DistanceTrend::Passing:
+                trendSymbol = "->"; trendText = I18n::t(StringId::DETAIL_PASSING); break;
+            case Aircraft::DistanceTrend::Unknown:
+            default:
+                break;
+        }
+
+        char distBuf[144];
+        snprintf(distBuf, sizeof(distBuf), "%s%.0fkm / %.0fnm / %.0fmi  %s%.0f  %s%.0f° %s  %s %s",
                  I18n::t(StringId::DETAIL_DIST),
                  a.distanceKm, Units::kmToNm(a.distanceKm), Units::kmToMi(a.distanceKm),
                  I18n::t(StringId::DETAIL_HDG), a.headingDeg,
-                 I18n::t(StringId::DETAIL_BEARING_PREFIX), a.bearingDeg, compassLabel(a.bearingDeg));
+                 I18n::t(StringId::DETAIL_BEARING_PREFIX), a.bearingDeg, compassLabel(a.bearingDeg),
+                 trendSymbol, trendText);
         updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.distHeading, String(distBuf), forceFull);
         y += LINE_H;
 
@@ -3097,7 +3148,22 @@ namespace {
     // Platz passt.
     constexpr int16_t EVENT_CORNER_CX = Config::SCREEN_WIDTH - 22;
     constexpr int16_t EVENT_CORNER_CY_OFFSET_FROM_LINE = 31;
-    constexpr int16_t EVENT_CORNER_R = 12;
+    // War vorher 12 - verkleinert (Alex' Wunsch), um Platz fuer die neue,
+    // feste "naechstes Flugzeug"-Zeile direkt darunter zu schaffen (siehe
+    // drawNearestAircraftCorner() weiter unten). Wirkt sich auf die
+    // Clear-/Tap-Flaeche (eventCornerRect()) aus - NICHT auf die
+    // tatsaechliche Groesse des SquawkWatch-Symbols selbst: das ist die
+    // normale drawAircraftMarker(heavy=true)-Silhouette mit fest
+    // verdrahteter Nase/Heck-Laenge (12/9px), unabhaengig von diesem
+    // Radius hier. Deren Heck (9px nach unten von cy) landet zufaellig
+    // exakt bei derselben Position wie dieser verkleinerte Radius - die
+    // tatsaechliche untere Kante des sichtbaren Symbols bleibt also bei
+    // cy+9, unveraendert gegenueber vorher (die vorherige Faellzeichnung
+    // "vorher 19px, jetzt 22px" bezog sich faelschlich auf diesen Radius
+    // statt auf die tatsaechliche Silhouette - siehe Geometrie-Kommentar
+    // bei drawNearestAircraftCorner() fuer die korrekte, an der echten
+    // Silhouette gemessene Rechnung).
+    constexpr int16_t EVENT_CORNER_R = 9;
     // Textbereich: linker Rand rechnerisch geprueft (siehe unten), rechter
     // Rand kurz vor dem Bildschirmrand - zeichenweise Kuerzung zur
     // Laufzeit (drawTruncatedLeft()) haelt sich an diese Breite, egal wie
@@ -3193,6 +3259,96 @@ namespace {
 
         gfx.setTextDatum(TL_DATUM);
     }
+
+    // Feste, NICHT ueber SettingsStore::eventCornerOverlayEnabled()
+    // abschaltbare "naechstes Flugzeug"-Zeile direkt ueber der Trennlinie
+    // zur Info-/Legenden-Leiste (Alex' Wunsch: gehoert fest zum
+    // Radarscreen, nicht zum optionalen Overlay-Bereich wie
+    // drawEventCorner()/drawForecastCorner() oben). Nutzt dieselbe, nach
+    // Distanz sortierte AircraftTable wie ueberall sonst im Projekt (Index
+    // 0 = naechstes Flugzeug, siehe aircraft_table.cpp::postFetchUpdate())
+    // - keine neue Distanzberechnung. Bewusst KEIN Flugzeug-Symbol als
+    // Font-Zeichen (Font deckt nur U+0020-U+015F ab, siehe CLAUDE.md) -
+    // stattdessen ein kleines, selbst gezeichnetes Symbol, siehe
+    // drawMiniAircraftIcon() unten.
+    //
+    // BEWUSST OHNE Text-Label ("Naechstes:") - anders als im Ruhebildschirm
+    // (main.cpp::drawScreensaverNearestAircraft()) konkurriert der
+    // Radarkreis hier um denselben Platz: per Live-Diagnose auf echter
+    // Hardware gemessen, passte das kuerzeste der 8 Uebersetzungen
+    // ("Nearest: ", 57px) nicht einmal ansatzweise in die verfuegbaren
+    // ~17px zwischen Icon und sicherer Kreisrand-Grenze (siehe Rechnung
+    // unten) - Icon+Distanz allein bleiben dagegen in jedem Fall sichtbar
+    // und kollisionsfrei.
+    //
+    // Geometrie (Standardfall, Bodenfahrzeuge ausgeblendet ->
+    // infoBarHeight()=64, L.cy=147, Radius=102, top=29 -> infoTop=256):
+    //   lineY = infoTop - CY_OFFSET(9)                         = 247
+    //   Text-/Icon-Oberkante ca. 9px ueber lineY (siehe
+    //   EVENT_CORNER_TEXT_X-Kommentar oben fuer dieselbe Annahme) = 238
+    //     dy = 238-147 = 91, dx_max = sqrt(102^2-91^2)          = 46.1
+    //     Kreisrand an dieser Hoehe: x = 120+46.1               = 166.1
+    //     + 6px Sicherheitsabstand -> sichere linke Grenze      = 172
+    // Alternativfall (Bodenfahrzeuge sichtbar -> infoBarHeight()=82,
+    // Radius=93, L.cy=138): lineY=229, Text-Oberkante=220, dy=82,
+    // dx_max=43.9, Kreisrand=163.9+6=170 - liegt INNERHALB der 172 des
+    // Standardfalls, 172 ist also fuer beide Faelle sicher. Icon+Distanz
+    // brauchen zusammen nur ca. 40px (deutlich weniger als die
+    // verfuegbaren 236-172=64px), Kollision damit ausgeschlossen.
+    constexpr int16_t NEAREST_AIRCRAFT_CY_OFFSET_FROM_LINE = 9;
+    constexpr int16_t NEAREST_AIRCRAFT_RIGHT_X = 236; // 4px vor dem Bildschirmrand
+    constexpr int16_t NEAREST_AIRCRAFT_SAFE_LEFT_X = 172; // siehe Rechnung oben, nur noch fuer die Clear-Flaeche genutzt
+    // Fuer Platzberechnungen (Icon-Breite) - der tatsaechliche Umriss ist
+    // asymmetrisch, siehe drawMiniAircraftIcon() unten.
+    constexpr int16_t NEAREST_AIRCRAFT_ICON_ARM = 4;
+
+    // Kleine Flugzeug-Silhouette: Rumpf mit laengerer Nase als Heck (wie
+    // bei der "grossen" generischen Silhouette drawAircraftMarker() unten,
+    // nur passend fuer diesen winzigen Eckbereich verkleinert) plus kurze
+    // Fluegel. Ein rein symmetrisches Kreuz (fruehere Version) sah auf dem
+    // Display wie ein einfaches Plus-Zeichen aus, nicht wie ein Flugzeug
+    // (Alex' Meldung) - die Asymmetrie Nase/Heck macht den Unterschied.
+    // Feste Ausrichtung "nach oben", Heading spielt fuer dieses generische
+    // Symbol keine Rolle.
+    void drawMiniAircraftIcon(TFT_eSPI& gfx, int16_t cx, int16_t cy, uint16_t color) {
+        constexpr int16_t NOSE = 5, TAIL = 3, WING = 4;
+        gfx.drawLine(cx, (int16_t)(cy + TAIL), cx, (int16_t)(cy - NOSE), color);
+        gfx.drawLine((int16_t)(cx - WING), cy, (int16_t)(cx + WING), cy, color);
+    }
+
+    void drawNearestAircraftCorner(TFT_eSPI& gfx, int16_t top) {
+        AircraftTable::lock();
+        Aircraft* table = AircraftTable::raw();
+        bool haveAircraft = table[0].valid;
+        float distKm = table[0].distanceKm;
+        AircraftTable::unlock();
+
+        int16_t lineY = (int16_t)(Config::SCREEN_HEIGHT - infoBarHeight() - NEAREST_AIRCRAFT_CY_OFFSET_FROM_LINE);
+
+        // Bereich immer erst loeschen (Distanzwert aendert sich praktisch
+        // jeden Zyklus) - deckt Icon+Text+Label-Bereich komplett ab.
+        gfx.fillRect(NEAREST_AIRCRAFT_SAFE_LEFT_X, (int16_t)(lineY - 13),
+                     (int16_t)(Config::SCREEN_WIDTH - NEAREST_AIRCRAFT_SAFE_LEFT_X), 18, TFT_BLACK);
+
+        if (!haveAircraft) return;
+
+        uint16_t color = UiTheme::accentColorDimmed(gfx, 0.4f);
+        char distBuf[16];
+        if (LocationManager::useMetricUnits()) {
+            snprintf(distBuf, sizeof(distBuf), "%.0fkm", distKm);
+        } else {
+            snprintf(distBuf, sizeof(distBuf), "%.0fnm", Units::kmToNm(distKm));
+        }
+
+        gfx.setTextColor(color, TFT_BLACK);
+        gfx.setTextDatum(MR_DATUM);
+        gfx.drawString(distBuf, NEAREST_AIRCRAFT_RIGHT_X, lineY);
+        int16_t distW = gfx.textWidth(distBuf);
+
+        int16_t iconCx = (int16_t)(NEAREST_AIRCRAFT_RIGHT_X - distW - 6 - NEAREST_AIRCRAFT_ICON_ARM);
+        drawMiniAircraftIcon(gfx, iconCx, lineY, color);
+        gfx.setTextDatum(TL_DATUM);
+    }
 }
 
 uint16_t themeColor(TFT_eSPI& gfx) {
@@ -3275,6 +3431,7 @@ void render(TFT_eSPI& tft, int16_t top) {
     drawUpdateCornerButton(tft);
     drawEventCorner(tft, top);
     drawNearestAirportCorner(tft, top);
+    drawNearestAircraftCorner(tft, top);
 
     drawWorldMap(tft, L);
     drawStaticBackground(tft, L, rangeKm);
@@ -3594,6 +3751,7 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     drawUpdateCornerButton(tft);
     drawEventCorner(tft, top);
     drawNearestAirportCorner(tft, top);
+    drawNearestAircraftCorner(tft, top);
 
     if (prevSweepAngleDeg >= 0.0f) {
         if (SettingsStore::classicRadarEnabled()) {
@@ -4389,20 +4547,21 @@ void updateProximityAlert(uint32_t nowMs) {
 
             if (!proximityOn || !smartOn) continue;
 
-            // "Intelligenter" Alarm: Zone wird IMMER rein geometrisch
-            // aktualisiert (auch ausserhalb des Hoehenfilters unten) -
-            // sonst wuerde ein Flugzeug, das die Zone waehrend eines
-            // Hoehenflugs durchquert hat, bei einem SPAETEREN echten
-            // Sinkflug in dieselbe (dann schon "bekannte") Zone faelschlich
-            // NICHT mehr als Annaeherung erkannt. Der Alarm selbst loest
-            // nur aus, wenn die Zone GESTIEGEN ist (= von aussen nach innen
-            // durchquert, nicht nur "immer noch drin" oder "wieder
-            // raus") UND der Hoehenfilter zusaetzlich erfuellt ist.
+            // "Intelligenter" Alarm: Der Alarm loest aus, wenn die Zone
+            // GESTIEGEN ist (= von aussen nach innen durchquert, nicht nur
+            // "immer noch drin" oder "wieder raus"). Frueher gab es hier
+            // zusaetzlich einen Hoehenfilter (nur Flugzeuge unterhalb einer
+            // festen barometrischen Hoehe loesten aus, um Fehlalarme durch
+            // hoch ueberfliegende Langstreckenfluege zu vermeiden) - auf
+            // Alex' Wunsch entfernt, da er in der Praxis auch tatsaechlich
+            // wahrgenommene (hoerbare) Flugzeuge stumm blieben liess, was
+            // wie ein Defekt statt einer bewussten Filterung wirkte.
+            // Konsistenz (jedes Flugzeug in einer Zone loest aus) wiegt
+            // schwerer als die Vermeidung einzelner Fehlalarme.
             uint8_t zone = smartProximityZone(table[i].distanceKm);
             bool climbedIntoZone = zone > table[i].proximityZone;
             table[i].proximityZone = zone;
             if (!climbedIntoZone || zone == 0) continue;
-            if (abs(table[i].altBaroFt) >= Config::SMART_PROXIMITY_ALT_DIFF_FT) continue;
 
             // Bei mehreren gleichzeitigen Ereignissen gewinnt die
             // schwerwiegendere (oder eine gleich schwere neue) Zone -

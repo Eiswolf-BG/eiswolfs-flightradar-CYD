@@ -19,6 +19,7 @@
 #include "wifi_manager.h"
 #include "location_manager.h"
 #include "location_presets.h"
+#include "units.h"
 #include "sun_times.h"
 #include "adsb_client.h"
 #include "touch_input.h"
@@ -500,8 +501,18 @@ constexpr float SCREENSAVER_LOGO_SCALE = 1.0f;
 
 // Layout darunter, von oben nach unten: kleine graue Versionsnummer direkt
 // unter dem Logo, dann - mit etwas Abstand - die grosse Uhrzeit, dann das
-// Datum. Alle drei Y-Positionen sind Mittelpunkte (MC_DATUM).
+// Datum, ganz unten die dezente "naechstes Flugzeug"-Distanzanzeige (siehe
+// drawScreensaverNearestAircraft()). Alle vier Y-Positionen sind
+// Mittelpunkte (MC_DATUM).
 constexpr int16_t SCREENSAVER_VERSION_CY = 192;
+// "Naechstes Flugzeug"-Zeile sitzt zwischen Versionsnummer und Uhrzeit
+// (Alex' Wunsch: ganz unten sieht man sie nicht mehr, wenn das Geraet
+// flach auf dem Tisch liegt und der untere Rand vom Gehaeuse verdeckt
+// wird). Verfuegbarer Platz: Versionsnummer endet bei ca. y=201 (Size-1-
+// Text um CY=192), die Uhrzeit reserviert ab y=218 ihr eigenes,
+// groesseres Hintergrund-Rechteck (CY=236, CLOCK_BAND_H=44, siehe
+// drawScreensaverClock()-Kommentar dort) - dazwischen bleiben ca. 17px.
+constexpr int16_t SCREENSAVER_AIRCRAFT_CY = 209;
 constexpr int16_t SCREENSAVER_CLOCK_CY = 236;
 constexpr int16_t SCREENSAVER_DATE_CY = 278;
 
@@ -646,6 +657,88 @@ void drawScreensaverClock() {
         tft.setTextSize(1);
         tft.setTextDatum(TL_DATUM);
     }
+}
+
+// Dezente "naechstes Flugzeug"-Distanzanzeige ganz unten auf dem
+// Ruhebildschirm - rein aus der AircraftTable abgeleitet, die im
+// Hintergrund (NetTask auf Core 0) unabhaengig vom aktuell angezeigten
+// Screen weiterlaeuft (siehe render()-Aufrufe in main.cpp::loop(), die nur
+// bei !screensaverShowing das RADARBILD neu zeichnen - der zugrunde
+// liegende ADS-B-Abruf selbst kennt den Ruhebildschirm gar nicht). Die
+// Tabelle ist bereits nach Distanz aufsteigend sortiert (siehe
+// aircraft_table.cpp::postFetchUpdate()), Index 0 ist deshalb - falls
+// gueltig - automatisch das naechstgelegene Flugzeug, kein eigener
+// Vergleich noetig. Bewusst KEIN Flugzeug-Symbol als Font-Zeichen (Font
+// deckt nur U+0020-U+015F ab, siehe CLAUDE.md) - stattdessen ein kleines,
+// selbst gezeichnetes Kreuz (dieselbe kompakte Form wie in der neuen
+// festen Eckzeile auf dem Radarscreen, siehe radar_screen.cpp::
+// drawMiniAircraftIcon()/drawNearestAircraftCorner() - hier lokal
+// dupliziert statt geteilt, siehe CLAUDE.md "jeder Screen unabhaengig
+// lauffaehig"). Ist gerade kein Flugzeug bekannt, bleibt die ganze Zeile
+// (Text UND Icon) weg und die Aenderungserkennung unten loescht sie
+// einfach (kein "0 Flugzeuge"-Hinweis, ganz im ambienten Charakter des
+// Screens). Gleiches "nur bei tatsaechlicher Textaenderung neu
+// zeichnen"-Muster wie bei Uhrzeit/Datum oben - kein Flackern.
+String lastScreensaverAircraftText;
+constexpr int16_t SCREENSAVER_AIRCRAFT_ICON_ARM = 4;
+
+void drawScreensaverNearestAircraft() {
+    AircraftTable::lock();
+    Aircraft* table = AircraftTable::raw();
+    bool haveAircraft = table[0].valid;
+    float distKm = table[0].distanceKm;
+    AircraftTable::unlock();
+
+    String label, distText, cacheKey;
+    if (haveAircraft) {
+        label = I18n::t(StringId::NEAREST_AIRCRAFT_PREFIX);
+        char buf[24];
+        if (LocationManager::useMetricUnits()) {
+            snprintf(buf, sizeof(buf), "%.1fkm", distKm);
+        } else {
+            snprintf(buf, sizeof(buf), "%.1fnm", Units::kmToNm(distKm));
+        }
+        distText = buf;
+        cacheKey = label + distText;
+    }
+
+    if (lastScreensaverAircraftText == cacheKey) return;
+    lastScreensaverAircraftText = cacheKey;
+
+    constexpr int16_t AIRCRAFT_BAND_H = 14; // knapper Platz zwischen Versionsnummer und Uhrzeit, siehe CY-Kommentar
+    tft.fillRect(0, (int16_t)(SCREENSAVER_AIRCRAFT_CY - AIRCRAFT_BAND_H / 2), Config::SCREEN_WIDTH, AIRCRAFT_BAND_H, TFT_BLACK);
+    if (cacheKey.length() == 0) return;
+
+    tft.setTextSize(1);
+    uint16_t color = UiTheme::accentColorDimmed(tft, 0.5f);
+    tft.setTextColor(color, TFT_BLACK);
+
+    // Label, Icon und Distanz als EINE zentrierte Gruppe - Breiten zur
+    // Laufzeit gemessen (tft.textWidth()), damit das in allen 8 Sprachen
+    // unterschiedlich lange Praefix die Gruppe korrekt zentriert haelt,
+    // statt fest verdrahteter Versatzwerte.
+    constexpr int16_t GAP = 6;
+    int16_t labelW = tft.textWidth(label);
+    int16_t distW = tft.textWidth(distText);
+    int16_t iconW = SCREENSAVER_AIRCRAFT_ICON_ARM * 2;
+    int16_t totalW = (int16_t)(labelW + GAP + iconW + GAP + distW);
+    int16_t leftX = (int16_t)((Config::SCREEN_WIDTH - totalW) / 2);
+
+    tft.setTextDatum(ML_DATUM);
+    tft.drawString(label, leftX, SCREENSAVER_AIRCRAFT_CY);
+
+    // Asymmetrische Nase/Heck-Silhouette statt eines symmetrischen Kreuzes
+    // (sah wie ein reines Plus-Zeichen aus, nicht wie ein Flugzeug, siehe
+    // Alex' Meldung) - gleiche Form wie radar_screen.cpp::
+    // drawMiniAircraftIcon(), hier lokal dupliziert (siehe CLAUDE.md "jeder
+    // Screen unabhaengig lauffaehig").
+    int16_t iconCx = (int16_t)(leftX + labelW + GAP + SCREENSAVER_AIRCRAFT_ICON_ARM);
+    tft.drawLine(iconCx, (int16_t)(SCREENSAVER_AIRCRAFT_CY + 3), iconCx, (int16_t)(SCREENSAVER_AIRCRAFT_CY - 5), color);
+    tft.drawLine((int16_t)(iconCx - SCREENSAVER_AIRCRAFT_ICON_ARM), SCREENSAVER_AIRCRAFT_CY,
+                 (int16_t)(iconCx + SCREENSAVER_AIRCRAFT_ICON_ARM), SCREENSAVER_AIRCRAFT_CY, color);
+
+    tft.drawString(distText, (int16_t)(leftX + labelW + GAP + iconW + GAP), SCREENSAVER_AIRCRAFT_CY);
+    tft.setTextDatum(TL_DATUM);
 }
 
 // Regen-Effekt fuer den Ruhebildschirm (SettingsStore::rainEffectEnabled(),
@@ -1761,6 +1854,7 @@ void loop() {
                 drawScreensaverVersion();
                 lastScreensaverTimeText = "";
                 lastScreensaverDateText = "";
+                lastScreensaverAircraftText = "";
                 lastScreensaverClockMs = 0; // sofortiges erstes Zeichnen erzwingen
             } else {
                 // Bewusst ganz aus (0) statt nur gedimmt - fuer den
@@ -1799,6 +1893,7 @@ void loop() {
             drawScreensaverLogo();
             drawScreensaverVersion();
             drawScreensaverClock();
+            drawScreensaverNearestAircraft();
         }
         MenuStars::update(tft);
         ScreensaverRain::update(tft);

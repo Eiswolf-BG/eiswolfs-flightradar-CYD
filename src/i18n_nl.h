@@ -258,6 +258,7 @@ static const char* const I18N_NL[] = {
     "De update kon niet worden gedownload of geïnstalleerd. Het apparaat draait nog steeds ongewijzigd op de vorige firmware. Controleer je WiFi-verbinding en probeer het later opnieuw.",
     "Time-out scherm",
     "Na deze tijd zonder aanraking gaat het scherm uit om stroom te besparen. Met de schermbeveiliging aan wordt in plaats daarvan een gedimde sterrenhemel met een klok getoond.",
+    "Dichtstbijzijnde: ",
 
     "Radarweergave",
     "Radarweergave",
@@ -288,6 +289,9 @@ static const char* const I18N_NL[] = {
     "Onweer",
 
     "Peiling: ",
+    "Nadert",
+    "Verwijdert zich",
+    "Passeert",
     "N", "NO", "O", "ZO", "Z", "ZW", "W", "NW",
 
     "Even geduld, opnieuw opstarten...",
@@ -412,7 +416,7 @@ static const char* const I18N_NL[] = {
     "Eenvoudig",
     "Slim",
     "Hoe het slimme alarm werkt",
-    "In plaats van één enkele afstandsdrempel gebruikt het slimme alarm drie geneste zones - Geel (<20 km), Oranje (<10 km), Rood (<5 km) - en gaat alleen af wanneer een vliegtuig daadwerkelijk nadert, dus opnieuw een dichterbij gelegen zone binnenkomt, niet zolang het daar blijft of zich weer verwijdert. Om valse alarmen door hoog overvliegend langeafstandsverkeer te verminderen, moet de hoogte van het vliegtuig bovendien onder 3000 ft liggen. Alle drie de zones gebruiken dezelfde LED-kleur als het eenvoudige alarm (je huidige themakleur), maar knipperen steeds sneller - langzaam bij Geel, gemiddeld bij Oranje, snel bij Rood - en blijven per gebeurtenis maar een paar seconden branden in plaats van continu.",
+    "In plaats van één enkele afstandsdrempel gebruikt het slimme alarm drie geneste zones - Geel (<20 km), Oranje (<10 km), Rood (<5 km) - en gaat alleen af wanneer een vliegtuig daadwerkelijk nadert, dus opnieuw een dichterbij gelegen zone binnenkomt, niet zolang het daar blijft of zich weer verwijdert. Alle drie de zones gebruiken dezelfde LED-kleur als het eenvoudige alarm (je huidige themakleur), maar knipperen steeds sneller - langzaam bij Geel, gemiddeld bij Oranje, snel bij Rood - en blijven per gebeurtenis maar een paar seconden branden in plaats van continu.",
 };
 
 static_assert(sizeof(I18N_NL) / sizeof(I18N_NL[0]) == (size_t)StringId::COUNT,

@@ -257,6 +257,7 @@ static const char* const I18N_PT[] = {
     "Não foi possível baixar ou instalar a atualização. O dispositivo continua funcionando normalmente com o firmware anterior. Verifique sua conexão WiFi e tente novamente mais tarde.",
     "Tempo de espera da tela",
     "Após esse tempo sem toques, a tela se apaga para economizar energia. Com a proteção de tela ativada, mostra em vez disso um céu estrelado atenuado com o horário.",
+    "Mais próximo: ",
 
     "Visualização do radar",
     "Visualização do radar",
@@ -287,6 +288,9 @@ static const char* const I18N_PT[] = {
     "Tempestade",
 
     "Direção: ",
+    "Aproximando-se",
+    "Afastando-se",
+    "Passando por perto",
     "N", "NE", "L", "SE", "S", "SO", "O", "NO",
 
     "Aguarde, reiniciando...",
@@ -410,7 +414,7 @@ static const char* const I18N_PT[] = {
     "Simples",
     "Inteligente",
     "Como funciona o alarme inteligente",
-    "Em vez de um único limite de distância, o alarme inteligente usa três zonas aninhadas - Amarela (<20 km), Laranja (<10 km), Vermelha (<5 km) - e só é acionado quando uma aeronave está realmente se aproximando, ou seja, entra recém-agora em uma zona mais próxima, não enquanto permanece nela ou se afasta novamente. Para reduzir alarmes falsos causados por voos de longo curso voando muito alto, também exige que a altitude da aeronave esteja abaixo de 3000 ft. As três zonas usam a mesma cor de LED do alarme simples (sua cor de tema atual), mas piscam cada vez mais rápido - devagar no amarelo, médio no laranja, rápido no vermelho - e ficam acesas apenas alguns segundos por evento, não continuamente.",
+    "Em vez de um único limite de distância, o alarme inteligente usa três zonas aninhadas - Amarela (<20 km), Laranja (<10 km), Vermelha (<5 km) - e só é acionado quando uma aeronave está realmente se aproximando, ou seja, entra recém-agora em uma zona mais próxima, não enquanto permanece nela ou se afasta novamente. As três zonas usam a mesma cor de LED do alarme simples (sua cor de tema atual), mas piscam cada vez mais rápido - devagar no amarelo, médio no laranja, rápido no vermelho - e ficam acesas apenas alguns segundos por evento, não continuamente.",
 };
 
 static_assert(sizeof(I18N_PT) / sizeof(I18N_PT[0]) == (size_t)StringId::COUNT,

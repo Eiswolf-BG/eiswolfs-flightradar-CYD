@@ -258,6 +258,7 @@ static const char* const I18N_EN[] = {
     "The update could not be downloaded or installed. The device is still running the previous firmware, unchanged. Please check your WiFi connection and try again later.",
     "Screen Timeout",
     "After this time without touch, the display turns off to save power. With the screensaver on, it dims to a starfield with a clock instead.",
+    "Nearest: ",
 
     "Radar Display",
     "Radar Display",
@@ -288,6 +289,9 @@ static const char* const I18N_EN[] = {
     "Thunderstorm",
 
     "Bearing: ",
+    "Approaching",
+    "Departing",
+    "Passing",
     "N", "NE", "E", "SE", "S", "SW", "W", "NW",
 
     "Please wait, restarting...",
@@ -411,7 +415,7 @@ static const char* const I18N_EN[] = {
     "Simple",
     "Smart",
     "How the Smart alert works",
-    "Instead of a single distance threshold, the Smart alert uses three nested zones - Yellow (<20 km), Orange (<10 km), Red (<5 km) - and only triggers when an aircraft is actually approaching, i.e. newly crossing into a closer zone, not while it stays there or moves away again. To cut down on false alarms from high-flying long-haul traffic, it also requires the aircraft's altitude to be below 3000 ft. All three zones use the same LED color as the Simple alert (your current theme color), but blink at increasing speed - slow for Yellow, medium for Orange, fast for Red - and stay lit for a few seconds per event instead of continuously.",
+    "Instead of a single distance threshold, the Smart alert uses three nested zones - Yellow (<20 km), Orange (<10 km), Red (<5 km) - and only triggers when an aircraft is actually approaching, i.e. newly crossing into a closer zone, not while it stays there or moves away again. All three zones use the same LED color as the Simple alert (your current theme color), but blink at increasing speed - slow for Yellow, medium for Orange, fast for Red - and stay lit for a few seconds per event instead of continuously.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

@@ -257,6 +257,7 @@ static const char* const I18N_DE[] = {
     "Das Update konnte nicht heruntergeladen oder installiert werden. Das Gerät läuft unverändert mit der bisherigen Firmware weiter. Bitte WLAN-Verbindung prüfen und es später erneut versuchen.",
     "Bildschirm-Timeout",
     "Nach dieser Zeit ohne Berührung schaltet sich das Display ab, um Strom zu sparen. Ist der Ruhebildschirm aktiviert, zeigt es stattdessen einen gedimmten Sternenhimmel mit Uhrzeit.",
+    "Nächstes: ",
 
     "Radar-Darstellung",
     "Radar-Darstellung",
@@ -287,6 +288,9 @@ static const char* const I18N_DE[] = {
     "Gewitter",
 
     "Peilung: ",
+    "Nähert sich",
+    "Entfernt sich",
+    "Fliegt vorbei",
     "N", "NO", "O", "SO", "S", "SW", "W", "NW",
 
     "Bitte warten, Gerät startet neu...",
@@ -410,7 +414,7 @@ static const char* const I18N_DE[] = {
     "Einfach",
     "Intelligent",
     "Wie der intelligente Alarm funktioniert",
-    "Statt eines einzelnen Distanz-Schwellenwerts nutzt der intelligente Alarm drei gestaffelte Zonen - Gelb (<20 km), Orange (<10 km), Rot (<5 km) - und löst nur aus, wenn sich ein Flugzeug tatsächlich annähert, also neu in eine engere Zone wechselt, nicht solange es dort bleibt oder sich wieder entfernt. Um Fehlalarme durch hoch überfliegende Langstreckenflüge zu vermeiden, muss die Flughöhe zusätzlich unter 3000 ft liegen. Alle drei Zonen nutzen dieselbe LED-Farbe wie der einfache Alarm (deine aktuelle Themenfarbe), blinken aber zunehmend schneller - langsam bei Gelb, mittel bei Orange, schnell bei Rot - und leuchten pro Ereignis nur für wenige Sekunden statt dauerhaft.",
+    "Statt eines einzelnen Distanz-Schwellenwerts nutzt der intelligente Alarm drei gestaffelte Zonen - Gelb (<20 km), Orange (<10 km), Rot (<5 km) - und löst nur aus, wenn sich ein Flugzeug tatsächlich annähert, also neu in eine engere Zone wechselt, nicht solange es dort bleibt oder sich wieder entfernt. Alle drei Zonen nutzen dieselbe LED-Farbe wie der einfache Alarm (deine aktuelle Themenfarbe), blinken aber zunehmend schneller - langsam bei Gelb, mittel bei Orange, schnell bei Rot - und leuchten pro Ereignis nur für wenige Sekunden statt dauerhaft.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

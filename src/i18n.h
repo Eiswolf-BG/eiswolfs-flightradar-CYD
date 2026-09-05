@@ -392,6 +392,17 @@ enum class StringId : uint16_t {
     TIMEOUT_SCREEN_TITLE,
     TIMEOUT_SCREENSAVER_DESC,
 
+    // Dezente "naechstes Flugzeug"-Distanzanzeige - genutzt sowohl auf dem
+    // Ruhebildschirm (main.cpp::drawScreensaverNearestAircraft()) als auch
+    // als feste Eckzeile auf dem Radarscreen selbst
+    // (radar_screen.cpp::drawNearestAircraftCorner()) - rein aus der
+    // ohnehin im Hintergrund weiterlaufenden AircraftTable abgeleitet,
+    // keine neue Abfrage. Bewusst kein Flugzeug-Symbol als Font-Glyph
+    // (Font deckt nur U+0020-U+015F ab, siehe CLAUDE.md) - kurzes
+    // Text-Praefix vor der Distanz, ein Icon wird ggf. separat gezeichnet
+    // (kein Font-Zeichen).
+    NEAREST_AIRCRAFT_PREFIX,
+
     MENU_RADAR_THEME,
     RADAR_THEME_TITLE,
     RADAR_THEME_GREEN,
@@ -447,6 +458,15 @@ enum class StringId : uint16_t {
     // jeder Sprache anders, z.B. Ost="O" auf Deutsch/Franzoesisch/
     // Spanisch/Italienisch, aber "E" auf Englisch, "D" auf Tuerkisch).
     DETAIL_BEARING_PREFIX,
+    // Naeherungs-/Entfernungs-Trend, angehaengt an dieselbe Distanz/Kurs-
+    // Zeile (radar_screen.cpp::drawDetailPanel()) - rein aus der bereits
+    // vorhandenen Distanz-Historie abgeleitet (aircraft.h::distanceTrend,
+    // aircraft_table.cpp::postFetchUpdate()), keine neue Abfrage. Kurzes
+    // ASCII-Symbol (kein Unicode-Pfeil, siehe CLAUDE.md - der eigene Font
+    // deckt nur U+0020-U+015F ab) plus dieses Wort.
+    DETAIL_APPROACHING,
+    DETAIL_DEPARTING,
+    DETAIL_PASSING,
     COMPASS_N,
     COMPASS_NE,
     COMPASS_E,
