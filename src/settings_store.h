@@ -8,17 +8,6 @@ namespace SettingsStore {
     uint8_t rangeIndex();
     void setRangeIndex(uint8_t idx);
 
-    // "Auto"-Reichweitenmodus (5. Schritt im Reichweiten-Button-Zyklus:
-    // 10->25->50->100->Auto->10->..., siehe radar_screen.cpp::handleTap())
-    // - waehlt bei AN automatisch zwischen 10/25/50km je nach aktueller
-    // Flugzeuganzahl (siehe auto_range.h). rangeIndex() wird waehrend Auto
-    // NICHT fuer die tatsaechliche Abfrage/Anzeige benutzt (siehe
-    // AutoRange::effectiveIndex()) und beim Verlassen von Auto explizit auf
-    // den jeweiligen Zyklus-Endpunkt gesetzt (10km vorwaerts/100km
-    // rueckwaerts), nicht auf einen "zuletzt manuell" gemerkten Wert.
-    bool autoRangeEnabled();
-    void setAutoRangeEnabled(bool on);
-
     bool displayInverted();
     void setDisplayInverted(bool inverted);
 
@@ -88,6 +77,32 @@ namespace SettingsStore {
     // zurueck.
     bool flightLogbookAutoOffTriggered();
     void setFlightLogbookAutoOffTriggered(bool on);
+
+    // "Peak Traffic" (siehe FlightLogbook::updatePeakTraffic()/
+    // todayPeakTraffic(), Anzeige in stats_history_screen.cpp) - persistiert
+    // ueber Geraete-Neustarts hinweg, damit ein Tages-Hoechstwert nicht
+    // durch einen zwischenzeitlichen Neustart verloren geht. BEWUSST
+    // unabhaengig vom Flugbuch-Ein/Aus-Schalter (anders als
+    // flightLogbookSessionFile() oben) - der Hoechstwert soll unabhaengig
+    // davon mitlaufen, ob gerade tatsaechlich in eine CSV-Datei geloggt
+    // wird.
+    uint16_t peakTrafficCount();
+    void setPeakTrafficCount(uint16_t count);
+
+    // Kalendertag ("YYYY-MM-DD"), zu dem peakTrafficCount() gehoert - dient
+    // NUR der Tageswechsel-Erkennung (weicht das aktuelle Datum davon ab,
+    // wird der Hoechstwert auf 0 zurueckgesetzt), wird nicht direkt
+    // angezeigt.
+    String peakTrafficDate();
+    void setPeakTrafficDate(const String& date);
+
+    // Unix-Zeitstempel des Moments, in dem der aktuelle Hoechstwert erreicht
+    // wurde - 0 bedeutet "Uhrzeit war zu diesem Zeitpunkt noch nicht NTP-
+    // synchronisiert" (gleiches Fallback-Prinzip wie Aircraft::
+    // firstSeenEpoch) - die Anzeige laesst die Uhrzeit dann einfach weg,
+    // statt eine falsche zu zeigen.
+    uint32_t peakTrafficEpoch();
+    void setPeakTrafficEpoch(uint32_t epoch);
 
     bool ledHeartbeatEnabled();
     void setLedHeartbeatEnabled(bool on);

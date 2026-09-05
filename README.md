@@ -105,8 +105,12 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Offline/stale-data mode** – if the ADS-B data fetch fails (network hiccup, timeout, or a temporarily overloaded API), the last known aircraft stay visible instead of disappearing immediately: their markers grey out and their label shows how long ago they were last seen, and the radar's status line switches to a clear "no connection" hint. Markers are removed only after a longer grace period with no data, and everything snaps back to normal the moment the connection returns
 - **Approaching/departing indicator** – the aircraft detail panel now also shows whether the selected aircraft is approaching, departing, or just passing by, derived purely from how its distance to you changes over the last few data updates, no extra lookups involved
 - **Nearest aircraft display** – a subtle "nearest aircraft" indicator (icon + distance) now appears on the idle screensaver and as a fixed line in the radar screen's corner, always visible regardless of whether the radar corner overlays (see above) are turned on
-- **Auto-Range** – tapping the range button now cycles through a fifth step, "Auto", after 100 km: it automatically picks between 10/25/50 km depending on how much traffic is currently visible, with a short "?" hint button explaining the thresholds right next to it. The 100 km step stays reachable only manually, since ADS-B responses at that radius occasionally get too large for the device to parse reliably
 - **Overflight ETA** – when an aircraft is approaching, the detail panel now also estimates when it will reach its closest point to you and how close that will be, based purely on its current heading and speed (always marked as an estimate, since a course change would invalidate it)
+- **Logbook auto-off notice** – if the flight logbook's 24-hour safety shutoff kicks in, a popup now lets you know right away - even if the device happened to be powered off exactly when the 24 hours ran out, the notice still catches up on the next boot
+- **First seen / seen for** – the aircraft detail panel now also shows when an aircraft was first spotted in the current session and how long it's been continuously visible since - session-only, resets on every device restart
+- **Circle-crossing pulse** – aircraft markers briefly flash brighter and larger whenever they cross one of the distance rings on the radar, in either direction (approaching or departing)
+- **Previously seen** – the aircraft detail panel now also shows how many times an aircraft has been logged on earlier days and when it was last seen, looked up from the logbook files in the background so opening the panel is never delayed
+- **Peak traffic** – a new stat (see [History Chart](#-history-chart) below) shows today's highest number of simultaneously visible aircraft, along with the time it happened
 
 ## Feature Deep-Dive
 
@@ -196,6 +200,8 @@ A "Top" button in the top-right of the Statistics screen opens a ranking of the 
 
 ### 📈 History Chart
 Shows a rolling window of the last **7 calendar days** (today and the 6 days before) as a simple bar chart, always exactly 7 individual, clearly separated bars – a quick visual complement to the plain number list in Logbook files. Days without any logged sightings still get their own labeled bar showing "0", instead of being skipped. Bar height is relative to the busiest day shown, with the exact count printed above each bar and the day-of-month printed below it. The underlying counts come from the SD-card-persisted logbook files, so the chart survives a device restart.
+
+Below the chart, a **"Peak traffic"** line shows today's highest number of aircraft visible at the same time, along with the time it happened (e.g. "Today's peak: 23 aircraft at 14:32") - persisted across restarts and reset automatically at midnight. Tracked independently of the flight logbook switch, so it keeps working even with logging turned off. The line is only shown once a peak has actually been recorded for today.
 
 **Good for:** spotting at a glance which days were busier than others, without having to compare numbers row by row.
 

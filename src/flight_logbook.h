@@ -15,6 +15,20 @@ namespace FlightLogbook {
     // durchsetzen konnte).
     void enforceAutoOff();
 
+    // True (und setzt sich dabei EINMALIG zurueck), wenn seit dem letzten
+    // Abfragen die 24h-Sicherheitsabschaltung tatsaechlich gegriffen hat -
+    // egal ob waehrend des laufenden Betriebs (checkAutoOff() greift live)
+    // oder weil das Geraet laenger als 24h vom Strom getrennt war und der
+    // gespeicherte Zeitstempel schon beim ersten Check nach dem Booten
+    // (sobald NTP synchronisiert ist) abgelaufen ist - beide Faelle laufen
+    // ueber denselben checkAutoOff()-Codepfad in flight_logbook.cpp, daher
+    // hier bewusst EIN gemeinsames Flag statt zweier getrennter Meldewege.
+    // Wird von Core 0 (NetTask, siehe enforceAutoOff()/update()) gesetzt,
+    // von Core 1 (main.cpp::loop(), fuer den Hinweis-Screen) konsumiert -
+    // gleiches Cross-Core-Flag-Muster wie RadarScreen::
+    // consumeHeaderRedrawFlag().
+    bool consumeAutoOffNotice();
+
     uint16_t todayCount();
 
     struct TopAltitude {
@@ -83,4 +97,61 @@ namespace FlightLogbook {
     // sortiert, out[0] = am haeufigsten gesehen. Gibt die Anzahl gefuellter
     // Eintraege zurueck (<= maxEntries).
     uint8_t computeTopAircraft(TopAircraft* out, uint8_t maxEntries);
+
+    struct PreviousSighting {
+        bool found = false;
+        uint16_t count = 0;
+        char lastDate[11] = {0}; // "YYYY-MM-DD", nur gueltig wenn found true
+    };
+
+    // Zaehlt, wie oft ein Flugzeug (per Hex-Code) bereits an FRUEHEREN
+    // Tagen (also NICHT in der/den Datei(en) des heutigen Kalendertags,
+    // egal ob durch die aktuelle Sitzung oder eine fruehere Sitzung
+    // desselben Tages entstanden - siehe PreviouslySeen::request(), das
+    // typischerweise genau in dem Moment aufgerufen wird, in dem das
+    // Flugzeug per Antippen ausgewaehlt/gerade erst in die heutige Datei
+    // eingetragen wird) in den Logbuch-Dateien vorkommt, sowie das Datum
+    // der letzten dieser frueheren Sichtungen. Scannt bis zu 90 Dateien
+    // (gleicher Deckel wie MAX_RAW_SCAN in listDaySummaries()), damit auch
+    // bei einem sehr lange genutzten Geraet mit vielen angesammelten
+    // Dateien keine unbegrenzt lange Aufgabe entsteht. BEWUSST NICHT
+    // blockierend im Touch-Handler aufrufen (siehe Analyse mit Alex: der
+    // dominante Kostenfaktor ist der SD.open()/close()-Overhead PRO Datei,
+    // bei vielen angesammelten Dateien spuerbar) - siehe stattdessen
+    // previously_seen.h fuer den asynchronen Anfrage-/Abhol-Mechanismus
+    // (Core 0/NetTask), der diese Funktion tatsaechlich aufruft.
+    PreviousSighting countPreviousSightings(const char* hex);
+
+    // "Peak Traffic" - Tages-Hoechstwert gleichzeitig sichtbarer Flugzeuge
+    // (AircraftTable::validCount()). Bewusst UNABHAENGIG vom Flugbuch-Ein/
+    // Aus-Schalter (anders als die CSV-Aufzeichnung) - von net_task.cpp bei
+    // JEDEM erfolgreichen ADS-B-Update aufgerufen. Erkennt einen
+    // Tageswechsel genau wie ensureSessionFile() (persistiertes Datum vs.
+    // tatsaechliches heutiges Datum vergleichen) und setzt den Hoechstwert
+    // dann auf 0 zurueck, BEVOR der aktuelle Wert einsortiert wird. Ohne
+    // NTP-synchronisierte Uhrzeit (kurz nach dem Booten) wird der Aufruf
+    // uebersprungen, statt einen Tageswechsel anhand einer falschen
+    // Zeitbasis zu erkennen/verpassen - der Wert wird spaetestens im
+    // naechsten Zyklus nach der Synchronisierung korrekt nachgeholt.
+    // Persistiert (siehe SettingsStore::peakTrafficCount() etc.), uebersteht
+    // also einen Geraete-Neustart.
+    void updatePeakTraffic(uint8_t currentCount);
+
+    struct PeakTraffic {
+        uint16_t count = 0;
+        // Nur gueltig, wenn hasTime true ist - fehlt sie (Hoechstwert wurde
+        // erreicht, bevor die Uhrzeit NTP-synchronisiert war), wird die
+        // Uhrzeit in der Anzeige bewusst weggelassen statt eine falsche zu
+        // zeigen (gleiches Fallback-Prinzip wie Aircraft::firstSeenEpoch).
+        bool hasTime = false;
+        char timeStr[6] = {0}; // "HH:MM"
+    };
+
+    // Liefert den aktuellen Tages-Hoechstwert - NUR wenn der gespeicherte
+    // Wert tatsaechlich zum heutigen Kalendertag gehoert (sonst waere es
+    // z.B. direkt nach dem Booten, bevor updatePeakTraffic() ueberhaupt
+    // einmal gelaufen ist, faelschlich noch der Wert von gestern).
+    // count==0 bedeutet "heute noch kein Hoechstwert ermittelt" - die
+    // Anzeige (stats_history_screen.cpp) laesst die Zeile dann komplett weg.
+    PeakTraffic todayPeakTraffic();
 }

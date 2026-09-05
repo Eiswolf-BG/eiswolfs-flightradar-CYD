@@ -416,12 +416,22 @@ static const char* const I18N_ES[] = {
     "Cómo funciona la alarma inteligente",
     "En lugar de un único umbral de distancia, la alarma inteligente usa tres zonas anidadas - Amarilla (<20 km), Naranja (<10 km), Roja (<5 km) - y solo se activa cuando un avión realmente se está acercando, es decir, cuando entra de nuevo en una zona más cercana, no mientras permanece en ella o vuelve a alejarse. Las tres zonas usan el mismo color de LED que la alarma simple (tu color de tema actual), pero parpadean cada vez más rápido - lento en amarillo, medio en naranja, rápido en rojo - y permanecen encendidas solo unos segundos por evento, no de forma continua.",
 
-    "Auto",
-    "Cómo funciona el alcance automático",
-    "En modo Auto, el alcance cambia automáticamente entre 10, 25 y 50 km según cuántos aviones haya visibles en ese momento (aproximadamente: muy pocos aviones -> 10 km, una cantidad moderada -> 25 km, muchos -> 50 km). Solo cambia después de que varias actualizaciones consecutivas confirmen la tendencia, y como mínimo 2 minutos después del último cambio, para evitar que oscile constantemente. El paso de 100 km queda deliberadamente excluido del modo Auto - a ese radio, las respuestas ADS-B a veces son demasiado grandes para procesarse de forma fiable - usa el paso manual del botón de alcance si lo necesitas.",
-
     "Sobrevuelo en ~",
     " (aprox.)",
+
+    "Cuaderno de vuelo desactivado automáticamente (24h)",
+    "El cuaderno de vuelo se acaba de desactivar automáticamente tras estar activo 24 horas, para evitar que la tarjeta SD se llene sin darte cuenta. Puedes volver a activarlo desde el menú si quieres seguir registrando.",
+
+    "Visto por primera vez: ",
+    "Visible desde hace: ",
+
+    "Visto antes: comprobando...",
+    "Visto ",
+    "x antes, la última vez el ",
+
+    "Pico de hoy: ",
+    " aviones",
+    " a las ",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

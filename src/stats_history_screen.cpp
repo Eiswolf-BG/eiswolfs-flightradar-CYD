@@ -211,6 +211,41 @@ void run(TFT_eSPI& tft) {
             }
         }
 
+        // "Peak Traffic" (Tages-Hoechstwert, siehe FlightLogbook::
+        // todayPeakTraffic()) - nur gezeichnet, wenn heute bereits ein Wert
+        // ermittelt wurde (count==0 -> Zeile komplett weggelassen, siehe
+        // dortiger Kommentar). Breite VOR dem Zeichnen tatsaechlich
+        // gemessen (Config::SCREEN_WIDTH - 20 nutzbar, wie der Balken-
+        // Bereich oben) statt blind anzunehmen, dass eine Zeile in jeder
+        // der 8 Sprachen reicht (CLAUDE.md-Pflichtpruefung) - passt der
+        // volle Text nicht, wird auf Praefix + Wert/Uhrzeit-Zeile
+        // aufgeteilt statt abzuschneiden.
+        FlightLogbook::PeakTraffic peak = FlightLogbook::todayPeakTraffic();
+        if (peak.count > 0) {
+            char valueBuf[40];
+            if (peak.hasTime) {
+                snprintf(valueBuf, sizeof(valueBuf), "%u%s%s%s",
+                         peak.count, I18n::t(StringId::PEAK_TRAFFIC_UNIT),
+                         I18n::t(StringId::PEAK_TRAFFIC_AT_TIME), peak.timeStr);
+            } else {
+                snprintf(valueBuf, sizeof(valueBuf), "%u%s", peak.count, I18n::t(StringId::PEAK_TRAFFIC_UNIT));
+            }
+            String fullLine = String(I18n::t(StringId::PEAK_TRAFFIC_PREFIX)) + valueBuf;
+
+            int16_t availableW = Config::SCREEN_WIDTH - 20;
+            uint16_t peakColor = UiTheme::accentColorDimmed(tft, 0.7f);
+            tft.setTextColor(peakColor, TFT_BLACK);
+            tft.setTextDatum(TL_DATUM);
+            constexpr int16_t PEAK_LINE1_Y = DAY_LABEL_Y + 14;
+            constexpr int16_t PEAK_LINE2_Y = PEAK_LINE1_Y + 14;
+            if (tft.textWidth(fullLine) <= availableW) {
+                tft.drawString(fullLine, 10, PEAK_LINE1_Y);
+            } else {
+                tft.drawString(I18n::t(StringId::PEAK_TRAFFIC_PREFIX), 10, PEAK_LINE1_Y);
+                tft.drawString(valueBuf, 10, PEAK_LINE2_Y);
+            }
+        }
+
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
         TouchInput::Point tap;

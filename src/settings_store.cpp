@@ -8,9 +8,6 @@ namespace SettingsStore {
 
 namespace {
     uint8_t rangeIdx = Config::DEFAULT_RANGE_INDEX;
-    // AUS per Default - Auto-Range ist ein bewusstes Opt-in ueber den
-    // Reichweiten-Button-Zyklus (siehe settings_store.h).
-    bool autoRangeOn = false;
     bool inverted = true; // Dieses Board braucht invertDisplay(true) fuer korrekte Farben (siehe main.cpp)
     // AUS per Default - Tischmontage (180 Grad) ist ein bewusstes Opt-in
     // ueber Menue > System > Anzeige, siehe settings_store.h.
@@ -32,6 +29,9 @@ namespace {
     // von jedem manuellen Antippen des Flugbuch-Schalters wieder auf AUS
     // zurueckgesetzt (siehe menu_screen.cpp).
     bool logbookAutoOffTriggered = false;
+    uint16_t peakTrafficCountVal = 0;
+    char peakTrafficDateVal[11] = {0};
+    uint32_t peakTrafficEpochVal = 0;
     bool ledHeartbeatOn = true;
     uint8_t screenTimeoutMin = 0;
     bool nightDimmingOn = true;
@@ -114,6 +114,14 @@ namespace {
             logbookSessionFile[sizeof(logbookSessionFile) - 1] = 0;
         } else if (key == "logbook_auto_off_triggered") {
             logbookAutoOffTriggered = (value.toInt() != 0);
+        } else if (key == "peak_traffic_count") {
+            int v = value.toInt();
+            if (v >= 0 && v <= 0xFFFF) peakTrafficCountVal = (uint16_t)v;
+        } else if (key == "peak_traffic_date") {
+            strncpy(peakTrafficDateVal, value.c_str(), sizeof(peakTrafficDateVal) - 1);
+            peakTrafficDateVal[sizeof(peakTrafficDateVal) - 1] = 0;
+        } else if (key == "peak_traffic_epoch") {
+            peakTrafficEpochVal = (uint32_t)value.toInt();
         } else if (key == "led_heartbeat") {
             ledHeartbeatOn = (value.toInt() != 0);
         } else if (key == "screen_timeout_min") {
@@ -123,8 +131,6 @@ namespace {
             nightDimmingOn = (value.toInt() != 0);
         } else if (key == "screensaver") {
             screensaverOn = (value.toInt() != 0);
-        } else if (key == "auto_range") {
-            autoRangeOn = (value.toInt() != 0);
         } else if (key == "hide_ground_vehicles") {
             hideGroundVehiclesOn = (value.toInt() != 0);
         } else if (key == "only_helicopters") {
@@ -229,11 +235,13 @@ void save() {
     f.printf("logbook_enabled_at=%lu\n", (unsigned long)logbookEnabledAtEpoch);
     f.printf("logbook_session_file=%s\n", logbookSessionFile);
     f.printf("logbook_auto_off_triggered=%d\n", logbookAutoOffTriggered ? 1 : 0);
+    f.printf("peak_traffic_count=%u\n", peakTrafficCountVal);
+    f.printf("peak_traffic_date=%s\n", peakTrafficDateVal);
+    f.printf("peak_traffic_epoch=%lu\n", (unsigned long)peakTrafficEpochVal);
     f.printf("led_heartbeat=%d\n", ledHeartbeatOn ? 1 : 0);
     f.printf("screen_timeout_min=%d\n", screenTimeoutMin);
     f.printf("night_dimming=%d\n", nightDimmingOn ? 1 : 0);
     f.printf("screensaver=%d\n", screensaverOn ? 1 : 0);
-    f.printf("auto_range=%d\n", autoRangeOn ? 1 : 0);
     f.printf("hide_ground_vehicles=%d\n", hideGroundVehiclesOn ? 1 : 0);
     f.printf("only_helicopters=%d\n", onlyHelicoptersOn ? 1 : 0);
     f.printf("only_low_altitude=%d\n", onlyLowAltitudeOn ? 1 : 0);
@@ -259,13 +267,6 @@ void save() {
 }
 
 uint8_t rangeIndex() { return rangeIdx; }
-
-bool autoRangeEnabled() { return autoRangeOn; }
-
-void setAutoRangeEnabled(bool on) {
-    autoRangeOn = on;
-    save();
-}
 
 void setRangeIndex(uint8_t idx) {
     if (idx < Config::RANGE_STEP_COUNT) {
@@ -351,6 +352,28 @@ bool flightLogbookAutoOffTriggered() { return logbookAutoOffTriggered; }
 
 void setFlightLogbookAutoOffTriggered(bool on) {
     logbookAutoOffTriggered = on;
+    save();
+}
+
+uint16_t peakTrafficCount() { return peakTrafficCountVal; }
+
+void setPeakTrafficCount(uint16_t count) {
+    peakTrafficCountVal = count;
+    save();
+}
+
+String peakTrafficDate() { return String(peakTrafficDateVal); }
+
+void setPeakTrafficDate(const String& date) {
+    strncpy(peakTrafficDateVal, date.c_str(), sizeof(peakTrafficDateVal) - 1);
+    peakTrafficDateVal[sizeof(peakTrafficDateVal) - 1] = 0;
+    save();
+}
+
+uint32_t peakTrafficEpoch() { return peakTrafficEpochVal; }
+
+void setPeakTrafficEpoch(uint32_t epoch) {
+    peakTrafficEpochVal = epoch;
     save();
 }
 

@@ -135,6 +135,17 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
     struct PrevDistance { char hex[7]; float dist; };
     PrevDistance prevDistanceByHex[Config::MAX_TRACKED_AIRCRAFT];
     uint8_t prevDistanceCount = 0;
+    // Gleicher Schnappschuss-Bedarf wie oben, fuer die "First Seen"/"Seen
+    // For"-Anzeige im Detail-Panel (aircraft.h::firstSeenMs) - rein
+    // session-lokal, MUSS aber trotzdem ueber diesen Reset hinweg erhalten
+    // bleiben, sonst wuerde jedes Flugzeug bei JEDEM Zyklus faelschlich als
+    // "gerade erst neu gesehen" gelten (identischer Bug-Mechanismus wie der
+    // urspruengliche prevDistanceKm-Fehler oben - deshalb von Anfang an
+    // gleich mit demselben Muster umgesetzt statt es erst spaeter zu
+    // entdecken).
+    struct PrevFirstSeen { char hex[7]; uint32_t firstSeenMs; uint32_t firstSeenEpoch; };
+    PrevFirstSeen prevFirstSeenByHex[Config::MAX_TRACKED_AIRCRAFT];
+    uint8_t prevFirstSeenCount = 0;
     for (uint8_t j = 0; j < tableCapacity && j < Config::MAX_TRACKED_AIRCRAFT; j++) {
         if (table[j].hex[0] != '\0') {
             strncpy(prevAirportDistByHex[prevAirportDistCount].hex, table[j].hex,
@@ -148,6 +159,13 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
             prevDistanceByHex[prevDistanceCount].hex[sizeof(prevDistanceByHex[0].hex) - 1] = 0;
             prevDistanceByHex[prevDistanceCount].dist = table[j].prevDistanceKm;
             prevDistanceCount++;
+
+            strncpy(prevFirstSeenByHex[prevFirstSeenCount].hex, table[j].hex,
+                    sizeof(prevFirstSeenByHex[0].hex) - 1);
+            prevFirstSeenByHex[prevFirstSeenCount].hex[sizeof(prevFirstSeenByHex[0].hex) - 1] = 0;
+            prevFirstSeenByHex[prevFirstSeenCount].firstSeenMs = table[j].firstSeenMs;
+            prevFirstSeenByHex[prevFirstSeenCount].firstSeenEpoch = table[j].firstSeenEpoch;
+            prevFirstSeenCount++;
         }
     }
 
@@ -202,6 +220,30 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
             if (strcmp(prevDistanceByHex[j].hex, hex) == 0) {
                 a.prevDistanceKm = prevDistanceByHex[j].dist;
                 break;
+            }
+        }
+        // firstSeenMs/firstSeenEpoch ebenso wiederherstellen (siehe
+        // Kommentar beim Schnappschuss oben) - falls nicht gefunden,
+        // bleiben beide beim Aircraft{}-Default 0 und werden gleich unten
+        // als "gerade jetzt zum ersten Mal in dieser Sitzung gesehen"
+        // gesetzt.
+        for (uint8_t j = 0; j < prevFirstSeenCount; j++) {
+            if (strcmp(prevFirstSeenByHex[j].hex, hex) == 0) {
+                a.firstSeenMs = prevFirstSeenByHex[j].firstSeenMs;
+                a.firstSeenEpoch = prevFirstSeenByHex[j].firstSeenEpoch;
+                break;
+            }
+        }
+        if (a.firstSeenMs == 0) {
+            a.firstSeenMs = millis();
+            // Echte Wanduhrzeit NUR erfassen, wenn sie GENAU JETZT (beim
+            // tatsaechlichen Erstsichten) schon NTP-synchronisiert ist -
+            // sonst bleibt firstSeenEpoch bewusst 0 (siehe Kommentar bei
+            // Aircraft::firstSeenEpoch, kein nachtraegliches "Aufholen" mit
+            // einer dann nicht mehr zutreffenden Uhrzeit).
+            time_t nowEpoch = time(nullptr);
+            if (nowEpoch > 8 * 3600 * 2) {
+                a.firstSeenEpoch = (uint32_t)nowEpoch;
             }
         }
 

@@ -1818,6 +1818,34 @@ void loop() {
 
     RadarScreen::updateProximityAlert(nowMs);
 
+    // Proaktiver Hinweis-Screen, sobald das Flugbuch durch die 24h-
+    // Sicherheitsabschaltung deaktiviert wurde (siehe FlightLogbook::
+    // consumeAutoOffNotice()) - deckt BEIDE Ausloeser mit demselben
+    // Mechanismus ab: (1) die Abschaltung greift waehrend des laufenden
+    // Betriebs (checkAutoOff() auf Core 0 setzt das Flag), UND (2) das
+    // Geraet war laenger als 24h vom Strom getrennt und der gespeicherte
+    // Aktivierungs-Zeitstempel ist beim Booten bereits abgelaufen - auch
+    // dieser Fall laeuft ueber denselben checkAutoOff()-Codepfad (der
+    // rein auf Epoch-Zeitstempeln rechnet, nicht auf "wie oft wurde
+    // waehrenddessen tatsaechlich geprueft"), sobald NTP nach dem Boot
+    // synchronisiert ist - kein zweiter, separater Boot-Check noetig.
+    // Bewusst NUR ausserhalb des Ruhebildschirms konsumiert (kurzes
+    // Schaltverhalten der && - solange screensaverShowing true ist, wird
+    // consumeAutoOffNotice() gar nicht erst aufgerufen), damit das Flag
+    // bei aktivem Ruhebildschirm einfach anstehen bleibt, statt dass der
+    // Hinweis dort ungesehen verpufft.
+    if (!screensaverShowing && FlightLogbook::consumeAutoOffNotice()) {
+        MenuScreen::showInfoScreen(tft, I18n::t(StringId::FLIGHT_LOGBOOK_AUTO_OFF_POPUP_TITLE),
+                                    I18n::t(StringId::FLIGHT_LOGBOOK_AUTO_OFF_POPUP_BODY),
+                                    UiTheme::accentColor(tft), I18n::t(StringId::OK));
+        // Vollbild-Overlay wie jeder andere Info-Screen - siehe die
+        // gleichartigen Aufrufe weiter unten (Menue, Wetter-Info, etc.).
+        RadarScreen::invalidatePanel();
+        drawHeader();
+        updateStatusLine();
+        forceRedraw = true;
+    }
+
     if (!screensaverShowing) {
         if (nowMs - lastSweepMs >= SWEEP_TICK_MS) {
             uint32_t deltaMs = nowMs - lastSweepMs;

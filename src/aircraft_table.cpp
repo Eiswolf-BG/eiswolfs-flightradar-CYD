@@ -2,6 +2,7 @@
 #include "radar_math.h"
 #include "weather.h"
 #include "units.h"
+#include "settings_store.h"
 #include <algorithm>
 #include <atomic>
 #include <math.h>
@@ -130,6 +131,39 @@ void postFetchUpdate(double homeLat, double homeLon) {
         } else {
             a.distanceTrend = Aircraft::DistanceTrend::Unknown;
         }
+
+        // Circle-Crossing-Puls (radar_screen.cpp, siehe Aircraft::
+        // ringCrossedAtMs) - dieselbe "alten Wert merken und mit aktuellem
+        // vergleichen"-Idee wie beim intelligenten Proximity-Alarm
+        // (radar_screen.cpp::updateProximityAlert()), hier aber bezogen auf
+        // die tatsaechlich angezeigten Ring-Distanzen (1/3, 2/3, Aussenrand
+        // der AKTUELLEN Anzeige-Reichweite - kann sich durch manuelle Wahl
+        // aendern) statt auf feste Alarm-Zonen. Bewusst als direkter
+        // Vergleich der tatsaechlichen ALTEN (a.prevDistanceKm, noch nicht
+        // ueberschrieben) und NEUEN (polar.distanceKm) Distanz gegen die
+        // Schwellen - NICHT als gespeicherter Zonen-INDEX wie
+        // proximityZone: ein reiner Reichweiten-Wechsel aendert nur, WO die
+        // Schwellen gerade liegen, kann aber niemals einen Puls ausloesen,
+        // wenn sich die tatsaechliche Distanz zwischen den beiden Werten
+        // gar nicht veraendert hat (Alex' Vorgabe: kein Fehlalarm durch
+        // reinen manuellen Reichweiten-Wechsel).
+        // "In beide Richtungen": lo/hi bilden das Intervall unabhaengig von
+        // der Bewegungsrichtung, ein Ueberschreiten wird so unabhaengig
+        // davon erkannt, ob sich das Flugzeug naehert oder entfernt.
+        a.ringCrossedAtMs = 0;
+        if (a.prevDistanceKm >= 0) {
+            float rangeKmNow = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
+            float thresholds[3] = { rangeKmNow / 3.0f, rangeKmNow * 2.0f / 3.0f, rangeKmNow };
+            float lo = (a.prevDistanceKm < polar.distanceKm) ? a.prevDistanceKm : polar.distanceKm;
+            float hi = (a.prevDistanceKm < polar.distanceKm) ? polar.distanceKm : a.prevDistanceKm;
+            for (float threshold : thresholds) {
+                if (threshold > lo && threshold <= hi) {
+                    a.ringCrossedAtMs = now;
+                    break;
+                }
+            }
+        }
+
         a.prevDistanceKm = polar.distanceKm;
 
         a.distanceKm = polar.distanceKm;

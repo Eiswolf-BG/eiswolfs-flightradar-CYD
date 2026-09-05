@@ -1,0 +1,40 @@
+#pragma once
+#include <Arduino.h>
+
+// Rein aus den bestehenden Logbuch-CSV-Dateien abgeleitet (siehe
+// flight_logbook.h::countPreviousSightings()) - wie oft ein Flugzeug (per
+// Hex-Code) bereits an FRUEHEREN Tagen (nicht heute, siehe dortiger
+// Kommentar) gesehen wurde, plus das Datum der letzten dieser frueheren
+// Sichtungen. Laeuft asynchron im Hintergrund (Core 0, NetTask), exakt
+// nach demselben Anfrage-/Abhol-Muster wie aircraft_details.h
+// (request()/get()/update()) - der eigentliche SD-Kartenscan kann bei
+// vielen ueber Wochen/Monate angesammelten Logbuch-Dateien spuerbar
+// dauern (siehe Analyse mit Alex: SD.open()/close()-Overhead pro Datei
+// dominiert) und darf deshalb nicht blockierend im Touch-Handler laufen.
+namespace PreviouslySeen {
+
+    struct Info {
+        bool loading = false;
+        bool found = false;
+        uint16_t count = 0;
+        char lastDate[11] = {0}; // "YYYY-MM-DD", nur gueltig wenn found true
+    };
+
+    // Core 1 (Touch-Auswahl, siehe radar_screen.cpp::handleTap()/
+    // selectAircraft()): merkt einen Scan fuer dieses Flugzeug vor, falls
+    // nicht schon geschehen oder bereits im Gange.
+    void request(const char* hex);
+
+    // Core 1: aktuellen (evtl. noch ladenden) Zustand fuer 'hex' abholen.
+    // Info::loading bleibt false UND Info::found bleibt false, wenn fuer
+    // dieses hex weder ein Ergebnis vorliegt noch ein Scan angefordert
+    // wurde - das Detail-Panel zeigt dann bewusst gar keine Zeile.
+    Info get(const char* hex);
+
+    // Core 0 (NetTask), periodisch aufgerufen: fuehrt einen vorgemerkten
+    // Scan aus (SD-Zugriff, kann bei vielen Dateien einen Moment dauern -
+    // laeuft im Hintergrund, verzoegert bestenfalls den naechsten ADS-B-
+    // Abruf etwas, exakt wie AircraftDetails::update() das fuer seine
+    // Netzwerk-Anfragen bereits akzeptiert).
+    void update();
+}

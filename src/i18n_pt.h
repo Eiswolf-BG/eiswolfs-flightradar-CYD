@@ -416,12 +416,22 @@ static const char* const I18N_PT[] = {
     "Como funciona o alarme inteligente",
     "Em vez de um único limite de distância, o alarme inteligente usa três zonas aninhadas - Amarela (<20 km), Laranja (<10 km), Vermelha (<5 km) - e só é acionado quando uma aeronave está realmente se aproximando, ou seja, entra recém-agora em uma zona mais próxima, não enquanto permanece nela ou se afasta novamente. As três zonas usam a mesma cor de LED do alarme simples (sua cor de tema atual), mas piscam cada vez mais rápido - devagar no amarelo, médio no laranja, rápido no vermelho - e ficam acesas apenas alguns segundos por evento, não continuamente.",
 
-    "Auto",
-    "Como funciona o alcance automático",
-    "No modo Auto, o alcance alterna automaticamente entre 10, 25 e 50 km, dependendo de quantas aeronaves estão visíveis no momento (aproximadamente: muito poucas aeronaves -> 10 km, uma quantidade moderada -> 25 km, muitas -> 50 km). A mudança só ocorre depois que várias atualizações consecutivas confirmam a tendência, e no mínimo 2 minutos após a última mudança, para evitar oscilações constantes. O nível de 100 km é propositalmente excluído do modo Auto - nesse raio, as respostas ADS-B às vezes ficam grandes demais para serem processadas de forma confiável - use a etapa manual do botão de alcance, se precisar dele.",
-
     "Sobrevoo em ~",
     " (aprox.)",
+
+    "Diário de bordo desativado automaticamente (24h)",
+    "O diário de bordo acabou de ser desativado automaticamente após 24 horas ativo, para evitar que o cartão SD encha sem você perceber. Você pode reativá-lo pelo menu se quiser continuar registrando.",
+
+    "Visto pela primeira vez: ",
+    "Visível há: ",
+
+    "Visto antes: verificando...",
+    "Visto ",
+    "x antes, a última vez em ",
+
+    "Pico de hoje: ",
+    " aeronaves",
+    " às ",
 };
 
 static_assert(sizeof(I18N_PT) / sizeof(I18N_PT[0]) == (size_t)StringId::COUNT,

@@ -2,9 +2,9 @@
 #include "config.h"
 #include "aircraft.h"
 #include "aircraft_table.h"
-#include "auto_range.h"
 #include "airline_lookup.h"
 #include "aircraft_details.h"
+#include "previously_seen.h"
 #include "radar_math.h"
 #include "units.h"
 #include "settings_store.h"
@@ -45,10 +45,6 @@ namespace {
     struct Layout {
         int16_t cx, cy, radius;
         Rect rangeBtn;
-        // Nur gueltig/antippbar, wenn SettingsStore::autoRangeEnabled() -
-        // kleiner "?"-Button direkt links neben rangeBtn, siehe
-        // computeLayout()/handleTap() unten.
-        Rect autoInfoBtn;
         int16_t infoTop;
     };
 
@@ -99,26 +95,7 @@ namespace {
         L.radius = min(maxRadiusByWidth, maxRadiusByHeight);
         L.cx = Config::SCREEN_WIDTH / 2;
         L.cy = top + L.radius + 6 + TOP_LABEL_MARGIN;
-        // Im Auto-Reichweitenmodus (SettingsStore::autoRangeEnabled())
-        // braucht der Button mehr Platz fuer das laengere "Auto(Xkm)"-
-        // Label (siehe render()) als die sonst feste "100km"-Beschriftung,
-        // PLUS Raum fuer den zusaetzlichen "?"-Info-Button links daneben
-        // (siehe handleTap()) - beides nur reserviert, wenn Auto gerade
-        // aktiv ist, damit sich am normalen Layout (10/25/50/100km) nichts
-        // aendert.
-        bool autoActive = SettingsStore::autoRangeEnabled();
-        constexpr int16_t RANGE_BTN_W_NORMAL = 62;
-        constexpr int16_t RANGE_BTN_W_AUTO = 84;
-        constexpr int16_t AUTO_INFO_BTN_W = 20;
-        constexpr int16_t AUTO_INFO_BTN_GAP = 4;
-        int16_t rangeBtnW = autoActive ? RANGE_BTN_W_AUTO : RANGE_BTN_W_NORMAL;
-        L.rangeBtn = {(int16_t)(Config::SCREEN_WIDTH - 8 - rangeBtnW), (int16_t)(L.infoTop + 4), rangeBtnW, 22};
-        if (autoActive) {
-            L.autoInfoBtn = {(int16_t)(L.rangeBtn.x - AUTO_INFO_BTN_GAP - AUTO_INFO_BTN_W),
-                              (int16_t)(L.infoTop + 5), AUTO_INFO_BTN_W, 20};
-        } else {
-            L.autoInfoBtn = {0, 0, 0, 0};
-        }
+        L.rangeBtn = {(int16_t)(Config::SCREEN_WIDTH - 70), (int16_t)(L.infoTop + 4), 62, 22};
         return L;
     }
 
@@ -183,6 +160,16 @@ namespace {
         // wird (siehe tick()-Redraw-Block unten). Leer = noch nichts
         // gezeichnet (frisch aus render() uebernommen).
         char staleLabelCache[20];
+        // Circle-Crossing-Puls (siehe Aircraft::ringCrossedAtMs) - aus
+        // AircraftTable::raw() uebernommen, damit tick() (laeuft viel
+        // haeufiger als render()) die 1-2s-Pulsdauer rein zeitbasiert
+        // auswerten kann, ohne selbst auf die AircraftTable zuzugreifen.
+        // pulseDrawn merkt sich, ob der weisse Ring GERADE sichtbar auf dem
+        // Schirm steht, damit tick() ihn beim Ablaufen der Pulsdauer gezielt
+        // wieder schwarz uebermalen kann (sonst bliebe ein Ring-Rest
+        // stehen) - gleiches Prinzip wie staleLabelCache oben.
+        uint32_t ringCrossedAtMs;
+        bool pulseDrawn;
     };
     constexpr uint8_t MAX_HIT_POINTS = Config::MAX_TRACKED_AIRCRAFT;
     HitPoint hitPoints[MAX_HIT_POINTS];
@@ -1138,6 +1125,25 @@ namespace {
     // Peilungsanzeige im Detail-Panel (siehe drawDetailPanel() unten) -
     // ergaenzt die bereits vorhandene grafische Anzeige (drawBearingIndicator()
     // oben) um eine auf einen Blick lesbare Himmelsrichtung.
+    // Formatiert eine millis()-Dauer als "MM:SS" bzw. "HH:MM:SS", sobald
+    // eine volle Stunde erreicht ist (fuer "Sichtbar seit", siehe
+    // drawDetailPanel()) - oder IMMER als "HH:MM:SS", wenn forceHours
+    // gesetzt ist (fuer "Erstmals gesehen", das als absoluter Boot-
+    // relativer Zeitpunkt auch nach mehreren Stunden Laufzeit noch die
+    // Stunden zeigen soll, nicht erst nach einer vollen Stunde SEIT dem
+    // Ereignis selbst).
+    void formatHms(uint32_t ms, char* out, size_t outSize, bool forceHours) {
+        uint32_t totalSec = ms / 1000;
+        uint32_t hh = totalSec / 3600;
+        uint32_t mm = (totalSec % 3600) / 60;
+        uint32_t ss = totalSec % 60;
+        if (forceHours || hh > 0) {
+            snprintf(out, outSize, "%02u:%02u:%02u", (unsigned)hh, (unsigned)mm, (unsigned)ss);
+        } else {
+            snprintf(out, outSize, "%02u:%02u", (unsigned)mm, (unsigned)ss);
+        }
+    }
+
     const char* compassLabel(float bearingDeg) {
         // Jeder der 8 Sektoren ist 45 Grad breit, zentriert auf die jeweilige
         // Haupt-/Zwischenrichtung (z.B. Nord = 337.5-22.5 Grad) - +22.5 und
@@ -2310,13 +2316,70 @@ namespace {
             }
         }
 
-        char distBuf[200];
-        snprintf(distBuf, sizeof(distBuf), "%s%.0fkm / %.0fnm / %.0fmi  %s%.0f  %s%.0f° %s  %s %s  %s",
+        // "First Seen"/"Seen For" (aircraft.h::firstSeenMs/firstSeenEpoch) -
+        // haengt aus demselben Platzgrund wie Trend/CPA oben ebenfalls an
+        // dieser Zeile an. "Erstmals gesehen" zeigt die ECHTE Wanduhrzeit
+        // (firstSeenEpoch, NTP-synchronisiert) statt einer boot-relativen
+        // Laufzeit (Alex' Wunsch) - fehlt sie (noch nicht synchronisiert
+        // gewesen, als das Flugzeug zum ersten Mal gesehen wurde), wird
+        // dieser Teil bewusst KOMPLETT weggelassen statt eine falsche/
+        // unsinnige Uhrzeit zu zeigen. "Sichtbar seit" bleibt unveraendert
+        // eine reine, laufend aktualisierte Dauer aus firstSeenMs (immer
+        // aus millis() ableitbar, unabhaengig von NTP), kuerzer als "MM:SS"
+        // formatiert, solange sie unter einer Stunde liegt.
+        char seenForBuf[12];
+        uint32_t seenForMs = (a.firstSeenMs > 0 && millis() >= a.firstSeenMs) ? (millis() - a.firstSeenMs) : 0;
+        formatHms(seenForMs, seenForBuf, sizeof(seenForBuf), false);
+        char firstSeenBuf[64];
+        if (a.firstSeenEpoch > 0) {
+            time_t firstSeenTime = (time_t)a.firstSeenEpoch;
+            struct tm firstSeenTm;
+            localtime_r(&firstSeenTime, &firstSeenTm);
+            char clockBuf[9];
+            snprintf(clockBuf, sizeof(clockBuf), "%02d:%02d:%02d",
+                     firstSeenTm.tm_hour, firstSeenTm.tm_min, firstSeenTm.tm_sec);
+            snprintf(firstSeenBuf, sizeof(firstSeenBuf), "%s%s  %s%s",
+                     I18n::t(StringId::DETAIL_FIRST_SEEN_PREFIX), clockBuf,
+                     I18n::t(StringId::DETAIL_SEEN_FOR_PREFIX), seenForBuf);
+        } else {
+            snprintf(firstSeenBuf, sizeof(firstSeenBuf), "%s%s",
+                     I18n::t(StringId::DETAIL_SEEN_FOR_PREFIX), seenForBuf);
+        }
+
+        // "Previously Seen" (echter Logbuch-Abgleich, siehe previously_seen.h/
+        // flight_logbook.h::countPreviousSightings()) - haengt aus demselben
+        // Platzgrund wie Trend/CPA/First-Seen oben ebenfalls an dieser Zeile
+        // an. Der eigentliche SD-Kartenscan laeuft asynchron im Hintergrund
+        // (Core 0/NetTask) - dieser Aufruf hier liest nur das (evtl. noch
+        // nicht fertige) Zwischenergebnis, blockiert also nie. Waehrend des
+        // Scans "wird geprueft..." (analog zum "laedt..."-Zustand bei
+        // Modell/Route), danach entweder "Bereits Nx gesehen, zuletzt am
+        // DD.MM." ODER (komplett neues Flugzeug, count==0) GAR NICHTS - kein
+        // dauerhaft haengendes "wird geprueft...", wenn es einfach nichts zu
+        // finden gab.
+        char previouslySeenBuf[56] = {0};
+        PreviouslySeen::Info previouslySeen = PreviouslySeen::get(a.hex);
+        if (previouslySeen.loading) {
+            strncpy(previouslySeenBuf, I18n::t(StringId::DETAIL_PREVIOUSLY_SEEN_LOADING), sizeof(previouslySeenBuf) - 1);
+        } else if (previouslySeen.found) {
+            // lastDate liegt als "YYYY-MM-DD" vor (siehe
+            // FlightLogbook::countPreviousSightings()) - fuer die Anzeige
+            // auf "DD.MM." gekuerzt (Alex' Vorgabe, Jahr ist fuer "zuletzt
+            // gesehen" nicht relevant).
+            int yy = 0, mm = 0, dd = 0;
+            sscanf(previouslySeen.lastDate, "%d-%d-%d", &yy, &mm, &dd);
+            snprintf(previouslySeenBuf, sizeof(previouslySeenBuf), "%s%u%s%02d.%02d.",
+                     I18n::t(StringId::DETAIL_PREVIOUSLY_SEEN_PREFIX), previouslySeen.count,
+                     I18n::t(StringId::DETAIL_PREVIOUSLY_SEEN_MIDDLE), dd, mm);
+        }
+
+        char distBuf[300];
+        snprintf(distBuf, sizeof(distBuf), "%s%.0fkm / %.0fnm / %.0fmi  %s%.0f  %s%.0f° %s  %s %s  %s  %s  %s",
                  I18n::t(StringId::DETAIL_DIST),
                  a.distanceKm, Units::kmToNm(a.distanceKm), Units::kmToMi(a.distanceKm),
                  I18n::t(StringId::DETAIL_HDG), a.headingDeg,
                  I18n::t(StringId::DETAIL_BEARING_PREFIX), a.bearingDeg, compassLabel(a.bearingDeg),
-                 trendSymbol, trendText, cpaBuf);
+                 trendSymbol, trendText, cpaBuf, firstSeenBuf, previouslySeenBuf);
         updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.distHeading, String(distBuf), forceFull);
         y += LINE_H;
 
@@ -3456,7 +3519,7 @@ bool consumeHeaderRedrawFlag() {
 
 void render(TFT_eSPI& tft, int16_t top) {
     Layout L = computeLayout(top);
-    float rangeKm = Config::RANGE_STEPS_KM[AutoRange::effectiveIndex()];
+    float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
     // Radar-Puls-Trigger: NUR bei echter Datenaenderung (Versionsvergleich),
     // nicht bei jedem render()-Aufruf - siehe Kommentar bei lastPulseVersion
@@ -3699,6 +3762,17 @@ void render(TFT_eSPI& tft, int16_t top) {
             tft.drawCircle(pt.x, pt.y, 12, TFT_ORANGE);
         }
 
+        // Circle-Crossing-Puls (siehe Aircraft::ringCrossedAtMs) - bewusst
+        // ein groesserer, separater Ring-Radius (15 statt 12) statt der
+        // Notfall-/Beobachtungs-/Auffaellig-Ringe oben, damit beide
+        // Ringe gleichzeitig sichtbar bleiben koennen, statt sich
+        // gegenseitig zu ueberzeichnen.
+        bool ringPulseActive = a.ringCrossedAtMs != 0 &&
+                                (millis() - a.ringCrossedAtMs) < Config::RING_CROSS_PULSE_MS;
+        if (ringPulseActive) {
+            tft.drawCircle(pt.x, pt.y, 15, TFT_WHITE);
+        }
+
         // Bodenfahrzeuge/Hubschrauber haben keinen Richtungs-Chevron
         // (siehe drawGroundVehicleMarker()/drawHelicopterMarker() - kein
         // aussagekraeftiger Kurs), die neue Ausweichlogik ist fuer sie
@@ -3730,6 +3804,8 @@ void render(TFT_eSPI& tft, int16_t top) {
         hitPoints[i].crtFadeEligible = crtFadeEligible;
         hitPoints[i].baseColor = ownColor;
         hitPoints[i].lastSeenMs = a.lastSeenMs;
+        hitPoints[i].ringCrossedAtMs = a.ringCrossedAtMs;
+        hitPoints[i].pulseDrawn = ringPulseActive;
         // Frisch aus AircraftTable uebernommen - noch kein Stale-Label
         // gezeichnet, siehe Kommentar bei HitPoint::staleLabelCache.
         hitPoints[i].staleLabelCache[0] = 0;
@@ -3791,40 +3867,19 @@ void render(TFT_eSPI& tft, int16_t top) {
         constexpr int16_t INFO_TEXT_X = 8;
         constexpr int16_t INFO_TEXT_GAP = 6;
         int16_t infoTextY = infoTop + 20;
-        // Bei aktivem Auto-Reichweitenmodus endet die Marquee-Zeile schon
-        // vor dem zusaetzlichen "?"-Info-Button (autoInfoBtn.x), sonst wie
-        // bisher vor rangeBtn.x - beide Rects kommen bereits korrekt
-        // dimensioniert aus computeLayout().
-        bool autoActive = SettingsStore::autoRangeEnabled();
-        int16_t infoTextRightEdge = autoActive ? L.autoInfoBtn.x : L.rangeBtn.x;
-        int16_t infoTextW = infoTextRightEdge - INFO_TEXT_X - INFO_TEXT_GAP;
+        int16_t infoTextW = L.rangeBtn.x - INFO_TEXT_X - INFO_TEXT_GAP;
         drawInfoMarquee(tft, INFO_TEXT_X, infoTextY, infoTextW);
 
         // Respektiert jetzt die Einheiten-Einstellung (Menue > Einheiten) -
-        // vorher immer "XXkm", auch bei Imperial (dort jetzt "XXnm"). Im
-        // Auto-Reichweitenmodus zusaetzlich das "Auto(...)"-Praefix (siehe
-        // StringId::RANGE_AUTO_SHORT) vor der aktuell tatsaechlich
-        // gewaehlten Stufe (rangeKm kommt oben bereits aus
-        // AutoRange::effectiveIndex(), aktualisiert sich also automatisch
-        // live mit, sobald Auto-Range selbststaendig zwischen den drei
-        // Stufen wechselt).
-        char rangeLabel[24];
+        // vorher immer "XXkm", auch bei Imperial (dort jetzt "XXnm").
+        char rangeLabel[8];
         bool rangeMetric = LocationManager::useMetricUnits();
-        if (autoActive) {
-            if (rangeMetric) {
-                snprintf(rangeLabel, sizeof(rangeLabel), "%s(%.0fkm)", I18n::t(StringId::RANGE_AUTO_SHORT), rangeKm);
-            } else {
-                snprintf(rangeLabel, sizeof(rangeLabel), "%s(%.0fnm)", I18n::t(StringId::RANGE_AUTO_SHORT), Units::kmToNm(rangeKm));
-            }
-        } else if (rangeMetric) {
+        if (rangeMetric) {
             snprintf(rangeLabel, sizeof(rangeLabel), "%.0fkm", rangeKm);
         } else {
             snprintf(rangeLabel, sizeof(rangeLabel), "%.0fnm", Units::kmToNm(rangeKm));
         }
         drawButton(tft, L.rangeBtn, rangeLabel);
-        if (autoActive) {
-            drawButton(tft, L.autoInfoBtn, "?");
-        }
 
         drawLegend(tft, infoTop + 44);
     }
@@ -3849,7 +3904,7 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     }
 
     Layout L = computeLayout(top);
-    float rangeKm = Config::RANGE_STEPS_KM[AutoRange::effectiveIndex()];
+    float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
     tft.startWrite();
 
@@ -4188,6 +4243,9 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             if (hp.isEmergency || hp.isWatched || hp.isNotable) {
                 tft.drawCircle(hp.x, hp.y, 12, TFT_BLACK);
             }
+            if (hp.pulseDrawn) {
+                tft.drawCircle(hp.x, hp.y, 15, TFT_BLACK);
+            }
             const char* eraseLabel = hp.staleLabelCache[0] ? hp.staleLabelCache : (hp.callsign[0] ? hp.callsign : hp.hex);
             LabelAnchor eraseAnchor = (hp.isGroundVehicle || hp.isRotorcraft)
                 ? LabelAnchor{hp.x, (int16_t)(hp.y - 8), BC_DATUM}
@@ -4258,6 +4316,9 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             if (hp.isEmergency || hp.isWatched || hp.isNotable) {
                 tft.drawCircle(hp.x, hp.y, 12, TFT_BLACK);
             }
+            if (hp.pulseDrawn) {
+                tft.drawCircle(hp.x, hp.y, 15, TFT_BLACK);
+            }
             // Muss exakt dieselbe Position/denselben Text wie beim
             // urspruenglichen Zeichnen treffen (siehe oben), sonst bleibt
             // hier ein farbiger Rest stehen statt sauber geloescht zu
@@ -4283,6 +4344,22 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             tft.drawCircle(hp.x, hp.y, 12, TFT_CYAN);
         } else if (hp.isNotable) {
             tft.drawCircle(hp.x, hp.y, 12, TFT_ORANGE);
+        }
+
+        // Circle-Crossing-Puls (siehe Aircraft::ringCrossedAtMs) - rein
+        // zeitbasiert ausgewertet (kein erneuter AircraftTable-Zugriff
+        // noetig, hp.ringCrossedAtMs kommt aus dem letzten render()).
+        // pulseDrawn merkt sich den zuletzt tatsaechlich gezeichneten
+        // Zustand, damit der Ring beim Ablaufen der Pulsdauer gezielt
+        // wieder schwarz uebermalt wird, statt stehen zu bleiben.
+        bool pulseActiveNow = hp.ringCrossedAtMs != 0 &&
+                               (nowMs - hp.ringCrossedAtMs) < Config::RING_CROSS_PULSE_MS;
+        if (pulseActiveNow) {
+            tft.drawCircle(hp.x, hp.y, 15, TFT_WHITE);
+            hp.pulseDrawn = true;
+        } else if (hp.pulseDrawn) {
+            tft.drawCircle(hp.x, hp.y, 15, TFT_BLACK);
+            hp.pulseDrawn = false;
         }
 
         tft.setTextColor(effectiveColor);
@@ -4407,21 +4484,7 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     constexpr int16_t INFO_TEXT_X = 8;
     constexpr int16_t INFO_TEXT_GAP = 6;
     int16_t infoTextY = L.infoTop + 20;
-    // BUGFIX (Alex' Meldung: fehlerhaftes gruenes Element neben dem Button,
-    // "?"-Info-Button im Auto-Zustand unsichtbar): diese Stelle hier in
-    // tick() (laeuft alle ~80ms fuer die Lauftext-Animation, viel oefter
-    // als render()) benutzte noch die alte Breiten-Berechnung bis
-    // rangeBtn.x, OHNE den zusaetzlichen "?"-Button (autoInfoBtn) bei
-    // aktivem Auto-Range zu beruecksichtigen - die Lauftext-Zeile scrollte
-    // dadurch bei jedem Tick ueber genau die Flaeche, in der render() den
-    // "?"-Button gezeichnet hatte, und ueberschrieb ihn praktisch sofort
-    // wieder (das gemeldete gruene Winkel-Element war ein Fragment des
-    // durchlaufenden Texts). Jetzt dieselbe Berechnung wie in render()
-    // (siehe dort), damit die Marquee-Zeile in beiden Funktionen
-    // konsistent VOR dem "?"-Button endet statt darueber hinweg zu laufen.
-    bool autoActiveTick = SettingsStore::autoRangeEnabled();
-    int16_t infoTextRightEdgeTick = autoActiveTick ? L.autoInfoBtn.x : L.rangeBtn.x;
-    int16_t infoTextW = infoTextRightEdgeTick - INFO_TEXT_X - INFO_TEXT_GAP;
+    int16_t infoTextW = L.rangeBtn.x - INFO_TEXT_X - INFO_TEXT_GAP;
 
     if (kind != infoMarqueeKind) {
         infoMarqueeKind = kind;
@@ -4475,6 +4538,7 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
             if (dx * dx + dy * dy <= 12 * 12) {
                 strncpy(selectedHex, hitPoints[i].hex, sizeof(selectedHex) - 1);
                 AircraftDetails::request(hitPoints[i].hex, hitPoints[i].callsign);
+                PreviouslySeen::request(hitPoints[i].hex);
                 return true;
             }
         }
@@ -4483,34 +4547,9 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
         return true;
     }
 
-    // "?"-Info-Button neben dem Reichweiten-Button - nur vorhanden/gueltig,
-    // wenn Auto-Range gerade aktiv ist (siehe computeLayout(), autoInfoBtn
-    // ist sonst ein Nullrect und "contains()" liefert fuer jede reale
-    // Koordinate false).
-    if (SettingsStore::autoRangeEnabled() && L.autoInfoBtn.contains(x, y)) {
-        MenuScreen::showInfoScreen(tft, I18n::t(StringId::RANGE_AUTO_INFO_TITLE),
-                                    I18n::t(StringId::RANGE_AUTO_INFO_BODY),
-                                    UiTheme::accentColor(tft), I18n::t(StringId::BACK));
-        lastPanel.valid = false;
-        headerRedrawNeeded = true;
-        return true;
-    }
-
     if (L.rangeBtn.contains(x, y)) {
-        // 5-Schritt-Zyklus 10->25->50->100->Auto->10->... (Alex' Wunsch,
-        // statt eines separaten Auto-Toggles im Mode-Menue) - Auto ist der
-        // fuenfte, zusaetzliche Schritt NACH der bisherigen 100km-Stufe.
-        if (SettingsStore::autoRangeEnabled()) {
-            // Auto verlassen -> zurueck zum Zyklus-Anfang (10km).
-            SettingsStore::setAutoRangeEnabled(false);
-            SettingsStore::setRangeIndex(0);
-        } else if (SettingsStore::rangeIndex() == Config::RANGE_STEP_COUNT - 1) {
-            // Von der letzten festen Stufe (100km) aus in Auto wechseln.
-            AutoRange::reset();
-            SettingsStore::setAutoRangeEnabled(true);
-        } else {
-            SettingsStore::setRangeIndex(SettingsStore::rangeIndex() + 1);
-        }
+        uint8_t idx = (SettingsStore::rangeIndex() + 1) % Config::RANGE_STEP_COUNT;
+        SettingsStore::setRangeIndex(idx);
         return true;
     }
 
@@ -4636,6 +4675,7 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
         if (dx * dx + dy * dy <= 12 * 12) {
             strncpy(selectedHex, hitPoints[i].hex, sizeof(selectedHex) - 1);
             AircraftDetails::request(hitPoints[i].hex, hitPoints[i].callsign);
+            PreviouslySeen::request(hitPoints[i].hex);
             return true;
         }
     }
@@ -4649,18 +4689,9 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
     lastEmptyTapY = y;
 
     if (isDoubleTap) {
-        // Rueckwaerts durch denselben 5-Schritt-Zyklus wie der
-        // Reichweiten-Button (siehe handleTap() oben) -
-        // ...->100km->Auto->10km->... rueckwaerts gelesen.
-        if (SettingsStore::autoRangeEnabled()) {
-            SettingsStore::setAutoRangeEnabled(false);
-            SettingsStore::setRangeIndex(Config::RANGE_STEP_COUNT - 1);
-        } else if (SettingsStore::rangeIndex() == 0) {
-            AutoRange::reset();
-            SettingsStore::setAutoRangeEnabled(true);
-        } else {
-            SettingsStore::setRangeIndex(SettingsStore::rangeIndex() - 1);
-        }
+        uint8_t idx = SettingsStore::rangeIndex();
+        idx = (idx == 0) ? (Config::RANGE_STEP_COUNT - 1) : (idx - 1);
+        SettingsStore::setRangeIndex(idx);
         lastEmptyTapMs = 0;
     }
 
@@ -4670,6 +4701,7 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
 void selectAircraft(const char* hex, const char* callsign) {
     strncpy(selectedHex, hex, sizeof(selectedHex) - 1);
     AircraftDetails::request(hex, callsign);
+    PreviouslySeen::request(hex);
     lastPanel.valid = false;
 }
 
@@ -4695,7 +4727,7 @@ void updateProximityAlert(uint32_t nowMs) {
     bool emergencyOn = SettingsStore::emergencyAlertEnabled();
     // Fuer isAircraftVisibleOnRadar() unten - dieselbe Reichweite, die
     // render() gerade tatsaechlich zum Zeichnen benutzt.
-    float rangeKm = Config::RANGE_STEPS_KM[AutoRange::effectiveIndex()];
+    float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
     // Haelt die zuletzt ausgeloeste Zonen-Eskalation fest (0=keine), damit
     // sie fuer Config::SMART_PROXIMITY_BURST_MS auf der LED sichtbar

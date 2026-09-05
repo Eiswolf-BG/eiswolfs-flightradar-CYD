@@ -6,7 +6,6 @@
 #include "aircraft_watchlist.h"
 #include "squawk_watchlist.h"
 #include "aircraft_table.h"
-#include "auto_range.h"
 #include "settings_store.h"
 #include "location_manager.h"
 #include "units.h"
@@ -293,7 +292,7 @@ namespace {
     // unabhaengiges Herein-/Herauszoomen auf dem Handy, ohne das Geraete-
     // Display zu beeinflussen. Default ist die aktuelle Geraete-Reichweite.
     void appendRadarSection(String& html) {
-        float deviceRangeKm = Config::RANGE_STEPS_KM[AutoRange::effectiveIndex()];
+        float deviceRangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
         // Gleiche Auto/Metrisch/Imperial-Logik wie ueberall sonst am Geraet
         // (Menues, Detailpanel, Listen - siehe LocationManager::
@@ -1050,7 +1049,7 @@ namespace {
     // genau dieser Prioritaet.
     void handleRadarJson() {
         lastRadarJsonRequestMs = millis();
-        float rangeKm = Config::RANGE_STEPS_KM[AutoRange::effectiveIndex()];
+        float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
         // Erlaubt der Web-Ansicht ein eigenes, unabhaengiges Zoomen (siehe
         // Reichweiten-Waehler in appendRadarSection()), OHNE die Geraete-
         // Einstellung zu veraendern. Nur einen der bekannten

@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "5.6.0";
+    constexpr const char* APP_VERSION = "5.6.5";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -201,6 +201,11 @@ namespace Config {
     constexpr float CPA_MAX_DISTANCE_KM = 20.0f;
     constexpr float CPA_MAX_TIME_MIN    = 30.0f;
     constexpr float CPA_MIN_SPEED_KT    = 20.0f;
+
+    // Circle-Crossing-Puls (radar_screen.cpp, siehe Aircraft::
+    // ringCrossedAtMs) - wie lange der visuelle Puls-Ring nach einem
+    // tatsaechlichen Ring-Durchgang sichtbar bleibt.
+    constexpr uint32_t RING_CROSS_PULSE_MS = 1500;
 
     // Best-Effort-Anflug-Erkennung auf den naechstgelegenen Flughafen
     // (aircraft_table.cpp::postFetchUpdate(), Anzeige in radar_screen.cpp::

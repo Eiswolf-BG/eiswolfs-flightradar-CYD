@@ -76,6 +76,58 @@ struct Aircraft {
     bool     cpaRelevant = false;
     float    cpaEtaMin   = 0;
 
+    // "First Seen"/"Seen For" fuers Detail-Panel (radar_screen.cpp::
+    // drawDetailPanel()) - rein session-lokal (nur RAM, keine SD-Karte/kein
+    // Logbuch), setzt sich bei jedem Geraete-Neustart zurueck. Merkt sich
+    // millis() beim allerersten Sichten dieses Flugzeugs (per Hex-Code) in
+    // der laufenden Sitzung, siehe adsb_client.cpp::fetch(). GENAU wie
+    // prevDistanceKm oben MUSS dieser Wert ueber den Fetch-Zyklus-
+    // Schnappschuss in adsb_client.cpp hinweg erhalten bleiben (siehe
+    // PrevFirstSeen dort) - sonst wuerde "a = Aircraft{}" ihn dort bei
+    // JEDEM Zyklus auf 0 zuruecksetzen, genau derselbe Bug-Mechanismus wie
+    // beim urspruenglichen prevDistanceKm-Fehler (siehe dessen Kommentar).
+    // 0 bedeutet "noch nicht gesetzt" (wird beim ersten Sichten in
+    // adsb_client.cpp auf den aktuellen millis()-Wert gesetzt). Bleibt
+    // weiterhin die Grundlage fuer "Sichtbar seit" (reine Dauer, immer aus
+    // millis() ableitbar, egal ob die Uhrzeit schon NTP-synchronisiert ist)
+    // UND dient als "wurde dieses Flugzeug schon einmal gesehen"-Sentinel
+    // fuer firstSeenEpoch unten.
+    uint32_t firstSeenMs = 0;
+
+    // Echte Wanduhrzeit (Unix-Epoch, Sekunden) zum Zeitpunkt des ersten
+    // Sichtens - fuer die "Erstmals gesehen: HH:MM:SS"-Anzeige (siehe
+    // radar_screen.cpp::drawDetailPanel()), auf Alex' Wunsch eine
+    // tatsaechliche Tageszeit statt der Boot-relativen firstSeenMs oben.
+    // Wird GENAU EINMAL zusammen mit firstSeenMs gesetzt (siehe
+    // adsb_client.cpp::fetch()) - NUR wenn die Systemzeit in genau diesem
+    // Moment bereits NTP-synchronisiert ist (time(nullptr) > 8*3600*2,
+    // gleiche Pruefung wie ueberall sonst im Projekt, z.B. flight_logbook.
+    // cpp::checkAutoOff()). War sie es zu diesem Zeitpunkt noch nicht,
+    // bleibt firstSeenEpoch bewusst dauerhaft 0 fuer dieses Flugzeug (KEIN
+    // nachtraegliches "Aufholen" mit einem spaeteren, dann zwar gueltigen,
+    // aber nicht mehr zum tatsaechlichen Erstsichten passenden Zeitstempel)
+    // - die Anzeige laesst "Erstmals gesehen" in diesem Fall einfach weg,
+    // statt eine falsche Uhrzeit zu zeigen. Wie firstSeenMs MUSS auch
+    // dieser Wert ueber den Fetch-Zyklus-Schnappschuss in adsb_client.cpp
+    // hinweg erhalten bleiben (siehe PrevFirstSeen dort).
+    uint32_t firstSeenEpoch = 0;
+
+    // Circle-Crossing-Puls auf dem Radar (radar_screen.cpp, rein visuell,
+    // kein Ton/keine LED) - millis()-Zeitstempel des letzten tatsaechlichen
+    // Durchquerens eines der drei angezeigten Entfernungsringe (1/3, 2/3,
+    // Aussenrand der AKTUELLEN Anzeige-Reichweite), in BEIDE Richtungen.
+    // Anders als firstSeenMs/prevDistanceKm braucht dieses Feld KEINE
+    // Erhaltung ueber den adsb_client.cpp-Schnappschuss hinweg - es wird in
+    // JEDEM aircraft_table.cpp::postFetchUpdate()-Durchlauf entweder neu
+    // gesetzt (falls in diesem Zyklus tatsaechlich eine Ringgrenze
+    // ueberquert wurde) oder bleibt bei 0 (kein Aussage ueber "kein
+    // Puls mehr noetig" - die 1-2s-Pulsdauer selbst wird rein zeitbasiert
+    // in radar_screen.cpp anhand dieses Zeitstempels ausgewertet, ein
+    // Zuruecksetzen durch den naechsten Fetch-Zyklus 10s spaeter kommt
+    // dafuer ohnehin viel zu spaet, um relevant zu sein). 0 = kein
+    // (kuerzlicher) Ringdurchgang.
+    uint32_t ringCrossedAtMs = 0;
+
     bool     valid          = false;
 
     char     airlineName[24] = {0};

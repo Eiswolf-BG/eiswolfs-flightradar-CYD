@@ -7,6 +7,7 @@
 #include <SD.h>
 #include <time.h>
 #include <cstring>
+#include <atomic>
 
 namespace FlightLogbook {
 
@@ -17,6 +18,10 @@ namespace {
     // Erfolg der ADS-B-Abfrage (siehe enforceAutoOff() unten sowie
     // net_task.cpp).
     constexpr uint32_t LOGBOOK_AUTO_OFF_SECONDS = 24UL * 3600UL;
+
+    // Siehe consumeAutoOffNotice()/checkAutoOff() - Core 0 (NetTask)
+    // schreibt, Core 1 (main.cpp::loop()) liest/konsumiert.
+    std::atomic<bool> pendingAutoOffNotice{false};
 
     constexpr uint16_t MAX_SEEN = 400;
     char seenHex[MAX_SEEN][7];
@@ -269,6 +274,12 @@ bool checkAutoOff() {
         // im Menue (siehe menu_screen.cpp), damit das nicht mehr unbemerkt
         // bleibt (Alex' Meldung: Flugbuch war wochenlang unbemerkt aus).
         SettingsStore::setFlightLogbookAutoOffTriggered(true);
+        // Loest den proaktiven Hinweis-Screen aus (siehe
+        // consumeAutoOffNotice()/main.cpp::loop()) - unabhaengig davon, ob
+        // dies waehrend des laufenden Betriebs greift oder der allererste
+        // Check nach einem laengeren Stromausfall ist (siehe Kommentar bei
+        // consumeAutoOffNotice() in flight_logbook.h).
+        pendingAutoOffNotice.store(true, std::memory_order_relaxed);
         return false;
     }
 
@@ -280,6 +291,10 @@ bool checkAutoOff() {
 // Kommentar bei checkAutoOff() fuer den Grund.
 void enforceAutoOff() {
     checkAutoOff();
+}
+
+bool consumeAutoOffNotice() {
+    return pendingAutoOffNotice.exchange(false, std::memory_order_relaxed);
 }
 
 void update() {
@@ -648,6 +663,163 @@ uint8_t computeTopAircraft(TopAircraft* out, uint8_t maxEntries) {
         out[r].sightings = trackCount[r];
     }
     return resultCount;
+}
+
+// Streaming-Suche nach genau einem Hex-Code in einer bereits geoeffneten
+// Logbuch-CSV-Datei - fruehestmoeglicher Abbruch, sobald ein Treffer
+// gefunden wurde (jeder Hex-Code kommt dank alreadySeen()/markSeen() beim
+// Schreiben ohnehin hoechstens einmal pro Datei vor). Gleiches Zeilen-
+// Parsing-Prinzip wie computeTopAircraft()/loadSeenFromCurrentFile() oben.
+namespace {
+    bool fileContainsHex(File& f, const char* hex) {
+        constexpr size_t BUF_SIZE = 512;
+        static uint8_t buf[BUF_SIZE];
+        char lineBuf[64];
+        size_t lineLen = 0;
+        bool firstLine = true;
+        bool found = false;
+        uint32_t blocksRead = 0;
+        size_t hexQueryLen = strlen(hex);
+
+        auto processLine = [&]() {
+            if (found || lineLen == 0) return;
+            if (firstLine) { firstLine = false; return; } // Header-Zeile
+            lineBuf[lineLen] = 0;
+            char* p1 = strchr(lineBuf, ',');
+            if (!p1) return;
+            char* p2 = strchr(p1 + 1, ',');
+            size_t hexLen = p2 ? (size_t)(p2 - (p1 + 1)) : strlen(p1 + 1);
+            if (hexLen == hexQueryLen && strncmp(p1 + 1, hex, hexLen) == 0) {
+                found = true;
+            }
+        };
+
+        while (f.available() && !found) {
+            size_t n = f.read(buf, BUF_SIZE);
+            for (size_t i = 0; i < n && !found; i++) {
+                char c = (char)buf[i];
+                if (c == '\n' || c == '\r') {
+                    if (lineLen > 0) processLine();
+                    lineLen = 0;
+                } else if (lineLen < sizeof(lineBuf) - 1) {
+                    lineBuf[lineLen++] = c;
+                }
+            }
+            blocksRead++;
+            if (blocksRead % 4 == 0) delay(1);
+        }
+        return found;
+    }
+}
+
+PreviousSighting countPreviousSightings(const char* hex) {
+    PreviousSighting result;
+    if (!hex || !hex[0]) return result;
+
+    SdMutex::Guard guard;
+
+    time_t now = time(nullptr);
+    bool timeKnown = now > 8 * 3600 * 2;
+    char todayStr[11] = {0};
+    if (timeKnown) formatDateFromEpoch((uint32_t)now, todayStr, sizeof(todayStr));
+
+    File dir = SD.open(Config::SD_LOG_DIR);
+    if (!dir || !dir.isDirectory()) return result;
+
+    // Gleicher Deckel wie MAX_RAW_SCAN in listDaySummaries() - verhindert
+    // eine unbegrenzt lange Hintergrund-Aufgabe bei einem sehr lange
+    // genutzten Geraet mit vielen angesammelten Dateien.
+    constexpr uint8_t MAX_FILES_SCANNED = 90;
+    uint8_t filesScanned = 0;
+    // SD.openNextFile() liefert keine garantierte Sortierung - "zuletzt
+    // gesehen" wird deshalb ueber einen fortlaufenden String-Vergleich
+    // ermittelt (funktioniert dank "YYYY-MM-DD"-Format lexikographisch
+    // korrekt wie ein Datumsvergleich).
+    char latestDate[11] = {0};
+
+    File entry = dir.openNextFile();
+    while (entry && filesScanned < MAX_FILES_SCANNED) {
+        if (!entry.isDirectory()) {
+            String name = String(entry.name());
+            if (name.endsWith(".csv")) {
+                filesScanned++;
+
+                String dateOnly = name.substring(0, name.length() - 4);
+                int slashIdx = dateOnly.lastIndexOf('/');
+                if (slashIdx >= 0) dateOnly = dateOnly.substring(slashIdx + 1);
+                // Das Kalenderdatum ist immer das feste "YYYY-MM-DD"-
+                // Praefix, auch bei mehreren Sitzungen desselben Tages
+                // ("YYYY-MM-DD_2" usw., siehe resolveSessionFilename()).
+                String dayKey = dateOnly.length() >= 10 ? dateOnly.substring(0, 10) : dateOnly;
+                bool isToday = timeKnown && dayKey == String(todayStr);
+
+                if (!isToday && fileContainsHex(entry, hex)) {
+                    result.count++;
+                    if (strcmp(dayKey.c_str(), latestDate) > 0) {
+                        strncpy(latestDate, dayKey.c_str(), sizeof(latestDate) - 1);
+                        latestDate[sizeof(latestDate) - 1] = 0;
+                    }
+                }
+            }
+        }
+        entry.close();
+        entry = dir.openNextFile();
+    }
+    dir.close();
+
+    result.found = result.count > 0;
+    if (result.found) {
+        strncpy(result.lastDate, latestDate, sizeof(result.lastDate) - 1);
+        result.lastDate[sizeof(result.lastDate) - 1] = 0;
+    }
+    return result;
+}
+
+void updatePeakTraffic(uint8_t currentCount) {
+    time_t now = time(nullptr);
+    if (now <= 8 * 3600 * 2) return; // Uhrzeit noch nicht synchronisiert - naechster Zyklus holt es nach
+
+    char todayStr[11];
+    formatDateFromEpoch((uint32_t)now, todayStr, sizeof(todayStr));
+
+    if (SettingsStore::peakTrafficDate() != String(todayStr)) {
+        // Tageswechsel (oder allererster Lauf ueberhaupt) - Hoechstwert
+        // zuruecksetzen, BEVOR der aktuelle Wert unten einsortiert wird.
+        SettingsStore::setPeakTrafficDate(todayStr);
+        SettingsStore::setPeakTrafficCount(0);
+        SettingsStore::setPeakTrafficEpoch(0);
+    }
+
+    if (currentCount > SettingsStore::peakTrafficCount()) {
+        SettingsStore::setPeakTrafficCount(currentCount);
+        SettingsStore::setPeakTrafficEpoch((uint32_t)now);
+    }
+}
+
+PeakTraffic todayPeakTraffic() {
+    PeakTraffic result;
+
+    time_t now = time(nullptr);
+    if (now <= 8 * 3600 * 2) return result; // Uhrzeit unbekannt - kein verlaesslicher Tagesvergleich moeglich
+
+    char todayStr[11];
+    formatDateFromEpoch((uint32_t)now, todayStr, sizeof(todayStr));
+    // Nur einen Wert zeigen, der auch tatsaechlich zu HEUTE gehoert (siehe
+    // Kommentar bei flight_logbook.h::todayPeakTraffic()) - sonst koennte
+    // kurz nach dem Booten (bevor updatePeakTraffic() den Tageswechsel
+    // selbst erkannt hat) faelschlich noch der Wert von gestern erscheinen.
+    if (SettingsStore::peakTrafficDate() != String(todayStr)) return result;
+
+    result.count = SettingsStore::peakTrafficCount();
+    uint32_t epoch = SettingsStore::peakTrafficEpoch();
+    if (epoch > 0) {
+        time_t t = (time_t)epoch;
+        struct tm tmv;
+        localtime_r(&t, &tmv);
+        snprintf(result.timeStr, sizeof(result.timeStr), "%02d:%02d", tmv.tm_hour, tmv.tm_min);
+        result.hasTime = true;
+    }
+    return result;
 }
 
 }

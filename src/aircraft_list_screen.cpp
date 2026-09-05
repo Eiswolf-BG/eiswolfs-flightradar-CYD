@@ -1,6 +1,5 @@
 #include "aircraft_list_screen.h"
 #include "aircraft_table.h"
-#include "auto_range.h"
 #include "aircraft.h"
 #include "airline_filter.h"
 #include "aircraft_watchlist.h"
@@ -82,7 +81,7 @@ bool run(TFT_eSPI& tft) {
     while (!done && !selected) {
         static Aircraft snapshot[Config::MAX_TRACKED_AIRCRAFT];
         uint8_t count = 0;
-        float rangeKm = Config::RANGE_STEPS_KM[AutoRange::effectiveIndex()];
+        float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
         // Gleiche Filter wie das Radar (Reichweite, Bodenfahrzeuge,
         // Airline-Filter), damit die Liste genau die Flugzeuge zeigt, die

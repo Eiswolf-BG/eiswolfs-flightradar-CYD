@@ -863,18 +863,6 @@ enum class StringId : uint16_t {
     PROXIMITY_SMART_INFO_TITLE,
     PROXIMITY_SMART_INFO_BODY,
 
-    // "Auto"-Reichweitenmodus (5. Schritt im Reichweiten-Button-Zyklus,
-    // siehe radar_screen.cpp/auto_range.h). RANGE_AUTO_SHORT ist bewusst
-    // kein neuer, laenglicher Satz, sondern ein kompaktes Praefix fuers
-    // enge Button-Label ("Auto(25km)") - in allen 8 Sprachen einheitlich
-    // "Auto" (in Tech-/Geraete-UIs international gebraeuchliche Kurzform
-    // fuer "automatisch", z.B. Kamera-/WLAN-Einstellungen, auch wenn das
-    // Wort in DE/IT/NL zusaetzlich "Auto" im Sinne von "Fahrzeug" bedeutet
-    // - im Kontext direkt neben einer km/nm-Distanz nicht missverstaendlich).
-    RANGE_AUTO_SHORT,
-    RANGE_AUTO_INFO_TITLE,
-    RANGE_AUTO_INFO_BODY,
-
     // "Ueberflug"-CPA-ETA (Closest Point of Approach, siehe aircraft.h::
     // cpaRelevant/cpaEtaMin, Berechnung in aircraft_table.cpp::
     // postFetchUpdate(), Anzeige an die Peilung/Distanz/Trend-Zeile in
@@ -886,6 +874,59 @@ enum class StringId : uint16_t {
     // nur den aktuellen Bewegungsvektor.
     DETAIL_OVERFLIGHT_PREFIX,
     DETAIL_OVERFLIGHT_SUFFIX,
+
+    // Proaktiver Hinweis-Screen (MenuScreen::showInfoScreen(), siehe
+    // main.cpp::loop()/FlightLogbook::consumeAutoOffNotice()), der
+    // automatisch aufpoppt, sobald die 24h-Sicherheitsabschaltung das
+    // Flugbuch tatsaechlich abgeschaltet hat - deckt sowohl den Fall "greift
+    // waehrend des laufenden Betriebs" als auch "Geraet war laenger als 24h
+    // vom Strom getrennt, Zeitstempel war beim Booten schon abgelaufen" ab
+    // (beide laufen ueber denselben checkAutoOff()-Codepfad in
+    // flight_logbook.cpp). Bewusst EIGENE, kuerzere Strings statt
+    // Wiederverwendung von FLIGHT_LOGBOOK_AUTO_OFF_TITLE/_BODY oben - jener
+    // Text verweist auf einen Schalter "oben" im Menue-Kontext, was in
+    // diesem eigenstaendigen Popup (kann von JEDEM Screen aus aufploppen)
+    // keinen Sinn ergeben wuerde.
+    FLIGHT_LOGBOOK_AUTO_OFF_POPUP_TITLE,
+    FLIGHT_LOGBOOK_AUTO_OFF_POPUP_BODY,
+
+    // "First Seen"/"Seen For" im Detail-Panel (aircraft.h::firstSeenMs,
+    // haengt an dieselbe Peilung/Distanz/Trend/CPA-Zeile an wie oben, siehe
+    // drawDetailPanel()) - rein session-lokal (RAM, kein SD-/Logbuch-
+    // Zugriff). DETAIL_FIRST_SEEN_PREFIX endet mit einem Leerzeichen
+    // (direkt gefolgt von der HH:MM:SS-Boot-Laufzeit), ebenso
+    // DETAIL_SEEN_FOR_PREFIX (gefolgt von der laufend aktualisierten
+    // MM:SS/HH:MM:SS-Dauer).
+    DETAIL_FIRST_SEEN_PREFIX,
+    DETAIL_SEEN_FOR_PREFIX,
+
+    // "Previously Seen" (echter Logbuch-Abgleich, siehe previously_seen.h/
+    // flight_logbook.h::countPreviousSightings()) - haengt ebenfalls an die
+    // Peilung/Distanz/Trend/CPA/First-Seen-Zeile in drawDetailPanel() an.
+    // Der SD-Kartenscan laeuft asynchron im Hintergrund (Core 0/NetTask,
+    // exakt nach dem AircraftDetails::request()/get()-Muster) - waehrenddessen
+    // zeigt DETAIL_PREVIOUSLY_SEEN_LOADING einen "wird geprueft..."-Hinweis
+    // (analog zum bestehenden "laedt..."-Zustand bei Modell/Route). Danach:
+    // DETAIL_PREVIOUSLY_SEEN_PREFIX + Anzahl + "x" (bewusst unuebersetztes,
+    // international verstaendliches Multiplikator-Kuerzel) +
+    // DETAIL_PREVIOUSLY_SEEN_MIDDLE + Datum im festen "DD.MM."-Format (siehe
+    // drawDetailPanel(), Jahr fuer "zuletzt gesehen" nicht relevant). Bei
+    // einem komplett neuen Flugzeug (keine fruehere Sichtung) wird dieser
+    // gesamte Teil der Zeile einfach weggelassen.
+    DETAIL_PREVIOUSLY_SEEN_LOADING,
+    DETAIL_PREVIOUSLY_SEEN_PREFIX,
+    DETAIL_PREVIOUSLY_SEEN_MIDDLE,
+
+    // "Peak Traffic" (Tages-Hoechstwert gleichzeitig sichtbarer Flugzeuge,
+    // siehe flight_logbook.h::updatePeakTraffic()/todayPeakTraffic()) - im
+    // 7-Tage-Verlauf-Screen (stats_history_screen.cpp) angezeigt. Aufbau:
+    // PEAK_TRAFFIC_PREFIX + Anzahl + PEAK_TRAFFIC_UNIT + (PEAK_TRAFFIC_AT_TIME
+    // + "HH:MM", NUR wenn die Uhrzeit beim Erreichen des Hoechstwerts schon
+    // NTP-synchronisiert war - siehe PeakTraffic::hasTime). Bei count==0
+    // (heute noch kein Wert ermittelt) wird die gesamte Zeile weggelassen.
+    PEAK_TRAFFIC_PREFIX,
+    PEAK_TRAFFIC_UNIT,
+    PEAK_TRAFFIC_AT_TIME,
 
     COUNT
 };

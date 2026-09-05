@@ -5,9 +5,9 @@
 #include "adsb_client.h"
 #include "aircraft_table.h"
 #include "aircraft.h"
-#include "auto_range.h"
 #include "settings_store.h"
 #include "aircraft_details.h"
+#include "previously_seen.h"
 #include "flight_logbook.h"
 #include "led_alert.h"
 #include "web_export_server.h"
@@ -71,6 +71,7 @@ namespace {
             }
 
             AircraftDetails::update();
+            PreviouslySeen::update();
             Weather::update();
             // Bonus-Feature (siehe iss_tracker.h) - kuemmert sich intern
             // um ihr eigenes, deutlich selteneres Intervall
@@ -112,12 +113,7 @@ namespace {
                     double lat = 0, lon = 0;
                     LocationManager::getHomeLocation(lat, lon);
 
-                    // AutoRange::effectiveIndex() liefert im "Auto"-
-                    // Reichweitenmodus (SettingsStore::autoRangeEnabled())
-                    // die gerade automatisch gewaehlte Stufe (10/25/50km),
-                    // sonst wie bisher die manuell eingestellte
-                    // SettingsStore::rangeIndex() - siehe auto_range.h.
-                    float rangeKm = Config::RANGE_STEPS_KM[AutoRange::effectiveIndex()];
+                    float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
                     // Solange die WebUI-Livekarte gerade aktiv geoeffnet ist
                     // (siehe WebExportServer::isRadarUiActive()), auf der
@@ -183,16 +179,16 @@ namespace {
 
                         AircraftTable::unlock();
 
-                        // Auto-Range-Auswertung (siehe auto_range.h) - nur
-                        // waehrend Auto tatsaechlich aktiv ist, sonst wuerde
-                        // die Hysterese-Zaehlung im Hintergrund auf Basis
-                        // der manuell fest eingestellten Reichweite
-                        // weiterlaufen, ohne dass das je sichtbar wuerde.
-                        if (SettingsStore::autoRangeEnabled()) {
-                            AutoRange::onFetchSuccess(validAircraftCount, millis());
-                        }
-
                         FlightLogbook::update();
+
+                        // "Peak Traffic" (Tages-Hoechstwert gleichzeitig
+                        // sichtbarer Flugzeuge, siehe flight_logbook.h) -
+                        // bewusst UNABHAENGIG von FlightLogbook::update()
+                        // oben, das nur bei eingeschaltetem Flugbuch
+                        // ueberhaupt etwas tut (siehe dortiges
+                        // checkAutoOff()) - der Hoechstwert soll immer
+                        // mitlaufen.
+                        FlightLogbook::updatePeakTraffic(validAircraftCount);
 
                         // MQTT-Statuswerte (SettingsStore::mqttEnabled(),
                         // siehe mqtt_client.h) - dieselben drei Kennzahlen,
