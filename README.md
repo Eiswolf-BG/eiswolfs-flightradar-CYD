@@ -105,6 +105,8 @@ You can flash the firmware directly from your browser to your CYD display withou
 - **Offline/stale-data mode** – if the ADS-B data fetch fails (network hiccup, timeout, or a temporarily overloaded API), the last known aircraft stay visible instead of disappearing immediately: their markers grey out and their label shows how long ago they were last seen, and the radar's status line switches to a clear "no connection" hint. Markers are removed only after a longer grace period with no data, and everything snaps back to normal the moment the connection returns
 - **Approaching/departing indicator** – the aircraft detail panel now also shows whether the selected aircraft is approaching, departing, or just passing by, derived purely from how its distance to you changes over the last few data updates, no extra lookups involved
 - **Nearest aircraft display** – a subtle "nearest aircraft" indicator (icon + distance) now appears on the idle screensaver and as a fixed line in the radar screen's corner, always visible regardless of whether the radar corner overlays (see above) are turned on
+- **Auto-Range** – tapping the range button now cycles through a fifth step, "Auto", after 100 km: it automatically picks between 10/25/50 km depending on how much traffic is currently visible, with a short "?" hint button explaining the thresholds right next to it. The 100 km step stays reachable only manually, since ADS-B responses at that radius occasionally get too large for the device to parse reliably
+- **Overflight ETA** – when an aircraft is approaching, the detail panel now also estimates when it will reach its closest point to you and how close that will be, based purely on its current heading and speed (always marked as an estimate, since a course change would invalidate it)
 
 ## Feature Deep-Dive
 
@@ -225,7 +227,7 @@ A small icon in the header (where the camera button used to be) shows the curren
 
 It always follows whichever location is currently active, including active [location presets](#-location-presets) – switch the active preset to e.g. Milan or Tokyo and the icon updates to show that location's weather.
 
-Powered by the free [Open-Meteo](https://open-meteo.com) API (no API key needed). Refreshed automatically in the background every 10 minutes, or immediately after switching to a different location.
+Powered by the free [Open-Meteo](https://open-meteo.com) API (no API key needed). Refreshed automatically in the background every 5 minutes, or immediately after switching to a different location.
 
 Tap the icon for a small info popup explaining that the shown weather always reflects your currently active location. That same popup also shows the **raw METAR text** for the nearest airport (from the free [aviationweather.gov](https://aviationweather.gov) data API), fetched in the same background cycle as the icon weather - handy if you're used to reading METARs and want the exact report instead of just an icon. Below that, it also shows today's **sunrise and sunset time** for the active location, and a **short forecast** (temperature and conditions) 3 hours ahead. The popup scrolls automatically if all of this doesn't fit on one screen.
 

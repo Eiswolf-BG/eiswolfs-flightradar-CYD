@@ -415,6 +415,13 @@ static const char* const I18N_DE[] = {
     "Intelligent",
     "Wie der intelligente Alarm funktioniert",
     "Statt eines einzelnen Distanz-Schwellenwerts nutzt der intelligente Alarm drei gestaffelte Zonen - Gelb (<20 km), Orange (<10 km), Rot (<5 km) - und löst nur aus, wenn sich ein Flugzeug tatsächlich annähert, also neu in eine engere Zone wechselt, nicht solange es dort bleibt oder sich wieder entfernt. Alle drei Zonen nutzen dieselbe LED-Farbe wie der einfache Alarm (deine aktuelle Themenfarbe), blinken aber zunehmend schneller - langsam bei Gelb, mittel bei Orange, schnell bei Rot - und leuchten pro Ereignis nur für wenige Sekunden statt dauerhaft.",
+
+    "Auto",
+    "Wie die automatische Reichweite funktioniert",
+    "Im Auto-Modus wechselt die Reichweite automatisch zwischen 10, 25 und 50 km, je nachdem, wie viele Flugzeuge gerade sichtbar sind (grob: sehr wenige Flugzeuge -> 10 km, mittelviel -> 25 km, viele -> 50 km). Gewechselt wird erst, wenn mehrere aufeinanderfolgende Updates die Änderung bestätigen, und frühestens 2 Minuten nach dem letzten Wechsel, damit es nicht hin- und herflackert. Die Stufe 100 km ist bei Auto bewusst ausgeschlossen - bei diesem Radius werden ADS-B-Antworten gelegentlich zu groß, um zuverlässig verarbeitet zu werden - nutze dafür weiterhin den manuellen Reichweiten-Button-Schritt.",
+
+    "Überflug in ~",
+    " (ca.)",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

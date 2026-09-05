@@ -2,6 +2,7 @@
 #include "config.h"
 #include "aircraft.h"
 #include "aircraft_table.h"
+#include "auto_range.h"
 #include "airline_lookup.h"
 #include "aircraft_details.h"
 #include "radar_math.h"
@@ -44,6 +45,10 @@ namespace {
     struct Layout {
         int16_t cx, cy, radius;
         Rect rangeBtn;
+        // Nur gueltig/antippbar, wenn SettingsStore::autoRangeEnabled() -
+        // kleiner "?"-Button direkt links neben rangeBtn, siehe
+        // computeLayout()/handleTap() unten.
+        Rect autoInfoBtn;
         int16_t infoTop;
     };
 
@@ -94,7 +99,26 @@ namespace {
         L.radius = min(maxRadiusByWidth, maxRadiusByHeight);
         L.cx = Config::SCREEN_WIDTH / 2;
         L.cy = top + L.radius + 6 + TOP_LABEL_MARGIN;
-        L.rangeBtn = {(int16_t)(Config::SCREEN_WIDTH - 70), (int16_t)(L.infoTop + 4), 62, 22};
+        // Im Auto-Reichweitenmodus (SettingsStore::autoRangeEnabled())
+        // braucht der Button mehr Platz fuer das laengere "Auto(Xkm)"-
+        // Label (siehe render()) als die sonst feste "100km"-Beschriftung,
+        // PLUS Raum fuer den zusaetzlichen "?"-Info-Button links daneben
+        // (siehe handleTap()) - beides nur reserviert, wenn Auto gerade
+        // aktiv ist, damit sich am normalen Layout (10/25/50/100km) nichts
+        // aendert.
+        bool autoActive = SettingsStore::autoRangeEnabled();
+        constexpr int16_t RANGE_BTN_W_NORMAL = 62;
+        constexpr int16_t RANGE_BTN_W_AUTO = 84;
+        constexpr int16_t AUTO_INFO_BTN_W = 20;
+        constexpr int16_t AUTO_INFO_BTN_GAP = 4;
+        int16_t rangeBtnW = autoActive ? RANGE_BTN_W_AUTO : RANGE_BTN_W_NORMAL;
+        L.rangeBtn = {(int16_t)(Config::SCREEN_WIDTH - 8 - rangeBtnW), (int16_t)(L.infoTop + 4), rangeBtnW, 22};
+        if (autoActive) {
+            L.autoInfoBtn = {(int16_t)(L.rangeBtn.x - AUTO_INFO_BTN_GAP - AUTO_INFO_BTN_W),
+                              (int16_t)(L.infoTop + 5), AUTO_INFO_BTN_W, 20};
+        } else {
+            L.autoInfoBtn = {0, 0, 0, 0};
+        }
         return L;
     }
 
@@ -389,6 +413,29 @@ namespace {
             if (strcmp(squawk, Config::EMERGENCY_SQUAWKS[i]) == 0) return true;
         }
         return false;
+    }
+
+    // Gemeinsame "wird dieses Flugzeug gerade tatsaechlich auf dem Radar
+    // gezeichnet"-Pruefung - von render() (Zeichnen, siehe dort) UND
+    // updateProximityAlert() (einfacher/intelligenter Naeherungsalarm)
+    // genutzt, damit die LED nur noch auf Flugzeuge reagiert, die auch
+    // wirklich sichtbar waeren (Alex' Meldung: der Alarm ignorierte bisher
+    // sowohl die eingestellte Radar-Reichweite als auch alle drei
+    // Anzeigefilter, weil er unabhaengig von render() direkt die rohe
+    // AircraftTable scannte). Bewusst OHNE den Airline-Filter-Check - der
+    // hat in render() einen zusaetzlichen Seiteneffekt (Ereignis-Ecke-
+    // Praefix merken), deshalb bleibt er dort als eigener Schritt stehen;
+    // updateProximityAlert() ruft AirlineFilter::isHidden() separat mit auf
+    // (siehe dort). Notfall-Squawk und Watchlist-Treffer nutzen diese
+    // Funktion bewusst NICHT - die sollen wie bisher immer erkannt werden,
+    // auch ausserhalb der Reichweite oder hinter einem aktiven Filter.
+    bool isAircraftVisibleOnRadar(const Aircraft& a, float rangeKm) {
+        if (a.distanceKm > rangeKm * 1.05f) return false;
+        if (SettingsStore::hideGroundVehicles() && a.category[0] == 'C') return false;
+        if (SettingsStore::onlyHelicopters() && !(a.category[0] == 'A' && a.category[1] == '7')) return false;
+        if (SettingsStore::onlyLowAltitude() &&
+            (a.category[0] == 'C' || a.altBaroFt >= Config::COLOR_LOW_ALT_THRESHOLD_FT)) return false;
+        return true;
     }
 
     // "Auffaellige Flugzeuge" (oranger Ring) - fuer Militaer-/Regierungs-
@@ -964,6 +1011,20 @@ namespace {
     // niedriger Flughoehe ebenfalls die Theme-Farbe liefert - gelbe/rote
     // Flugzeuge und blaue Bodenfahrzeug-Marker wurden dabei schlicht nie mit
     // ihrer EIGENEN Farbe gefaedet.
+    // Nahe der Radar-Mitte ist die berechnete Peilung (atan2 aus winzigen
+    // dx/dy-Deltas) numerisch instabil - schon minimales GPS-/Positions-
+    // rauschen laesst sie zwischen zwei ADS-B-Updates stark springen (z.B.
+    // 40 Grad -> 220 Grad -> 95 Grad). Der schmale Sweep-Strahl trifft
+    // diesen staendig wandernden Zielwinkel dadurch oft mehrere Umdrehungen
+    // lang gar nicht, wodurch ein fast genau ueberfliegendes Flugzeug im
+    // CRT-Phosphor-Modus faelschlich fast unsichtbar (auf Mindesthelligkeit
+    // verblasst) bleibt, obwohl der Naeherungsalarm laengst korrekt
+    // ausloest (Alex' Meldung: LED blinkt, Flugzeug hoerbar, aber kein
+    // Marker sichtbar). Radius grosszuegiger als SWEEP_INNER_RADIUS
+    // gewaehlt, weil es hier nicht um die Sweep-Linien-Zeichnung, sondern
+    // um den ganzen Marker (samt Silhouette-Ausdehnung) geht.
+    constexpr int16_t CRT_PHOSPHOR_CENTER_DEADZONE_R = 10;
+
     uint16_t crtPhosphorColor(uint16_t baseColor, const PhosphorEntry* ph, uint32_t nowMs) {
         if (!ph || !ph->everSwept) return TFT_BLACK;
         uint32_t elapsed = nowMs - ph->lastSweptMs;
@@ -2221,13 +2282,41 @@ namespace {
                 break;
         }
 
-        char distBuf[144];
-        snprintf(distBuf, sizeof(distBuf), "%s%.0fkm / %.0fnm / %.0fmi  %s%.0f  %s%.0f° %s  %s %s",
+        // "Ueberflug"-CPA-ETA (aircraft.h::cpaRelevant/cpaEtaMin, Berechnung
+        // in aircraft_table.cpp::postFetchUpdate()) haengt aus demselben
+        // Platzgrund wie Peilung/Trend oben ebenfalls an dieser Zeile an,
+        // statt eine eigene Zeile zu bekommen. cpaRelevant ist bereits so
+        // definiert, dass es NUR bei distanceTrend==Approaching gesetzt
+        // werden kann (siehe dort) - kein zusaetzlicher Check hier noetig.
+        // "(ca.)"-Zusatz ist Pflicht (Alex' Vorgabe): das Flugzeug kann
+        // seinen Kurs jederzeit aendern, die Formel extrapoliert nur den
+        // AKTUELLEN Bewegungsvektor. "min"/"s" bleiben wie ueberall sonst
+        // im Projekt unuebersetzt (siehe DETAIL_APPROACH_* oben), nur
+        // Praefix/Suffix werden uebersetzt.
+        char cpaBuf[40] = {0};
+        if (a.cpaRelevant) {
+            int totalSec = (int)(a.cpaEtaMin * 60.0f + 0.5f);
+            if (totalSec < 0) totalSec = 0;
+            int mins = totalSec / 60;
+            int secs = totalSec % 60;
+            if (mins > 0) {
+                snprintf(cpaBuf, sizeof(cpaBuf), "%s%dmin %02ds%s",
+                         I18n::t(StringId::DETAIL_OVERFLIGHT_PREFIX), mins, secs,
+                         I18n::t(StringId::DETAIL_OVERFLIGHT_SUFFIX));
+            } else {
+                snprintf(cpaBuf, sizeof(cpaBuf), "%s%ds%s",
+                         I18n::t(StringId::DETAIL_OVERFLIGHT_PREFIX), secs,
+                         I18n::t(StringId::DETAIL_OVERFLIGHT_SUFFIX));
+            }
+        }
+
+        char distBuf[200];
+        snprintf(distBuf, sizeof(distBuf), "%s%.0fkm / %.0fnm / %.0fmi  %s%.0f  %s%.0f° %s  %s %s  %s",
                  I18n::t(StringId::DETAIL_DIST),
                  a.distanceKm, Units::kmToNm(a.distanceKm), Units::kmToMi(a.distanceKm),
                  I18n::t(StringId::DETAIL_HDG), a.headingDeg,
                  I18n::t(StringId::DETAIL_BEARING_PREFIX), a.bearingDeg, compassLabel(a.bearingDeg),
-                 trendSymbol, trendText);
+                 trendSymbol, trendText, cpaBuf);
         updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.distHeading, String(distBuf), forceFull);
         y += LINE_H;
 
@@ -3367,7 +3456,7 @@ bool consumeHeaderRedrawFlag() {
 
 void render(TFT_eSPI& tft, int16_t top) {
     Layout L = computeLayout(top);
-    float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
+    float rangeKm = Config::RANGE_STEPS_KM[AutoRange::effectiveIndex()];
 
     // Radar-Puls-Trigger: NUR bei echter Datenaenderung (Versionsvergleich),
     // nicht bei jedem render()-Aufruf - siehe Kommentar bei lastPulseVersion
@@ -3467,20 +3556,10 @@ void render(TFT_eSPI& tft, int16_t top) {
 
     for (uint8_t i = 0; i < count && i < MAX_HIT_POINTS; i++) {
         Aircraft& a = snapshot[i];
-        if (a.distanceKm > rangeKm * 1.05f) continue;
-
-        if (SettingsStore::hideGroundVehicles() && a.category[0] == 'C') continue;
-
-        if (SettingsStore::onlyHelicopters() && !(a.category[0] == 'A' && a.category[1] == '7')) continue;
-
-        // "Nur niedrig fliegende Flugzeuge" - dieselbe Schwelle wie die
-        // gruene Hoehen-Einfaerbung (Config::COLOR_LOW_ALT_THRESHOLD_FT,
-        // siehe colorForAltitude()). Bodenfahrzeuge (Kategorie "C")
-        // bewusst IMMER ausgeschlossen, wenn dieser Filter aktiv ist -
-        // unabhaengig vom separaten hideGroundVehicles()-Schalter, da es
-        // sich nicht um "niedrig fliegende Flugzeuge" handelt.
-        if (SettingsStore::onlyLowAltitude() &&
-            (a.category[0] == 'C' || a.altBaroFt >= Config::COLOR_LOW_ALT_THRESHOLD_FT)) continue;
+        // Reichweite + die drei Anzeigefilter (Bodenfahrzeuge/Nur-Heli/Nur-
+        // Niedrigflieger) - siehe isAircraftVisibleOnRadar() oben, jetzt
+        // dieselbe Pruefung wie im Naeherungsalarm (updateProximityAlert()).
+        if (!isAircraftVisibleOnRadar(a, rangeKm)) continue;
 
         if (AirlineFilter::isHidden(a.callsign)) {
             // Fuer die Ereignis-Ecke festhalten, BEVOR das Flugzeug hier
@@ -3538,6 +3617,20 @@ void render(TFT_eSPI& tft, int16_t top) {
         uint16_t color;
         PhosphorEntry* ph = findOrCreatePhosphor(a.hex);
         if (ph) ph->seenThisRender = true;
+        // Center-Totzone (siehe CRT_PHOSPHOR_CENTER_DEADZONE_R) auch hier
+        // beim initialen Zeichnen anwenden - sonst waere ein neu
+        // ausgewaehlter/neu aufgetauchter, fast genau ueberfliegender
+        // Marker schon im allerersten render()-Durchlauf unsichtbar
+        // (everSwept noch false), statt erst nach mehreren Sweep-
+        // Umdrehungen in tick() nachtraeglich "gerettet" zu werden.
+        if (ph) {
+            int32_t ddxC = pt.x - L.cx;
+            int32_t ddyC = pt.y - L.cy;
+            if (ddxC * ddxC + ddyC * ddyC <= (int32_t)CRT_PHOSPHOR_CENTER_DEADZONE_R * CRT_PHOSPHOR_CENTER_DEADZONE_R) {
+                ph->everSwept = true;
+                ph->lastSweptMs = millis();
+            }
+        }
         color = crtModeActive() ? crtPhosphorColor(ownColor, ph, millis()) : ownColor;
 
         // "Klassik-Radar", Teil 3+4: Sonar-Ping UND Signal-Rauschen bei
@@ -3698,19 +3791,40 @@ void render(TFT_eSPI& tft, int16_t top) {
         constexpr int16_t INFO_TEXT_X = 8;
         constexpr int16_t INFO_TEXT_GAP = 6;
         int16_t infoTextY = infoTop + 20;
-        int16_t infoTextW = L.rangeBtn.x - INFO_TEXT_X - INFO_TEXT_GAP;
+        // Bei aktivem Auto-Reichweitenmodus endet die Marquee-Zeile schon
+        // vor dem zusaetzlichen "?"-Info-Button (autoInfoBtn.x), sonst wie
+        // bisher vor rangeBtn.x - beide Rects kommen bereits korrekt
+        // dimensioniert aus computeLayout().
+        bool autoActive = SettingsStore::autoRangeEnabled();
+        int16_t infoTextRightEdge = autoActive ? L.autoInfoBtn.x : L.rangeBtn.x;
+        int16_t infoTextW = infoTextRightEdge - INFO_TEXT_X - INFO_TEXT_GAP;
         drawInfoMarquee(tft, INFO_TEXT_X, infoTextY, infoTextW);
 
         // Respektiert jetzt die Einheiten-Einstellung (Menue > Einheiten) -
-        // vorher immer "XXkm", auch bei Imperial (dort jetzt "XXnm").
-        char rangeLabel[8];
+        // vorher immer "XXkm", auch bei Imperial (dort jetzt "XXnm"). Im
+        // Auto-Reichweitenmodus zusaetzlich das "Auto(...)"-Praefix (siehe
+        // StringId::RANGE_AUTO_SHORT) vor der aktuell tatsaechlich
+        // gewaehlten Stufe (rangeKm kommt oben bereits aus
+        // AutoRange::effectiveIndex(), aktualisiert sich also automatisch
+        // live mit, sobald Auto-Range selbststaendig zwischen den drei
+        // Stufen wechselt).
+        char rangeLabel[24];
         bool rangeMetric = LocationManager::useMetricUnits();
-        if (rangeMetric) {
+        if (autoActive) {
+            if (rangeMetric) {
+                snprintf(rangeLabel, sizeof(rangeLabel), "%s(%.0fkm)", I18n::t(StringId::RANGE_AUTO_SHORT), rangeKm);
+            } else {
+                snprintf(rangeLabel, sizeof(rangeLabel), "%s(%.0fnm)", I18n::t(StringId::RANGE_AUTO_SHORT), Units::kmToNm(rangeKm));
+            }
+        } else if (rangeMetric) {
             snprintf(rangeLabel, sizeof(rangeLabel), "%.0fkm", rangeKm);
         } else {
             snprintf(rangeLabel, sizeof(rangeLabel), "%.0fnm", Units::kmToNm(rangeKm));
         }
         drawButton(tft, L.rangeBtn, rangeLabel);
+        if (autoActive) {
+            drawButton(tft, L.autoInfoBtn, "?");
+        }
 
         drawLegend(tft, infoTop + 44);
     }
@@ -3735,7 +3849,7 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     }
 
     Layout L = computeLayout(top);
-    float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
+    float rangeKm = Config::RANGE_STEPS_KM[AutoRange::effectiveIndex()];
 
     tft.startWrite();
 
@@ -4023,6 +4137,22 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
                     ph->lastSweptMs = nowMs;
                 }
             }
+            // Center-Totzone (siehe CRT_PHOSPHOR_CENTER_DEADZONE_R oben):
+            // dicht an der Mitte den Phosphor-Zustand unabhaengig vom
+            // tatsaechlichen Sweep-Treffer "frisch" halten, statt auf eine
+            // durch Peilungs-Jitter oft verpasste sweepCrossedBearing()-
+            // Erkennung zu warten. Sobald der Marker die Zone wieder
+            // verlaesst, faedet er ganz normal weiter (lastSweptMs ist ja
+            // gerade erst gesetzt worden, kein abrupter Sprung auf Schwarz).
+            int32_t ddxC = hp.x - L.cx;
+            int32_t ddyC = hp.y - L.cy;
+            if (ddxC * ddxC + ddyC * ddyC <= (int32_t)CRT_PHOSPHOR_CENTER_DEADZONE_R * CRT_PHOSPHOR_CENTER_DEADZONE_R) {
+                PhosphorEntry* ph = findOrCreatePhosphor(hp.hex);
+                if (ph) {
+                    ph->everSwept = true;
+                    ph->lastSweptMs = nowMs;
+                }
+            }
             if (crtModeActive()) {
                 PhosphorEntry* ph = findOrCreatePhosphor(hp.hex);
                 hp.color = crtPhosphorColor(hp.baseColor, ph, nowMs);
@@ -4277,7 +4407,21 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     constexpr int16_t INFO_TEXT_X = 8;
     constexpr int16_t INFO_TEXT_GAP = 6;
     int16_t infoTextY = L.infoTop + 20;
-    int16_t infoTextW = L.rangeBtn.x - INFO_TEXT_X - INFO_TEXT_GAP;
+    // BUGFIX (Alex' Meldung: fehlerhaftes gruenes Element neben dem Button,
+    // "?"-Info-Button im Auto-Zustand unsichtbar): diese Stelle hier in
+    // tick() (laeuft alle ~80ms fuer die Lauftext-Animation, viel oefter
+    // als render()) benutzte noch die alte Breiten-Berechnung bis
+    // rangeBtn.x, OHNE den zusaetzlichen "?"-Button (autoInfoBtn) bei
+    // aktivem Auto-Range zu beruecksichtigen - die Lauftext-Zeile scrollte
+    // dadurch bei jedem Tick ueber genau die Flaeche, in der render() den
+    // "?"-Button gezeichnet hatte, und ueberschrieb ihn praktisch sofort
+    // wieder (das gemeldete gruene Winkel-Element war ein Fragment des
+    // durchlaufenden Texts). Jetzt dieselbe Berechnung wie in render()
+    // (siehe dort), damit die Marquee-Zeile in beiden Funktionen
+    // konsistent VOR dem "?"-Button endet statt darueber hinweg zu laufen.
+    bool autoActiveTick = SettingsStore::autoRangeEnabled();
+    int16_t infoTextRightEdgeTick = autoActiveTick ? L.autoInfoBtn.x : L.rangeBtn.x;
+    int16_t infoTextW = infoTextRightEdgeTick - INFO_TEXT_X - INFO_TEXT_GAP;
 
     if (kind != infoMarqueeKind) {
         infoMarqueeKind = kind;
@@ -4339,9 +4483,34 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
         return true;
     }
 
+    // "?"-Info-Button neben dem Reichweiten-Button - nur vorhanden/gueltig,
+    // wenn Auto-Range gerade aktiv ist (siehe computeLayout(), autoInfoBtn
+    // ist sonst ein Nullrect und "contains()" liefert fuer jede reale
+    // Koordinate false).
+    if (SettingsStore::autoRangeEnabled() && L.autoInfoBtn.contains(x, y)) {
+        MenuScreen::showInfoScreen(tft, I18n::t(StringId::RANGE_AUTO_INFO_TITLE),
+                                    I18n::t(StringId::RANGE_AUTO_INFO_BODY),
+                                    UiTheme::accentColor(tft), I18n::t(StringId::BACK));
+        lastPanel.valid = false;
+        headerRedrawNeeded = true;
+        return true;
+    }
+
     if (L.rangeBtn.contains(x, y)) {
-        uint8_t idx = (SettingsStore::rangeIndex() + 1) % Config::RANGE_STEP_COUNT;
-        SettingsStore::setRangeIndex(idx);
+        // 5-Schritt-Zyklus 10->25->50->100->Auto->10->... (Alex' Wunsch,
+        // statt eines separaten Auto-Toggles im Mode-Menue) - Auto ist der
+        // fuenfte, zusaetzliche Schritt NACH der bisherigen 100km-Stufe.
+        if (SettingsStore::autoRangeEnabled()) {
+            // Auto verlassen -> zurueck zum Zyklus-Anfang (10km).
+            SettingsStore::setAutoRangeEnabled(false);
+            SettingsStore::setRangeIndex(0);
+        } else if (SettingsStore::rangeIndex() == Config::RANGE_STEP_COUNT - 1) {
+            // Von der letzten festen Stufe (100km) aus in Auto wechseln.
+            AutoRange::reset();
+            SettingsStore::setAutoRangeEnabled(true);
+        } else {
+            SettingsStore::setRangeIndex(SettingsStore::rangeIndex() + 1);
+        }
         return true;
     }
 
@@ -4480,9 +4649,18 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
     lastEmptyTapY = y;
 
     if (isDoubleTap) {
-        uint8_t idx = SettingsStore::rangeIndex();
-        idx = (idx == 0) ? (Config::RANGE_STEP_COUNT - 1) : (idx - 1);
-        SettingsStore::setRangeIndex(idx);
+        // Rueckwaerts durch denselben 5-Schritt-Zyklus wie der
+        // Reichweiten-Button (siehe handleTap() oben) -
+        // ...->100km->Auto->10km->... rueckwaerts gelesen.
+        if (SettingsStore::autoRangeEnabled()) {
+            SettingsStore::setAutoRangeEnabled(false);
+            SettingsStore::setRangeIndex(Config::RANGE_STEP_COUNT - 1);
+        } else if (SettingsStore::rangeIndex() == 0) {
+            AutoRange::reset();
+            SettingsStore::setAutoRangeEnabled(true);
+        } else {
+            SettingsStore::setRangeIndex(SettingsStore::rangeIndex() - 1);
+        }
         lastEmptyTapMs = 0;
     }
 
@@ -4515,6 +4693,9 @@ void updateProximityAlert(uint32_t nowMs) {
     bool proximityOn = SettingsStore::proximityAlertEnabled();
     bool smartOn = SettingsStore::proximityAlertSmartMode();
     bool emergencyOn = SettingsStore::emergencyAlertEnabled();
+    // Fuer isAircraftVisibleOnRadar() unten - dieselbe Reichweite, die
+    // render() gerade tatsaechlich zum Zeichnen benutzt.
+    float rangeKm = Config::RANGE_STEPS_KM[AutoRange::effectiveIndex()];
 
     // Haelt die zuletzt ausgeloeste Zonen-Eskalation fest (0=keine), damit
     // sie fuer Config::SMART_PROXIMITY_BURST_MS auf der LED sichtbar
@@ -4535,7 +4716,12 @@ void updateProximityAlert(uint32_t nowMs) {
         Aircraft* table = AircraftTable::raw();
         for (uint8_t i = 0; i < AircraftTable::capacity(); i++) {
             if (!table[i].valid) continue;
-            if (proximityOn && !smartOn && table[i].distanceKm <= Config::LED_ALERT_RADIUS_KM) anyClose = true;
+
+            // Notfall-Squawk und Watchlist-Treffer bewusst OHNE
+            // Sichtbarkeits-Einschraenkung (siehe Kommentar bei
+            // isAircraftVisibleOnRadar() oben) - sollen weiterhin IMMER
+            // erkannt werden, auch ausserhalb der eingestellten Reichweite
+            // oder hinter einem aktiven Anzeigefilter.
             if (emergencyOn && isEmergencySquawk(table[i].squawk)) anyEmergency = true;
             // Squawk-Wachliste loest denselben WatchlistBlue-Alarm aus wie
             // die Rufzeichen-Beobachtungsliste (siehe squawk_watchlist.h) -
@@ -4544,6 +4730,16 @@ void updateProximityAlert(uint32_t nowMs) {
             // entfernt).
             if (AircraftWatchlist::isWatched(table[i].callsign) ||
                 SquawkWatchlist::isWatched(table[i].squawk)) anyWatched = true;
+
+            // Einfacher UND intelligenter Naeherungsalarm dagegen NUR fuer
+            // Flugzeuge, die auch tatsaechlich auf dem Radar sichtbar waeren
+            // (Alex' Meldung: der Alarm ignorierte bisher die eingestellte
+            // Reichweite und alle Anzeigefilter). AirlineFilter::isHidden()
+            // wird hier zusaetzlich zur gemeinsamen Funktion geprueft (siehe
+            // Kommentar dort).
+            if (!isAircraftVisibleOnRadar(table[i], rangeKm) || AirlineFilter::isHidden(table[i].callsign)) continue;
+
+            if (proximityOn && !smartOn && table[i].distanceKm <= Config::LED_ALERT_RADIUS_KM) anyClose = true;
 
             if (!proximityOn || !smartOn) continue;
 

@@ -416,6 +416,13 @@ static const char* const I18N_EN[] = {
     "Smart",
     "How the Smart alert works",
     "Instead of a single distance threshold, the Smart alert uses three nested zones - Yellow (<20 km), Orange (<10 km), Red (<5 km) - and only triggers when an aircraft is actually approaching, i.e. newly crossing into a closer zone, not while it stays there or moves away again. All three zones use the same LED color as the Simple alert (your current theme color), but blink at increasing speed - slow for Yellow, medium for Orange, fast for Red - and stay lit for a few seconds per event instead of continuously.",
+
+    "Auto",
+    "How Auto range works",
+    "In Auto mode, the range automatically switches between 10, 25, and 50 km depending on how many aircraft are currently visible (roughly: very few aircraft -> 10 km, a moderate amount -> 25 km, a lot -> 50 km). It only switches after several consecutive updates confirm the change, and waits at least 2 minutes between switches, to avoid flickering back and forth. The 100 km step is deliberately excluded from Auto - at that radius, ADS-B responses occasionally get too large for the device to parse reliably - use the manual range button step instead if you need it.",
+
+    "Overflight in ~",
+    " (approx.)",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

@@ -4,6 +4,7 @@
 #include "units.h"
 #include <algorithm>
 #include <atomic>
+#include <math.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
@@ -62,6 +63,35 @@ uint8_t validCount() {
     return n;
 }
 
+void ageOutStale(uint32_t nowMs) {
+    lock();
+    bool anyEvicted = false;
+    for (auto& a : table) {
+        if (!a.valid) continue;
+        if (nowMs - a.lastSeenMs > STALE_TIMEOUT_MS) {
+            a = Aircraft{};
+            anyEvicted = true;
+        }
+    }
+    // Bewusst nicht mit der (weiterhin vorhandenen, siehe dort) Alterung in
+    // postFetchUpdate() zusammengelegt, um deren bestehende, laengst
+    // getestete Struktur nicht anzufassen - ein doppelter Eviction-Check
+    // ist unschaedlich, da a.valid ohnehin zuerst geprueft wird. Sortierung/
+    // versionCounter++ nur bei tatsaechlicher Aenderung, damit ein Aufruf
+    // ohne veraltete Eintraege (der Normalfall) keine unnoetigen Redraws
+    // ausloest.
+    if (anyEvicted) {
+        std::sort(table, table + Config::MAX_TRACKED_AIRCRAFT,
+                  [](const Aircraft& a, const Aircraft& b) {
+                      if (a.valid != b.valid) return a.valid > b.valid;
+                      if (!a.valid) return false;
+                      return a.distanceKm < b.distanceKm;
+                  });
+        versionCounter++;
+    }
+    unlock();
+}
+
 void postFetchUpdate(double homeLat, double homeLon) {
     uint32_t now = millis();
 
@@ -104,6 +134,53 @@ void postFetchUpdate(double homeLat, double homeLon) {
 
         a.distanceKm = polar.distanceKm;
         a.bearingDeg = polar.bearingDeg;
+
+        // "Ueberflug"-CPA (Closest Point of Approach, siehe aircraft.h::
+        // cpaRelevant/cpaEtaMin und Config::CPA_*) - reine Momentaufnahme
+        // aus Position, Kurs und Geschwindigkeit DIESES Zyklus, kein
+        // "vorherige Messung merken"-Muster noetig. Nur ueberhaupt relevant,
+        // wenn sich das Flugzeug gerade annaehert (s.o.), es kein Boden-
+        // fahrzeug ist (Kategorie "C" ueberfliegt nichts) und schnell genug
+        // fuer eine numerisch stabile Berechnung ist.
+        a.cpaRelevant = false;
+        a.cpaEtaMin = 0;
+        if (a.distanceTrend == Aircraft::DistanceTrend::Approaching &&
+            a.category[0] != 'C' &&
+            a.groundSpeedKt >= Config::CPA_MIN_SPEED_KT) {
+            constexpr double DEG2RAD = M_PI / 180.0;
+            // r = Position des Flugzeugs relativ zum eigenen Standort
+            // (Ost-/Nord-Komponenten aus der bereits berechneten Distanz/
+            // Peilung) - Standard-CPA-Konvention "Position des Ziels
+            // relativ zum eigenen Standort".
+            double bearingRad = polar.bearingDeg * DEG2RAD;
+            double rx = polar.distanceKm * sin(bearingRad);
+            double ry = polar.distanceKm * cos(bearingRad);
+
+            // v = Geschwindigkeitsvektor des Flugzeugs aus Kurs+Ground-
+            // speed, in km/min (passend zur gewuenschten Zeiteinheit).
+            double headingRad = a.headingDeg * DEG2RAD;
+            double speedKmPerMin = Units::ktToKmh(a.groundSpeedKt) / 60.0;
+            double vx = speedKmPerMin * sin(headingRad);
+            double vy = speedKmPerMin * cos(headingRad);
+
+            double rv = rx * vx + ry * vy;
+            double vv = vx * vx + vy * vy;
+            if (vv > 0.0001) {
+                // Zeit bis zum naechsten Punkt auf der aktuellen Flugbahn,
+                // siehe Config::CPA_MAX_TIME_MIN-Kommentar fuer die Formel-
+                // Herleitung.
+                double tStar = -rv / vv;
+                if (tStar > 0.0 && tStar <= (double)Config::CPA_MAX_TIME_MIN) {
+                    double cpaX = rx + vx * tStar;
+                    double cpaY = ry + vy * tStar;
+                    double cpaDistKm = sqrt(cpaX * cpaX + cpaY * cpaY);
+                    if (cpaDistKm <= Config::CPA_MAX_DISTANCE_KM) {
+                        a.cpaRelevant = true;
+                        a.cpaEtaMin = (float)tStar;
+                    }
+                }
+            }
+        }
 
         if (nearestAirport.available) {
             float airportDistKm = RadarMath::toPolar(a.lat, a.lon, nearestAirport.lat, nearestAirport.lon).distanceKm;

@@ -61,6 +61,21 @@ struct Aircraft {
     float          prevDistanceKm = -1;
     DistanceTrend  distanceTrend  = DistanceTrend::Unknown;
 
+    // "Ueberflug"-CPA (Closest Point of Approach) fuers Detail-Panel (siehe
+    // radar_screen.cpp::drawDetailPanel()) - Standard-Navigationsformel aus
+    // Position, Kurs und Geschwindigkeit DIESES einen Zyklus (kein
+    // "vorherige Messung merken"-Muster noetig wie bei prevDistanceKm oben,
+    // die Formel extrapoliert direkt aus dem aktuellen Bewegungsvektor).
+    // Nur gueltig/gesetzt, wenn cpaRelevant true ist (siehe
+    // aircraft_table.cpp::postFetchUpdate() fuer alle Bedingungen:
+    // Flugzeug naehert sich UEBERHAUPT (distanceTrend == Approaching),
+    // errechnete Zeit bis zum naechsten Punkt liegt im Fenster 0 bis
+    // Config::CPA_MAX_TIME_MIN, UND die dabei erreichte Minimaldistanz
+    // liegt unter Config::CPA_MAX_DISTANCE_KM - sonst waere die Anzeige nur
+    // Rauschen fuer Flugbahnen, die ohnehin nie nah vorbeikommen).
+    bool     cpaRelevant = false;
+    float    cpaEtaMin   = 0;
+
     bool     valid          = false;
 
     char     airlineName[24] = {0};

@@ -8,6 +8,9 @@ namespace SettingsStore {
 
 namespace {
     uint8_t rangeIdx = Config::DEFAULT_RANGE_INDEX;
+    // AUS per Default - Auto-Range ist ein bewusstes Opt-in ueber den
+    // Reichweiten-Button-Zyklus (siehe settings_store.h).
+    bool autoRangeOn = false;
     bool inverted = true; // Dieses Board braucht invertDisplay(true) fuer korrekte Farben (siehe main.cpp)
     // AUS per Default - Tischmontage (180 Grad) ist ein bewusstes Opt-in
     // ueber Menue > System > Anzeige, siehe settings_store.h.
@@ -120,6 +123,8 @@ namespace {
             nightDimmingOn = (value.toInt() != 0);
         } else if (key == "screensaver") {
             screensaverOn = (value.toInt() != 0);
+        } else if (key == "auto_range") {
+            autoRangeOn = (value.toInt() != 0);
         } else if (key == "hide_ground_vehicles") {
             hideGroundVehiclesOn = (value.toInt() != 0);
         } else if (key == "only_helicopters") {
@@ -228,6 +233,7 @@ void save() {
     f.printf("screen_timeout_min=%d\n", screenTimeoutMin);
     f.printf("night_dimming=%d\n", nightDimmingOn ? 1 : 0);
     f.printf("screensaver=%d\n", screensaverOn ? 1 : 0);
+    f.printf("auto_range=%d\n", autoRangeOn ? 1 : 0);
     f.printf("hide_ground_vehicles=%d\n", hideGroundVehiclesOn ? 1 : 0);
     f.printf("only_helicopters=%d\n", onlyHelicoptersOn ? 1 : 0);
     f.printf("only_low_altitude=%d\n", onlyLowAltitudeOn ? 1 : 0);
@@ -253,6 +259,13 @@ void save() {
 }
 
 uint8_t rangeIndex() { return rangeIdx; }
+
+bool autoRangeEnabled() { return autoRangeOn; }
+
+void setAutoRangeEnabled(bool on) {
+    autoRangeOn = on;
+    save();
+}
 
 void setRangeIndex(uint8_t idx) {
     if (idx < Config::RANGE_STEP_COUNT) {

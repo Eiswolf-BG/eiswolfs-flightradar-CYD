@@ -417,6 +417,13 @@ static const char* const I18N_NL[] = {
     "Slim",
     "Hoe het slimme alarm werkt",
     "In plaats van één enkele afstandsdrempel gebruikt het slimme alarm drie geneste zones - Geel (<20 km), Oranje (<10 km), Rood (<5 km) - en gaat alleen af wanneer een vliegtuig daadwerkelijk nadert, dus opnieuw een dichterbij gelegen zone binnenkomt, niet zolang het daar blijft of zich weer verwijdert. Alle drie de zones gebruiken dezelfde LED-kleur als het eenvoudige alarm (je huidige themakleur), maar knipperen steeds sneller - langzaam bij Geel, gemiddeld bij Oranje, snel bij Rood - en blijven per gebeurtenis maar een paar seconden branden in plaats van continu.",
+
+    "Auto",
+    "Hoe automatisch bereik werkt",
+    "In de Auto-modus wisselt het bereik automatisch tussen 10, 25 en 50 km, afhankelijk van hoeveel vliegtuigen er op dat moment zichtbaar zijn (ruwweg: heel weinig vliegtuigen -> 10 km, een gemiddeld aantal -> 25 km, veel -> 50 km). Er wordt pas gewisseld nadat meerdere opeenvolgende updates de trend bevestigen, en op zijn vroegst 2 minuten na de vorige wissel, om heen-en-weer-flikkeren te voorkomen. De stap van 100 km is bewust uitgesloten van Auto - bij die straal worden ADS-B-antwoorden soms te groot om betrouwbaar te verwerken - gebruik daarvoor de handmatige stap van de bereik-knop.",
+
+    "Overvlucht over ~",
+    " (ca.)",
 };
 
 static_assert(sizeof(I18N_NL) / sizeof(I18N_NL[0]) == (size_t)StringId::COUNT,

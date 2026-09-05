@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "5.5.5";
+    constexpr const char* APP_VERSION = "5.6.0";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -116,8 +116,10 @@ namespace Config {
     // Wetter-Icon im Header (siehe weather.cpp) - deutlich seltener
     // abgefragt als die ADS-B-Daten, das Wetter aendert sich nicht
     // minuetlich und die kostenlose Open-Meteo-API soll nicht unnoetig oft
-    // belastet werden.
-    constexpr uint32_t WEATHER_FETCH_INTERVAL_MS = 600000; // 10 Minuten
+    // belastet werden. Vorher 10 Minuten - auf Alex' Wunsch auf 5 Minuten
+    // verkuerzt, damit z.B. Regenbeginn (Regen-Overlay auf Radar/
+    // Ruhebildschirm) nicht bis zu 10 Minuten zu spaet erkannt wird.
+    constexpr uint32_t WEATHER_FETCH_INTERVAL_MS = 300000; // 5 Minuten
 
     // ISS-Positions-Bonusfeature (siehe iss_tracker.h) - Open-Notify liefert
     // ohnehin nur eine grob gerundete Momentaufnahme, ein kuerzeres
@@ -176,6 +178,29 @@ namespace Config {
     // annaeherndes/entfernendes Flugzeug (typische Geschwindigkeiten
     // liegen deutlich darueber) diesen Schwellenwert klar ueberschreitet.
     constexpr float DISTANCE_TREND_THRESHOLD_KM = 0.2f;
+
+    // "Ueberflug"-CPA-Anzeige im Detail-Panel (aircraft.h::cpaRelevant/
+    // cpaEtaMin, Berechnung in aircraft_table.cpp::postFetchUpdate(),
+    // Standard-Navigationsformel: Zeit bis zum naechsten Punkt auf der
+    // aktuellen Flugbahn = -(r*v)/(v*v), r=Position des Flugzeugs relativ
+    // zum eigenen Standort, v=Geschwindigkeitsvektor aus Kurs+Groundspeed).
+    // CPA_MAX_DISTANCE_KM bewusst identisch zu SMART_PROXIMITY_YELLOW_KM
+    // gewaehlt (nicht direkt wiederverwendet, damit beide Werte unabhaengig
+    // voneinander weiter abgestimmt werden koennen) - die Anzeige soll
+    // genau dann erscheinen, wenn das Flugzeug mindestens so nah vorbei-
+    // kommen wird wie die aeusserste Naeherungsalarm-Zone, sonst waere sie
+    // fuer Flugbahnen, die ohnehin nie in Alarmnaehe kommen, nur Rauschen.
+    // CPA_MAX_TIME_MIN begrenzt die Anzeige auf einen praktisch relevanten
+    // Zeithorizont (in 30 Minuten kann sich ein Kurs laengst geaendert
+    // haben - eine "ETA" darueber hinaus waere kaum noch aussagekraeftig).
+    // CPA_MIN_SPEED_KT verhindert eine numerisch instabile/unsinnig hohe
+    // ETA bei einem praktisch stehenden "Flugzeug" (Geschwindigkeitsvektor
+    // nahe Null macht die Formel instabil, siehe (v*v)-Division) - 20kt
+    // liegt deutlich unter jeder realistischen Reisegeschwindigkeit, aber
+    // ueber typischem Boden-/Schwebeflug-Rauschen.
+    constexpr float CPA_MAX_DISTANCE_KM = 20.0f;
+    constexpr float CPA_MAX_TIME_MIN    = 30.0f;
+    constexpr float CPA_MIN_SPEED_KT    = 20.0f;
 
     // Best-Effort-Anflug-Erkennung auf den naechstgelegenen Flughafen
     // (aircraft_table.cpp::postFetchUpdate(), Anzeige in radar_screen.cpp::

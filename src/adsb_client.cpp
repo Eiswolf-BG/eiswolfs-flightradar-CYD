@@ -123,6 +123,18 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
     struct PrevAirportDist { char hex[7]; float dist; };
     PrevAirportDist prevAirportDistByHex[Config::MAX_TRACKED_AIRCRAFT];
     uint8_t prevAirportDistCount = 0;
+    // Gleicher Schnappschuss-Bedarf wie bei prevAirportDistKm oben, nur fuer
+    // den Naeherungs-/Entfernungs-Trend im Detail-Panel (aircraft.h::
+    // DistanceTrend, aircraft_table.cpp::postFetchUpdate()). Wurde beim
+    // urspruenglichen Hinzufuegen dieses Features vergessen - dadurch wurde
+    // prevDistanceKm bei JEDEM Zyklus durch "a = Aircraft{}" unten auf den
+    // Default (-1) zurueckgesetzt, NOCH BEVOR postFetchUpdate() eine
+    // vorherige Distanz zum Vergleichen sehen konnte. Ergebnis: der Trend
+    // blieb praktisch immer auf "Unknown" (leerer Text), unabhaengig davon,
+    // wie lange ein Flugzeug schon verfolgt wurde (Alex' Bugmeldung).
+    struct PrevDistance { char hex[7]; float dist; };
+    PrevDistance prevDistanceByHex[Config::MAX_TRACKED_AIRCRAFT];
+    uint8_t prevDistanceCount = 0;
     for (uint8_t j = 0; j < tableCapacity && j < Config::MAX_TRACKED_AIRCRAFT; j++) {
         if (table[j].hex[0] != '\0') {
             strncpy(prevAirportDistByHex[prevAirportDistCount].hex, table[j].hex,
@@ -130,6 +142,12 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
             prevAirportDistByHex[prevAirportDistCount].hex[sizeof(prevAirportDistByHex[0].hex) - 1] = 0;
             prevAirportDistByHex[prevAirportDistCount].dist = table[j].prevAirportDistKm;
             prevAirportDistCount++;
+
+            strncpy(prevDistanceByHex[prevDistanceCount].hex, table[j].hex,
+                    sizeof(prevDistanceByHex[0].hex) - 1);
+            prevDistanceByHex[prevDistanceCount].hex[sizeof(prevDistanceByHex[0].hex) - 1] = 0;
+            prevDistanceByHex[prevDistanceCount].dist = table[j].prevDistanceKm;
+            prevDistanceCount++;
         }
     }
 
@@ -174,6 +192,15 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
         for (uint8_t j = 0; j < prevAirportDistCount; j++) {
             if (strcmp(prevAirportDistByHex[j].hex, hex) == 0) {
                 a.prevAirportDistKm = prevAirportDistByHex[j].dist;
+                break;
+            }
+        }
+        // prevDistanceKm ebenso wiederherstellen (siehe Kommentar beim
+        // Schnappschuss oben) - fuer den Naeherungs-/Entfernungs-Trend im
+        // Detail-Panel.
+        for (uint8_t j = 0; j < prevDistanceCount; j++) {
+            if (strcmp(prevDistanceByHex[j].hex, hex) == 0) {
+                a.prevDistanceKm = prevDistanceByHex[j].dist;
                 break;
             }
         }

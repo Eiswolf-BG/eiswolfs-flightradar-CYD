@@ -415,6 +415,13 @@ static const char* const I18N_IT[] = {
     "Intelligente",
     "Come funziona l'allarme intelligente",
     "Invece di una singola soglia di distanza, l'allarme intelligente usa tre zone annidate - Giallo (<20 km), Arancione (<10 km), Rosso (<5 km) - e si attiva solo quando un aereo si sta effettivamente avvicinando, cioè entra di nuovo in una zona più vicina, non mentre vi rimane o si allontana di nuovo. Tutte e tre le zone usano lo stesso colore LED dell'allarme semplice (il tuo colore tema attuale), ma lampeggiano sempre più velocemente - lento per il giallo, medio per l'arancione, veloce per il rosso - e restano accese solo per pochi secondi per evento, non in modo continuo.",
+
+    "Auto",
+    "Come funziona la portata automatica",
+    "In modalità Auto, la portata passa automaticamente tra 10, 25 e 50 km a seconda di quanti aerei sono attualmente visibili (indicativamente: pochissimi aerei -> 10 km, una quantità moderata -> 25 km, molti -> 50 km). Il cambio avviene solo dopo che diversi aggiornamenti consecutivi confermano la tendenza, e non prima di 2 minuti dall'ultimo cambio, per evitare oscillazioni continue. Il livello 100 km è volutamente escluso dalla modalità Auto - a questo raggio le risposte ADS-B a volte diventano troppo grandi per essere elaborate in modo affidabile - usa invece il passaggio manuale del pulsante della portata, se necessario.",
+
+    "Sorvolo tra ~",
+    " (circa)",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

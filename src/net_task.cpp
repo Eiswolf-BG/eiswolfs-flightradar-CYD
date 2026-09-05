@@ -5,6 +5,7 @@
 #include "adsb_client.h"
 #include "aircraft_table.h"
 #include "aircraft.h"
+#include "auto_range.h"
 #include "settings_store.h"
 #include "aircraft_details.h"
 #include "flight_logbook.h"
@@ -94,6 +95,14 @@ namespace {
             // flight_logbook.cpp::enforceAutoOff() fuer den Hintergrund).
             FlightLogbook::enforceAutoOff();
 
+            // Alterung veralteter Flugzeuge (siehe AircraftTable::
+            // ageOutStale()) laeuft bewusst hier, UNABHAENGIG vom Erfolg der
+            // ADS-B-Abfrage weiter unten - sonst wuerden bei anhaltendem
+            // Verbindungsverlust nie mehr entfernte Eintraege den
+            // Naeherungsalarm auf einem eingefrorenen Zustand haengen
+            // lassen (Alex' Meldung).
+            AircraftTable::ageOutStale(millis());
+
             if (millis() - lastFetchMs >= currentIntervalMs) {
                 lastFetchMs = millis();
 
@@ -103,7 +112,12 @@ namespace {
                     double lat = 0, lon = 0;
                     LocationManager::getHomeLocation(lat, lon);
 
-                    float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
+                    // AutoRange::effectiveIndex() liefert im "Auto"-
+                    // Reichweitenmodus (SettingsStore::autoRangeEnabled())
+                    // die gerade automatisch gewaehlte Stufe (10/25/50km),
+                    // sonst wie bisher die manuell eingestellte
+                    // SettingsStore::rangeIndex() - siehe auto_range.h.
+                    float rangeKm = Config::RANGE_STEPS_KM[AutoRange::effectiveIndex()];
 
                     // Solange die WebUI-Livekarte gerade aktiv geoeffnet ist
                     // (siehe WebExportServer::isRadarUiActive()), auf der
@@ -165,7 +179,18 @@ namespace {
                         memcpy(tempTable, AircraftTable::raw(),
                                sizeof(Aircraft) * Config::MAX_TRACKED_AIRCRAFT);
 
+                        uint8_t validAircraftCount = AircraftTable::validCount();
+
                         AircraftTable::unlock();
+
+                        // Auto-Range-Auswertung (siehe auto_range.h) - nur
+                        // waehrend Auto tatsaechlich aktiv ist, sonst wuerde
+                        // die Hysterese-Zaehlung im Hintergrund auf Basis
+                        // der manuell fest eingestellten Reichweite
+                        // weiterlaufen, ohne dass das je sichtbar wuerde.
+                        if (SettingsStore::autoRangeEnabled()) {
+                            AutoRange::onFetchSuccess(validAircraftCount, millis());
+                        }
 
                         FlightLogbook::update();
 

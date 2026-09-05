@@ -415,6 +415,13 @@ static const char* const I18N_TR[] = {
     "Akıllı",
     "Akıllı alarm nasıl çalışır",
     "Tek bir mesafe eşiği yerine, akıllı alarm iç içe geçmiş üç bölge kullanır - Sarı (<20 km), Turuncu (<10 km), Kırmızı (<5 km) - ve yalnızca bir uçak gerçekten yaklaştığında, yani daha yakın bir bölgeye yeni girdiğinde tetiklenir; orada kaldığı veya tekrar uzaklaştığı sürece tetiklenmez. Üç bölge de basit alarmla aynı LED rengini kullanır (mevcut tema renginiz), ancak gittikçe hızlanan bir şekilde yanıp söner - Sarı'da yavaş, Turuncu'da orta, Kırmızı'da hızlı - ve sürekli değil, her olayda yalnızca birkaç saniye yanar.",
+
+    "Oto",
+    "Otomatik menzil nasıl çalışır",
+    "Otomatik modda, menzil o anda görünen uçak sayısına göre otomatik olarak 10, 25 ve 50 km arasında geçiş yapar (yaklaşık olarak: çok az uçak -> 10 km, orta düzeyde -> 25 km, çok sayıda -> 50 km). Geçiş yalnızca birbirini izleyen birkaç güncelleme değişikliği doğruladıktan sonra ve son geçişten en az 2 dakika sonra gerçekleşir, böylece sürekli ileri geri değişmez. 100 km adımı Otomatik modda bilinçli olarak hariç tutulmuştur - bu yarıçapta ADS-B yanıtları bazen cihazın güvenilir şekilde işleyemeyeceği kadar büyük olabiliyor - buna ihtiyacınız olursa menzil düğmesindeki manuel adımı kullanın.",
+
+    "Üstten geçiş ~",
+    " (tahmini)",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

@@ -415,6 +415,13 @@ static const char* const I18N_FR[] = {
     "Intelligent",
     "Comment fonctionne l'alarme intelligente",
     "Au lieu d'un seul seuil de distance, l'alarme intelligente utilise trois zones imbriquées - Jaune (<20 km), Orange (<10 km), Rouge (<5 km) - et ne se déclenche que lorsqu'un avion se rapproche réellement, c'est-à-dire qu'il passe nouvellement dans une zone plus proche, pas tant qu'il y reste ou s'éloigne à nouveau. Les trois zones utilisent la même couleur LED que l'alarme simple (votre couleur de thème actuelle), mais clignotent de plus en plus vite - lentement pour le jaune, moyennement pour l'orange, rapidement pour le rouge - et restent allumées quelques secondes par événement au lieu d'en continu.",
+
+    "Auto",
+    "Comment fonctionne la portée automatique",
+    "En mode Auto, la portée bascule automatiquement entre 10, 25 et 50 km selon le nombre d'avions actuellement visibles (environ : très peu d'avions -> 10 km, un nombre modéré -> 25 km, beaucoup -> 50 km). Le changement n'intervient qu'après plusieurs mises à jour consécutives confirmant la tendance, et au plus tôt 2 minutes après le dernier changement, pour éviter les allers-retours. Le palier 100 km est volontairement exclu du mode Auto - à ce rayon, les réponses ADS-B deviennent parfois trop volumineuses pour être traitées de façon fiable - utilisez plutôt l'étape manuelle du bouton de portée si besoin.",
+
+    "Survol dans ~",
+    " (approx.)",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

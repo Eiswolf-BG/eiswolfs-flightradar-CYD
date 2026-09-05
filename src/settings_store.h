@@ -8,6 +8,17 @@ namespace SettingsStore {
     uint8_t rangeIndex();
     void setRangeIndex(uint8_t idx);
 
+    // "Auto"-Reichweitenmodus (5. Schritt im Reichweiten-Button-Zyklus:
+    // 10->25->50->100->Auto->10->..., siehe radar_screen.cpp::handleTap())
+    // - waehlt bei AN automatisch zwischen 10/25/50km je nach aktueller
+    // Flugzeuganzahl (siehe auto_range.h). rangeIndex() wird waehrend Auto
+    // NICHT fuer die tatsaechliche Abfrage/Anzeige benutzt (siehe
+    // AutoRange::effectiveIndex()) und beim Verlassen von Auto explizit auf
+    // den jeweiligen Zyklus-Endpunkt gesetzt (10km vorwaerts/100km
+    // rueckwaerts), nicht auf einen "zuletzt manuell" gemerkten Wert.
+    bool autoRangeEnabled();
+    void setAutoRangeEnabled(bool on);
+
     bool displayInverted();
     void setDisplayInverted(bool inverted);
 

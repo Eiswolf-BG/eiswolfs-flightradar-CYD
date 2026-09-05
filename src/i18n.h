@@ -863,6 +863,30 @@ enum class StringId : uint16_t {
     PROXIMITY_SMART_INFO_TITLE,
     PROXIMITY_SMART_INFO_BODY,
 
+    // "Auto"-Reichweitenmodus (5. Schritt im Reichweiten-Button-Zyklus,
+    // siehe radar_screen.cpp/auto_range.h). RANGE_AUTO_SHORT ist bewusst
+    // kein neuer, laenglicher Satz, sondern ein kompaktes Praefix fuers
+    // enge Button-Label ("Auto(25km)") - in allen 8 Sprachen einheitlich
+    // "Auto" (in Tech-/Geraete-UIs international gebraeuchliche Kurzform
+    // fuer "automatisch", z.B. Kamera-/WLAN-Einstellungen, auch wenn das
+    // Wort in DE/IT/NL zusaetzlich "Auto" im Sinne von "Fahrzeug" bedeutet
+    // - im Kontext direkt neben einer km/nm-Distanz nicht missverstaendlich).
+    RANGE_AUTO_SHORT,
+    RANGE_AUTO_INFO_TITLE,
+    RANGE_AUTO_INFO_BODY,
+
+    // "Ueberflug"-CPA-ETA (Closest Point of Approach, siehe aircraft.h::
+    // cpaRelevant/cpaEtaMin, Berechnung in aircraft_table.cpp::
+    // postFetchUpdate(), Anzeige an die Peilung/Distanz/Trend-Zeile in
+    // drawDetailPanel() angehaengt) - "min"/"s" bleiben wie ueberall sonst
+    // im Projekt unuebersetzt (siehe DETAIL_APPROACH_ETA-Kommentar oben),
+    // nur Praefix ("Ueberflug in ~") und Suffix (" (ca.)") werden
+    // uebersetzt. Der "(ca.)"-Zusatz ist Pflicht (Alex' Vorgabe) - das
+    // Flugzeug kann seinen Kurs jederzeit aendern, die Formel extrapoliert
+    // nur den aktuellen Bewegungsvektor.
+    DETAIL_OVERFLIGHT_PREFIX,
+    DETAIL_OVERFLIGHT_SUFFIX,
+
     COUNT
 };
 
