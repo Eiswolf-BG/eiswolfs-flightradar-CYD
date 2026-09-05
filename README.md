@@ -37,257 +37,181 @@ You can flash the firmware directly from your browser to your CYD display withou
 ---
 
 ## Features
-- **Live radar screen** – circular radar view, sized to the full screen width, with a rotating green sweep line; each aircraft marker shows a recognizable type silhouette with a small directional chevron just ahead of its nose, so its direction of travel is unambiguous at a glance even with 30+ aircraft on screen at once. Twinkling background stars fill the space outside the radar circle.
-- **Real ADS-B data** via the free [adsb.lol](https://adsb.lol) API, refreshed every 8 seconds
-- **Color-coded aircraft** by altitude (green `<10k ft`, yellow `10-30k ft`, red `>30k ft`) with an on-screen legend
-- **Tap an aircraft** to open a detail panel: callsign, airline, aircraft model (via [hexdb.io](https://hexdb.io)), flight route (origin/destination airport, resolved via a chain of three free lookup services for better coverage), altitude/speed/distance/heading/bearing in both metric and aviation units, estimated seat count, plus a "QR" button that shows a full-screen QR code linking to that flight's live-tracking page on FlightAware. The panel stays open with the last known values even if the aircraft leaves radar range while you're reading it - it only closes when you tap to close it yourself
-- **Bearing indicator** – with an aircraft selected, a dotted line plus a heading-in-degrees label points from the radar center to the compass edge, showing exactly which direction to look to spot it in the sky (not to be confused with the aircraft's own heading arrow)
-- **Empty-sky timer** – when no aircraft are currently in range, the info bar counts up how long the sky's been empty instead of showing the usual "tap for details" hint, which itself now also shows how many aircraft are currently visible
-- **Adjustable range** (10/25/50/100 km) via on-screen button
-- **Aircraft list view** – a sortable list (by distance, altitude, or callsign) of every aircraft currently in range, tap any row to jump straight to its detail panel (see [Aircraft List](#-aircraft-list) below)
-- **Touch-driven WiFi setup** and on-screen keyboard for first-time configuration, with up to 3 saved networks (see [WiFi Manager](#-wifi-manager-up-to-3-saved-networks) below)
-- **Location presets** – save up to 3 fixed locations, or point the radar at any place in the world, including a native in-device address search for setting your exact location (see [Location Presets](#-location-presets) below)
-- **Aircraft watchlist** – track up to 5 specific flights by callsign, with a cyan radar ring and blue LED alert when one appears (see [Watchlist](#-watchlist) below)
-- **Night dimming** – automatically dims the backlight, plus the radar's aircraft markers and sweep line, to a softer (but still readable) look between 22:00 and 06:00 local time (see [Night Dimming](#-night-dimming) below)
-- **History chart** – a simple 7-day bar chart of logged aircraft counts, right next to the plain logbook file list (see [History Chart](#-history-chart) below)
-- **Web export** – a small built-in web page (reachable via the device's IP while on the same WiFi, with its own "Logbook / WebUI" entry in Menu → System) to view, download and individually delete the flight logbook, in addition to a merged CSV of all days (see [Web Export](#-web-export) below)
-- **Weather icon** – a small icon in the header shows the current conditions (sun, cloud, sun-behind-cloud, rain, snow, thunderstorm) for whichever location is currently active, including active location presets (see [Weather Icon](#-weather-icon) below)
-- **IP-based geolocation** (no GPS module needed) to center the radar on your location
-- **Proximity LED alert** – the onboard RGB LED blinks green when an aircraft is within 3 km (no speaker on this board, so this replaces an audible alert)
-- **Dual-core design** – all networking (WiFi, ADS-B polling, aircraft detail lookups) runs on Core 0, while the display and touch input run on Core 1, so the UI never freezes during a network request
-- Data (airline names, aircraft-type seat estimates) loaded from CSV files on the SD card, auto-seeded on first boot
-- **8 languages** (English, German, French, Turkish, Spanish, Italian, Brazilian Portuguese, Dutch), selectable on first boot or anytime from the menu
-- **Adjustable brightness** (10-100% in 10% steps, Menu → System → "Brightness") with a live preview as you tap, plus an optional **Auto-Brightness** toggle right on the same screen that uses the device's built-in light sensor instead, smoothed to avoid flickering
-- **Metric/Imperial units** (Menu → Region → "Units") consistently applied across the radar range button, range ring labels, aircraft list, nearest-airport distance, and stats
-- **IATA or ICAO airport codes** (same "Units" screen, or tap the route line directly in the aircraft detail panel) – choose whether the route shown in the aircraft detail panel (origin/destination) uses 3-letter IATA codes (e.g. "FRA", the default on a fresh install) or 4-letter ICAO codes (e.g. "EDDF"); falls back to ICAO automatically if no IATA code is available for a given airport. The route line itself now also shows a short "(IATA)"/"(ICAO)" label so it's always clear which format is currently displayed
-- **Firmware version** is shown directly on the "Check for updates" button (Menu → System)
-- **Backup & Reset** (Menu → System → "Backup & Reset") – back up or restore your settings, or fully reset the device (wipes all on-device data and re-runs first-time setup) - handy for testing or handing the device to someone else
-- **Screen timeout with slider** (Menu → System → "Screen Timeout") – set how long until the display turns off after a period of no touches, from 1 to 15 minutes or "Never", using a drag slider instead of tapping through values one minute at a time
-- **Idle screensaver** (same screen, off by default) – instead of turning the display off completely after the timeout, shows a dimmed starfield with the radar logo, a large clock, today's date (in your language's local format), and the firmware version, dimmed noticeably deeper than the regular night dimming; a tap wakes it back up. When the "Show Weather" effect is on and the weather data detects rain or a thunderstorm, drops fall straight down across the whole screen here too (no wind tilt, since there's no compass reference on this screen), visibly in front of the logo/clock. When it detects actual snowfall instead, small white dots drift gently downward (clearly distinct from the rain lines) - the time and date stay readable, snowflakes never draw over them
-- **OTA firmware updates over WiFi** (Menu → System → "Check for update") – checks the latest GitHub release and, if newer, downloads and installs it directly on the device, no cable or web flasher needed. Update results are shown as a clear on-screen message that requires confirmation, with an explicit restart button on success. The onboard LED also briefly flashes white three times every 10 seconds whenever an update is available, in addition to the red dot on the update button - this LED signal can be turned off separately (right below the update button) if you'd rather rely on the red dot alone
-- **Automatic background update check** – the device quietly checks for new firmware every few minutes in the background; a small red dot (like an app badge) appears on the Menu button, the System tile, the "Check for update" button, and the sleep screen when a new version is available. Installing always still requires your explicit confirmation - nothing happens automatically
-- **Quick header shortcuts** – tap the WiFi signal bars in the header to jump straight to WiFi settings, or tap the small clock to jump straight to the screen-timeout settings - the entire header is interactive. A QR code linking to this project's GitHub page is available under Menu → System → Tools → **"About"**
-- **Live radar in the web UI** – scanning the QR code (or opening the device's IP) now shows a live radar with all currently visible aircraft at the top of the page, refreshing every few seconds, with the flight logbook below it as before (see [Web Export](#-web-export) below)
-- **Sun-based night dimming** – the night dimming window now follows the actual sunrise/sunset time at your location instead of a fixed 10pm-6am window, so it matches how dark it actually is outside depending on the season
-- **Heavy aircraft marker** – wide-body jets over 136 tonnes MTOW (e.g. A380, B747, B777) get a larger, bolder version of their aircraft-type silhouette (see below) on both the device radar and the web UI radar, instead of the normal-size marker
-- **Live flight tracking QR code** – a "QR" button in the aircraft detail panel shows a full-screen QR code linking straight to that flight's FlightAware live-tracking page, so you can pull it up on your phone in one scan
-- **Most-seen aircraft ranking** – a "Top" button on the Statistics screen shows the 5 aircraft logged most often across your whole flight logbook (see [Most-Seen Aircraft](#-most-seen-aircraft) below)
-- **METAR flight-weather report** – the Weather Info screen now also shows the raw METAR text for the nearest airport, right below the usual weather explanation (see [Weather Icon](#-weather-icon) below)
-- **Radar Display** – tap the **"Colors"** button under **Menu → System → "Radar Display"** to choose between five color themes: Green, Amber, Blue, Red, or Purple; the chosen color now applies system-wide (all menus, buttons, borders and text), not just the radar screen - aircraft altitude colors and alert/status colors are unaffected, they always keep their own meaning. Plus five independent, combinable extras: a CRT-Phosphor glow effect that fades *every* aircraft marker color (not just low-altitude/green ones) in and out as the sweep passes them, a Radar Pulse animation - an expanding ring from the radar center on every fresh data update, Classic Radar mode - a comet-tail sweep, extra grid spokes, a sonar-ping ring and a brief burst of signal noise whenever a new aircraft first appears, a best-effort Military/Government flight detection based on known squawk-code ranges (orange ring around the marker, no alert), and an animated "Show Weather" effect that shows falling rain drops over the radar circle - matching the actual wind direction - whenever the weather data detects rain or a thunderstorm; drop count and fall speed now scale with the actual rain intensity from the weather data (light/moderate/heavy), and the same switch also drives falling snow (small drifting white dots, visually distinct from rain) on the idle screensaver and the web live radar whenever it's actually snowing (see below); a small "?" help button next to each explains it right on the device
-- **OTA update changelog** – after a firmware update installs successfully, the confirmation screen now shows a short, scrollable list of what changed in that version
-- **Sunrise/sunset times** – the Weather Info screen now also shows today's sunrise and sunset time for your currently active location, right below the METAR report
-- **Short weather forecast** – the Weather Info screen also shows a short forecast (temperature and conditions) 3 hours ahead, and now scrolls automatically if the combined text (including a long METAR report) doesn't fit on one screen
-- **Bearing to selected aircraft** – the detail panel now also shows a compass direction (e.g. "NE") alongside the numeric bearing, so you know which way to look without doing the math yourself
-- **Quick watchlist add** – a "+"/"-" button in the aircraft detail panel, right next to the "QR" button, adds the currently shown aircraft to the [Watchlist](#-watchlist) with a single tap instead of typing its callsign manually
-- **Show helicopters only** – a toggle under **Menu → Flight Options → Display Filters** filters the radar, aircraft list, and web live map down to helicopters (see [Show helicopters only](#-show-helicopters-only-onoff) below)
-- **Show low-altitude aircraft only** – a toggle in the same **Display Filters** menu shows only aircraft currently below the green altitude threshold (see [Show low-altitude aircraft only](#-show-low-altitude-aircraft-only-onoff) below)
-- **Empty-sky filter hint** – when the radar shows no aircraft because a filter (helicopters only, low-altitude only, airline filter) is hiding everything, the "empty sky" message now names which filter is active and is tappable, jumping straight to the Display Filters menu instead of leaving you guessing whether something's technically wrong
-- **Reorganized menus** – the Flight Options menu is now grouped into category buttons: **Lists** (Aircraft List, Watchlist), **Stats & Logbook**, **LED Alerts**, **Display Filters** (airline filter, ground vehicles, helicopters only, low-altitude only), and a direct **Location Presets** button (no separate "Tools" submenu anymore); the System menu keeps its own Display/Tools categories. A watchlist match always triggers the alert LED automatically now - there's no separate on/off switch for it anymore
-- **Optional GPS module support** – a new "GPS" button in [Location Presets](#-location-presets) turns reading from a connected GPS module on/off, so your location can follow your movement live instead of only being estimated via IP
-- **Rotate screen (180°)** – a new switch under **Menu → System → Display** flips the screen and touch input upside down, useful for table-mount setups where the panel's limited vertical viewing angle otherwise washes out the radar circles when looked at from above
-- **Squawk Watchlist** – store your own squawk codes (see [Watchlist](#-watchlist) below); as soon as any aircraft transmits a watched squawk, it gets the same cyan ring and blue LED alert as the callsign-based watchlist
-- **ISS marker** – shows the International Space Station as a special marker whenever it's currently passing within your radar range, since it moves fast enough (~7.66 km/s) that it's usually only visible for a few seconds; can be turned off under **Menu → Flight Options → Display Filters**
-- **Scanline overlay** – a subtle, always-on horizontal scanline pattern over the radar circle area for a classic CRT-radar look, without affecting the readability of buttons or text elsewhere on screen
-- **Terminal-style boot sequence** – a short, simulated old-radar-system startup sequence ("Initializing transponder receiver...", etc.) plays before the usual splash screen on every boot
-- **"Mode" button** – a quick shortcut right on the radar screen header that jumps straight to the **Radar Display** menu, so the CRT-Phosphor/Radar Pulse toggles are reachable without digging through the System menu
-- **Eye icon header shortcut** – a small eye icon in the radar screen header, between "Menu" and the WiFi signal bars, jumps straight to the **Display Filters** menu (ground vehicles/helicopters/low-altitude) without going through Menu → Flight Options first
-- **Aircraft-type silhouettes** – aircraft markers now show a recognizable silhouette (airliner, private jet, or turboprop) instead of a generic arrow, based on a best-effort classification of the ICAO type code (including modern Neo/MAX generations); an unrecognized type falls back to a neutral generic-aircraft silhouette – applies consistently across all categories, including Heavy aircraft, with no circle/blob markers anywhere. A small, single-color chevron just ahead of the nose points in the current direction of travel, so heading stays obvious at a glance even in dense traffic
-- **Update-available LED signal** – the RGB LED blinks white three times every 10 seconds whenever a firmware update is available, in addition to the existing red dot badges; suppressed while an emergency alert is active, and stops as soon as the update is installed or no longer available
-- **Color-themed LED alerts** – the heartbeat flash and proximity alert LED now follow the selected **Radar Display** color theme (green/amber/blue/red/purple) instead of always being green; the watchlist alert LED is fixed cyan so it stays clearly distinguishable from the proximity alert on any theme, and the emergency alarm always blinks a Morse SOS pattern (see [Emergency alert](#-emergency-alert-onoff) below) so it stays unmistakable even on the Red theme. Purple is deliberately tuned (not a plain 1:1 red+blue mix) so it stays visually distinct from the white update-available signal
-- **Web Live Radar improvements** – the page now shows a live-counting "last updated" timestamp plus the firmware version and connection status in the footer, automatically follows the device's selected color theme, shows a subtle watchlist/squawk status hint when a tracked aircraft is visible, and the logbook table below it is now searchable (by date) and sortable by clicking a column header. When the "Show Weather" effect is on and it's actually raining, drops fall across the radar circle in the device's current theme color, following the real wind direction just like the device's own radar screen; when it's actually snowing instead, small white dots drift down around the radar circle (page background, not drawn over the live radar itself)
-- **MQTT / Home Assistant integration** – an optional MQTT connection (**Menu → System → Tools → "MQTT"**, off by default) publishes aircraft count, proximity/watchlist alert status, WiFi signal strength, and firmware version to your own broker, with automatic Home Assistant device discovery so all sensors show up grouped under one device, including online/offline availability (see [MQTT / Home Assistant](#-mqtt--home-assistant) below)
-- **Military/government legend hint** – the aircraft detail panel now shows a small legend line (matching the existing altitude-legend style) whenever the currently viewed aircraft was detected as a military/government flight, in addition to the existing orange ring on the radar itself
-- **Radar corner overlays** – four small, dimmed indicators now live in the free space outside the radar circle, none of them interfering with the sweep, scanlines, or rain effect: a **3h weather preview** (top-right) that only appears when the weather 3 hours from now differs from the current conditions; an **update-available indicator** (bottom-left, a pulsing exclamation mark in a circle) whenever a firmware update is ready, tap it to jump to the update screen; a **nearest airport** display (top-left, distance + bearing in your configured IATA/ICAO format) that's always visible and tappable to add that airport directly as a new location preset; and an **"Overlay" event indicator** (bottom-right) that rotates every 3 seconds through whatever's currently active among a squawk watchlist match, an aircraft watchlist match, or a hidden (filtered) airline nearby - each tappable to jump straight to the matching screen (military/government detection was removed from this rotation - it stays visible via the orange marker ring and detail panel line instead). A single "Overlay" switch turns the weather preview, nearest-airport display, and event indicator off together, under **Menu → System → "Radar Display"** (the update indicator is unaffected)
-- **Tappable altitude legend** – tapping the altitude-color legend at the bottom of the radar screen now opens a full-screen overlay showing the same three color bands (plus the ground-vehicle marker, if visible) larger and with a short explanation, using your configured metric/imperial unit, plus the military/government marker ring and the Heavy aircraft symbol
-- **Live map view (Web UI)** – the web live radar now has a "Map" tab alongside the existing radar circle, showing a real OpenStreetMap view with the home location, every currently visible aircraft's position and heading, and a tap popup with its details. The zoom level automatically fits itself to whichever aircraft are visible (or the current radar range, if the sky's empty) the first time the map is opened, and stays exactly as you left it afterwards - manual zooming/panning is never reset by incoming data updates
-- **Intelligent proximity alert** – an alternative alert mode (**Menu → Flight Options → LED Alerts → "Alert mode"**) that replaces the single-radius alert with three staggered distance zones (yellow/orange/red), only triggering when an aircraft genuinely moves into a tighter zone (not while it stays there or moves back out), each zone blinking progressively faster; triggers regardless of the aircraft's altitude, so it stays consistent for high-flying long-haul traffic passing overhead too
-- **Airport approach detection** – a best-effort hint in the aircraft detail panel ("Likely approaching `<code>` - ETA ~X min") when an aircraft's distance to the nearest airport is shrinking, it's descending, and its speed/altitude are in a plausible landing-approach range - derived purely from the same live position data already shown elsewhere, no extra route lookups involved
-- **Offline/stale-data mode** – if the ADS-B data fetch fails (network hiccup, timeout, or a temporarily overloaded API), the last known aircraft stay visible instead of disappearing immediately: their markers grey out and their label shows how long ago they were last seen, and the radar's status line switches to a clear "no connection" hint. Markers are removed only after a longer grace period with no data, and everything snaps back to normal the moment the connection returns
-- **Approaching/departing indicator** – the aircraft detail panel now also shows whether the selected aircraft is approaching, departing, or just passing by, derived purely from how its distance to you changes over the last few data updates, no extra lookups involved
-- **Nearest aircraft display** – a subtle "nearest aircraft" indicator (icon + distance) now appears on the idle screensaver and as a fixed line in the radar screen's corner, always visible regardless of whether the radar corner overlays (see above) are turned on
-- **Overflight ETA** – when an aircraft is approaching, the detail panel now also estimates when it will reach its closest point to you and how close that will be, based purely on its current heading and speed (always marked as an estimate, since a course change would invalidate it)
-- **Logbook auto-off notice** – if the flight logbook's 24-hour safety shutoff kicks in, a popup now lets you know right away - even if the device happened to be powered off exactly when the 24 hours ran out, the notice still catches up on the next boot
-- **First seen / seen for** – the aircraft detail panel now also shows when an aircraft was first spotted in the current session and how long it's been continuously visible since - session-only, resets on every device restart
-- **Circle-crossing pulse** – aircraft markers briefly flash brighter and larger whenever they cross one of the distance rings on the radar, in either direction (approaching or departing)
-- **Previously seen** – the aircraft detail panel now also shows how many times an aircraft has been logged on earlier days and when it was last seen, looked up from the logbook files in the background so opening the panel is never delayed
-- **Peak traffic** – a new stat (see [History Chart](#-history-chart) below) shows today's highest number of simultaneously visible aircraft, along with the time it happened
 
-## Feature Deep-Dive
+- [Radar Display & Visuals](#️-radar-display--visuals)
+- [Aircraft Details](#-aircraft-details)
+- [Alerts & LEDs](#-alerts--leds)
+- [Filters](#-filters)
+- [Location & Range](#-location--range)
+- [Lists & Logbook](#-lists--logbook)
+- [Web & Integrations](#-web--integrations)
+- [System & Settings](#️-system--settings)
 
-### 📍 Location Presets
-By default the device figures out where it is automatically (via IP geolocation).
-Under **Menu → Flight Options → Location Presets** you can additionally save up
-to 3 fixed locations and switch between them.
+### 🛰️ Radar Display & Visuals
 
-**Good to know:** only **one** location is ever active at a time – either "Auto"
-or exactly one of the 3 presets. Tap an entry to make it the active one.
+The main screen is a circular radar view, sized to the full screen width, with a rotating sweep line and a twinkling starfield filling the space outside the radar circle. Each aircraft marker shows a recognizable type silhouette (airliner, private jet, or turboprop) instead of a generic arrow, based on a best-effort classification of the ICAO type code, with a small single-color chevron just ahead of the nose pointing in the current direction of travel - heading stays obvious at a glance even in dense traffic. Wide-body "Heavy" jets over 136 tonnes MTOW (e.g. A380, B747, B777) get a larger, bolder version of the same silhouette. Ground vehicles (follow-me cars, pushback tugs, flagged by the API under their own category) render as distinct blue square markers, and helicopters get a filled circle with a rotor cross instead of an arrowhead, since a hovering helicopter has no meaningful forward heading. Aircraft detected as military/government flights (via a best-effort squawk-code range check) get a thin orange ring around the marker.
 
-**Optional GPS module:** a "GPS" button next to "Auto" turns reading from a connected GPS module on/off (only has any effect when "Auto" is the active location). With GPS enabled and a module wired up, your location follows your movement live (e.g. while driving) instead of only being roughly estimated via IP - without a connected module, the button simply has no effect. Wiring: GPS module TX to GPIO22, GPS module RX to GPIO27, 3.3V and GND, 9600 baud (NMEA protocol). See the "?" info button on the Location Presets screen for the same details on-device.
+Aircraft are color-coded by altitude - green below 10,000 ft, yellow between 10,000-30,000 ft, red above 30,000 ft - with a legend at the bottom of the radar screen. Tapping the legend opens a full-screen overlay showing the same three bands larger, with a short explanation, the ground-vehicle marker (if visible), the military/government ring, and the Heavy aircraft symbol, all using your configured metric/imperial unit. With an aircraft selected, a dotted line plus a heading-in-degrees label points from the radar center to the compass edge, showing exactly which direction to look to spot it in the sky.
 
-**The actual trick:** you don't have to enter *your own* location there – you can
-enter the coordinates of **any place in the world** and the radar will show the
-live air traffic *there* instead, regardless of where your device physically is.
+**Color themes & effects:** under **Menu → System → "Radar Display"**, the **"Colors"** button switches between five color themes - Green, Amber, Blue, Red, or Purple - applied system-wide (menus, buttons, borders, text); aircraft altitude colors and alert/status colors keep their own fixed meaning regardless of theme. Five independent, combinable extras live on the same screen: a **CRT-Phosphor** glow that fades every aircraft marker color in and out as the sweep passes it; a **Radar Pulse** animation - an expanding ring from the center on every fresh data update; **Classic Radar** mode - a comet-tail sweep, extra grid spokes, a sonar-ping ring and a brief burst of signal noise whenever a new aircraft first appears; a subtle, always-on horizontal **scanline overlay** for a classic CRT-radar look; and an animated **"Show Weather"** effect (see below). A "?" help button next to each explains it directly on the device. A short, simulated old-radar-system startup sequence ("Initializing transponder receiver...", etc.) plays on every boot before the usual splash screen, and a **"Mode"** button in the radar screen header jumps straight to this **Radar Display** menu.
 
-**Examples:**
-- Enter the coordinates of Milan-Malpensa Airport (`45.6306`, `8.7281`) and watch
-  the traffic there while sitting at home.
-- Save home, workplace, and a holiday house as 3 presets and switch between them
-  with a single tap, without waiting for IP geolocation to re-run each time.
-- More precise than IP geolocation (which is often only accurate to city level) –
-  handy if the device lives permanently at one fixed spot and you know its exact
-  coordinates.
+**Weather on the radar:** whenever the weather data for the active location detects rain or a thunderstorm, animated rain drops fall across the radar circle, matching the real wind direction, with drop count and fall speed scaled to the actual rain intensity (light/moderate/heavy). When it's actually snowing, small drifting white dots appear instead, visually distinct from rain. The same effect plays on the idle screensaver (straight down, no wind tilt, since there's no compass reference there) and on the web live radar (in the device's current theme color).
 
-A "?" info button right on the Location Presets screen explains all of this
-again directly on the device.
+**Radar corner overlays:** four small, dimmed indicators sit in the free space outside the radar circle without interfering with the sweep, scanlines, or rain effect - a **3h weather preview** (top-right) that only appears when the weather 3 hours from now differs from current conditions; an **update-available indicator** (bottom-left, a pulsing exclamation mark) that jumps to the update screen when tapped; a **nearest airport** display (top-left, distance + bearing in your configured IATA/ICAO format), tappable to add that airport directly as a new location preset; and an **event indicator** (bottom-right) that rotates every 3 seconds through whatever's currently active among a squawk watchlist match, an aircraft watchlist match, or a hidden (filtered) airline nearby, each tappable to jump to the matching screen. A single **"Overlay"** switch on the Radar Display menu turns the weather preview, nearest-airport display, and event indicator off together (the update indicator is unaffected).
 
-**Naming presets:** when adding a preset, you can optionally give it a name (e.g. "Home"), which is then shown in the overview instead of the raw coordinates.
+**Night dimming:** between sunset and sunrise at your active location, the backlight automatically dims to a softer brightness level - still readable, easier on the eyes if the device runs around the clock. The window follows the real sunrise/sunset time for your location and the current date, shifting earlier in winter and later in summer; until location or time of day is known (e.g. briefly after boot), it falls back to a fixed 10pm-6am window. The same window also softens the radar screen itself - aircraft markers and the sweep line switch to darker green/yellow/red tones. Toggle it under **Menu → System → "Night dimming"**; tapping the screen while dimmed wakes it to the soft night level (not full brightness) if it's still night, avoiding a sudden bright flash in a dark room. This is separate from the inactivity screen timeout, which turns the display fully off after a period without touches regardless of time of day.
 
-The screen also shows the **nearest known airport** (from a built-in, worldwide database of over 5,000 large and medium-sized airports) to whichever location is currently active - handy to see exactly where a foreign preset points to, or why a location has a lot of air traffic. This ticker is tappable (shown with a thin green border) - tapping it adds that airport directly as a new preset at its coordinates, using the same local airport database on the SD card, no internet lookup needed.
+**Idle screensaver:** instead of turning the display fully off after the screen timeout, an optional screensaver (same settings screen, off by default) shows a dimmed starfield with the radar logo, a large clock, today's date in your language's local format, the firmware version, and a subtle "nearest aircraft" indicator (icon + distance) - dimmed noticeably deeper than regular night dimming. A tap wakes it back up. The same rain/snow weather effect plays here too, visibly in front of the logo/clock without ever drawing over the time and date.
 
-**Search by address:** when adding a preset ("+"), you can either enter coordinates manually or tap "Search by address" to type a plain address (e.g. "Main Street 12, 12345 Springfield") - the device geocodes it via the free OpenStreetMap Nominatim service and shows you the matching place to confirm before saving it as a preset. If a place name is ambiguous (e.g. "Cambridge" exists multiple times worldwide, in the UK, the US, Canada...), a short pick-list of the top matches (name and country) appears first so you can choose the right one, instead of the device silently guessing. The address keyboard includes a format hint, punctuation keys (comma, hyphen, slash, period, apostrophe) so house numbers like "45/3" can actually be entered, and a dedicated special-character page (À Á Ä Â Ç É È Ê Ë Í Î Ñ Ó Ò Ô Ú Ù Ü Ş İ Ğ ß, etc.) for accented place names. This is much more accurate than automatic IP-based location, which can easily be off by 20-30 km. The preset-naming screen also shows example names (e.g. "Home, Work, Holiday home") and has its own special-character page too, so names like "Zürich" or "São Paulo" can be typed correctly instead of only their ASCII approximation.
+### ✈️ Aircraft Details
 
-### 📶 WiFi Manager (up to 3 saved networks)
-Under **Menu → WiFi/Network** you can save up to 3 WiFi networks at once (not
-just one). On boot, the device automatically connects to whichever one it can
-currently see.
+Tapping an aircraft opens a detail panel showing callsign, airline, aircraft model (via [hexdb.io](https://hexdb.io)), flight route (origin/destination airport, resolved via a chain of three free lookup services for better coverage), altitude/speed/distance/heading/bearing in both metric and aviation units, estimated seat count, and a "QR" button that shows a full-screen QR code linking to that flight's live-tracking page on FlightAware. The bearing is shown both as a compass direction (e.g. "NE") and the numeric degree value. A "+"/"-" button right next to "QR" adds or removes the aircraft from the [Watchlist](#-watchlist) with a single tap. The route line itself shows a short "(IATA)"/"(ICAO)" label so it's always clear which code format is displayed. The panel stays open with the last known values even if the aircraft leaves radar range while you're reading it - it only closes when you tap to close it yourself.
 
-**Why would you need 3 networks if you're only ever in one place?**
-- **Portable use:** take the device to the office, a friend's place, or a
-  holiday home, and it connects automatically everywhere without re-entering
-  passwords each time.
-- **Guest network + main network:** many routers offer separate guest and main
-  WiFi networks – save both, and the device just uses whichever is reachable.
-- **Multiple access points/repeaters:** if you have several access points around
-  the house (e.g. living room + workshop), the device automatically connects to
-  whichever saved network it can currently reach.
+The panel also derives a few things purely from how the aircraft's position changes over the last few data updates, with no extra lookups involved:
+- **Approaching / departing / passing** - whether the aircraft's distance to you is currently shrinking, growing, or roughly constant.
+- **Overflight ETA** - while approaching, an estimate of when it will reach its closest point to you and how close that will be, based on its current heading and speed (always marked as an estimate, since a course change would invalidate it).
+- **First seen / seen for** - when the aircraft was first spotted in the current session and how long it's been continuously visible since; resets on every device restart.
+- **Previously seen** - how many times the aircraft has been logged on earlier days and when it was last seen, looked up from the logbook files in the background so opening the panel is never delayed.
 
-Any saved network can be removed again at any time via the red "X", freeing up a
-slot for a new one.
+Aircraft identified as military/government flights (see the orange ring on the radar) get a matching legend line in the detail panel itself.
 
-**Hidden networks:** if your WiFi network doesn't broadcast its name, it won't
-show up in the scan list. An "Other/Hidden SSID" button on that same list lets
-you type the network name manually using the same on-screen keyboard used for
-passwords, then continue straight to the password step as usual - available
-both during first-time setup and when adding a network later.
+### 🚨 Alerts & LEDs
 
-### 🌙 Night Dimming
-Between sunset and sunrise at your active location, the backlight automatically dims to a softer brightness level - still perfectly readable, but easier on the eyes if the device sits in a bedroom or living room around the clock. The dimming window follows the real sunrise/sunset time (calculated from your location and the current date), not a fixed clock window, so it automatically shifts earlier in winter and later in summer. Until the location or time of day is known (e.g. briefly after boot), it falls back to a fixed 10pm-6am window. This is separate from the inactivity screen timeout (**Menu → System → "Screen Timeout"**), which turns the display fully off after a period of no touch input, regardless of time of day - handy if you just want the flight logbook running in the background without needing the screen. Tapping the screen wakes it back up to your configured brightness (or the soft night level above, if it's still night).
+Since the CYD board has no speaker, all alerts are conveyed through the onboard RGB LED.
 
-Toggle it under **Menu → System → "Night dimming"**. When you tap the screen while it's night-dimmed, it wakes back up to the soft night level (not full brightness) if it's still night - no sudden bright flash in a dark room.
+- **Proximity LED (ON/OFF)** - blinks in the currently selected color theme whenever an aircraft comes within 3 km (straight-line distance to the active location).
+- **Intelligent proximity alert** - an alternative mode (**Menu → Flight Options → LED Alerts → "Alert mode"**) that replaces the single-radius alert with three staggered distance zones (yellow/orange/red), triggering only when an aircraft genuinely moves into a tighter zone, each zone blinking progressively faster. Triggers regardless of altitude, so it stays consistent for high-flying long-haul traffic too.
+- **Watchlist (callsign)** - track up to 5 specific flights by exact callsign (e.g. `DLH441`). A matching aircraft gets a cyan ring on the radar and the LED blinks a fixed cyan (independent of the color theme, so it always stays distinguishable from the theme-colored proximity alert). Add flights via **Menu → Flight Options → "Watchlist"**, or with the "+"/"-" button in the aircraft detail panel. Turn the alert on/off separately under "Watchlist alert".
+- **Squawk Watchlist** - a similarly-structured list right next to the callsign watchlist stores up to 5 four-digit octal squawk codes; any aircraft transmitting a watched squawk triggers the same cyan-ring-plus-LED alert.
+- **Emergency alert (ON/OFF)** - continuously monitors all visible aircraft for one of the three international emergency squawk codes (7500 hijacking, 7600 radio failure, 7700 general emergency). On detection, the LED blinks a real Morse SOS pattern (3 short, 3 long, 3 short, then a pause) - deliberately distinct from every other LED indication, including the Red color theme's own accent color - and a flashing red banner appears in the radar header with the callsign and squawk code. Takes priority over all other LED indications.
+- **LED heartbeat (ON/OFF)** - a brief flash of the LED, in the current color theme, on every successful ADS-B data fetch (every 8 seconds), confirming the device is actively receiving data. Overridden by an active proximity or emergency alert.
+- **Update-available LED signal** - the LED blinks white three times every 10 seconds whenever a firmware update is available, in addition to the red dot badges elsewhere in the UI; suppressed during an emergency alert, and stops once the update is installed or no longer available. Can be turned off separately, right below the update button, if you'd rather rely on the red dot alone.
+- **Color-themed LEDs** - the heartbeat flash and proximity alert LED follow the selected Radar Display color theme; the watchlist LED is fixed cyan and the emergency alarm always blinks its Morse pattern, so both stay unmistakable on any theme. Purple is deliberately tuned so it stays visually distinct from the white update-available signal.
 
-Since this update, the same night window also softens the **radar screen itself** — aircraft markers and the rotating sweep line switch to darker green/yellow/red tones, so the whole display is easier on the eyes at night, not just the backlight. No separate toggle needed - it uses the same **Night dimming** setting.
+Priority order when several conditions apply at once: emergency alert first, then watchlist, then the (simple or intelligent) proximity alert, then the heartbeat.
 
-## ✈️ Flight Options — every function in detail
+### 🔎 Filters
 
-All the functions below are found under **Menu → Flight Options**.
+- **Airline filter** - completely hides aircraft from up to 10 specific airlines (entered by ICAO code, e.g. `DLH` for Lufthansa, `RYR` for Ryanair) from the radar, aircraft list, and counts/logging. Handy near an airport with high-frequency airlines you'd rather not see.
+- **Hide ground vehicles (ON/OFF)** - hides airport ground vehicles (follow-me cars, pushback tugs) that ADS-B data can include alongside real aircraft, so the radar stays focused purely on air traffic.
+- **Show helicopters only (ON/OFF)** - filters the radar, [Aircraft List](#-aircraft-list), and Live Radar web page down to helicopters only, hiding everything else. Off by default; handy for rotorcraft-specific traffic (medevac, police, sightseeing tours).
+- **Show low-altitude aircraft only (ON/OFF)** - filters the radar down to aircraft currently below the green altitude threshold. Ground vehicles are never included by this filter regardless of the separate ground-vehicle setting. Off by default.
+- **Empty-sky filter hint** - when the radar shows no aircraft because a filter (helicopters only, low-altitude only, airline filter) is hiding everything, the "empty sky" message names which filter is active and is tappable, jumping straight to the Display Filters menu.
 
-### 📋 Aircraft List
-Menu → Flight Options → **"Aircraft list"** (top entry) shows every aircraft currently visible on the radar as a scrollable, sortable list instead of dots — handy for a quick text overview instead of parsing the radar view. Shows callsign, altitude (color-coded the same way as the radar: green/yellow/red), and distance for each entry. A button at the top cycles the sort order through **distance → altitude → callsign**. Emergency squawks get a red border, watched aircraft (see [Watchlist](#-watchlist)) a cyan one, matching the radar's own markers. Tap any row to jump straight back to the radar with that aircraft's detail panel already open.
+All four toggles live under **Menu → Flight Options → Display Filters**.
 
-### 📊 Statistics
+### 📍 Location & Range
+
+By default the device figures out where it is automatically via IP geolocation. Under **Menu → Flight Options → Location Presets** you can additionally save up to 3 fixed locations and switch between them - only one location is ever active at a time, either "Auto" or exactly one of the 3 presets, and tapping an entry makes it active.
+
+**The actual trick:** a preset doesn't have to be *your own* location - entering the coordinates of any place in the world makes the radar show the live air traffic *there* instead, regardless of where the device physically is. For example, entering the coordinates of Milan-Malpensa Airport (`45.6306`, `8.7281`) shows the traffic there while sitting at home; saving home, workplace, and a holiday house as 3 presets lets you switch between them with a single tap, without waiting for IP geolocation to re-run each time. It's also generally more precise than IP geolocation (often only accurate to city level) if the device lives permanently at one fixed spot and you know its exact coordinates. A "?" info button on the Location Presets screen explains all of this directly on the device.
+
+**Naming presets:** when adding a preset, you can optionally give it a name (e.g. "Home"), shown in the overview instead of the raw coordinates. The naming screen shows example names and has its own special-character page, so names like "Zürich" or "São Paulo" can be typed correctly.
+
+**Search by address:** when adding a preset ("+"), you can enter coordinates manually or tap "Search by address" to type a plain address (e.g. "Main Street 12, 12345 Springfield") - the device geocodes it via the free OpenStreetMap Nominatim service and shows the matching place to confirm before saving. If a place name is ambiguous (e.g. "Cambridge" exists in the UK, the US, Canada, and elsewhere), a short pick-list of the top matches (name and country) appears first instead of the device silently guessing. The address keyboard includes a format hint, punctuation keys (comma, hyphen, slash, period, apostrophe) so house numbers like "45/3" can be entered, and a dedicated special-character page (À Á Ä Â Ç É È Ê Ë Í Î Ñ Ó Ò Ô Ú Ù Ü Ş İ Ğ ß, etc.) for accented place names.
+
+**Optional GPS module:** a "GPS" button next to "Auto" turns reading from a connected GPS module on/off (only has an effect when "Auto" is active). With GPS enabled and a module wired up, your location follows your movement live (e.g. while driving) instead of only being estimated via IP; without a connected module, the button simply has no effect. Wiring: GPS module TX to GPIO22, GPS module RX to GPIO27, 3.3V and GND, 9600 baud (NMEA protocol). See the "?" info button on the Location Presets screen for the same details on-device.
+
+**Nearest airport:** the Location Presets screen shows the nearest known airport (from a built-in, worldwide database of over 5,000 large and medium-sized airports) to whichever location is currently active - handy to see where a foreign preset points to, or why a location has heavy air traffic. This line is tappable (thin green border) - tapping it adds that airport directly as a new preset at its coordinates, using the local airport database on the SD card, with no internet lookup needed. The same nearest-airport distance and bearing also appears as a corner overlay on the radar screen itself (see [Radar corner overlays](#️-radar-display--visuals) above).
+
+**Adjustable range:** the radar range cycles between 10/25/50/100 km via an on-screen button, applied consistently to the radar circle, range rings, and the underlying ADS-B query radius.
+
+**Airport approach detection:** a best-effort hint in the aircraft detail panel ("Likely approaching `<code>` - ETA ~X min") appears when an aircraft's distance to the nearest airport is shrinking, it's descending, and its speed/altitude are in a plausible landing-approach range - derived purely from the same live position data already shown elsewhere, with no extra route lookups involved.
+
+### 📊 Lists & Logbook
+
+#### 📋 Aircraft List
+**Menu → Flight Options → "Aircraft list"** shows every aircraft currently visible on the radar as a scrollable, sortable list instead of dots - a quick text overview instead of parsing the radar view. Shows callsign, altitude (color-coded the same way as the radar), and distance for each entry. A button at the top cycles the sort order through distance → altitude → callsign. Emergency squawks get a red border, watched aircraft (see [Watchlist](#-watchlist)) a cyan one, matching the radar's own markers. Tapping a row jumps straight back to the radar with that aircraft's detail panel open.
+
+#### 📈 Statistics
 Shows at a glance:
-- **Aircraft logged today** – number of distinct aircraft first seen today
-- **Aircraft logged all-time** – total across the entire runtime (all days combined)
-- **Days with sightings** – how many days anything was logged at all
-- **Average per day** – total count divided by number of days
-- **Uptime** – how long the device has been running since the last restart
-- **Highest flight today** – callsign and altitude of whichever aircraft was logged at the greatest altitude today (the altitude at first sighting, not necessarily its current one), e.g. "DLH441 (38000 ft)"
+- **Aircraft logged today** - number of distinct aircraft first seen today
+- **Aircraft logged all-time** - total across the entire runtime (all days combined)
+- **Days with sightings** - how many days anything was logged at all
+- **Average per day** - total count divided by number of days
+- **Uptime** - how long the device has been running since the last restart
+- **Highest flight today** - callsign and altitude of whichever aircraft was logged at the greatest altitude today (altitude at first sighting), e.g. "DLH441 (38000 ft)"
 
 The **"Reset logbook data"** button (tap twice to confirm) permanently deletes all logged data.
 
-### 🏆 Most-Seen Aircraft
-A "Top" button in the top-right of the Statistics screen opens a ranking of the **5 aircraft logged most often** across the entire flight logbook (all days combined), showing each one's registration (or hex code if unknown) and total sighting count - handy for spotting the "regulars" that pass over again and again.
+#### 🏆 Most-Seen Aircraft
+A "Top" button in the top-right of the Statistics screen opens a ranking of the 5 aircraft logged most often across the entire flight logbook (all days combined), showing each one's registration (or hex code if unknown) and total sighting count - handy for spotting the "regulars" that pass over again and again.
 
-### 📈 History Chart
-Shows a rolling window of the last **7 calendar days** (today and the 6 days before) as a simple bar chart, always exactly 7 individual, clearly separated bars – a quick visual complement to the plain number list in Logbook files. Days without any logged sightings still get their own labeled bar showing "0", instead of being skipped. Bar height is relative to the busiest day shown, with the exact count printed above each bar and the day-of-month printed below it. The underlying counts come from the SD-card-persisted logbook files, so the chart survives a device restart.
+#### 📅 History Chart
+Shows a rolling window of the last 7 calendar days (today and the 6 days before) as a simple bar chart, always exactly 7 individual, clearly separated bars - a quick visual complement to the plain number list in Logbook files. Days without any logged sightings still get their own labeled bar showing "0". Bar height is relative to the busiest day shown, with the exact count printed above each bar and the day-of-month below it. The underlying counts come from the SD-card-persisted logbook files, so the chart survives a device restart.
 
-Below the chart, a **"Peak traffic"** line shows today's highest number of aircraft visible at the same time, along with the time it happened (e.g. "Today's peak: 23 aircraft at 14:32") - persisted across restarts and reset automatically at midnight. Tracked independently of the flight logbook switch, so it keeps working even with logging turned off. The line is only shown once a peak has actually been recorded for today.
-
-**Good for:** spotting at a glance which days were busier than others, without having to compare numbers row by row.
+Below the chart, a "Peak traffic" line shows today's highest number of aircraft visible at the same time, along with the time it happened (e.g. "Today's peak: 23 aircraft at 14:32") - persisted across restarts, reset automatically at midnight, and tracked independently of the flight logbook switch, so it keeps working even with logging turned off. The line is only shown once a peak has actually been recorded for today.
 
 A "?" info button on the History chart screen explains how it works directly on the device.
 
-### 📁 Logbook files
-Lists the last several days from the logbook individually, with date and the number of aircraft logged that day. Handy for tracing the history over multiple days instead of only seeing the grand total. Each file has its own red "X" to delete it individually.
+#### 📁 Logbook files
+Lists the last several days from the logbook individually, with date and the number of aircraft logged that day - handy for tracing history over multiple days instead of only seeing the grand total. Each file has its own red "X" to delete it individually.
 
-### 🌐 Web Export
-A small built-in web page lets you view a live radar and export the flight logbook from any browser on the same WiFi network – handy for checking traffic from your phone or opening the logbook in Excel, Numbers, or Google Sheets. It starts automatically in the background as soon as the device connects to WiFi.
+#### 📖 Flight logbook (ON/OFF)
+When enabled, the device logs every newly sighted aircraft (timestamp, hex code, callsign, registration, type, distance, altitude) into a CSV file on the SD card. An aircraft is only logged once per activation, even if it crosses the radar multiple times.
 
-**Live radar:** the top of the page shows a canvas radar with all currently visible aircraft, refreshing automatically every 8 seconds (simple polling, no app or special software needed) – same distance rings, aircraft-type silhouettes, altitude colors, marker shapes (ground vehicles, rotorcraft, Heavy aircraft), and full compass directions (N/E/S/W) as the device display, plus a full-page twinkling starfield background (same look as the web installer). The page automatically follows whichever of the five color themes (green/amber/blue/red/purple) is currently selected on the device, updating live if you change it while the page is open. A small "last updated" timestamp above the radar counts up live between refreshes, and a footer shows the firmware version, a live connection-status indicator, and a subtle watchlist/squawk badge whenever a currently visible aircraft is on your watchlist. Tap or click an aircraft to open an info panel with callsign, altitude, speed, distance, bearing, heading, squawk, and – if the callsign is known – a tracking link (route, details, photo) via FlightAware. Distances and the radius selector automatically follow the device's Metric/Imperial units setting. The radius selector (10/25/50/100 km or nm) above the radar actually zooms the web view independently of the device's own range setting – the device temporarily queries at the largest configured range while the Live Radar page is open, so a wider web selection can show aircraft beyond what the device itself is currently set to.
+Off by default, with a safety net: an unnoticed, permanently running logbook can quietly fill up the SD card and slow down the logbook menus, so turning it on shows a full-screen warning that has to be confirmed, and once on, it automatically switches off again after 24 hours - staying off after a restart unless it was actually turned on with a valid timestamp, so it can never silently keep running forever across power cycles or firmware updates. If the 24-hour safety shutoff kicks in, a popup lets you know right away - even if the device happened to be powered off exactly when the 24 hours ran out, the notice catches up on the next boot.
 
-**Logbook:** below the radar, the page lists every logged day with its aircraft count, a download link for the **merged CSV** (all days combined), and per-day **download/delete** links for each individual day's file. A search field above the table filters the list by date as it grows, and clicking the "Date" or "Aircraft" column header sorts the table (click again to reverse the order). Delete and download buttons show immediate visual feedback ("Deleting…"/"Preparing…") while the request is in progress.
+Each time you turn it on, a new CSV file is created for that session (e.g. `2026-08-06.csv`, or `2026-08-06_2.csv` for a second activation on the same day) instead of endlessly appending to one growing file. Turning it off saves SD card write cycles if you don't care about the statistics/history.
 
-**How to use it:** while your computer or phone is on the same WiFi network as the device, open a browser and go to the device's IP address (e.g. `http://192.168.1.42/`).
+### 🌐 Web & Integrations
 
-Don't know the device's current IP? **Menu > System > "Logbook / WebUI"** shows it live on the device, along with a short explanation of the page (the "?" info button on the **Logbook files** screen also still shows it). While connected to WiFi, this screen also shows a **QR code** for the page's URL, so you can open it on your phone without typing the IP address by hand.
+#### 🖥️ Web Export
+A small built-in web page lets you view a live radar and export the flight logbook from any browser on the same WiFi network - handy for checking traffic from your phone or opening the logbook in Excel, Numbers, or Google Sheets. It starts automatically in the background as soon as the device connects to WiFi.
 
-### 🏠 MQTT / Home Assistant
-An optional MQTT connection (**Menu → System → Tools → "MQTT"**, off by default) lets you feed a few live radar values into your own smart-home system, such as Home Assistant. Turn it on, enter your broker's address (host and port, e.g. `192.168.1.10:1883`), and optionally a username/password if your broker requires authentication – public test brokers without a login work too.
+**Live radar:** the top of the page shows a canvas radar with all currently visible aircraft, refreshing automatically every 8 seconds (simple polling, no app needed) - the same distance rings, aircraft-type silhouettes, altitude colors, marker shapes (ground vehicles, rotorcraft, Heavy aircraft), and full compass directions (N/E/S/W) as the device display, plus a full-page twinkling starfield background. The page follows whichever of the five color themes is currently selected on the device, updating live if you change it while the page is open. A "last updated" timestamp above the radar counts up live between refreshes, and a footer shows the firmware version, a live connection-status indicator, and a subtle watchlist/squawk badge whenever a currently visible aircraft is on your watchlist. Tapping or clicking an aircraft opens an info panel with callsign, altitude, speed, distance, bearing, heading, squawk, and - if the callsign is known - a FlightAware tracking link. Distances and the radius selector automatically follow the device's Metric/Imperial units setting. The radius selector (10/25/50/100 km or nm) zooms the web view independently of the device's own range setting - the device temporarily queries at the largest configured range while the page is open, so a wider web selection can show aircraft beyond the device's current range.
+
+**Map view:** a "Map" tab alongside the radar circle shows a real OpenStreetMap view with the home location, every currently visible aircraft's position and heading, and a tap popup with its details. The zoom level fits itself to whichever aircraft are visible (or the current radar range, if the sky's empty) the first time the map opens, and stays exactly as left afterwards - manual zooming/panning is never reset by incoming data updates.
+
+**Logbook:** below the radar, the page lists every logged day with its aircraft count, a download link for the merged CSV (all days combined), and per-day download/delete links. A search field filters the list by date, and clicking the "Date" or "Aircraft" column header sorts the table (click again to reverse the order). Delete and download buttons show immediate visual feedback ("Deleting…"/"Preparing…") while the request is in progress.
+
+**How to use it:** while your computer or phone is on the same WiFi network as the device, open a browser and go to the device's IP address (e.g. `http://192.168.1.42/`). **Menu → System → "Logbook / WebUI"** shows the current IP directly on the device (the "?" info button on the Logbook files screen shows it too) along with a QR code for the page's URL, so you can open it on your phone without typing the IP by hand.
+
+#### 🏠 MQTT / Home Assistant
+An optional MQTT connection (**Menu → System → Tools → "MQTT"**, off by default) feeds a few live radar values into your own smart-home system, such as Home Assistant. Turn it on, enter your broker's address (host and port, e.g. `192.168.1.10:1883`), and optionally a username/password if your broker requires authentication - public test brokers without a login work too.
 
 Once connected, the device regularly publishes the number of aircraft currently in range, the proximity-alert and watchlist-alert status, the WiFi signal strength, and the running firmware version, all under a shared `eiswolfs-flightradar/` topic prefix.
 
-**Home Assistant auto-discovery:** if you're using Home Assistant, no manual configuration is needed – the device announces all of the above as sensors via the standard MQTT Discovery mechanism as soon as it connects, and they appear automatically as a single grouped device ("Eiswolfs Flightradar") on your dashboard. A proper MQTT Last-Will-and-Testament makes sure Home Assistant correctly shows the device as unavailable if the connection ever drops unexpectedly (e.g. power loss), not just when you turn MQTT off on purpose.
+**Home Assistant auto-discovery:** if you're using Home Assistant, no manual configuration is needed - the device announces all of the above as sensors via the standard MQTT Discovery mechanism as soon as it connects, and they appear automatically as a single grouped device ("Eiswolfs Flightradar") on your dashboard. A proper MQTT Last-Will-and-Testament makes sure Home Assistant correctly shows the device as unavailable if the connection ever drops unexpectedly (e.g. power loss), not just when MQTT is turned off on purpose.
 
-### ☀️ Weather Icon
-A small icon in the header (where the camera button used to be) shows the current weather conditions – sun, cloud, sun-behind-cloud, rain, snow, or thunderstorm – drawn entirely with simple shapes, no image files or extra fonts needed.
+### ⚙️ System & Settings
 
-It always follows whichever location is currently active, including active [location presets](#-location-presets) – switch the active preset to e.g. Milan or Tokyo and the icon updates to show that location's weather.
+- **Languages** - 8 languages (English, German, French, Turkish, Spanish, Italian, Brazilian Portuguese, Dutch), selectable on first boot or anytime from the menu.
+- **Metric/Imperial units** (**Menu → Region → "Units"**) - applied consistently across the radar range button, range ring labels, aircraft list, nearest-airport distance, and stats.
+- **IATA or ICAO airport codes** (same "Units" screen, or tap the route line in the aircraft detail panel) - chooses whether the route shown in the detail panel uses 3-letter IATA codes (e.g. "FRA", the default) or 4-letter ICAO codes (e.g. "EDDF"), falling back to ICAO automatically if no IATA code is available.
+- **Adjustable brightness** (10-100% in 10% steps, **Menu → System → "Brightness"**) with a live preview as you tap, plus an optional Auto-Brightness toggle on the same screen that uses the device's built-in light sensor, smoothed to avoid flickering.
+- **Backup & Reset** (**Menu → System → "Backup & Reset"**) - back up or restore your settings, or fully reset the device (wipes all on-device data and re-runs first-time setup) - handy for testing or handing the device to someone else.
+- **Screen timeout with slider** (**Menu → System → "Screen Timeout"**) - sets how long until the display turns off after a period of no touches, from 1 to 15 minutes or "Never", using a drag slider instead of tapping through values one minute at a time.
+- **Rotate screen (180°)** (**Menu → System → Display**) - flips the screen and touch input upside down, useful for table-mount setups where the panel's limited vertical viewing angle would otherwise wash out the radar circle when viewed from above.
+- **WiFi Manager** - see below.
+- **OTA firmware updates over WiFi** - see below.
+- **Weather Icon** - see below.
+- **Menu structure** - the Flight Options menu is grouped into category buttons: Lists (Aircraft List, Watchlist), Stats & Logbook, LED Alerts, Display Filters (airline filter, ground vehicles, helicopters only, low-altitude only), and a direct Location Presets button. The System menu has its own Display/Tools categories.
+- **Quick header shortcuts** - tapping the WiFi signal bars in the header jumps to WiFi settings, tapping the small clock jumps to screen-timeout settings, and a small eye icon between "Menu" and the WiFi bars jumps to the Display Filters menu - the entire header is interactive. A QR code linking to this project's GitHub page is available under **Menu → System → Tools → "About"**.
+- **Firmware version** is shown directly on the "Check for updates" button (**Menu → System**).
+- **Dual-core design** - all networking (WiFi, ADS-B polling, aircraft detail lookups) runs on Core 0, while the display and touch input run on Core 1, so the UI never freezes during a network request.
+- Data (airline names, aircraft-type seat estimates) is loaded from CSV files on the SD card, auto-seeded on first boot.
 
-Powered by the free [Open-Meteo](https://open-meteo.com) API (no API key needed). Refreshed automatically in the background every 5 minutes, or immediately after switching to a different location.
+#### 📶 WiFi Manager (up to 3 saved networks)
+Under **Menu → WiFi/Network** you can save up to 3 WiFi networks at once. On boot, the device automatically connects to whichever one it can currently see.
 
-Tap the icon for a small info popup explaining that the shown weather always reflects your currently active location. That same popup also shows the **raw METAR text** for the nearest airport (from the free [aviationweather.gov](https://aviationweather.gov) data API), fetched in the same background cycle as the icon weather - handy if you're used to reading METARs and want the exact report instead of just an icon. Below that, it also shows today's **sunrise and sunset time** for the active location, and a **short forecast** (temperature and conditions) 3 hours ahead. The popup scrolls automatically if all of this doesn't fit on one screen.
+This is useful for portable use (take the device to the office, a friend's place, or a holiday home, and it connects automatically everywhere), for a guest network plus a main network (many routers offer both - save both, and the device uses whichever is reachable), or for multiple access points/repeaters around the house (the device connects to whichever saved network it can currently reach).
 
-### 📖 Flight logbook (ON/OFF)
-When enabled, the device logs **every newly sighted aircraft** (timestamp, hex code, callsign, registration, type, distance, altitude) into a CSV file on the SD card. An aircraft is only logged once per activation, even if it crosses the radar multiple times.
+Any saved network can be removed again at any time via the red "X", freeing up a slot for a new one.
 
-**Off by default, with a safety net:** because an unnoticed, permanently running logbook can quietly fill up the SD card and slow down the logbook menus, this is **disabled by default** and comes with two safeguards:
-- Turning it on shows a full-screen warning explaining the behavior below, which you have to confirm.
-- Once on, it **automatically switches off again after 24 hours** – and stays off after a restart unless it was actually turned on with a valid timestamp (so it can never silently keep running forever, even across power cycles or firmware updates).
+**Hidden networks:** if your WiFi network doesn't broadcast its name, it won't show up in the scan list. An "Other/Hidden SSID" button on that same list lets you type the network name manually using the same on-screen keyboard used for passwords, then continue straight to the password step as usual - available both during first-time setup and when adding a network later.
 
-Each time you turn it on, a **new CSV file** is created for that session (e.g. `2026-08-06.csv`, or `2026-08-06_2.csv` for a second activation on the same day) instead of endlessly appending to one growing file – see [Logbook files](#-logbook-files) above for deleting them individually. Turning it off saves SD card write cycles if you don't care about the statistics/history.
+#### 🔄 OTA firmware updates over WiFi
+**Menu → System → "Check for update"** checks the latest GitHub release and, if newer, downloads and installs it directly on the device - no cable or web flasher needed. Update results are shown as a clear on-screen message that requires confirmation, with an explicit restart button on success, and a short, scrollable changelog of what changed in that version.
 
-### 💚 LED heartbeat (ON/OFF)
-A brief flash of the RGB LED, in the currently selected **Radar Display** color theme (green/amber/blue/red/purple), on every successful ADS-B data fetch (every 8 seconds) – a quick visual confirmation that the device is actively receiving data and hasn't frozen. Automatically overridden by an active proximity or emergency alert (which take priority), so the indicators never mix. Also blinks white three times every 10 seconds whenever a firmware update is available (suppressed during an emergency alert).
+The device also quietly checks for new firmware every few minutes in the background; a small red dot (like an app badge) appears on the Menu button, the System tile, the "Check for update" button, and the sleep screen when a new version is available. Installing always requires explicit confirmation - nothing happens automatically.
 
-### 🔔 Proximity LED (ON/OFF)
-The RGB LED **blinks in the currently selected color theme** (green/amber/blue/red/purple) whenever an aircraft comes within **3 km** (straight-line distance to the currently active location, see [Location Presets](#-location-presets)). Since the CYD board has no speaker, this replaces an audible alert. Handy for noticing something interesting flying nearby without having to watch the screen.
+#### ☀️ Weather Icon
+A small icon in the header shows the current weather conditions - sun, cloud, sun-behind-cloud, rain, snow, or thunderstorm - drawn entirely with simple shapes, no image files or extra fonts needed. It always follows whichever location is currently active, including active [location presets](#-location--range) - switching the active preset to e.g. Milan or Tokyo updates the icon to that location's weather.
 
-### 🚨 Emergency alert (ON/OFF)
-Continuously monitors all visible aircraft for one of the three international **emergency squawk codes**:
-- **7500** – hijacking
-- **7600** – radio failure
-- **7700** – general emergency
+Powered by the free [Open-Meteo](https://open-meteo.com) API (no API key needed), refreshed automatically every 5 minutes or immediately after switching location.
 
-If the device detects one of these codes, the RGB LED **blinks a real Morse SOS pattern** (3 short, 3 long, 3 short, then a pause, on repeat) - deliberately distinct from the continuous, evenly-timed pulse of the other LED indications (including the Red color theme's own accent color), so an emergency stays unmistakably recognizable no matter which color theme is active. A flashing red banner also appears in the radar header showing the callsign and squawk code. Takes priority over all other LED indications (proximity, heartbeat).
-
-### 🎯 Watchlist
-Track up to **5 specific flights** by their exact callsign (e.g. `DLH441`) - unlike the Airline Filter, which matches whole airlines, this targets one specific flight. As soon as a watched aircraft appears anywhere within the current radar range, it gets a **cyan ring** on the radar and the **RGB LED blinks cyan** (a fixed color, independent of the selected color theme, so it always stays clearly distinguishable from the theme-colored proximity alert) - handy for spotting a particular flight, e.g. when someone you know is arriving. Takes priority over the normal proximity alert, but not over an emergency squawk. Add flights either via Menu → Flight Options → **"Watchlist"** (manual callsign entry) or with a single tap on the "+"/"-" button in an aircraft's detail panel on the radar screen. Turn the alert on/off separately under **"Watchlist alert"**.
-
-**Squawk Watchlist:** a separate, similarly-structured list (Menu → Flight Options → **"Watchlist"**, right next to the callsign watchlist) lets you store up to 5 four-digit octal squawk codes instead of callsigns - e.g. a code your local ATC uses for a specific purpose. As soon as any aircraft transmits a watched squawk, it triggers the exact same cyan-ring-plus-cyan-LED alert as the callsign watchlist. Emergency squawks (7500/7600/7700) are always handled separately by the red emergency alarm, regardless of this list.
-
-### 📍 Location Presets
-See the dedicated section above: [Location Presets](#-location-presets) – save up to 3 fixed locations, or enter any place in the world to watch the air traffic there.
-
-### 🏢 Airline filter
-Completely hides aircraft from specific airlines from the radar (they're also excluded from counts/logging). Up to **10 airlines** can be entered (by ICAO code, e.g. `DLH` for Lufthansa, `RYR` for Ryanair). Handy if you live near an airport and don't want certain high-frequency airlines cluttering the radar.
-
-### 🚗 Hide ground vehicles (ON/OFF)
-ADS-B data doesn't only contain aircraft – it can also include **airport ground vehicles** (follow-me cars, pushback tugs, etc., flagged by the API under a separate "C" category). This option hides them so the radar stays focused purely on air traffic.
-
-When shown, ground vehicles render as distinct **blue square markers** on the radar screen instead of the normal aircraft marker, with a matching entry in the legend - so they're never mistaken for a low-flying aircraft.
-
-Helicopters (ADS-B emitter category "A7") get their own marker too - a filled circle with a rotor cross instead of the usual arrowhead, since a hovering helicopter doesn't have a meaningful "forward heading" to point in.
-
-"Heavy" aircraft (category "A5" - wide-body jets over 136 tonnes MTOW, e.g. A380, B747, B777) also get a distinct marker - a larger circle with an outer ring plus the usual heading line, so they stand out at a glance from smaller aircraft.
-
-### 🚁 Show helicopters only (ON/OFF)
-Filters the radar, the [Aircraft list](#-aircraft-list), and the Live Radar web page down to helicopters only (ADS-B emitter category "A7"), hiding all other aircraft. Off by default. Handy if you're specifically interested in rotorcraft traffic (medevac, police, sightseeing tours) rather than the usual fixed-wing airliners passing overhead.
-
-### 🛬 Show low-altitude aircraft only (ON/OFF)
-Filters the radar down to aircraft currently below the green altitude threshold (the same cutoff used for the green marker color, see [Color-coded aircraft](#color-coded-aircraft) above). Ground vehicles are never included by this filter, regardless of the separate "Show ground vehicles" setting. Off by default. Found in **Menu → Flight Options → Display Filters**.
-
-### 📶 WiFi Manager
-See the dedicated section above: [WiFi Manager](#-wifi-manager-up-to-3-saved-networks) – save up to 3 WiFi networks at once.
+Tapping the icon opens a small info popup explaining that the shown weather reflects the currently active location. The same popup shows the raw METAR text for the nearest airport (from the free [aviationweather.gov](https://aviationweather.gov) data API), fetched in the same background cycle as the icon weather, today's sunrise and sunset time for the active location, and a short forecast (temperature and conditions) 3 hours ahead. The popup scrolls automatically if all of this doesn't fit on one screen.
 
 ---
 
