@@ -38,6 +38,20 @@ namespace AircraftTable {
     void markFetchSuccess(uint32_t nowMs);
     uint32_t msSinceLastSuccessfulFetch(uint32_t nowMs);
 
+    // Ergebnis des letzten Abrufversuchs (Feature 5 "Verbindungsqualitaet",
+    // siehe connection_status_screen.cpp) - anders als markFetchSuccess()/
+    // msSinceLastSuccessfulFetch() oben (die nur ERFOLGREICHE Abrufe
+    // verfolgen) wird recordFetchOutcome() bei JEDEM Abrufversuch
+    // aufgerufen, egal ob erfolgreich oder nicht (net_task.cpp, direkt nach
+    // AdsbClient::fetch()).
+    struct FetchOutcome {
+        bool hasResult = false; // false = noch kein Abrufversuch seit dem Boot
+        bool ok = false;
+        int  httpCode = 0;
+    };
+    void recordFetchOutcome(bool ok, int httpCode);
+    FetchOutcome lastFetchOutcome();
+
     // Wird bei jedem postFetchUpdate() erhoeht. Damit koennen andere Teile des
     // Programms (z.B. der Render-Loop) erkennen, ob sich die Daten seit dem
     // letzten Mal ueberhaupt geaendert haben, statt stumpf auf Zeit zu pollen -

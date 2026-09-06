@@ -5,6 +5,7 @@
 #include "stats_screen.h"
 #include "stats_history_screen.h"
 #include "logbook_files_screen.h"
+#include "flight_logbook.h"
 #include "webui_screen.h"
 #include "mqtt_screen.h"
 #include "location_presets_screen.h"
@@ -12,6 +13,8 @@
 #include "aircraft_watchlist_screen.h"
 #include "squawk_watchlist_screen.h"
 #include "aircraft_list_screen.h"
+#include "live_traffic_screen.h"
+#include "connection_status_screen.h"
 #include "brightness_screen.h"
 #include "timeout_screen.h"
 #include "language_screen.h"
@@ -115,6 +118,33 @@ namespace {
         tft.setTextDatum(TL_DATUM);
     }
 
+    // Wie drawButton(), aber mit einer optionalen zweiten, kleineren/
+    // dezenteren Zeile darunter (aktuell nur fuer den Flugbuch-Abschalt-
+    // Countdown gebraucht, siehe Page::FlightStatsLogbook) - eigene
+    // Variante statt drawButton() um einen optionalen Parameter zu
+    // erweitern, da drawButton() sonst ueberall nur eine Zeile zentriert
+    // zeichnet. subLabel leer = identisch zu drawButton().
+    void drawButtonWithSubline(TFT_eSPI& tft, const Rect& r, const String& label,
+                                const String& subLabel) {
+        if (subLabel.length() == 0) {
+            drawButton(tft, r, label);
+            return;
+        }
+        uint16_t accent = UiTheme::accentColor(tft);
+        tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, TFT_BLACK);
+        tft.drawRoundRect(r.x, r.y, r.w, r.h, 4, accent);
+        tft.setTextDatum(MC_DATUM);
+        // Zwei Zeilen, mittig im oberen/unteren Drittel der Zeile platziert
+        // (Zeilenhoehe 50px, Zeichenhoehe des Fonts bei Size 1 nur ~8-9px -
+        // reichlich Abstand zueinander und zum Zeilenrahmen, siehe CLAUDE.md
+        // Textbreiten-/-hoehen-Pflichtpruefung).
+        tft.setTextColor(accent, TFT_BLACK);
+        tft.drawString(label, r.x + r.w / 2, (int16_t)(r.y + r.h * 0.36f));
+        tft.setTextColor(UiTheme::accentColorDimmed(tft, 0.6f), TFT_BLACK);
+        tft.drawString(subLabel, r.x + r.w / 2, (int16_t)(r.y + r.h * 0.74f));
+        tft.setTextDatum(TL_DATUM);
+    }
+
     // Kleiner "?"-Info-Button rechts INNERHALB einer normalen Zeile (statt
     // wie sonst oben rechts im Seiten-Header) - gleiches Prinzip/gleiche
     // Groesse wie die neuen "?"-Buttons in radar_theme_screen.cpp (dort
@@ -137,6 +167,24 @@ namespace {
     }
 
     String onOff(bool on) { return I18n::t(on ? StringId::ON : StringId::OFF); }
+
+    // Countdown-Text bis zur 24h-Sicherheitsabschaltung des Flugbuchs, fuer
+    // die zweite Zeile in der Flugbuch-Ein/Aus-Zeile (siehe Page::
+    // FlightStatsLogbook). Leerer String, wenn der Countdown gerade nicht
+    // sinnvoll anzeigbar ist (siehe FlightLogbook::secondsUntilAutoOff()).
+    String logbookCountdownText() {
+        int32_t remaining = FlightLogbook::secondsUntilAutoOff();
+        if (remaining < 0) return "";
+        uint32_t hh = (uint32_t)remaining / 3600;
+        uint32_t mm = ((uint32_t)remaining % 3600) / 60;
+        char buf[24];
+        if (hh > 0) {
+            snprintf(buf, sizeof(buf), "%uh %umin", (unsigned)hh, (unsigned)mm);
+        } else {
+            snprintf(buf, sizeof(buf), "%umin", (unsigned)mm);
+        }
+        return String(I18n::t(StringId::FLIGHT_LOGBOOK_COUNTDOWN_PREFIX)) + buf;
+    }
 
     // Fortschrittspunkte-Anzeige waehrend SettingsBackup::backup()/restore()
     // laufen (siehe Aufrufe unten in Page::BackupReset) - diese sind
@@ -1260,16 +1308,18 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             // Sicherung & Reset (das bestehende Page::BackupReset-Untermenue
             // bleibt unveraendert, wird jetzt nur eine Ebene tiefer erreicht:
             // System > Werkzeuge > Sicherung & Reset).
-            Rect calibBtn       = subMenuRowRect(0, 6);
-            Rect webuiBtn       = subMenuRowRect(1, 6);
-            Rect mqttBtn        = subMenuRowRect(2, 6);
-            Rect backupResetBtn = subMenuRowRect(3, 6);
-            Rect aboutBtn       = subMenuRowRect(4, 6);
-            Rect backBtn        = subMenuRowRect(5, 6);
+            Rect calibBtn       = subMenuRowRect(0, 7);
+            Rect webuiBtn       = subMenuRowRect(1, 7);
+            Rect mqttBtn        = subMenuRowRect(2, 7);
+            Rect connectionBtn  = subMenuRowRect(3, 7);
+            Rect backupResetBtn = subMenuRowRect(4, 7);
+            Rect aboutBtn       = subMenuRowRect(5, 7);
+            Rect backBtn        = subMenuRowRect(6, 7);
 
             drawButton(tft, calibBtn, I18n::t(StringId::MENU_CALIBRATE));
             drawButton(tft, webuiBtn, I18n::t(StringId::MENU_LOGBOOK_WEBUI));
             drawButton(tft, mqttBtn, I18n::t(StringId::MENU_MQTT));
+            drawButton(tft, connectionBtn, I18n::t(StringId::MENU_CONNECTION_STATUS));
             drawButton(tft, backupResetBtn, I18n::t(StringId::MENU_BACKUP_RESET));
             drawButton(tft, aboutBtn, I18n::t(StringId::MENU_ABOUT));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
@@ -1288,6 +1338,8 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 WebUiScreen::run(tft);
             } else if (mqttBtn.contains(tap.x, tap.y)) {
                 MqttScreen::run(tft);
+            } else if (connectionBtn.contains(tap.x, tap.y)) {
+                ConnectionStatusScreen::run(tft);
             } else if (backupResetBtn.contains(tap.x, tap.y)) {
                 page = Page::BackupReset;
             } else if (aboutBtn.contains(tap.x, tap.y)) {
@@ -1441,12 +1493,14 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_LISTS));
 
-            Rect aircraftListBtn = subMenuRowRect(0, 4);
-            Rect watchlistBtn    = subMenuRowRect(1, 4);
-            Rect squawkWatchBtn  = subMenuRowRect(2, 4);
-            Rect backBtn         = subMenuRowRect(3, 4);
+            Rect aircraftListBtn = subMenuRowRect(0, 5);
+            Rect liveTrafficBtn  = subMenuRowRect(1, 5);
+            Rect watchlistBtn    = subMenuRowRect(2, 5);
+            Rect squawkWatchBtn  = subMenuRowRect(3, 5);
+            Rect backBtn         = subMenuRowRect(4, 5);
 
             drawButton(tft, aircraftListBtn, I18n::t(StringId::MENU_AIRCRAFT_LIST));
+            drawButton(tft, liveTrafficBtn, I18n::t(StringId::MENU_LIVE_TRAFFIC));
             drawButton(tft, watchlistBtn, I18n::t(StringId::MENU_WATCHLIST));
             drawButton(tft, squawkWatchBtn, I18n::t(StringId::MENU_SQUAWK_WATCHLIST));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
@@ -1466,6 +1520,8 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                     // statt in der Flugoptionen-Seite stehen zu bleiben.
                     done = true;
                 }
+            } else if (liveTrafficBtn.contains(tap.x, tap.y)) {
+                LiveTrafficScreen::run(tft);
             } else if (watchlistBtn.contains(tap.x, tap.y)) {
                 AircraftWatchlistScreen::run(tft);
             } else if (squawkWatchBtn.contains(tap.x, tap.y)) {
@@ -1488,7 +1544,8 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             drawButton(tft, statsBtn, I18n::t(StringId::MENU_STATISTICS));
             drawButton(tft, statsHistoryBtn, I18n::t(StringId::MENU_STATS_HISTORY));
             drawButton(tft, logFilesBtn, I18n::t(StringId::MENU_LOGBOOK_FILES));
-            drawButton(tft, logbookBtn, I18n::t(StringId::MENU_FLIGHT_LOGBOOK) + onOff(SettingsStore::flightLogbookEnabled()));
+            drawButtonWithSubline(tft, logbookBtn, I18n::t(StringId::MENU_FLIGHT_LOGBOOK) + onOff(SettingsStore::flightLogbookEnabled()),
+                                  SettingsStore::flightLogbookEnabled() ? logbookCountdownText() : "");
             // Hinweis auf die 24h-Sicherheitsabschaltung, NUR solange sie
             // tatsaechlich (und nicht durch bewusstes manuelles Ausschalten)
             // gegriffen hat, siehe SettingsStore::flightLogbookAutoOffTriggered().

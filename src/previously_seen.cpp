@@ -68,6 +68,11 @@ void update() {
     result.found = sighting.found;
     result.count = sighting.count;
     strncpy(result.lastDate, sighting.lastDate, sizeof(result.lastDate) - 1);
+    result.hasPattern = sighting.hasPattern;
+    result.minHour = sighting.minHour;
+    result.maxHour = sighting.maxHour;
+    result.minAltitudeFt = sighting.minAltitudeFt;
+    result.maxAltitudeFt = sighting.maxAltitudeFt;
 
     xSemaphoreTake(mutex, portMAX_DELAY);
     // Nur uebernehmen, wenn pendingHex sich waehrend des (unter Umstaenden

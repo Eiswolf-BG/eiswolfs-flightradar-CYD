@@ -934,6 +934,68 @@ enum class StringId : uint16_t {
     // Flughafen als neuen Preset uebernimmt.
     LOCATION_NEAREST_AIRPORT_TAP_HINT,
 
+    // Countdown bis zur 24h-Sicherheitsabschaltung des Flugbuchs (siehe
+    // FlightLogbook::secondsUntilAutoOff()), als zweite Zeile direkt unter
+    // dem Flugbuch-Ein/Aus-Button, NUR solange das Flugbuch an ist. Aufbau:
+    // FLIGHT_LOGBOOK_COUNTDOWN_PREFIX + "18h 42min" bzw. nur "34min" unter
+    // einer Stunde (die Einheiten "h"/"min" selbst bleiben bewusst
+    // unuebersetzt, gleiches Prinzip wie bei der Ueberflug-ETA in
+    // radar_screen.cpp).
+    FLIGHT_LOGBOOK_COUNTDOWN_PREFIX,
+
+    // "Smart Aircraft Recognition" - einfaches Zeitmuster (Uhrzeit-Bereich +
+    // Hoehen-Bereich der bisherigen Sichtungen laut Logbuch, siehe
+    // FlightLogbook::PreviousSighting::hasPattern), an dieselbe Detail-
+    // Panel-Zeile wie DETAIL_PREVIOUSLY_SEEN_* angehaengt, NUR wenn
+    // mindestens 3 fruehere Sichtungen vorliegen. Aufbau:
+    // DETAIL_TYPICAL_PATTERN_PREFIX + "07-09h, 2000-8000ft" (Einheiten "h"/
+    // "ft" bewusst unuebersetzt, gleiches Prinzip wie ueberall sonst in der
+    // App).
+    DETAIL_TYPICAL_PATTERN_PREFIX,
+
+    // "Live Traffic Dashboard" (Feature 9) - kompakte Zusammenfassung des
+    // aktuellen Verkehrs, reine Aggregation der bereits vorhandenen
+    // AircraftTable (live_traffic_screen.cpp), kein zusaetzlicher
+    // Netzwerk-/SD-Zugriff. MENU_LIVE_TRAFFIC dient sowohl als Menue-
+    // Button-Label als auch als Bildschirm-Titel (identischer Text an
+    // beiden Stellen verwendet, spart eine zusaetzliche *_TITLE-ID). Die
+    // vier *_PREFIX-IDs fuer die Extremwerte werden zur Laufzeit per
+    // tft.textWidth() geprueft (siehe printFittingLine() in
+    // live_traffic_screen.cpp) - laengere Uebersetzungen sind hier bewusst
+    // NICHT auf eine feste Zeichenzahl zusammengekuerzt, da der Fallback-
+    // Mechanismus (Einheit weglassen, notfalls hart kuerzen) das ohnehin
+    // in jeder Sprache sicher innerhalb der Bildschirmbreite haelt.
+    MENU_LIVE_TRAFFIC,
+    LIVE_TRAFFIC_TOTAL_PREFIX,
+    LIVE_TRAFFIC_TYPE_AIRLINER,
+    LIVE_TRAFFIC_TYPE_PRIVATE_JET,
+    LIVE_TRAFFIC_TYPE_TURBOPROP,
+    LIVE_TRAFFIC_TYPE_UNKNOWN,
+    LIVE_TRAFFIC_NEAREST_PREFIX,
+    LIVE_TRAFFIC_HIGHEST_PREFIX,
+    LIVE_TRAFFIC_LOWEST_PREFIX,
+    LIVE_TRAFFIC_FASTEST_PREFIX,
+
+    // Feature 5 "ADS-B-Verbindungsqualitaet-Uebersicht"
+    // (connection_status_screen.cpp) - reine Diagnose-Anzeige, liest nur
+    // bereits vorhandene Werte (AircraftTable::validCount()/
+    // msSinceLastSuccessfulFetch()/lastFetchOutcome()), kein neuer
+    // Netzwerk-Zugriff. MENU_CONNECTION_STATUS dient wieder sowohl als
+    // Menue-Label als auch als Bildschirm-Titel (gleiches Prinzip wie
+    // MENU_LIVE_TRAFFIC).
+    MENU_CONNECTION_STATUS,
+    CONNECTION_STATUS_TRACKED_PREFIX,
+    CONNECTION_STATUS_LAST_FETCH_PREFIX,
+    CONNECTION_STATUS_RESULT_PREFIX,
+    CONNECTION_STATUS_RESULT_SUCCESS,
+    CONNECTION_STATUS_RESULT_TIMEOUT,
+    CONNECTION_STATUS_RESULT_ERROR_PREFIX,
+    CONNECTION_STATUS_RESULT_NONE,
+    CONNECTION_STATUS_QUALITY_PREFIX,
+    CONNECTION_STATUS_QUALITY_GOOD,
+    CONNECTION_STATUS_QUALITY_FAIR,
+    CONNECTION_STATUS_QUALITY_POOR,
+
     COUNT
 };
 

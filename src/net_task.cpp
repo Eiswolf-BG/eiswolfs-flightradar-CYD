@@ -140,6 +140,12 @@ namespace {
                     auto result = AdsbClient::fetch(lat, lon, rangeKm,
                                                      tempTable, Config::MAX_TRACKED_AIRCRAFT);
 
+                    // Feature 5 "Verbindungsqualitaet" - bei JEDEM
+                    // Abrufversuch aktualisiert, unabhaengig vom Ergebnis
+                    // (anders als AircraftTable::markFetchSuccess() unten,
+                    // das nur bei Erfolg laeuft).
+                    AircraftTable::recordFetchOutcome(result.ok, result.httpCode);
+
                     if (result.ok) {
                         // Offline-/Stale-Data-Modus (radar_screen.cpp) - haelt
                         // fest, WANN zuletzt ein ADS-B-Abruf erfolgreich war,

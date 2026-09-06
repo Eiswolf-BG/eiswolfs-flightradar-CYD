@@ -51,4 +51,15 @@ namespace RadarScreen {
     };
 
     EmergencyInfo checkEmergency();
+
+    // Oeffentliche Huellen um die intern (anonymer Namespace in
+    // radar_screen.cpp) bereits bestehende Typ-/Kategorie-Klassifikation -
+    // fuer das Live Traffic Dashboard (live_traffic_screen.cpp), damit
+    // dort NICHT dieselbe Praefix-Tabelle/Logik dupliziert werden muss.
+    // Gleiche 4 Kategorien wie die interne TypeSilhouette, nur unter
+    // eigenem, oeffentlichem Namen.
+    enum class AircraftCategory : uint8_t { Unknown, Airliner, PrivateJet, Turboprop };
+    AircraftCategory classifyAircraftType(const char* typeCode);
+    bool isHeavyAircraftCategory(const char* category);
+    bool isRotorcraftCategory(const char* category);
 }

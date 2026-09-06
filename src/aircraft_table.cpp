@@ -31,6 +31,17 @@ namespace {
     // liest ihn per load() und leitet "wie lange her?" rein rechnerisch
     // ab, ohne je zurueckzuschreiben.
     std::atomic<uint32_t> lastSuccessfulFetchMs{0};
+
+    // Ergebnis des letzten Abrufversuchs (Feature 5 "Verbindungsqualitaet",
+    // connection_status_screen.cpp) - unabhaengig vom reinen Zeitstempel
+    // oben, der nur ERFOLGREICHE Abrufe merkt. Drei separate Atomics statt
+    // eines Mutex-geschuetzten Structs, da jedes Feld unabhaengig gelesen/
+    // geschrieben wird (gleiches einfaches Cross-Core-Muster wie
+    // lastSuccessfulFetchMs) - ein torn read (z.B. ok=true mit noch altem
+    // httpCode) waere hier unkritisch, das ist reine Diagnose-Anzeige.
+    std::atomic<bool> hasFetchOutcome{false};
+    std::atomic<bool> lastFetchOk{false};
+    std::atomic<int>  lastFetchHttpCode{0};
 }
 
 void lock() { xSemaphoreTake(mutex, portMAX_DELAY); }
@@ -53,6 +64,20 @@ void markFetchSuccess(uint32_t nowMs) {
 
 uint32_t msSinceLastSuccessfulFetch(uint32_t nowMs) {
     return nowMs - lastSuccessfulFetchMs.load(std::memory_order_relaxed);
+}
+
+void recordFetchOutcome(bool ok, int httpCode) {
+    lastFetchOk.store(ok, std::memory_order_relaxed);
+    lastFetchHttpCode.store(httpCode, std::memory_order_relaxed);
+    hasFetchOutcome.store(true, std::memory_order_relaxed);
+}
+
+FetchOutcome lastFetchOutcome() {
+    FetchOutcome out;
+    out.hasResult = hasFetchOutcome.load(std::memory_order_relaxed);
+    out.ok = lastFetchOk.load(std::memory_order_relaxed);
+    out.httpCode = lastFetchHttpCode.load(std::memory_order_relaxed);
+    return out;
 }
 
 Aircraft* raw() { return table; }

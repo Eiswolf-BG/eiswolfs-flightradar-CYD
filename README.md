@@ -72,6 +72,7 @@ The panel also derives a few things purely from how the aircraft's position chan
 - **Overflight ETA** - while approaching, an estimate of when it will reach its closest point to you and how close that will be, based on its current heading and speed (always marked as an estimate, since a course change would invalidate it).
 - **First seen / seen for** - when the aircraft was first spotted in the current session and how long it's been continuously visible since; resets on every device restart.
 - **Previously seen** - how many times the aircraft has been logged on earlier days and when it was last seen, looked up from the logbook files in the background so opening the panel is never delayed.
+- **Typical pattern** - once an aircraft has been logged at least 3 times before, the panel also shows the typical time-of-day range and altitude range it's usually seen in (e.g. "usually 07-09h, 2000-8000ft"), derived from the same logbook lookup as "Previously seen" above.
 
 Aircraft identified as military/government flights (see the orange ring on the radar) get a matching legend line in the detail panel itself.
 
@@ -134,6 +135,9 @@ Shows at a glance:
 
 The **"Reset logbook data"** button (tap twice to confirm) permanently deletes all logged data.
 
+#### 🛰️ Live Traffic
+A "Live traffic" button right next to the Aircraft List opens a compact dashboard summarizing the current traffic at a glance: total number of aircraft in range, a breakdown by type (airliner, private jet, turboprop, unknown, helicopter, heavy - only categories that actually have at least one aircraft are shown), and the nearest, highest, lowest, and fastest aircraft currently visible, each with its callsign and value. Pure aggregation of the same live data already used for the radar and aircraft list - no extra network requests.
+
 #### 🏆 Most-Seen Aircraft
 A "Top" button in the top-right of the Statistics screen opens a ranking of the 5 aircraft logged most often across the entire flight logbook (all days combined), showing each one's registration (or hex code if unknown) and total sighting count - handy for spotting the "regulars" that pass over again and again.
 
@@ -150,7 +154,7 @@ Lists the last several days from the logbook individually, with date and the num
 #### 📖 Flight logbook (ON/OFF)
 When enabled, the device logs every newly sighted aircraft (timestamp, hex code, callsign, registration, type, distance, altitude) into a CSV file on the SD card. An aircraft is only logged once per activation, even if it crosses the radar multiple times.
 
-Off by default, with a safety net: an unnoticed, permanently running logbook can quietly fill up the SD card and slow down the logbook menus, so turning it on shows a full-screen warning that has to be confirmed, and once on, it automatically switches off again after 24 hours - staying off after a restart unless it was actually turned on with a valid timestamp, so it can never silently keep running forever across power cycles or firmware updates. If the 24-hour safety shutoff kicks in, a popup lets you know right away - even if the device happened to be powered off exactly when the 24 hours ran out, the notice catches up on the next boot.
+Off by default, with a safety net: an unnoticed, permanently running logbook can quietly fill up the SD card and slow down the logbook menus, so turning it on shows a full-screen warning that has to be confirmed, and once on, it automatically switches off again after 24 hours - staying off after a restart unless it was actually turned on with a valid timestamp, so it can never silently keep running forever across power cycles or firmware updates. While it's on, a small countdown right on the logbook line ("Off in 18h 42min") shows how much time is left before this automatic shutoff. If the 24-hour safety shutoff kicks in, a popup lets you know right away - even if the device happened to be powered off exactly when the 24 hours ran out, the notice catches up on the next boot.
 
 Each time you turn it on, a new CSV file is created for that session (e.g. `2026-08-06.csv`, or `2026-08-06_2.csv` for a second activation on the same day) instead of endlessly appending to one growing file. Turning it off saves SD card write cycles if you don't care about the statistics/history.
 
@@ -186,6 +190,7 @@ Once connected, the device regularly publishes the number of aircraft currently 
 - **WiFi Manager** - see below.
 - **OTA firmware updates over WiFi** - see below.
 - **Weather Icon** - see below.
+- **Connection status** (**Menu → System → Tools → "Connection status"**) - a diagnostic screen showing the number of currently tracked aircraft, time since the last successful ADS-B data fetch, the result of the last fetch attempt (success, timeout, or error code), and a simple green/yellow/red status derived from how stale the data currently is. Updates live while the screen is open.
 - **Menu structure** - the Flight Options menu is grouped into category buttons: Lists (Aircraft List, Watchlist), Stats & Logbook, LED Alerts, Display Filters (airline filter, ground vehicles, helicopters only, low-altitude only), and a direct Location Presets button. The System menu has its own Display/Tools categories.
 - **Quick header shortcuts** - tapping the WiFi signal bars in the header jumps to WiFi settings, tapping the small clock jumps to screen-timeout settings, and a small eye icon between "Menu" and the WiFi bars jumps to the Display Filters menu - the entire header is interactive. A QR code linking to this project's GitHub page is available under **Menu → System → Tools → "About"**.
 - **Firmware version** is shown directly on the "Check for updates" button (**Menu → System**).

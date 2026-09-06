@@ -102,6 +102,19 @@ namespace FlightLogbook {
         bool found = false;
         uint16_t count = 0;
         char lastDate[11] = {0}; // "YYYY-MM-DD", nur gueltig wenn found true
+
+        // "Smart Aircraft Recognition" - einfache Zeitmuster ueber alle
+        // fruehreren Sichtungen hinweg, IM SELBEN Scan-Durchlauf wie
+        // count/lastDate oben ermittelt (kein zweiter SD-Scan). Nur
+        // gueltig, wenn hasPattern true ist - das ist erst ab
+        // MIN_SIGHTINGS_FOR_PATTERN (siehe flight_logbook.cpp) frueheren
+        // Sichtungen der Fall, da ein Muster aus 1-2 Datenpunkten
+        // statistisch nicht aussagekraeftig waere.
+        bool hasPattern = false;
+        uint8_t minHour = 0;
+        uint8_t maxHour = 0;
+        int32_t minAltitudeFt = 0;
+        int32_t maxAltitudeFt = 0;
     };
 
     // Zaehlt, wie oft ein Flugzeug (per Hex-Code) bereits an FRUEHEREN
@@ -154,4 +167,14 @@ namespace FlightLogbook {
     // count==0 bedeutet "heute noch kein Hoechstwert ermittelt" - die
     // Anzeige (stats_history_screen.cpp) laesst die Zeile dann komplett weg.
     PeakTraffic todayPeakTraffic();
+
+    // Verbleibende Sekunden bis zur 24h-Sicherheitsabschaltung greift (siehe
+    // checkAutoOff()), fuer die Countdown-Anzeige im Menue (Flugbuch-Zeile).
+    // Nutzt denselben gespeicherten Aktivierungs-Zeitstempel wie die
+    // Abschaltung selbst - keine eigene Datenquelle. Liefert -1, wenn der
+    // Countdown gerade nicht sinnvoll anzeigbar ist: Flugbuch aus, oder die
+    // Uhrzeit noch nicht NTP-synchronisiert (dann waere "verbleibende Zeit"
+    // nicht verlaesslich berechenbar) - der Aufrufer laesst die Zeile in
+    // diesem Fall einfach weg.
+    int32_t secondsUntilAutoOff();
 }

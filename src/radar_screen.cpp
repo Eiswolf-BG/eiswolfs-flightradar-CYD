@@ -628,6 +628,17 @@ namespace {
         return TypeSilhouette::Unknown;
     }
 
+    // Rotorcraft-Emitter-Kategorie "A7" (siehe drawTypedMarker()/
+    // isHeavyCategory() oben fuer das gleiche Muster bei "A5") - bisher nur
+    // inline an den paar Stellen geprueft, die es brauchten (render()/tick(),
+    // web_export_server.cpp). Eigene kleine Funktion, damit
+    // RadarScreen::isRotorcraftCategory() (siehe radar_screen.h) unten
+    // einfach durchreichen kann, statt die Bedingung ein drittes Mal zu
+    // duplizieren.
+    bool isRotorcraftCategoryInternal(const char* category) {
+        return category[0] == 'A' && category[1] == '7';
+    }
+
     float sweepAngleDeg = 0.0f;
     float prevSweepAngleDeg = -1.0f;
     constexpr float SWEEP_DEGREES_PER_SEC = 45.0f;
@@ -2357,7 +2368,7 @@ namespace {
         // DD.MM." ODER (komplett neues Flugzeug, count==0) GAR NICHTS - kein
         // dauerhaft haengendes "wird geprueft...", wenn es einfach nichts zu
         // finden gab.
-        char previouslySeenBuf[56] = {0};
+        char previouslySeenBuf[96] = {0};
         PreviouslySeen::Info previouslySeen = PreviouslySeen::get(a.hex);
         if (previouslySeen.loading) {
             strncpy(previouslySeenBuf, I18n::t(StringId::DETAIL_PREVIOUSLY_SEEN_LOADING), sizeof(previouslySeenBuf) - 1);
@@ -2371,9 +2382,25 @@ namespace {
             snprintf(previouslySeenBuf, sizeof(previouslySeenBuf), "%s%u%s%02d.%02d.",
                      I18n::t(StringId::DETAIL_PREVIOUSLY_SEEN_PREFIX), previouslySeen.count,
                      I18n::t(StringId::DETAIL_PREVIOUSLY_SEEN_MIDDLE), dd, mm);
+
+            // "Smart Aircraft Recognition" - einfaches Zeitmuster (Uhrzeit-
+            // und Hoehen-Spanne der bisherigen Sichtungen), direkt an die
+            // "Previously Seen"-Angabe angehaengt, NUR wenn genug fruehere
+            // Sichtungen vorliegen (siehe PreviousSighting::hasPattern,
+            // MIN_SIGHTINGS_FOR_PATTERN=3 in flight_logbook.cpp). Kommt aus
+            // demselben Hintergrund-Scan wie previouslySeen oben - kein
+            // zusaetzlicher SD-Zugriff.
+            if (previouslySeen.hasPattern) {
+                size_t used = strlen(previouslySeenBuf);
+                snprintf(previouslySeenBuf + used, sizeof(previouslySeenBuf) - used,
+                         "  %s%02u-%02uh, %ld-%ldft",
+                         I18n::t(StringId::DETAIL_TYPICAL_PATTERN_PREFIX),
+                         previouslySeen.minHour, previouslySeen.maxHour,
+                         (long)previouslySeen.minAltitudeFt, (long)previouslySeen.maxAltitudeFt);
+            }
         }
 
-        char distBuf[300];
+        char distBuf[400];
         snprintf(distBuf, sizeof(distBuf), "%s%.0fkm / %.0fnm / %.0fmi  %s%.0f  %s%.0f° %s  %s %s  %s  %s  %s",
                  I18n::t(StringId::DETAIL_DIST),
                  a.distanceKm, Units::kmToNm(a.distanceKm), Units::kmToMi(a.distanceKm),
@@ -4849,6 +4876,23 @@ EmergencyInfo checkEmergency() {
     AircraftTable::unlock();
 
     return info;
+}
+
+AircraftCategory classifyAircraftType(const char* typeCode) {
+    switch (classifyTypeSilhouette(typeCode)) {
+        case TypeSilhouette::Airliner:   return AircraftCategory::Airliner;
+        case TypeSilhouette::PrivateJet: return AircraftCategory::PrivateJet;
+        case TypeSilhouette::Turboprop:  return AircraftCategory::Turboprop;
+        default:                         return AircraftCategory::Unknown;
+    }
+}
+
+bool isHeavyAircraftCategory(const char* category) {
+    return isHeavyCategory(category);
+}
+
+bool isRotorcraftCategory(const char* category) {
+    return isRotorcraftCategoryInternal(category);
 }
 
 }

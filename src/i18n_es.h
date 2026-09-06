@@ -434,6 +434,34 @@ static const char* const I18N_ES[] = {
     " a las ",
 
     "Toca para establecer como preset",
+
+    "En ",
+
+    "Normalmente ",
+
+    "Tráfico en vivo",
+    "Aviones en alcance: ",
+    "Avión comercial",
+    "Jet privado",
+    "Turbohélice",
+    "Desconocido",
+    "Más cercano: ",
+    "Más alto: ",
+    "Más bajo: ",
+    "Más rápido: ",
+
+    "Estado de la conexión",
+    "Aviones rastreados: ",
+    "Última actualización: ",
+    "Último intento: ",
+    "Éxito",
+    "Tiempo agotado",
+    "Código de error: ",
+    "Aún sin intentos",
+    "Estado: ",
+    "Bueno",
+    "Regular",
+    "Malo",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

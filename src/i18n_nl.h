@@ -436,6 +436,34 @@ static const char* const I18N_NL[] = {
     " om ",
 
     "Tik om als voorkeuze in te stellen",
+
+    "Over ",
+
+    "Meestal ",
+
+    "Live verkeer",
+    "Vliegtuigen in bereik: ",
+    "Lijnvliegtuig",
+    "Privéjet",
+    "Turboprop",
+    "Onbekend",
+    "Dichtstbijzijnde: ",
+    "Hoogste: ",
+    "Laagste: ",
+    "Snelste: ",
+
+    "Verbindingsstatus",
+    "Gevolgde vliegtuigen: ",
+    "Laatste update: ",
+    "Laatste poging: ",
+    "Succes",
+    "Time-out",
+    "Foutcode: ",
+    "Nog geen poging",
+    "Status: ",
+    "Goed",
+    "Matig",
+    "Slecht",
 };
 
 static_assert(sizeof(I18N_NL) / sizeof(I18N_NL[0]) == (size_t)StringId::COUNT,

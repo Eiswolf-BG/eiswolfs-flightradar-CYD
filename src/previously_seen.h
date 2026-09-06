@@ -18,6 +18,15 @@ namespace PreviouslySeen {
         bool found = false;
         uint16_t count = 0;
         char lastDate[11] = {0}; // "YYYY-MM-DD", nur gueltig wenn found true
+
+        // "Smart Aircraft Recognition" - siehe FlightLogbook::
+        // PreviousSighting im selben Scan-Durchlauf mit ermittelt, nur
+        // gueltig wenn hasPattern true ist (mind. 3 fruehere Sichtungen).
+        bool hasPattern = false;
+        uint8_t minHour = 0;
+        uint8_t maxHour = 0;
+        int32_t minAltitudeFt = 0;
+        int32_t maxAltitudeFt = 0;
     };
 
     // Core 1 (Touch-Auswahl, siehe radar_screen.cpp::handleTap()/

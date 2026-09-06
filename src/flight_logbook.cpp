@@ -7,6 +7,8 @@
 #include <SD.h>
 #include <time.h>
 #include <cstring>
+#include <cctype>
+#include <cstdint>
 #include <atomic>
 
 namespace FlightLogbook {
@@ -291,6 +293,21 @@ bool checkAutoOff() {
 // Kommentar bei checkAutoOff() fuer den Grund.
 void enforceAutoOff() {
     checkAutoOff();
+}
+
+int32_t secondsUntilAutoOff() {
+    if (!SettingsStore::flightLogbookEnabled()) return -1;
+
+    time_t nowCheck = time(nullptr);
+    if (nowCheck <= 8 * 3600 * 2) return -1; // Uhrzeit noch nicht synchronisiert
+
+    uint32_t enabledAt = SettingsStore::flightLogbookEnabledAtEpoch();
+    if (enabledAt == 0) return -1; // Migrations-Fall, siehe checkAutoOff()
+
+    if ((uint32_t)nowCheck <= enabledAt) return (int32_t)LOGBOOK_AUTO_OFF_SECONDS;
+    uint32_t elapsed = (uint32_t)nowCheck - enabledAt;
+    if (elapsed >= LOGBOOK_AUTO_OFF_SECONDS) return 0;
+    return (int32_t)(LOGBOOK_AUTO_OFF_SECONDS - elapsed);
 }
 
 bool consumeAutoOffNotice() {
@@ -671,7 +688,13 @@ uint8_t computeTopAircraft(TopAircraft* out, uint8_t maxEntries) {
 // Schreiben ohnehin hoechstens einmal pro Datei vor). Gleiches Zeilen-
 // Parsing-Prinzip wie computeTopAircraft()/loadSeenFromCurrentFile() oben.
 namespace {
-    bool fileContainsHex(File& f, const char* hex) {
+    // Wie zuvor "fileContainsHex" (nur Treffer/kein Treffer), liefert bei
+    // einem Treffer zusaetzlich die Sichtungsstunde (aus Spalte 0,
+    // "YYYY-MM-DD HH:MM:SS") und die Flughoehe in ft (letzte Spalte) mit
+    // zurueck - fuer Smart Aircraft Recognition (Zeitmuster-Erkennung,
+    // siehe countPreviousSightings()) im SELBEN Scan-Durchlauf statt eines
+    // zweiten, separaten SD-Scans fuer dasselbe Flugzeug.
+    bool fileFindHexRow(File& f, const char* hex, uint8_t& outHour, int32_t& outAltitudeFt) {
         constexpr size_t BUF_SIZE = 512;
         static uint8_t buf[BUF_SIZE];
         char lineBuf[64];
@@ -691,6 +714,16 @@ namespace {
             size_t hexLen = p2 ? (size_t)(p2 - (p1 + 1)) : strlen(p1 + 1);
             if (hexLen == hexQueryLen && strncmp(p1 + 1, hex, hexLen) == 0) {
                 found = true;
+                // Spalte 0 (Zeitstempel) ist "YYYY-MM-DD HH:MM:SS" - Stunde
+                // steht immer an Zeichen 11-12, unabhaengig vom Rest.
+                if ((size_t)(p1 - lineBuf) >= 13 && isdigit((unsigned char)lineBuf[11]) && isdigit((unsigned char)lineBuf[12])) {
+                    outHour = (uint8_t)((lineBuf[11] - '0') * 10 + (lineBuf[12] - '0'));
+                } else {
+                    outHour = 0;
+                }
+                // Letzte Spalte (altitude_ft) - nach dem letzten Komma.
+                char* lastComma = strrchr(lineBuf, ',');
+                outAltitudeFt = lastComma ? (int32_t)atol(lastComma + 1) : 0;
             }
         };
 
@@ -737,6 +770,14 @@ PreviousSighting countPreviousSightings(const char* hex) {
     // korrekt wie ein Datumsvergleich).
     char latestDate[11] = {0};
 
+    // "Smart Aircraft Recognition" - Zeit-/Hoehen-Spanne ueber alle
+    // Treffer, im selben Durchlauf wie count/lastDate gesammelt (siehe
+    // fileFindHexRow() oben). MIN_SIGHTINGS_FOR_PATTERN = 3 (Alex' Vorgabe:
+    // weniger Datenpunkte sind statistisch nicht aussagekraeftig).
+    constexpr uint16_t MIN_SIGHTINGS_FOR_PATTERN = 3;
+    uint8_t minHour = 255, maxHour = 0;
+    int32_t minAlt = INT32_MAX, maxAlt = INT32_MIN;
+
     File entry = dir.openNextFile();
     while (entry && filesScanned < MAX_FILES_SCANNED) {
         if (!entry.isDirectory()) {
@@ -753,12 +794,18 @@ PreviousSighting countPreviousSightings(const char* hex) {
                 String dayKey = dateOnly.length() >= 10 ? dateOnly.substring(0, 10) : dateOnly;
                 bool isToday = timeKnown && dayKey == String(todayStr);
 
-                if (!isToday && fileContainsHex(entry, hex)) {
+                uint8_t rowHour = 0;
+                int32_t rowAltitudeFt = 0;
+                if (!isToday && fileFindHexRow(entry, hex, rowHour, rowAltitudeFt)) {
                     result.count++;
                     if (strcmp(dayKey.c_str(), latestDate) > 0) {
                         strncpy(latestDate, dayKey.c_str(), sizeof(latestDate) - 1);
                         latestDate[sizeof(latestDate) - 1] = 0;
                     }
+                    if (rowHour < minHour) minHour = rowHour;
+                    if (rowHour > maxHour) maxHour = rowHour;
+                    if (rowAltitudeFt < minAlt) minAlt = rowAltitudeFt;
+                    if (rowAltitudeFt > maxAlt) maxAlt = rowAltitudeFt;
                 }
             }
         }
@@ -771,6 +818,16 @@ PreviousSighting countPreviousSightings(const char* hex) {
     if (result.found) {
         strncpy(result.lastDate, latestDate, sizeof(result.lastDate) - 1);
         result.lastDate[sizeof(result.lastDate) - 1] = 0;
+    }
+    if (result.count >= MIN_SIGHTINGS_FOR_PATTERN) {
+        result.hasPattern = true;
+        result.minHour = minHour;
+        result.maxHour = maxHour;
+        // Auf 1000ft gerundet (Alex' Vorgabe) - min abwaerts, max aufwaerts,
+        // damit die tatsaechlichen Werte immer innerhalb der angezeigten
+        // Spanne liegen.
+        result.minAltitudeFt = (minAlt / 1000) * 1000;
+        result.maxAltitudeFt = ((maxAlt + 999) / 1000) * 1000;
     }
     return result;
 }

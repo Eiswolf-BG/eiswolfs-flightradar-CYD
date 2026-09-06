@@ -434,6 +434,34 @@ static const char* const I18N_TR[] = {
     " saat ",
 
     "Preset olarak ayarlamak için dokunun",
+
+    "Kalan: ",
+
+    "Genellikle ",
+
+    "Canlı trafik",
+    "Menzildeki uçak: ",
+    "Yolcu uçağı",
+    "Özel jet",
+    "Turboprop",
+    "Bilinmiyor",
+    "En yakın: ",
+    "En yüksek: ",
+    "En alçak: ",
+    "En hızlı: ",
+
+    "Bağlantı durumu",
+    "Takip edilen uçak: ",
+    "Son güncelleme: ",
+    "Son deneme: ",
+    "Başarılı",
+    "Zaman aşımı",
+    "Hata kodu: ",
+    "Henüz deneme yok",
+    "Durum: ",
+    "İyi",
+    "Orta",
+    "Kötü",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,
