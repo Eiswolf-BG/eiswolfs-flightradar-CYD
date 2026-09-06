@@ -62,4 +62,12 @@ namespace RadarScreen {
     AircraftCategory classifyAircraftType(const char* typeCode);
     bool isHeavyAircraftCategory(const char* category);
     bool isRotorcraftCategory(const char* category);
+
+    // Weitere oeffentliche Huellen, gleiches Prinzip wie die drei oben -
+    // fuer Feature 14 (MQTT/Home Assistant erweitern, siehe net_task.cpp),
+    // damit die dortige Aggregation Militaer-/Notfall-Erkennung nutzen
+    // kann, OHNE die Squawk-Bereichspruefung/-Liste ein zweites Mal zu
+    // pflegen.
+    bool isEmergencySquawkCode(const char* squawk);
+    bool isMilitaryGovSquawkCode(const char* squawk);
 }

@@ -4895,4 +4895,12 @@ bool isRotorcraftCategory(const char* category) {
     return isRotorcraftCategoryInternal(category);
 }
 
+bool isEmergencySquawkCode(const char* squawk) {
+    return isEmergencySquawk(squawk);
+}
+
+bool isMilitaryGovSquawkCode(const char* squawk) {
+    return isMilitaryGovSquawk(squawk);
+}
+
 }

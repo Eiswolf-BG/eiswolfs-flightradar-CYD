@@ -171,10 +171,12 @@ A small built-in web page lets you view a live radar and export the flight logbo
 
 **How to use it:** while your computer or phone is on the same WiFi network as the device, open a browser and go to the device's IP address (e.g. `http://192.168.1.42/`). **Menu → System → "Logbook / WebUI"** shows the current IP directly on the device (the "?" info button on the Logbook files screen shows it too) along with a QR code for the page's URL, so you can open it on your phone without typing the IP by hand.
 
+**Install as an app:** the page can be installed on your phone's home screen as its own app, with its own icon and a full-screen view without the browser's address bar - on Android/Chrome via the browser's "Add to Home screen" option, on iOS/Safari via the Share sheet's "Add to Home Screen". The install icon and theme color follow the device's currently selected color theme.
+
 #### 🏠 MQTT / Home Assistant
 An optional MQTT connection (**Menu → System → Tools → "MQTT"**, off by default) feeds a few live radar values into your own smart-home system, such as Home Assistant. Turn it on, enter your broker's address (host and port, e.g. `192.168.1.10:1883`), and optionally a username/password if your broker requires authentication - public test brokers without a login work too.
 
-Once connected, the device regularly publishes the number of aircraft currently in range, the proximity-alert and watchlist-alert status, the WiFi signal strength, and the running firmware version, all under a shared `eiswolfs-flightradar/` topic prefix.
+Once connected, the device regularly publishes the number of aircraft currently in range, the proximity-alert and watchlist-alert status, the WiFi signal strength, and the running firmware version, all under a shared `eiswolfs-flightradar/` topic prefix. It also publishes the distance of the nearest aircraft, the altitude of the highest and lowest aircraft, the speed of the fastest aircraft, the number of helicopters and Heavy aircraft currently in range, and whether a military/government flight or an emergency squawk is currently detected.
 
 **Home Assistant auto-discovery:** if you're using Home Assistant, no manual configuration is needed - the device announces all of the above as sensors via the standard MQTT Discovery mechanism as soon as it connects, and they appear automatically as a single grouped device ("Eiswolfs Flightradar") on your dashboard. A proper MQTT Last-Will-and-Testament makes sure Home Assistant correctly shows the device as unavailable if the connection ever drops unexpectedly (e.g. power loss), not just when MQTT is turned off on purpose.
 

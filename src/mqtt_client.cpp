@@ -179,6 +179,60 @@ namespace {
                                             "firmware_version", "mdi:chip-outline", nullptr, nullptr,
                                             nullptr, false, "diagnostic").c_str(),
                      true);
+
+        // Feature 14 "MQTT/Home Assistant erweitern" - acht weitere
+        // Sensoren, alle aus derselben net_task.cpp-Aggregation gespeist
+        // wie die fuenf obigen (siehe MqttClient::TrafficStats). Bewusst
+        // AUSGESCHLOSSEN (Alex' Vorgabe): Wetter/Wind/Temperatur-Sensoren
+        // sowie separate MQTT-"Events" - nur Dauerzustands-Sensoren wie die
+        // bestehenden fuenf.
+        mqtt.publish(topicFor("sensor", "nearest_distance").c_str(),
+                     buildDiscoveryPayload("Nearest Aircraft Distance", (prefix + "nearest-distance-km").c_str(),
+                                            "nearest_distance", "mdi:airplane-marker", "distance", "measurement",
+                                            "km", false, nullptr).c_str(),
+                     true);
+
+        mqtt.publish(topicFor("sensor", "highest_altitude").c_str(),
+                     buildDiscoveryPayload("Highest Aircraft Altitude", (prefix + "highest-altitude-ft").c_str(),
+                                            "highest_altitude", "mdi:arrow-up-bold", nullptr, "measurement",
+                                            "ft", false, nullptr).c_str(),
+                     true);
+
+        mqtt.publish(topicFor("sensor", "lowest_altitude").c_str(),
+                     buildDiscoveryPayload("Lowest Aircraft Altitude", (prefix + "lowest-altitude-ft").c_str(),
+                                            "lowest_altitude", "mdi:arrow-down-bold", nullptr, "measurement",
+                                            "ft", false, nullptr).c_str(),
+                     true);
+
+        mqtt.publish(topicFor("sensor", "fastest_speed").c_str(),
+                     buildDiscoveryPayload("Fastest Aircraft Speed", (prefix + "fastest-speed-kt").c_str(),
+                                            "fastest_speed", "mdi:speedometer", nullptr, "measurement",
+                                            "kt", false, nullptr).c_str(),
+                     true);
+
+        mqtt.publish(topicFor("sensor", "helicopter_count").c_str(),
+                     buildDiscoveryPayload("Helicopter Count", (prefix + "helicopter-count").c_str(),
+                                            "helicopter_count", "mdi:helicopter", nullptr, "measurement",
+                                            nullptr, false, nullptr).c_str(),
+                     true);
+
+        mqtt.publish(topicFor("sensor", "heavy_count").c_str(),
+                     buildDiscoveryPayload("Heavy Aircraft Count", (prefix + "heavy-count").c_str(),
+                                            "heavy_count", "mdi:airplane", nullptr, "measurement",
+                                            nullptr, false, nullptr).c_str(),
+                     true);
+
+        mqtt.publish(topicFor("binary_sensor", "military_detected").c_str(),
+                     buildDiscoveryPayload("Military/Government Flight Detected", (prefix + "military-detected").c_str(),
+                                            "military_detected", "mdi:shield-airplane", nullptr, nullptr,
+                                            nullptr, true, nullptr).c_str(),
+                     true);
+
+        mqtt.publish(topicFor("binary_sensor", "emergency_detected").c_str(),
+                     buildDiscoveryPayload("Emergency Squawk Detected", (prefix + "emergency-detected").c_str(),
+                                            "emergency_detected", "mdi:alarm-light", "safety", nullptr,
+                                            nullptr, true, nullptr).c_str(),
+                     true);
     }
 
     bool tryConnect() {
@@ -262,7 +316,8 @@ void loop() {
     mqtt.loop();
 }
 
-void publishStatus(uint8_t aircraftCount, bool watchlistAlert, bool proximityAlert) {
+void publishStatus(uint8_t aircraftCount, bool watchlistAlert, bool proximityAlert,
+                    const TrafficStats& traffic) {
     if (!SettingsStore::mqttEnabled()) return;
     if (!mqtt.connected()) return;
 
@@ -283,6 +338,41 @@ void publishStatus(uint8_t aircraftCount, bool watchlistAlert, bool proximityAle
     snprintf(rssiBuf, sizeof(rssiBuf), "%d", (int)WiFi.RSSI());
     mqtt.publish((prefix + "wifi-rssi").c_str(), rssiBuf, true);
     mqtt.publish((prefix + "firmware-version").c_str(), Config::APP_VERSION, true);
+
+    // Feature 14 - acht weitere Sensoren (siehe TrafficStats/
+    // publishDiscovery() oben), aus derselben net_task.cpp-Aggregation wie
+    // aircraftCount/watchlistAlert/proximityAlert oben, kein zweiter
+    // Durchlauf. Die vier Extremwerte werden NUR veroeffentlicht, wenn
+    // tatsaechlich ein Flugzeug in Reichweite ist (hasX) - bei leerem
+    // Himmel bleibt der zuletzt bekannte (retained) Wert einfach stehen,
+    // statt faelschlich einen Nullwert zu senden, der als "0km entfernt"
+    // missverstanden werden koennte.
+    char buf[16];
+    if (traffic.hasNearest) {
+        snprintf(buf, sizeof(buf), "%.1f", traffic.nearestKm);
+        mqtt.publish((prefix + "nearest-distance-km").c_str(), buf, true);
+    }
+    if (traffic.hasHighest) {
+        snprintf(buf, sizeof(buf), "%ld", (long)traffic.highestFt);
+        mqtt.publish((prefix + "highest-altitude-ft").c_str(), buf, true);
+    }
+    if (traffic.hasLowest) {
+        snprintf(buf, sizeof(buf), "%ld", (long)traffic.lowestFt);
+        mqtt.publish((prefix + "lowest-altitude-ft").c_str(), buf, true);
+    }
+    if (traffic.hasFastest) {
+        snprintf(buf, sizeof(buf), "%.0f", traffic.fastestKt);
+        mqtt.publish((prefix + "fastest-speed-kt").c_str(), buf, true);
+    }
+
+    char smallBuf[8];
+    snprintf(smallBuf, sizeof(smallBuf), "%u", (unsigned)traffic.helicopters);
+    mqtt.publish((prefix + "helicopter-count").c_str(), smallBuf, true);
+    snprintf(smallBuf, sizeof(smallBuf), "%u", (unsigned)traffic.heavy);
+    mqtt.publish((prefix + "heavy-count").c_str(), smallBuf, true);
+
+    mqtt.publish((prefix + "military-detected").c_str(), traffic.militaryDetected ? "ON" : "OFF", true);
+    mqtt.publish((prefix + "emergency-detected").c_str(), traffic.emergencyDetected ? "ON" : "OFF", true);
 }
 
 }

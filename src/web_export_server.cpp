@@ -10,6 +10,7 @@
 #include "location_manager.h"
 #include "units.h"
 #include "weather.h"
+#include "web_pwa_icon.h"
 #include <WebServer.h>
 #include <ArduinoJson.h>
 #include <SD.h>
@@ -202,6 +203,26 @@ namespace {
         html += "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">";
         html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
         html += "<title>" + title + "</title>";
+        // Feature 12 "PWA fuer die Web-UI" - macht die Seite auf dem
+        // Smartphone als eigenstaendige App installierbar (Icon auf dem
+        // Homescreen, Start im Vollbild ohne Adressleiste). "theme-color"
+        // folgt dynamisch dem AKTUELL gewaehlten Geraete-Farbthema (wt.accent,
+        // siehe currentWebTheme() oben) - dieselbe Instanz, die auch die
+        // CSS-Variablen weiter unten setzt. Die "apple-mobile-web-app-*"-
+        // Metas sind Safaris ALTE, aber weiterhin noetige Variante von
+        // manifest.json's "display":"standalone" - ohne sie ignoriert iOS
+        // Safari den Manifest-Eintrag beim "Zum Home-Bildschirm hinzufuegen"
+        // komplett und oeffnet stattdessen weiterhin einen normalen
+        // Browser-Tab (siehe handleManifest()/handleIcon() unten fuer die
+        // beiden referenzierten Routen).
+        html += "<link rel=\"manifest\" href=\"/manifest.json\">";
+        html += "<meta name=\"theme-color\" content=\"" + String(wt.accent) + "\">";
+        html += "<link rel=\"icon\" href=\"/icon.png\" type=\"image/png\">";
+        html += "<link rel=\"apple-touch-icon\" href=\"/icon.png\">";
+        html += "<meta name=\"mobile-web-app-capable\" content=\"yes\">";
+        html += "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\">";
+        html += "<meta name=\"apple-mobile-web-app-status-bar-style\" content=\"black-translucent\">";
+        html += "<meta name=\"apple-mobile-web-app-title\" content=\"Flightradar\">";
         html += "<style>";
         // CSS-Variablen statt fest verdrahtetem Gruen - Alex' Wunsch,
         // dieselbe systemweite Farbthema-Logik wie auf dem Geraet selbst
@@ -272,6 +293,16 @@ namespace {
         html += "#star-bg{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;}";
         html += ".page{position:relative;z-index:1;}";
         html += "</style></head><body>";
+        // Service-Worker-Registrierung (siehe handleServiceWorker() unten) -
+        // "in navigator"-Check noetig, weil Service Worker nur ueber HTTPS
+        // ODER "localhost" verfuegbar sind; das Geraet wird ausschliesslich
+        // ueber eine reine HTTP-IP-Adresse im lokalen WLAN aufgerufen, dort
+        // ist die API in den meisten Browsern schlicht nicht vorhanden -
+        // ohne diesen Check wuerde register() dort mit einer Konsolen-
+        // Fehlermeldung fehlschlagen, aber ansonsten folgenlos bleiben (die
+        // Seite selbst funktioniert unveraendert weiter, nur ohne Offline-
+        // Caching der Seitenhuelle).
+        html += "<script>if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js');}</script>";
         appendStarBackground(html);
         html += "<div class=\"page\">";
         html += "<h1>" + title + "</h1>";
@@ -1203,6 +1234,104 @@ namespace {
         server.send(200, "application/json", out);
     }
 
+    // Feature 12 "PWA fuer die Web-UI" - drei neue, rein statische Routen
+    // (Manifest/Icon/Service-Worker). Alle drei Anfragen sind komplett
+    // unabhaengig von der AircraftTable/SD-Karte - kein SdMutex/AircraftTable-
+    // Lock noetig, anders als die meisten anderen Handler hier in der Datei.
+
+    // Web-App-Manifest (offizielles Format, siehe
+    // https://developer.mozilla.org/en-US/docs/Web/Manifest) - "theme_color"
+    // UND "background_color" folgen dem aktuellen Geraete-Farbthema (gleiche
+    // WebTheme-Quelle wie das "theme-color"-Meta in htmlHeader() und die
+    // CSS-Variablen der Seite selbst), damit die Splash-/Statusleisten-Farbe
+    // beim App-Start zur Seite passt. "start_url":"/" fuehrt nach dem
+    // Start immer zur Live-Radar-Startseite, unabhaengig davon, von welcher
+    // Unterseite aus installiert wurde.
+    void handleManifest() {
+        WebTheme wt = currentWebTheme();
+        JsonDocument doc;
+        doc["name"] = "Eiswolfs Flightradar";
+        doc["short_name"] = "Flightradar";
+        doc["start_url"] = "/";
+        doc["display"] = "standalone";
+        doc["background_color"] = "#0a0f0d";
+        doc["theme_color"] = wt.accent;
+        JsonArray icons = doc["icons"].to<JsonArray>();
+        JsonObject icon = icons.add<JsonObject>();
+        icon["src"] = "/icon.png";
+        icon["sizes"] = "192x192";
+        icon["type"] = "image/png";
+        icon["purpose"] = "any";
+
+        String out;
+        serializeJson(doc, out);
+        // Offizieller MIME-Type fuer Web-App-Manifeste - manche Browser
+        // pruefen ihn beim Installierbarkeits-Check, "application/json"
+        // waere hier nicht 1:1 spezifikationskonform.
+        server.send(200, "application/manifest+json", out);
+    }
+
+    // PNG-Icon aus dem Flash (PROGMEM, siehe web_pwa_icon.h) - dient sowohl
+    // als Android/Chrome-Manifest-Icon als auch als iOS "apple-touch-icon"
+    // (beide referenzieren dieselbe Route, siehe htmlHeader()/
+    // handleManifest()) sowie als normales Browser-Favicon.
+    void handleIcon() {
+        server.send_P(200, "image/png", (PGM_P)PWA_ICON_PNG, PWA_ICON_PNG_LEN);
+    }
+
+    // Minimaler Service Worker fuers Offline-Caching der SEITENHUELLE
+    // (HTML/CSS/JS-Grundgeruest von "/", plus Manifest/Icon) - bewusst NUR
+    // diese drei URLs, alles andere (insbesondere /radar.json, aber auch
+    // /lists, /export.csv, /csv und die Formular-POST-Routen) wird NIE
+    // abgefangen und geht immer direkt/frisch ans Geraet, siehe Alex'
+    // ausdrueckliche Vorgabe "nicht die Live-Daten selbst cachen". Netzwerk-
+    // zuerst-mit-Cache-Fallback (statt Cache-zuerst): sobald das Geraet
+    // erreichbar ist, bekommt der Nutzer immer die aktuelle, frisch vom
+    // Geraet gerenderte Seite (inkl. z.B. des aktuellen Farbthemas) - nur
+    // wenn das Geraet gerade NICHT erreichbar ist (z.B. Handy nicht mehr im
+    // selben WLAN), springt die zuletzt zwischengespeicherte Version ein,
+    // statt nur eine leere Fehlerseite zu zeigen.
+    //
+    // WICHTIG: Service Worker sind nur in einem "sicheren Kontext" (HTTPS
+    // oder "localhost") verfuegbar - das Geraet wird ausschliesslich ueber
+    // eine reine HTTP-IP-Adresse im lokalen WLAN erreicht, dort registriert
+    // navigator.serviceWorker.register() (siehe htmlHeader()) in den
+    // meisten Browsern (u.a. Chrome) gar nicht erst erfolgreich, das
+    // Offline-Caching bleibt dort also praktisch wirkungslos. Trotzdem
+    // sinnvoll: (a) iOS Safaris "Zum Home-Bildschirm"-Vollbildmodus haengt
+    // NICHT vom Service Worker ab (siehe htmlHeader()-Kommentar), (b) minimal
+    // im Flash, (c) funktioniert sofort, falls die Seite doch einmal ueber
+    // HTTPS erreichbar gemacht wird (z.B. Reverse-Proxy).
+    void handleServiceWorker() {
+        String js;
+        js.reserve(1200);
+        js += "const CACHE_NAME='eiswolfs-flightradar-shell-v1';";
+        js += "const SHELL_URLS=['/','/manifest.json','/icon.png'];";
+        js += "self.addEventListener('install',function(event){";
+        js += "self.skipWaiting();";
+        js += "event.waitUntil(caches.open(CACHE_NAME).then(function(cache){return cache.addAll(SHELL_URLS);}));";
+        js += "});";
+        js += "self.addEventListener('activate',function(event){";
+        js += "self.clients.claim();";
+        js += "event.waitUntil(caches.keys().then(function(keys){";
+        js += "return Promise.all(keys.filter(function(k){return k!==CACHE_NAME;}).map(function(k){return caches.delete(k);}));";
+        js += "}));";
+        js += "});";
+        js += "self.addEventListener('fetch',function(event){";
+        js += "var url=new URL(event.request.url);";
+        // Nur GET-Anfragen auf genau die drei Huellen-URLs abfangen - alles
+        // andere (insbesondere /radar.json) unangetastet an den Browser
+        // durchreichen (kein respondWith() = normales Netzwerkverhalten).
+        js += "if(event.request.method!=='GET'||SHELL_URLS.indexOf(url.pathname)===-1){return;}";
+        js += "event.respondWith(fetch(event.request).then(function(response){";
+        js += "var copy=response.clone();";
+        js += "caches.open(CACHE_NAME).then(function(cache){cache.put(event.request,copy);});";
+        js += "return response;";
+        js += "}).catch(function(){return caches.match(event.request);}));";
+        js += "});";
+        server.send(200, "application/javascript", js);
+    }
+
     void handleNotFound() {
         server.send(404, "text/plain", "Not found");
     }
@@ -1210,6 +1339,9 @@ namespace {
 
 void begin() {
     server.on("/", handleRoot);
+    server.on("/manifest.json", handleManifest);
+    server.on("/icon.png", handleIcon);
+    server.on("/sw.js", handleServiceWorker);
     server.on("/radar.json", handleRadarJson);
     server.on("/export.csv", handleExportCsv);
     server.on("/csv", HTTP_GET, handleCsvDownload);

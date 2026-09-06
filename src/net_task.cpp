@@ -17,6 +17,7 @@
 #include "mqtt_client.h"
 #include "aircraft_watchlist.h"
 #include "squawk_watchlist.h"
+#include "radar_screen.h"
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -209,8 +210,22 @@ namespace {
                         // No-Op).
                         {
                             bool proximityOn = SettingsStore::proximityAlertEnabled();
+                            bool militaryOn = SettingsStore::militarySquawkDetectionEnabled();
+                            bool emergencyOn = SettingsStore::emergencyAlertEnabled();
                             bool anyWatched = false;
                             bool anyClose = false;
+
+                            // Feature 14 "MQTT/Home Assistant erweitern" -
+                            // IM SELBEN Durchlauf wie anyWatched/anyClose
+                            // oben mitberechnet (keine zweite, separate
+                            // Aggregation ueber die AircraftTable, siehe
+                            // MqttClient::TrafficStats). Nutzt dieselben
+                            // RadarScreen-Huellfunktionen wie der Live-
+                            // Traffic-Screen (radar_screen.h) statt die
+                            // Typ-/Squawk-Klassifikation hier ein zweites
+                            // Mal zu implementieren.
+                            MqttClient::TrafficStats traffic;
+
                             AircraftTable::lock();
                             Aircraft* table = AircraftTable::raw();
                             uint8_t aircraftCount = AircraftTable::validCount();
@@ -223,9 +238,35 @@ namespace {
                                 if (proximityOn && table[i].distanceKm <= Config::LED_ALERT_RADIUS_KM) {
                                     anyClose = true;
                                 }
+
+                                if (!traffic.hasNearest || table[i].distanceKm < traffic.nearestKm) {
+                                    traffic.hasNearest = true;
+                                    traffic.nearestKm = table[i].distanceKm;
+                                }
+                                if (!traffic.hasHighest || table[i].altBaroFt > traffic.highestFt) {
+                                    traffic.hasHighest = true;
+                                    traffic.highestFt = table[i].altBaroFt;
+                                }
+                                if (!traffic.hasLowest || table[i].altBaroFt < traffic.lowestFt) {
+                                    traffic.hasLowest = true;
+                                    traffic.lowestFt = table[i].altBaroFt;
+                                }
+                                if (!traffic.hasFastest || table[i].groundSpeedKt > traffic.fastestKt) {
+                                    traffic.hasFastest = true;
+                                    traffic.fastestKt = table[i].groundSpeedKt;
+                                }
+
+                                if (RadarScreen::isRotorcraftCategory(table[i].category)) traffic.helicopters++;
+                                if (RadarScreen::isHeavyAircraftCategory(table[i].category)) traffic.heavy++;
+                                if (militaryOn && RadarScreen::isMilitaryGovSquawkCode(table[i].squawk)) {
+                                    traffic.militaryDetected = true;
+                                }
+                                if (emergencyOn && RadarScreen::isEmergencySquawkCode(table[i].squawk)) {
+                                    traffic.emergencyDetected = true;
+                                }
                             }
                             AircraftTable::unlock();
-                            MqttClient::publishStatus(aircraftCount, anyWatched, anyClose);
+                            MqttClient::publishStatus(aircraftCount, anyWatched, anyClose, traffic);
                         }
 
                         // Kurzer gruener LED-Blitz als "Herzschlag" - zeigt,
