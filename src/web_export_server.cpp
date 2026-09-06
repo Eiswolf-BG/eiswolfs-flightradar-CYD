@@ -1333,7 +1333,7 @@ namespace {
     // HTTPS erreichbar gemacht wird (z.B. Reverse-Proxy).
     void handleServiceWorker() {
         String js;
-        js.reserve(1200);
+        js.reserve(2200);
         js += "const CACHE_NAME='eiswolfs-flightradar-shell-v1';";
         js += "const SHELL_URLS=['/','/manifest.json','/icon.png'];";
         js += "self.addEventListener('install',function(event){";
@@ -1346,16 +1346,50 @@ namespace {
         js += "return Promise.all(keys.filter(function(k){return k!==CACHE_NAME;}).map(function(k){return caches.delete(k);}));";
         js += "}));";
         js += "});";
+        // Netzwerk-Timeout fuer den Fetch-Handler unten (Alex' Meldung:
+        // ~30s schwarzer Bildschirm bei JEDEM Start der installierten iOS-
+        // Standalone-App, nicht nur beim allerersten - widerlegt die zuerst
+        // vermutete einmalige "Lokales Netzwerk"-Berechtigungsverhandlung.
+        // Naheliegendste verbleibende Erklaerung: iOS beendet den WKWebView-
+        // Prozess einer Standalone-Homescreen-App zwischen den Aufrufen
+        // komplett (kein dauerhaft laufender Hintergrundprozess wie bei
+        // einer nativen App) - jeder Start baut die Verbindung zur lokalen
+        // Geraete-IP darum tatsaechlich JEDES Mal neu auf, nicht nur beim
+        // ersten Mal. Das ist weiterhin eine iOS-Netzwerk-Eigenheit, kein
+        // Server-/Fetch-Bug - der Fix hier repariert die Ursache nicht,
+        // sorgt aber dafuer, dass die Seite trotzdem zuegig etwas anzeigt,
+        // sobald ein Huellen-Cache vom letzten Aufruf vorliegt, statt
+        // unbegrenzt auf die langsame Verbindung zu warten.
+        js += "const NETWORK_TIMEOUT_MS=4000;";
         js += "self.addEventListener('fetch',function(event){";
         js += "var url=new URL(event.request.url);";
         // Nur GET-Anfragen auf genau die drei Huellen-URLs abfangen - alles
         // andere (insbesondere /radar.json) unangetastet an den Browser
         // durchreichen (kein respondWith() = normales Netzwerkverhalten).
         js += "if(event.request.method!=='GET'||SHELL_URLS.indexOf(url.pathname)===-1){return;}";
-        js += "event.respondWith(fetch(event.request).then(function(response){";
+        js += "var networkPromise=fetch(event.request).then(function(response){";
         js += "var copy=response.clone();";
         js += "caches.open(CACHE_NAME).then(function(cache){cache.put(event.request,copy);});";
         js += "return response;";
+        js += "});";
+        // Promise.race() gegen einen kurzen Timeout - laeuft der Timeout
+        // zuerst ab (Netzwerk noch nicht fertig), wird SOFORT auf den Cache
+        // zurueckgegriffen, statt weiter zu warten. networkPromise laeuft im
+        // Hintergrund einfach weiter (fuellt bei Erfolg trotzdem noch den
+        // Cache fuer den naechsten Aufruf) - wird aber, sobald ein Cache-
+        // Treffer vorliegt, NICHT mehr fuer die aktuelle Antwort abgewartet.
+        // Ohne vorhandenen Cache-Eintrag (z.B. beim allerersten Aufruf
+        // ueberhaupt) bleibt networkPromise selbst der Fallback - besser als
+        // gar keine Antwort. Bei einem echten Fetch-FEHLSCHLAG (Ablehnung,
+        // nicht nur Langsamkeit) entscheidet Promise.race() sofort zugunsten
+        // der Ablehnung (ein abgelehntes Promise "gewinnt" das Rennen genau
+        // wie ein erfuelltes) - der aeussere catch() greift dann direkt auf
+        // den Cache zurueck, der ungenutzte timeoutPromise verfaellt einfach
+        // folgenlos im Hintergrund.
+        js += "var timeoutPromise=new Promise(function(resolve){setTimeout(function(){resolve(null);},NETWORK_TIMEOUT_MS);});";
+        js += "event.respondWith(Promise.race([networkPromise,timeoutPromise]).then(function(result){";
+        js += "if(result)return result;";
+        js += "return caches.match(event.request).then(function(cached){return cached||networkPromise;});";
         js += "}).catch(function(){return caches.match(event.request);}));";
         js += "});";
         server.send(200, "application/javascript", js);

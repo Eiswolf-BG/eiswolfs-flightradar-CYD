@@ -111,6 +111,139 @@ namespace {
         return lines;
     }
 
+    // Performance-Fix (Alex' Meldung: Web-UI-Seitenaufruf brauchte ~9,6s,
+    // fast komplett in listDays()/countLinesFast()) - eine bereits
+    // ABGESCHLOSSENE Logbuch-Datei (nicht mehr currentSessionFile) aendert
+    // sich nie wieder, ihre Zeilenzahl kann also nach dem ersten Zaehlen
+    // fuer den Rest der Betriebszeit unveraendert wiederverwendet werden,
+    // statt bei JEDEM Aufruf (z.B. jedem Web-UI-Seitenaufruf) erneut den
+    // kompletten Dateiinhalt einzulesen. Reiner RAM-Cache (keine SD-
+    // Persistierung noetig) - der volle Lesevorgang wird so pro Datei
+    // hoechstens EINMAL pro Boot bezahlt, nicht bei jedem Aufruf.
+    //
+    // Fuer die AKTIVE Sitzungsdatei (currentSessionFile) wird NIE gecacht,
+    // sondern der Wert direkt aus dem ohnehin schon im RAM gefuehrten
+    // seenCount abgeleitet (siehe markSeen()/update() - jede neue Zeile
+    // erhoeht seenCount im selben Moment, in dem sie geschrieben wird, die
+    // beiden sind also immer exakt synchron) - kein SD-Zugriff noetig, und
+    // garantiert nie veraltet, waehrend die Datei noch waechst.
+    constexpr uint8_t LINE_COUNT_CACHE_SIZE = 96; // > MAX_RAW_SCAN (90) an anderen Stellen
+    struct LineCountCacheEntry {
+        char label[16] = {0}; // Dateiname ohne Pfad/".csv", siehe resolveSessionFilename()
+        uint32_t lines = 0;
+        bool valid = false;
+    };
+    LineCountCacheEntry lineCountCache[LINE_COUNT_CACHE_SIZE];
+
+    // Liefert die Zeilenzahl (inkl. Kopfzeile, wie countLinesFast()) fuer
+    // die Logbuch-Datei mit diesem Label. "entry" muss bereits geoeffnet
+    // sein - wird nur bei einem tatsaechlichen Cache-Miss gelesen.
+    uint32_t cachedLineCountFor(File& entry, const char* label) {
+        if (currentSessionFile[0] && strcmp(label, currentSessionFile) == 0) {
+            return (uint32_t)seenCount + 1; // +1 fuer die Kopfzeile
+        }
+        for (uint8_t i = 0; i < LINE_COUNT_CACHE_SIZE; i++) {
+            if (lineCountCache[i].valid && strcmp(lineCountCache[i].label, label) == 0) {
+                return lineCountCache[i].lines;
+            }
+        }
+        uint32_t lines = countLinesFast(entry);
+        // Ersten freien Platz belegen - ist der Cache voll (sehr viele
+        // Tage), wird der Wert einfach nicht abgelegt (naechster Aufruf
+        // zaehlt diese eine Datei dann erneut) statt einen bestehenden,
+        // noch gueltigen Eintrag zu verdraengen.
+        for (uint8_t i = 0; i < LINE_COUNT_CACHE_SIZE; i++) {
+            if (!lineCountCache[i].valid) {
+                strncpy(lineCountCache[i].label, label, sizeof(lineCountCache[i].label) - 1);
+                lineCountCache[i].lines = lines;
+                lineCountCache[i].valid = true;
+                break;
+            }
+        }
+        return lines;
+    }
+
+    // Extrahiert das Label (Dateiname ohne Verzeichnis-Praefix und ohne
+    // ".csv") aus einem SD-Dateinamen - dieselbe Logik, die bisher einzeln
+    // in listDays() und computeAllTimeStats() stand, jetzt an einer Stelle
+    // fuer beide (und cachedLineCountFor() oben).
+    String labelFromEntryName(const String& name) {
+        String label = name.substring(0, name.length() - 4); // ".csv" abschneiden
+        int slashIdx = label.lastIndexOf('/');
+        if (slashIdx >= 0) label = label.substring(slashIdx + 1);
+        return label;
+    }
+
+    // Entfernt (falls vorhanden) den Cache-Eintrag fuer genau dieses Label -
+    // noetig bei deleteFile()/resetAllData(), sonst koennte eine SPAETER neu
+    // angelegte Datei mit demselben Datums-Label (z.B. Flugbuch am selben
+    // Tag geloescht und erneut eingeschaltet) faelschlich die alte,
+    // gecachte Zeilenzahl der geloeschten Datei uebernehmen.
+    void invalidateLineCountCache(const char* label) {
+        for (uint8_t i = 0; i < LINE_COUNT_CACHE_SIZE; i++) {
+            if (lineCountCache[i].valid && strcmp(lineCountCache[i].label, label) == 0) {
+                lineCountCache[i].valid = false;
+                return;
+            }
+        }
+    }
+
+    void clearLineCountCache() {
+        for (uint8_t i = 0; i < LINE_COUNT_CACHE_SIZE; i++) lineCountCache[i].valid = false;
+    }
+
+    // Performance-Fix Teil 2 (Alex' Meldung: selbst OHNE Zeilenzaehlung
+    // brauchte der reine SD-Verzeichnis-Scan - nur openNextFile()/close()
+    // fuer 7 Eintraege, kein Dateiinhalt - noch ~4s, weit ausserhalb dessen,
+    // was fuer einen SD-Kartenzugriff normal ist). Die TAGESLISTE selbst
+    // (welche .csv-Dateien ueberhaupt existieren) aendert sich nur an drei
+    // Stellen: (1) eine neue Datei entsteht bei Tageswechsel/erstem
+    // Einschalten (siehe update()'s needsHeader-Zweig), (2) deleteFile(),
+    // (3) resetAllData() - an genau diesen drei Stellen wird der Cache
+    // unten invalidiert/aktualisiert, sonst bleibt er fuer den Rest der
+    // Betriebszeit unveraendert im RAM stehen, statt bei JEDEM Web-UI-
+    // Aufruf das komplette SD-Verzeichnis erneut zu durchsuchen.
+    struct DayListCache {
+        DayEntry entries[LINE_COUNT_CACHE_SIZE];
+        uint8_t count = 0;
+        bool valid = false;
+    };
+    DayListCache dayListCache;
+
+    void invalidateDayListCache() { dayListCache.valid = false; }
+
+    // Baut dayListCache per vollem SD-Verzeichnis-Scan neu auf (genau EIN
+    // solcher Scan pro tatsaechlicher Aenderung der Dateiliste, nicht mehr
+    // einer pro Web-UI-Aufruf) - dieselbe Schleife, die vorher direkt in
+    // listDays() stand, schreibt jetzt in den Cache statt in den
+    // Aufrufer-Puffer. Erwartet, dass der SdMutex bereits gehalten wird.
+    void rebuildDayListCache() {
+        dayListCache.count = 0;
+        dayListCache.valid = true; // schon hier setzen: ein leeres Verzeichnis ist ein gueltiges (nicht staendig neu zu scannendes) Ergebnis
+
+        File dir = SD.open(Config::SD_LOG_DIR);
+        if (!dir || !dir.isDirectory()) return;
+
+        File entry = dir.openNextFile();
+        while (entry && dayListCache.count < LINE_COUNT_CACHE_SIZE) {
+            if (!entry.isDirectory()) {
+                String name = String(entry.name());
+                if (name.endsWith(".csv")) {
+                    String label = labelFromEntryName(name);
+                    uint32_t lines = cachedLineCountFor(entry, label.c_str());
+                    DayEntry& out = dayListCache.entries[dayListCache.count];
+                    strncpy(out.date, label.c_str(), sizeof(out.date) - 1);
+                    out.date[sizeof(out.date) - 1] = 0;
+                    out.count = (lines > 0) ? (lines - 1) : 0;
+                    dayListCache.count++;
+                }
+            }
+            entry.close();
+            entry = dir.openNextFile();
+        }
+        dir.close();
+    }
+
     void loadSeenFromCurrentFile() {
         seenCount = 0;
         char filename[64];
@@ -347,6 +480,10 @@ void update() {
     if (!f) return;
     if (needsHeader) {
         f.println("timestamp,hex,callsign,reg,type,distance_km,altitude_ft");
+        // Eine neue Logbuch-Datei ist entstanden (Tageswechsel oder erstes
+        // Einschalten) - die Tagesliste hat sich damit geaendert, siehe
+        // rebuildDayListCache()-Kommentar oben.
+        invalidateDayListCache();
     }
 
     for (uint8_t i = 0; i < count; i++) {
@@ -431,7 +568,7 @@ void computeAllTimeStats(uint32_t& totalAircraft, uint16_t& totalDays) {
             String name = String(entry.name());
             if (name.endsWith(".csv")) {
                 totalDays++;
-                uint32_t lines = countLinesFast(entry);
+                uint32_t lines = cachedLineCountFor(entry, labelFromEntryName(name).c_str());
                 if (lines > 0) totalAircraft += (lines - 1);
             }
         }
@@ -442,35 +579,29 @@ void computeAllTimeStats(uint32_t& totalAircraft, uint16_t& totalDays) {
 }
 
 uint8_t listDays(DayEntry* out, uint8_t maxEntries) {
-    uint8_t filled = 0;
-
     SdMutex::Guard guard;
 
-    File dir = SD.open(Config::SD_LOG_DIR);
-    if (!dir || !dir.isDirectory()) return 0;
+    // Voller SD-Verzeichnis-Scan nur noch, wenn sich die Dateiliste seit
+    // dem letzten Mal tatsaechlich geaendert haben KANN (siehe
+    // invalidateDayListCache()-Aufrufe unten in update()/deleteFile()/
+    // resetAllData()) - im Normalfall (mehrere Web-UI-Aufrufe zwischen zwei
+    // solchen Aenderungen) ist dayListCache bereits gueltig, kein SD-
+    // Zugriff noetig.
+    if (!dayListCache.valid) rebuildDayListCache();
 
-    File entry = dir.openNextFile();
-    while (entry && filled < maxEntries) {
-        if (!entry.isDirectory()) {
-            String name = String(entry.name());
-            if (name.endsWith(".csv")) {
-                String dateOnly = name.substring(0, name.length() - 4);
-                int slashIdx = dateOnly.lastIndexOf('/');
-                if (slashIdx >= 0) dateOnly = dateOnly.substring(slashIdx + 1);
-
-                uint32_t lines = countLinesFast(entry);
-
-                strncpy(out[filled].date, dateOnly.c_str(), sizeof(out[filled].date) - 1);
-                out[filled].date[sizeof(out[filled].date) - 1] = 0;
-                out[filled].count = (lines > 0) ? (lines - 1) : 0;
-                filled++;
-            }
+    uint8_t filled = 0;
+    for (uint8_t i = 0; i < dayListCache.count && filled < maxEntries; i++) {
+        out[filled] = dayListCache.entries[i];
+        // Die AKTIVE Sitzungsdatei waechst laufend weiter, ohne dass sich
+        // die Dateiliste selbst aendert (kein invalidateDayListCache()-
+        // Aufruf dafuer) - ihr count wird deshalb hier bei JEDEM Aufruf
+        // live aus dem ohnehin im RAM gefuehrten seenCount ueberschrieben
+        // (kein SD-Zugriff), damit "heute" nie veraltet erscheint.
+        if (currentSessionFile[0] && strcmp(out[filled].date, currentSessionFile) == 0) {
+            out[filled].count = seenCount;
         }
-        entry.close();
-        entry = dir.openNextFile();
+        filled++;
     }
-    dir.close();
-
     return filled;
 }
 
@@ -512,11 +643,16 @@ bool deleteFile(const char* label) {
     if (!SD.exists(path)) return false;
 
     bool ok = SD.remove(path);
-    if (ok && strcmp(label, currentSessionFile) == 0) {
-        // Die gerade aktive Sitzungsdatei wurde geloescht - Dopplungs-Liste
-        // zuruecksetzen, damit neue Sichtungen wieder korrekt in die (beim
-        // naechsten Schreibvorgang neu angelegte) Datei geloggt werden.
-        seenCount = 0;
+    if (ok) {
+        invalidateLineCountCache(label);
+        invalidateDayListCache();
+        if (strcmp(label, currentSessionFile) == 0) {
+            // Die gerade aktive Sitzungsdatei wurde geloescht - Dopplungs-
+            // Liste zuruecksetzen, damit neue Sichtungen wieder korrekt in
+            // die (beim naechsten Schreibvorgang neu angelegte) Datei
+            // geloggt werden.
+            seenCount = 0;
+        }
     }
     return ok;
 }
@@ -545,6 +681,8 @@ void resetAllData() {
 
     seenCount = 0;
     currentSessionFile[0] = 0;
+    clearLineCountCache();
+    invalidateDayListCache();
     if (SettingsStore::flightLogbookEnabled()) {
         ensureSessionFile();
     }
