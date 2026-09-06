@@ -882,6 +882,35 @@ namespace {
         // (semantischer Alarm-/Status-Ton, kein UI-Chrome). Standardmaessig
         // versteckt, erscheint nur bei tatsaechlichem Treffer.
         html += " &middot; <span id=\"watchBadge\" style=\"display:none;color:#00e5ff;\">&#9679; Watchlist match</span>";
+        // Feature 12 Nachtrag - dezenter Hinweis auf die PWA-Installierbarkeit
+        // (siehe /manifest.json, /icon.png, /sw.js oben) direkt auf der
+        // Seite selbst, da das bisher nur in der README stand, die niemand
+        // liest, der einfach nur die Seite im Browser oeffnet. "display:none"
+        // per Default - das kleine Skript direkt darunter blendet die Zeile
+        // NUR ein, wenn die Seite gerade in einem normalen Browser-Tab laeuft
+        // (nicht bereits als installierte App im Standalone-/Vollbildmodus,
+        // siehe Alex' Vorgabe: ein Nutzer, der die App schon installiert hat,
+        // braucht den Hinweis nicht mehr zu sehen). "display-mode: standalone"
+        // deckt Android/Chrome ab, "navigator.standalone" das iOS-Aequivalent
+        // (Chrome kennt diese Eigenschaft gar nicht, daher der "=== true"-
+        // Vergleich statt einer reinen Wahrheitswert-Pruefung). Leicht
+        // unterschiedlicher Text je Plattform, da der Installationsweg
+        // tatsaechlich unterschiedlich ist (iOS: Teilen-Button, Android/
+        // Desktop-Chrome: Browser-Menue) - "navigator.standalone !== undefined"
+        // ist dabei KEIN echter iOS-Check per se, aber diese Eigenschaft
+        // existiert ausschliesslich in iOS Safari, ist also in der Praxis ein
+        // zuverlaessiges Unterscheidungsmerkmal.
+        html += "<div id=\"pwaHint\" style=\"display:none;margin-top:4px;\">&#128241; <span id=\"pwaHintText\"></span></div>";
+        html += "<script>(function(){";
+        html += "var standalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;";
+        html += "if(standalone)return;";
+        html += "var el=document.getElementById('pwaHint');if(!el)return;";
+        html += "var isIOS=window.navigator.standalone!==undefined;";
+        html += "document.getElementById('pwaHintText').textContent=isIOS";
+        html += "?'Add to Home Screen (Share button) for the full-screen app view'";
+        html += ":'Add to Home screen (browser menu) for the full-screen app view';";
+        html += "el.style.display='';";
+        html += "})();</script>";
         html += "</footer>";
 
         html += "</div></body></html>";
