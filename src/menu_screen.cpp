@@ -428,8 +428,21 @@ namespace {
         Rect upBtn   = {(int16_t)(BOX_X + BOX_W / 2 - 64), scrollRowY, 60, SCROLL_ROW_H};
         Rect downBtn = {(int16_t)(BOX_X + BOX_W / 2 + 4), scrollRowY, 60, SCROLL_ROW_H};
 
-        MenuStars::reset();
-
+        // BUGFIX (Alex' Meldung: "Update installiert"-Bestaetigung flackerte
+        // sichtbar) - MenuStars::update() verteilt seine Sterne zufaellig
+        // ueber den GESAMTEN Bildschirm, ohne Ruecksicht auf bereits
+        // gezeichneten Vordergrund-Inhalt, und pulsiert jeden Stern danach
+        // dauerhaft an genau dieser festen Position (kein Loeschen/
+        // Neuplatzieren). Diese Box hier deckt bis auf einen 4px-Rand die
+        // GESAMTE Bildschirmflaeche ab - praktisch jeder der 34 Sterne
+        // landet also zwangslaeufig auf Titel/Text/Button-Pixeln und
+        // blinkt dort einzeln vor sich hin, was in der Summe wie
+        // grossflaechiges Flackern aussieht. Anders als bei normalen
+        // Menueseiten (kleine Buttons, viel echter schwarzer Hintergrund
+        // dazwischen) gibt es hier keinen sinnvollen freien Bereich fuer
+        // einen Sternenhintergrund - deshalb bewusst KEIN MenuStars::
+        // reset()/update() mehr fuer diesen (und die beiden strukturell
+        // identischen infoScreen()/twoPartInfoScreen()-) Dialoge.
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
             tft.drawRoundRect(BOX_X, BOX_Y, BOX_W, BOX_H, 6, accentColor);
@@ -478,7 +491,6 @@ namespace {
             // "false" (= Abbrechen) als sicherer Standard, da diese Funktion
             // fuer Warnungen wie die Werksreset-Bestaetigung genutzt wird.
             if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return false;
-            MenuStars::update(tft);
             delay(20);
         }
     }
@@ -567,8 +579,13 @@ namespace {
         Rect upBtn   = {(int16_t)(BOX_X + BOX_W / 2 - 64), scrollRowY, 60, SCROLL_ROW_H};
         Rect downBtn = {(int16_t)(BOX_X + BOX_W / 2 + 4), scrollRowY, 60, SCROLL_ROW_H};
 
-        MenuStars::reset();
-
+        // BUGFIX (Alex' Meldung: "Update installiert"-Bestaetigung
+        // flackerte sichtbar) - siehe ausfuehrlicher Kommentar in
+        // confirmWarningScreen() oben: die zufaellig ueber den GESAMTEN
+        // Bildschirm verteilten, dauerhaft an fixer Position pulsierenden
+        // MenuStars-Sterne landen bei dieser fast bildschirmfuellenden Box
+        // zwangslaeufig auf Titel/Text/Button und blinken dort einzeln -
+        // deshalb bewusst KEIN MenuStars::reset()/update() mehr hier.
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
             tft.drawRoundRect(BOX_X, BOX_Y, BOX_W, BOX_H, 6, accentColor);
@@ -620,7 +637,6 @@ namespace {
             }
             // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
             if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return false;
-            MenuStars::update(tft);
             delay(20);
         }
     }
@@ -701,8 +717,10 @@ namespace {
         Rect upBtn   = {(int16_t)(BOX_X + BOX_W / 2 - 64), scrollRowY, 60, SCROLL_ROW_H};
         Rect downBtn = {(int16_t)(BOX_X + BOX_W / 2 + 4), scrollRowY, 60, SCROLL_ROW_H};
 
-        MenuStars::reset();
-
+        // BUGFIX (Alex' Meldung: "Update installiert"-Bestaetigung
+        // flackerte sichtbar) - siehe ausfuehrlicher Kommentar in
+        // confirmWarningScreen() oben: bewusst KEIN MenuStars::reset()/
+        // update() mehr fuer diese fast bildschirmfuellende Box.
         auto redraw = [&]() {
             tft.fillScreen(TFT_BLACK);
             tft.drawRoundRect(BOX_X, BOX_Y, BOX_W, BOX_H, 6, accentColor);
@@ -752,7 +770,6 @@ namespace {
                 }
             }
             if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return;
-            MenuStars::update(tft);
             delay(20);
         }
     }

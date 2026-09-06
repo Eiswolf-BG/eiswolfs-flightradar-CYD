@@ -117,21 +117,49 @@ namespace {
                     float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
                     // Solange die WebUI-Livekarte gerade aktiv geoeffnet ist
-                    // (siehe WebExportServer::isRadarUiActive()), auf der
-                    // groessten konfigurierten Reichweitenstufe abfragen -
-                    // sonst kann der Reichweiten-Waehler dort nie mehr
-                    // Flugzeuge zeigen als am Geraet selbst gerade
-                    // eingestellt ist (Flugzeuge ausserhalb der Geraete-
-                    // Reichweite werden ja gar nicht erst abgefragt/
-                    // gespeichert). Nur waehrend die WebUI tatsaechlich
-                    // genutzt wird, um die zusaetzliche Netzwerk-/Speicher-
-                    // last nicht dauerhaft allen Nutzern aufzuerlegen. Das
-                    // Geraete-Display selbst filtert beim Zeichnen weiterhin
-                    // unabhaengig auf seine eigene rangeIndex()-Reichweite
-                    // (siehe radar_screen.cpp), zeigt also trotzdem nur die
-                    // eingestellte Reichweite an.
-                    if (webServerStarted && WebExportServer::isRadarUiActive()) {
-                        rangeKm = Config::RANGE_STEPS_KM[Config::RANGE_STEP_COUNT - 1];
+                    // (siehe WebExportServer::isRadarUiActive()), auf einer
+                    // groesseren Reichweitenstufe abfragen - sonst kann der
+                    // Reichweiten-Waehler dort nie mehr Flugzeuge zeigen als
+                    // am Geraet selbst gerade eingestellt ist (Flugzeuge
+                    // ausserhalb der Geraete-Reichweite werden ja gar nicht
+                    // erst abgefragt/gespeichert). Nur waehrend die WebUI
+                    // tatsaechlich genutzt wird, um die zusaetzliche
+                    // Netzwerk-/Speicherlast nicht dauerhaft allen Nutzern
+                    // aufzuerlegen. Das Geraete-Display selbst filtert beim
+                    // Zeichnen weiterhin unabhaengig auf seine eigene
+                    // rangeIndex()-Reichweite (siehe radar_screen.cpp), zeigt
+                    // also trotzdem nur die eingestellte Reichweite an.
+                    //
+                    // BUGFIX (Alex' Meldung: Web-UI oeffnen liess das Geraet
+                    // zuverlaessig "Keine Verbindung" anzeigen) - diese
+                    // automatische Eskalation sprang bisher IMMER auf die
+                    // groesste Stufe (100km), unabhaengig von der Geraete-
+                    // Einstellung. Bei 100km ist die ADS-B-JSON-Antwort so
+                    // gross (~85-95KB), dass deserializeJson() intermittierend
+                    // mit "IncompleteInput" fehlschlaegt (siehe CLAUDE.md,
+                    // Abschnitt "Bekannte Probleme") - jeder fehlgeschlagene
+                    // Fetch verzoegert AircraftTable::markFetchSuccess(),
+                    // bis irgendwann die Offline-Schwelle (Config::
+                    // STALE_DATA_OFFLINE_THRESHOLD_MS) ueberschritten wird.
+                    // Live per Serial-Diagnose bestaetigt: sobald ein Web-
+                    // Client /radar.json pollt, schlagen die Fetches
+                    // zuverlaessig fehl, sobald die Web-UI wieder geschlossen
+                    // wird (Reichweite faellt zurueck), laufen sie sofort
+                    // wieder durch.
+                    //
+                    // Deckelt die automatische Eskalation deshalb auf
+                    // maximal 50km - dieselbe Grenze, die schon das
+                    // inzwischen wieder entfernte Auto-Range-Feature aus
+                    // genau demselben Grund bewusst nie ueberschritten hat
+                    // (100km war dort explizit ausgeschlossen). Ist die am
+                    // Geraet MANUELL eingestellte Reichweite bereits groesser
+                    // als 50km (Nutzer hat bewusst 100km gewaehlt), bleibt es
+                    // bei dieser hoeheren Reichweite - nur die automatische
+                    // Web-UI-Eskalation selbst darf 50km nie ueberschreiten.
+                    constexpr float WEB_UI_MAX_AUTO_RANGE_KM = 50.0f;
+                    if (webServerStarted && WebExportServer::isRadarUiActive() &&
+                        rangeKm < WEB_UI_MAX_AUTO_RANGE_KM) {
+                        rangeKm = WEB_UI_MAX_AUTO_RANGE_KM;
                     }
 
                     // Ab hier bis zum Ende der Ergebnisverarbeitung unten

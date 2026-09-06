@@ -9,68 +9,71 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 8;
 
     const char* const CHANGELOG_EN =
-        "- New: a hint in the web interface now points out that it "
-        "can be installed as its own app\n"
-        "- Fix: loading the web interface could take several "
-        "seconds up to a noticeable delay due to inefficient "
-        "logbook file access - significantly faster now";
+        "- Fix: with the web interface open, the automatic increase "
+        "of the query range could in rare cases cause a data fetch "
+        "error that made the device falsely show \"No connection\"\n"
+        "- Fix: a flicker on confirmation/info screens (e.g. after a "
+        "firmware update) has been fixed";
 
     const char* const CHANGELOG_DE =
-        "- Neu: Ein Hinweis in der Web-Oberfläche macht jetzt "
-        "darauf aufmerksam, dass sie sich als eigene App "
-        "installieren lässt\n"
-        "- Fix: Das Laden der Web-Oberfläche konnte durch "
-        "ineffiziente Logbuch-Dateizugriffe mehrere Sekunden bis "
-        "hin zu spürbaren Verzögerungen dauern - deutlich "
-        "beschleunigt";
+        "- Fix: Bei geöffneter Web-Oberfläche konnte die automatische "
+        "Erhöhung der Abfrage-Reichweite in seltenen Fällen zu einem "
+        "Datenabruf-Fehler führen, der das Gerät fälschlich \"Keine "
+        "Verbindung\" anzeigen ließ\n"
+        "- Fix: Ein Flackern auf Bestätigungs-/Info-Bildschirmen (z.B. "
+        "nach einem Firmware-Update) wurde behoben";
 
     const char* const CHANGELOG_FR =
-        "- Nouveau : un indice dans l'interface web signale "
-        "désormais qu'elle peut être installée comme sa propre "
-        "application\n"
-        "- Correction : le chargement de l'interface web pouvait "
-        "prendre plusieurs secondes voire un délai perceptible à "
-        "cause d'accès inefficaces aux fichiers du journal de vol - "
-        "nettement plus rapide maintenant";
+        "- Correction : lorsque l'interface web était ouverte, "
+        "l'augmentation automatique du rayon de requête pouvait "
+        "dans de rares cas provoquer une erreur de récupération de "
+        "données faisant afficher à tort \"Pas de connexion\"\n"
+        "- Correction : un scintillement sur les écrans de "
+        "confirmation/info (par ex. après une mise à jour du "
+        "firmware) a été corrigé";
 
     const char* const CHANGELOG_TR =
-        "- Yeni: web arayüzündeki bir ipucu artık kendi uygulaması "
-        "olarak yüklenebileceğine dikkat çekiyor\n"
-        "- Düzeltme: web arayüzünün yüklenmesi, verimsiz uçuş "
-        "defteri dosya erişimleri nedeniyle birkaç saniyeden "
-        "belirgin bir gecikmeye kadar sürebiliyordu - artık "
-        "belirgin şekilde daha hızlı";
+        "- Düzeltme: web arayüzü açıkken, sorgu menzilinin otomatik "
+        "artırılması nadiren bir veri alma hatasına yol açarak "
+        "cihazın yanlışlıkla \"Bağlantı yok\" göstermesine neden "
+        "olabiliyordu\n"
+        "- Düzeltme: onay/bilgi ekranlarındaki (örn. bir bellenim "
+        "güncellemesinden sonra) bir titreme sorunu giderildi";
 
     const char* const CHANGELOG_ES =
-        "- Novedad: un aviso en la interfaz web ahora indica que se "
-        "puede instalar como su propia app\n"
-        "- Corrección: la carga de la interfaz web podía tardar "
-        "varios segundos, incluso con un retraso notable, debido a "
-        "accesos ineficientes a los archivos del cuaderno de vuelo "
-        "- ahora considerablemente más rápida";
+        "- Corrección: con la interfaz web abierta, el aumento "
+        "automático del alcance de consulta podía, en casos raros, "
+        "causar un error de obtención de datos que hacía que el "
+        "dispositivo mostrara erróneamente \"Sin conexión\"\n"
+        "- Corrección: se corrigió un parpadeo en las pantallas de "
+        "confirmación/información (por ejemplo, tras una "
+        "actualización de firmware)";
 
     const char* const CHANGELOG_IT =
-        "- Novità: un avviso nell'interfaccia web ora segnala che "
-        "può essere installata come app a sé stante\n"
-        "- Correzione: il caricamento dell'interfaccia web poteva "
-        "richiedere diversi secondi, con ritardi percepibili, a "
-        "causa di accessi inefficienti ai file del diario di volo - "
-        "ora notevolmente più veloce";
+        "- Correzione: con l'interfaccia web aperta, l'aumento "
+        "automatico del raggio di interrogazione poteva, in rari "
+        "casi, causare un errore di recupero dati che faceva "
+        "mostrare erroneamente al dispositivo \"Nessuna "
+        "connessione\"\n"
+        "- Correzione: risolto uno sfarfallio nelle schermate di "
+        "conferma/informazione (ad es. dopo un aggiornamento del "
+        "firmware)";
 
     const char* const CHANGELOG_PT =
-        "- Novo: um aviso na interface web agora indica que ela "
-        "pode ser instalada como um app próprio\n"
-        "- Correção: o carregamento da interface web podia levar "
-        "vários segundos, com atrasos perceptíveis, devido a "
-        "acessos ineficientes aos arquivos do diário de bordo - "
-        "agora consideravelmente mais rápido";
+        "- Correção: com a interface web aberta, o aumento "
+        "automático do alcance de consulta podia, em casos raros, "
+        "causar um erro de busca de dados que fazia o aparelho "
+        "mostrar erroneamente \"Sem conexão\"\n"
+        "- Correção: corrigido um tremular nas telas de confirmação/"
+        "informação (por exemplo, após uma atualização de firmware)";
 
     const char* const CHANGELOG_NL =
-        "- Nieuw: een hint in de webinterface wijst er nu op dat "
-        "deze als eigen app geïnstalleerd kan worden\n"
-        "- Fix: het laden van de webinterface kon door "
-        "inefficiënte logboek-bestandstoegang meerdere seconden tot "
-        "een merkbare vertraging duren - nu aanzienlijk sneller";
+        "- Fix: bij een geopende webinterface kon de automatische "
+        "verhoging van het zoekbereik in zeldzame gevallen een "
+        "gegevensophaalfout veroorzaken, waardoor het apparaat ten "
+        "onrechte \"Geen verbinding\" toonde\n"
+        "- Fix: een knipperprobleem op bevestigings-/infoschermen "
+        "(bijv. na een firmware-update) is verholpen";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT, CHANGELOG_PT, CHANGELOG_NL
