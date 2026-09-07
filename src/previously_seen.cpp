@@ -73,6 +73,9 @@ void update() {
     result.maxHour = sighting.maxHour;
     result.minAltitudeFt = sighting.minAltitudeFt;
     result.maxAltitudeFt = sighting.maxAltitudeFt;
+    result.hasProfile = sighting.hasProfile;
+    result.minDistanceKm = sighting.minDistanceKm;
+    result.maxSpeedKt = sighting.maxSpeedKt;
 
     xSemaphoreTake(mutex, portMAX_DELAY);
     // Nur uebernehmen, wenn pendingHex sich waehrend des (unter Umstaenden

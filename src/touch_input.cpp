@@ -24,6 +24,11 @@ namespace {
     bool lastTouched = false;
     Point lastRaw;
 
+    // TEST DIAG - siehe touch_input.h::lastRawSample(). Rein additiv,
+    // wird nur in rawPoint() unten passiv mitgeschrieben, beeinflusst
+    // keinerlei bestehende Kalibrierungs-/Tap-Logik.
+    RawSample lastRawSampleValue;
+
     // Siehe setRotated180() in touch_input.h - Default false (normale
     // Ausrichtung), wird beim Boot bzw. beim Umschalten im Menue gesetzt.
     bool rotated180 = false;
@@ -101,8 +106,17 @@ Point rawPoint() {
         TS_Point raw = touch.getPoint();
         p.x = raw.x;
         p.y = raw.y;
+        // TEST DIAG - siehe RawSample oben, rein passives Mitschreiben.
+        lastRawSampleValue.x = raw.x;
+        lastRawSampleValue.y = raw.y;
+        lastRawSampleValue.z = raw.z;
     }
     return p;
+}
+
+// TEST DIAG - siehe touch_input.h.
+RawSample lastRawSample() {
+    return lastRawSampleValue;
 }
 
 Point mappedPoint() {

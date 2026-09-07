@@ -128,6 +128,20 @@ struct Aircraft {
     // (kuerzlicher) Ringdurchgang.
     uint32_t ringCrossedAtMs = 0;
 
+    // Flugzeug-Steckbrief fuers Flugbuch (siehe flight_logbook.cpp::
+    // update()/writeLogLine()) - kuerzeste je gemessene Distanz bzw.
+    // hoechste je gemessene Geschwindigkeit SEIT dem ersten Sichten dieses
+    // Flugzeugs in der laufenden Sitzung, rein session-lokal (kein SD-
+    // Zugriff hier). Wird JEDEN Zyklus in aircraft_table.cpp::
+    // postFetchUpdate() aktualisiert, analog zum bestehenden
+    // prevDistanceKm-Muster. Muss GENAU wie prevDistanceKm/firstSeenMs
+    // ueber den Fetch-Zyklus-Schnappschuss in adsb_client.cpp hinweg
+    // erhalten bleiben (siehe dortiges PrevProfile), sonst wuerde "a =
+    // Aircraft{}" die bisherigen Extremwerte bei JEDEM Zyklus verwerfen.
+    // -1 = noch keine Messung (erster Zyklus dieses Flugzeugs).
+    float    sessionMinDistanceKm = -1;
+    float    sessionMaxSpeedKt    = -1;
+
     bool     valid          = false;
 
     char     airlineName[24] = {0};

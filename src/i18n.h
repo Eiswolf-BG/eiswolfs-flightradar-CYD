@@ -996,6 +996,19 @@ enum class StringId : uint16_t {
     CONNECTION_STATUS_QUALITY_FAIR,
     CONNECTION_STATUS_QUALITY_POOR,
 
+    // Detail-Panel: Hoehenwinkel (rein aus a.altBaroFt/a.distanceKm
+    // berechnet, siehe radar_screen.cpp), haengt an die bestehende Peil-
+    // Zeile an ("327° NW · 21° hoch") - kurzes Wort, kein ganzer Satz,
+    // wegen des ohnehin schon vollen Detail-Panels.
+    DETAIL_ELEVATION_SUFFIX,
+    // Detail-Panel: "Flugzeug-Steckbrief" (kuerzeste je gemessene Distanz/
+    // hoechste je gemessene Geschwindigkeit ueber alle Logbuch-Eintraege
+    // dieses Flugzeugs, siehe FlightLogbook::countPreviousSightings()) -
+    // haengt an die bestehende hasPattern-Zeile an. Bewusst kurze
+    // Abkuerzungen ("Min"/"Max"), gleiches Prinzip wie "Dist:"/"Hdg:".
+    DETAIL_MIN_DIST_PREFIX,
+    DETAIL_MAX_SPEED_PREFIX,
+
     COUNT
 };
 

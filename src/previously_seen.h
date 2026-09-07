@@ -27,6 +27,15 @@ namespace PreviouslySeen {
         uint8_t maxHour = 0;
         int32_t minAltitudeFt = 0;
         int32_t maxAltitudeFt = 0;
+
+        // "Flugzeug-Steckbrief" - siehe FlightLogbook::PreviousSighting,
+        // im selben Scan-Durchlauf mit ermittelt, nur gueltig wenn
+        // hasProfile true ist (mind. eine fruehere Logbuch-Zeile mit den
+        // beiden neuen Spalten - aeltere Dateien ohne sie liefern hier
+        // bewusst nichts, statt einen falschen Wert zu erfinden).
+        bool hasProfile = false;
+        float minDistanceKm = 0;
+        float maxSpeedKt = 0;
     };
 
     // Core 1 (Touch-Auswahl, siehe radar_screen.cpp::handleTap()/

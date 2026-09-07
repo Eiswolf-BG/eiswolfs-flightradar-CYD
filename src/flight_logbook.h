@@ -115,6 +115,18 @@ namespace FlightLogbook {
         uint8_t maxHour = 0;
         int32_t minAltitudeFt = 0;
         int32_t maxAltitudeFt = 0;
+
+        // "Flugzeug-Steckbrief" - kleinste je geloggte Distanz bzw. hoechste
+        // je geloggte Geschwindigkeit ueber ALLE frueheren Logbuch-Eintraege
+        // dieses Flugzeugs (min_distance_km/max_speed_kt-Spalten, siehe
+        // flight_logbook.cpp::writeLogLine()), im selben Scan-Durchlauf wie
+        // count/lastDate/hasPattern oben ermittelt. Nur gueltig, wenn
+        // hasProfile true ist - ALTE Logbuch-Dateien ohne diese beiden
+        // Spalten liefern hier bewusst KEINEN Wert (nicht 0), gleiches
+        // Prinzip wie firstSeenEpoch bei Aircraft.
+        bool hasProfile = false;
+        float minDistanceKm = 0;
+        float maxSpeedKt = 0;
     };
 
     // Zaehlt, wie oft ein Flugzeug (per Hex-Code) bereits an FRUEHEREN

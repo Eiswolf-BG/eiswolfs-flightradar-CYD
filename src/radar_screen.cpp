@@ -2368,7 +2368,7 @@ namespace {
         // DD.MM." ODER (komplett neues Flugzeug, count==0) GAR NICHTS - kein
         // dauerhaft haengendes "wird geprueft...", wenn es einfach nichts zu
         // finden gab.
-        char previouslySeenBuf[96] = {0};
+        char previouslySeenBuf[160] = {0};
         PreviouslySeen::Info previouslySeen = PreviouslySeen::get(a.hex);
         if (previouslySeen.loading) {
             strncpy(previouslySeenBuf, I18n::t(StringId::DETAIL_PREVIOUSLY_SEEN_LOADING), sizeof(previouslySeenBuf) - 1);
@@ -2398,14 +2398,42 @@ namespace {
                          previouslySeen.minHour, previouslySeen.maxHour,
                          (long)previouslySeen.minAltitudeFt, (long)previouslySeen.maxAltitudeFt);
             }
+
+            // "Flugzeug-Steckbrief" (kuerzeste je geloggte Distanz/hoechste
+            // je geloggte Geschwindigkeit, siehe PreviouslySeen::Info::
+            // hasProfile/FlightLogbook::countPreviousSightings()) - direkt
+            // an die hasPattern-Zeile angehaengt, aus demselben Grund/
+            // demselben Hintergrund-Scan wie diese. NUR wenn mindestens ein
+            // historischer Logbuch-Eintrag mit den beiden neuen Spalten
+            // existiert (alte Dateien ohne sie liefern hasProfile=false,
+            // gleiches "nur anzeigen wenn vorhanden"-Prinzip wie
+            // hasPattern/cpaRelevant/showApproach).
+            if (previouslySeen.hasProfile) {
+                size_t used = strlen(previouslySeenBuf);
+                snprintf(previouslySeenBuf + used, sizeof(previouslySeenBuf) - used,
+                         "  %s%.0fkm %s%.0fkt",
+                         I18n::t(StringId::DETAIL_MIN_DIST_PREFIX), previouslySeen.minDistanceKm,
+                         I18n::t(StringId::DETAIL_MAX_SPEED_PREFIX), previouslySeen.maxSpeedKt);
+            }
         }
 
-        char distBuf[400];
-        snprintf(distBuf, sizeof(distBuf), "%s%.0fkm / %.0fnm / %.0fmi  %s%.0f  %s%.0f° %s  %s %s  %s  %s  %s",
+        // Hoehenwinkel (rein aus a.altBaroFt/a.distanceKm berechnet, keine
+        // neue Datenquelle) - Standard-Trigonometrie atan2(Hoehe_m,
+        // Distanz_m). Bewusste Vereinfachung: die eigene Standort-Hoehe
+        // ueber Meeresspiegel wird NICHT beruecksichtigt (praktisch als 0m
+        // angenommen) - fuer dieses Hobby-Feature ausreichend genau, keine
+        // neue Einstellung dafuer noetig. atan2() deckt auch den (seltenen)
+        // Fall "Flugzeug fast senkrecht ueber einem" (Distanz nahe 0) korrekt
+        // ab, liefert dann nahe 90°, statt eine Division durch 0 zu riskieren.
+        float elevDeg = degrees(atan2f(a.altBaroFt * 0.3048f, a.distanceKm * 1000.0f));
+
+        char distBuf[560]; // vergroessert (vorher 400) fuer den neuen Hoehenwinkel- und Steckbrief-Zusatz
+        snprintf(distBuf, sizeof(distBuf), "%s%.0fkm / %.0fnm / %.0fmi  %s%.0f  %s%.0f° %s · %.0f°%s  %s %s  %s  %s  %s",
                  I18n::t(StringId::DETAIL_DIST),
                  a.distanceKm, Units::kmToNm(a.distanceKm), Units::kmToMi(a.distanceKm),
                  I18n::t(StringId::DETAIL_HDG), a.headingDeg,
                  I18n::t(StringId::DETAIL_BEARING_PREFIX), a.bearingDeg, compassLabel(a.bearingDeg),
+                 elevDeg, I18n::t(StringId::DETAIL_ELEVATION_SUFFIX),
                  trendSymbol, trendText, cpaBuf, firstSeenBuf, previouslySeenBuf);
         updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.distHeading, String(distBuf), forceFull);
         y += LINE_H;
@@ -4564,6 +4592,11 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
             int16_t dy = y - hitPoints[i].y;
             if (dx * dx + dy * dy <= 12 * 12) {
                 strncpy(selectedHex, hitPoints[i].hex, sizeof(selectedHex) - 1);
+                {
+                    TouchInput::RawSample rs = TouchInput::lastRawSample();
+                    Serial.printf("[AUTOSELECT-DIAG] caller=1 ms=%lu rawX=%d rawY=%d rawZ=%d\n",
+                                  (unsigned long)millis(), rs.x, rs.y, rs.z);
+                }
                 AircraftDetails::request(hitPoints[i].hex, hitPoints[i].callsign);
                 PreviouslySeen::request(hitPoints[i].hex);
                 return true;
@@ -4701,6 +4734,11 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
         int16_t dy = y - hitPoints[i].y;
         if (dx * dx + dy * dy <= 12 * 12) {
             strncpy(selectedHex, hitPoints[i].hex, sizeof(selectedHex) - 1);
+            {
+                TouchInput::RawSample rs = TouchInput::lastRawSample();
+                Serial.printf("[AUTOSELECT-DIAG] caller=2 ms=%lu rawX=%d rawY=%d rawZ=%d\n",
+                              (unsigned long)millis(), rs.x, rs.y, rs.z);
+            }
             AircraftDetails::request(hitPoints[i].hex, hitPoints[i].callsign);
             PreviouslySeen::request(hitPoints[i].hex);
             return true;
@@ -4727,6 +4765,11 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
 
 void selectAircraft(const char* hex, const char* callsign) {
     strncpy(selectedHex, hex, sizeof(selectedHex) - 1);
+    {
+        TouchInput::RawSample rs = TouchInput::lastRawSample();
+        Serial.printf("[AUTOSELECT-DIAG] caller=3 ms=%lu rawX=%d rawY=%d rawZ=%d\n",
+                      (unsigned long)millis(), rs.x, rs.y, rs.z);
+    }
     AircraftDetails::request(hex, callsign);
     PreviouslySeen::request(hex);
     lastPanel.valid = false;

@@ -462,6 +462,10 @@ static const char* const I18N_PT[] = {
     "Bom",
     "Razoável",
     "Fraco",
+
+    " alto",
+    "Mín ",
+    "Máx ",
 };
 
 static_assert(sizeof(I18N_PT) / sizeof(I18N_PT[0]) == (size_t)StringId::COUNT,

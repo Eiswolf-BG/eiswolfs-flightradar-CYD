@@ -194,6 +194,20 @@ void postFetchUpdate(double homeLat, double homeLon) {
         a.distanceKm = polar.distanceKm;
         a.bearingDeg = polar.bearingDeg;
 
+        // Flugzeug-Steckbrief fuers Flugbuch (aircraft.h::
+        // sessionMinDistanceKm/sessionMaxSpeedKt, siehe flight_logbook.cpp)
+        // - laufend die bisher kleinste Distanz bzw. hoechste Geschwindigkeit
+        // SEIT dem ersten Sichten in dieser Sitzung festhalten. -1 (Default,
+        // noch keine Messung) ist immer kleiner als jede echte Distanz bzw.
+        // -1 < jede echte Geschwindigkeit >= 0, daher reicht ein einfacher
+        // Vergleich ohne Sonderfall fuer den allerersten Zyklus.
+        if (a.sessionMinDistanceKm < 0 || polar.distanceKm < a.sessionMinDistanceKm) {
+            a.sessionMinDistanceKm = polar.distanceKm;
+        }
+        if (a.groundSpeedKt > a.sessionMaxSpeedKt) {
+            a.sessionMaxSpeedKt = a.groundSpeedKt;
+        }
+
         // "Ueberflug"-CPA (Closest Point of Approach, siehe aircraft.h::
         // cpaRelevant/cpaEtaMin und Config::CPA_*) - reine Momentaufnahme
         // aus Position, Kurs und Geschwindigkeit DIESES Zyklus, kein

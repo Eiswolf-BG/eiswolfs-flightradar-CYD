@@ -246,6 +246,15 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
     struct PrevFirstSeen { char hex[7]; uint32_t firstSeenMs; uint32_t firstSeenEpoch; };
     PrevFirstSeen prevFirstSeenByHex[Config::MAX_TRACKED_AIRCRAFT];
     uint8_t prevFirstSeenCount = 0;
+    // Gleicher Schnappschuss-Bedarf wie oben, fuer den "Flugzeug-Steckbrief"
+    // (aircraft.h::sessionMinDistanceKm/sessionMaxSpeedKt, siehe
+    // aircraft_table.cpp::postFetchUpdate()/flight_logbook.cpp) - ohne
+    // diesen Schnappschuss wuerden die bisherigen Extremwerte bei JEDEM
+    // Zyklus verworfen, identischer Bug-Mechanismus wie bei prevDistanceKm
+    // oben.
+    struct PrevProfile { char hex[7]; float minDist; float maxSpeed; };
+    PrevProfile prevProfileByHex[Config::MAX_TRACKED_AIRCRAFT];
+    uint8_t prevProfileCount = 0;
     for (uint8_t j = 0; j < tableCapacity && j < Config::MAX_TRACKED_AIRCRAFT; j++) {
         if (table[j].hex[0] != '\0') {
             strncpy(prevAirportDistByHex[prevAirportDistCount].hex, table[j].hex,
@@ -266,6 +275,13 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
             prevFirstSeenByHex[prevFirstSeenCount].firstSeenMs = table[j].firstSeenMs;
             prevFirstSeenByHex[prevFirstSeenCount].firstSeenEpoch = table[j].firstSeenEpoch;
             prevFirstSeenCount++;
+
+            strncpy(prevProfileByHex[prevProfileCount].hex, table[j].hex,
+                    sizeof(prevProfileByHex[0].hex) - 1);
+            prevProfileByHex[prevProfileCount].hex[sizeof(prevProfileByHex[0].hex) - 1] = 0;
+            prevProfileByHex[prevProfileCount].minDist = table[j].sessionMinDistanceKm;
+            prevProfileByHex[prevProfileCount].maxSpeed = table[j].sessionMaxSpeedKt;
+            prevProfileCount++;
         }
     }
 
@@ -379,6 +395,18 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
                 if (strcmp(prevFirstSeenByHex[j].hex, hex) == 0) {
                     a.firstSeenMs = prevFirstSeenByHex[j].firstSeenMs;
                     a.firstSeenEpoch = prevFirstSeenByHex[j].firstSeenEpoch;
+                    break;
+                }
+            }
+            // sessionMinDistanceKm/sessionMaxSpeedKt ebenso wiederherstellen
+            // (siehe Kommentar beim Schnappschuss oben) - fuer den
+            // "Flugzeug-Steckbrief" im Flugbuch. Nicht gefunden = neues
+            // Flugzeug, bleibt beim Aircraft{}-Default (-1), wird gleich im
+            // ersten postFetchUpdate()-Durchlauf gesetzt.
+            for (uint8_t j = 0; j < prevProfileCount; j++) {
+                if (strcmp(prevProfileByHex[j].hex, hex) == 0) {
+                    a.sessionMinDistanceKm = prevProfileByHex[j].minDist;
+                    a.sessionMaxSpeedKt = prevProfileByHex[j].maxSpeed;
                     break;
                 }
             }

@@ -29,6 +29,36 @@ namespace {
     char seenHex[MAX_SEEN][7];
     uint16_t seenCount = 0;
 
+    // "Flugzeug-Steckbrief" (siehe Absprache im Chat): der eigentliche
+    // Logbuch-Eintrag wird nicht mehr beim ERSTEN Sichten geschrieben,
+    // sondern erst, wenn ein Flugzeug aus AircraftTable VERSCHWINDET (egal
+    // ob durch normales Altern oder durch Verdraengung in der 40er-
+    // Tabelle) - erst dann stehen die finalen sessionMinDistanceKm/
+    // sessionMaxSpeedKt fest. seenHex/seenCount/alreadySeen()/markSeen()
+    // oben bleiben UNVERAENDERT die "heute schon gesehen"-Zaehlung (weiter
+    // sofort beim ersten Sichten gesetzt, siehe update() unten) - diese
+    // beiden Arrays hier sind eine ZUSAETZLICHE, davon unabhaengige
+    // Verfolgung "aktuell sichtbar, aber noch nicht geloggt".
+    //
+    // Ein Hex-Code wird NUR aufgenommen, wenn er noch nicht alreadySeen()
+    // ist (also wirklich neu) - kommt ein bereits einmal geloggtes und
+    // wieder verschwundenes Flugzeug spaeter in derselben Sitzung erneut
+    // ins Bild, wird es NICHT erneut getrackt/geloggt (weiterhin maximal
+    // ein Logbuch-Eintrag pro Flugzeug und Sitzung, wie bisher - nur der
+    // Zeitpunkt des Schreibens hat sich verschoben). Groesse = maximale
+    // AircraftTable-Kapazitaet, mehr gleichzeitig verfolgte Flugzeuge sind
+    // physisch nicht moeglich.
+    Aircraft trackedAircraft[Config::MAX_TRACKED_AIRCRAFT];
+    bool trackedValid[Config::MAX_TRACKED_AIRCRAFT] = {};
+
+    // Tatsaechliche Anzahl bereits geschriebener CSV-Zeilen der aktuellen
+    // Sitzungsdatei - ANDERS als seenCount jetzt NICHT mehr identisch mit
+    // der Anzahl "heute gesehener" Flugzeuge (die werden sofort gezaehlt,
+    // geloggt wird aber erst spaeter). cachedLineCountFor() unten braucht
+    // diesen eigenen Zaehler, um weiterhin ohne SD-Zugriff die korrekte
+    // Zeilenzahl der noch wachsenden aktiven Datei zu kennen.
+    uint16_t loggedLineCount = 0;
+
     // Datei der aktuell laufenden Aufzeichnungs-Sitzung (ohne ".csv"), z.B.
     // "2026-08-06" fuer die erste Sitzung eines Tages oder "2026-08-06_2"
     // fuer ein erneutes Einschalten am selben Tag. Leer = noch nicht
@@ -140,7 +170,11 @@ namespace {
     // sein - wird nur bei einem tatsaechlichen Cache-Miss gelesen.
     uint32_t cachedLineCountFor(File& entry, const char* label) {
         if (currentSessionFile[0] && strcmp(label, currentSessionFile) == 0) {
-            return (uint32_t)seenCount + 1; // +1 fuer die Kopfzeile
+            // NICHT mehr seenCount (das zaehlt seit dem "Flugzeug-
+            // Steckbrief"-Umbau nur noch "heute schon gesehen", nicht mehr
+            // 1:1 die tatsaechliche Zeilenzahl - siehe loggedLineCount
+            // oben) - sondern die tatsaechlich geschriebenen CSV-Zeilen.
+            return (uint32_t)loggedLineCount + 1; // +1 fuer die Kopfzeile
         }
         for (uint8_t i = 0; i < LINE_COUNT_CACHE_SIZE; i++) {
             if (lineCountCache[i].valid && strcmp(lineCountCache[i].label, label) == 0) {
@@ -246,6 +280,7 @@ namespace {
 
     void loadSeenFromCurrentFile() {
         seenCount = 0;
+        loggedLineCount = 0;
         char filename[64];
         logFilename(filename, sizeof(filename));
         if (!SD.exists(filename)) return;
@@ -263,6 +298,11 @@ namespace {
         auto processLine = [&]() {
             if (lineLen == 0) return;
             if (firstLine) { firstLine = false; return; }
+            // Jede echte (Nicht-Kopf-)Zeile ist eine bereits geschriebene
+            // CSV-Zeile - siehe loggedLineCount-Kommentar oben (nach einem
+            // Neustart muss dieser Zaehler aus der bestehenden Datei
+            // rekonstruiert werden, exakt wie seenCount/seenHex).
+            loggedLineCount++;
             lineBuf[lineLen] = 0;
             char* firstComma = strchr(lineBuf, ',');
             if (!firstComma) return;
@@ -352,14 +392,28 @@ namespace {
                  tmNow.tm_year + 1900, tmNow.tm_mon + 1, tmNow.tm_mday,
                  tmNow.tm_hour, tmNow.tm_min, tmNow.tm_sec);
 
-        f.printf("%s,%s,%s,%s,%s,%.1f,%d\n",
+        // min_distance_km/max_speed_kt (Spalten 8/9, "Flugzeug-Steckbrief")
+        // - final zum Zeitpunkt des Verschwindens aus der Tabelle, siehe
+        // aircraft.h::sessionMinDistanceKm/sessionMaxSpeedKt und deren
+        // laufende Aktualisierung in aircraft_table.cpp::postFetchUpdate().
+        // Beide sollten hier praktisch nie mehr -1 (Default) sein, da diese
+        // Funktion erst aufgerufen wird, nachdem das Flugzeug mindestens
+        // einen postFetchUpdate()-Durchlauf durchlaufen hat - trotzdem mit
+        // max(0, ...) abgesichert, um niemals einen negativen Wert in die
+        // CSV zu schreiben (siehe Testauftrag: "sinnvolle, nicht negative
+        // Werte").
+        float loggedMinDist = a.sessionMinDistanceKm >= 0 ? a.sessionMinDistanceKm : a.distanceKm;
+        float loggedMaxSpeed = a.sessionMaxSpeedKt >= 0 ? a.sessionMaxSpeedKt : a.groundSpeedKt;
+        f.printf("%s,%s,%s,%s,%s,%.1f,%d,%.1f,%.1f\n",
                  timestamp,
                  a.hex,
                  a.callsign[0] ? a.callsign : "",
                  a.reg[0] ? a.reg : "",
                  a.typeCode[0] ? a.typeCode : "",
                  a.distanceKm,
-                 (int)a.altBaroFt);
+                 (int)a.altBaroFt,
+                 loggedMinDist,
+                 loggedMaxSpeed);
     }
 }
 
@@ -465,11 +519,67 @@ void update() {
     }
     AircraftTable::unlock();
 
-    bool anyNew = false;
-    for (uint8_t i = 0; i < count; i++) {
-        if (snapshot[i].hex[0] && !alreadySeen(snapshot[i].hex)) { anyNew = true; break; }
+    // Schritt 1: fuer jedes aktuell sichtbare Flugzeug den laufenden
+    // "Steckbrief"-Datensatz aktualisieren (neueste sessionMinDistanceKm/
+    // sessionMaxSpeedKt aus aircraft_table.cpp::postFetchUpdate()
+    // uebernehmen), bzw. ein wirklich NEUES Flugzeug (noch nicht
+    // alreadySeen) frisch aufnehmen - "heute schon gesehen" (seenHex/
+    // seenCount) wird dabei weiterhin SOFORT gesetzt wie bisher, nur das
+    // eigentliche CSV-Schreiben passiert noch nicht hier (siehe Schritt 2).
+    for (uint8_t j = 0; j < count; j++) {
+        if (!snapshot[j].hex[0]) continue;
+
+        int8_t trackedIdx = -1;
+        for (uint8_t i = 0; i < Config::MAX_TRACKED_AIRCRAFT; i++) {
+            if (trackedValid[i] && strcmp(trackedAircraft[i].hex, snapshot[j].hex) == 0) {
+                trackedIdx = (int8_t)i;
+                break;
+            }
+        }
+        if (trackedIdx >= 0) {
+            trackedAircraft[trackedIdx] = snapshot[j];
+            continue;
+        }
+
+        // Nicht getrackt - entweder brandneu, oder bereits frueher in
+        // dieser Sitzung geloggt und wieder verschwunden (dann bewusst
+        // NICHT erneut tracken, siehe Kommentar bei trackedAircraft oben).
+        if (alreadySeen(snapshot[j].hex)) continue;
+
+        markSeen(snapshot[j].hex);
+        for (uint8_t i = 0; i < Config::MAX_TRACKED_AIRCRAFT; i++) {
+            if (!trackedValid[i]) {
+                trackedAircraft[i] = snapshot[j];
+                trackedValid[i] = true;
+                break;
+            }
+        }
     }
-    if (!anyNew) return;
+
+    // Schritt 2: getrackte Flugzeuge, die JETZT nicht mehr in der aktuellen
+    // Tabelle sind (egal ob normales Altern ueber AircraftTable::
+    // postFetchUpdate()s STALE_TIMEOUT_MS, oder Verdraengung durch ein
+    // naeheres Flugzeug in der "naechste 40"-Auswahl in adsb_client.cpp),
+    // sind jetzt endgueltig verschwunden - genau DANN wird die Logbuch-
+    // Zeile geschrieben, mit dem letzten bekannten Datensatz (inkl. finaler
+    // sessionMinDistanceKm/sessionMaxSpeedKt). Ein Flugzeug, das das Geraet
+    // waehrend eines laufenden Neustarts noch sichtbar war, geht dabei
+    // verloren (trackedAircraft ist rein RAM-basiert, wie alle anderen
+    // session-lokalen Aircraft-Felder auch) - akzeptierter Rand-Fall,
+    // gleiches Prinzip wie bei firstSeenMs/prevDistanceKm.
+    bool anyDisappeared = false;
+    for (uint8_t i = 0; i < Config::MAX_TRACKED_AIRCRAFT; i++) {
+        if (!trackedValid[i]) continue;
+        bool stillPresent = false;
+        for (uint8_t j = 0; j < count; j++) {
+            if (snapshot[j].hex[0] && strcmp(snapshot[j].hex, trackedAircraft[i].hex) == 0) {
+                stillPresent = true;
+                break;
+            }
+        }
+        if (!stillPresent) { anyDisappeared = true; break; }
+    }
+    if (!anyDisappeared) return;
 
     char filename[64];
     logFilename(filename, sizeof(filename));
@@ -479,18 +589,26 @@ void update() {
     File f = SD.open(filename, FILE_APPEND);
     if (!f) return;
     if (needsHeader) {
-        f.println("timestamp,hex,callsign,reg,type,distance_km,altitude_ft");
+        f.println("timestamp,hex,callsign,reg,type,distance_km,altitude_ft,min_distance_km,max_speed_kt");
         // Eine neue Logbuch-Datei ist entstanden (Tageswechsel oder erstes
         // Einschalten) - die Tagesliste hat sich damit geaendert, siehe
         // rebuildDayListCache()-Kommentar oben.
         invalidateDayListCache();
     }
 
-    for (uint8_t i = 0; i < count; i++) {
-        if (!snapshot[i].hex[0]) continue;
-        if (alreadySeen(snapshot[i].hex)) continue;
-        markSeen(snapshot[i].hex);
-        writeLogLine(f, snapshot[i]);
+    for (uint8_t i = 0; i < Config::MAX_TRACKED_AIRCRAFT; i++) {
+        if (!trackedValid[i]) continue;
+        bool stillPresent = false;
+        for (uint8_t j = 0; j < count; j++) {
+            if (snapshot[j].hex[0] && strcmp(snapshot[j].hex, trackedAircraft[i].hex) == 0) {
+                stillPresent = true;
+                break;
+            }
+        }
+        if (stillPresent) continue;
+        writeLogLine(f, trackedAircraft[i]);
+        loggedLineCount++;
+        trackedValid[i] = false;
         yield();
     }
 
@@ -652,6 +770,7 @@ bool deleteFile(const char* label) {
             // die (beim naechsten Schreibvorgang neu angelegte) Datei
             // geloggt werden.
             seenCount = 0;
+            loggedLineCount = 0;
         }
     }
     return ok;
@@ -680,6 +799,7 @@ void resetAllData() {
     }
 
     seenCount = 0;
+    loggedLineCount = 0;
     currentSessionFile[0] = 0;
     clearLineCountCache();
     invalidateDayListCache();
@@ -828,14 +948,25 @@ uint8_t computeTopAircraft(TopAircraft* out, uint8_t maxEntries) {
 namespace {
     // Wie zuvor "fileContainsHex" (nur Treffer/kein Treffer), liefert bei
     // einem Treffer zusaetzlich die Sichtungsstunde (aus Spalte 0,
-    // "YYYY-MM-DD HH:MM:SS") und die Flughoehe in ft (letzte Spalte) mit
-    // zurueck - fuer Smart Aircraft Recognition (Zeitmuster-Erkennung,
-    // siehe countPreviousSightings()) im SELBEN Scan-Durchlauf statt eines
-    // zweiten, separaten SD-Scans fuer dasselbe Flugzeug.
-    bool fileFindHexRow(File& f, const char* hex, uint8_t& outHour, int32_t& outAltitudeFt) {
+    // "YYYY-MM-DD HH:MM:SS"), die Flughoehe in ft (Spalte 7) sowie -
+    // sofern vorhanden - den "Flugzeug-Steckbrief" (min_distance_km/
+    // max_speed_kt, Spalten 8/9, siehe writeLogLine()) mit zurueck - fuer
+    // Smart Aircraft Recognition/den Steckbrief (countPreviousSightings())
+    // im SELBEN Scan-Durchlauf statt eines zweiten, separaten SD-Scans
+    // fuer dasselbe Flugzeug.
+    //
+    // WICHTIG: positionsbasiert (Komma-Index), NICHT mehr ueber das
+    // LETZTE Komma - seit min_distance_km/max_speed_kt als neue Spalten 8/9
+    // dazugekommen sind, waere altitude_ft (Spalte 7) sonst falsch
+    // ausgelesen. Alte Logbuch-Dateien ohne diese beiden Spalten (Zeile
+    // endet nach altitude_ft) liefern outHasProfile=false, statt einen
+    // falschen/geratenen Wert zu erfinden - "fehlende Spalte" bedeutet
+    // "kein Wert bekannt", nicht 0.
+    bool fileFindHexRow(File& f, const char* hex, uint8_t& outHour, int32_t& outAltitudeFt,
+                         bool& outHasProfile, float& outMinDistanceKm, float& outMaxSpeedKt) {
         constexpr size_t BUF_SIZE = 512;
         static uint8_t buf[BUF_SIZE];
-        char lineBuf[64];
+        char lineBuf[128];
         size_t lineLen = 0;
         bool firstLine = true;
         bool found = false;
@@ -859,9 +990,24 @@ namespace {
                 } else {
                     outHour = 0;
                 }
-                // Letzte Spalte (altitude_ft) - nach dem letzten Komma.
-                char* lastComma = strrchr(lineBuf, ',');
-                outAltitudeFt = lastComma ? (int32_t)atol(lastComma + 1) : 0;
+                outAltitudeFt = 0;
+                outHasProfile = false;
+                char* p3 = p2 ? strchr(p2 + 1, ',') : nullptr;
+                char* p4 = p3 ? strchr(p3 + 1, ',') : nullptr;
+                char* p5 = p4 ? strchr(p4 + 1, ',') : nullptr;
+                char* p6 = p5 ? strchr(p5 + 1, ',') : nullptr; // Spalte 6 (distance_km) endet hier, Spalte 7 (altitude_ft) beginnt
+                if (p6) {
+                    outAltitudeFt = (int32_t)atol(p6 + 1);
+                    char* p7 = strchr(p6 + 1, ','); // Spalte 7 endet hier, Spalte 8 (min_distance_km) beginnt - nur bei neueren Zeilen vorhanden
+                    if (p7) {
+                        char* p8 = strchr(p7 + 1, ','); // Spalte 8 endet hier, Spalte 9 (max_speed_kt) beginnt
+                        if (p8) {
+                            outMinDistanceKm = (float)atof(p7 + 1);
+                            outMaxSpeedKt = (float)atof(p8 + 1);
+                            outHasProfile = true;
+                        }
+                    }
+                }
             }
         };
 
@@ -916,6 +1062,13 @@ PreviousSighting countPreviousSightings(const char* hex) {
     uint8_t minHour = 255, maxHour = 0;
     int32_t minAlt = INT32_MAX, maxAlt = INT32_MIN;
 
+    // "Flugzeug-Steckbrief" (siehe PreviousSighting::hasProfile) - ueber
+    // alle Treffer MIT Profildaten hinweg (aeltere Zeilen ohne die beiden
+    // neuen Spalten liefern hasProfile=false und fliessen hier nicht ein).
+    bool anyProfileFound = false;
+    float minDistOverall = 0;
+    float maxSpeedOverall = 0;
+
     File entry = dir.openNextFile();
     while (entry && filesScanned < MAX_FILES_SCANNED) {
         if (!entry.isDirectory()) {
@@ -934,7 +1087,10 @@ PreviousSighting countPreviousSightings(const char* hex) {
 
                 uint8_t rowHour = 0;
                 int32_t rowAltitudeFt = 0;
-                if (!isToday && fileFindHexRow(entry, hex, rowHour, rowAltitudeFt)) {
+                bool rowHasProfile = false;
+                float rowMinDist = 0, rowMaxSpeed = 0;
+                if (!isToday && fileFindHexRow(entry, hex, rowHour, rowAltitudeFt,
+                                                rowHasProfile, rowMinDist, rowMaxSpeed)) {
                     result.count++;
                     if (strcmp(dayKey.c_str(), latestDate) > 0) {
                         strncpy(latestDate, dayKey.c_str(), sizeof(latestDate) - 1);
@@ -944,6 +1100,11 @@ PreviousSighting countPreviousSightings(const char* hex) {
                     if (rowHour > maxHour) maxHour = rowHour;
                     if (rowAltitudeFt < minAlt) minAlt = rowAltitudeFt;
                     if (rowAltitudeFt > maxAlt) maxAlt = rowAltitudeFt;
+                    if (rowHasProfile) {
+                        if (!anyProfileFound || rowMinDist < minDistOverall) minDistOverall = rowMinDist;
+                        if (!anyProfileFound || rowMaxSpeed > maxSpeedOverall) maxSpeedOverall = rowMaxSpeed;
+                        anyProfileFound = true;
+                    }
                 }
             }
         }
@@ -966,6 +1127,11 @@ PreviousSighting countPreviousSightings(const char* hex) {
         // Spanne liegen.
         result.minAltitudeFt = (minAlt / 1000) * 1000;
         result.maxAltitudeFt = ((maxAlt + 999) / 1000) * 1000;
+    }
+    if (anyProfileFound) {
+        result.hasProfile = true;
+        result.minDistanceKm = minDistOverall;
+        result.maxSpeedKt = maxSpeedOverall;
     }
     return result;
 }

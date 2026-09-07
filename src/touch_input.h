@@ -48,4 +48,16 @@ namespace TouchInput {
     // lange sie geoeffnet bleiben - siehe Alex' Bugmeldung "Displaytimeout
     // reagiert nicht mehr, wenn ein Menue offen ist".
     uint32_t msSinceLastTap();
+
+    // TEST DIAG (siehe CLAUDE.md "Bekannte Probleme" - unerklaerte
+    // automatische Flugzeug-Auswahl kurz nach Boot ohne Touch-Eingabe):
+    // rein passive Aufzeichnung der rohen (unkalibrierten) X/Y/Druckwerte
+    // des zuletzt tatsaechlich als beruehrt erkannten Touch-Samples -
+    // aendert nichts an der Touch-Erkennung/Kalibrierung selbst, dient nur
+    // dazu, im Nachhinein (z.B. bei AircraftDetails::request()) sehen zu
+    // koennen, wie die zugrundeliegenden Rohdaten aussahen.
+    struct RawSample {
+        int16_t x = 0, y = 0, z = 0;
+    };
+    RawSample lastRawSample();
 }

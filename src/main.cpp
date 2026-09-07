@@ -414,7 +414,16 @@ void showWeatherInfo(TFT_eSPI& tftRef) {
     Weather::Metar metar = Weather::currentMetar();
     if (metar.available) {
         body += "\n\n";
-        body += String(I18n::t(StringId::WEATHER_METAR_PREFIX)) + metar.icao + ":\n";
+        // IATA/ICAO-Anzeige-Einstellung (SettingsStore::useIataAirportCodes())
+        // beachten, gleiches Muster wie an den anderen drei Stellen im
+        // Projekt (radar_screen.cpp::drawNearestAirportCorner()/Detail-Panel,
+        // location_presets_screen.cpp) - der eigentliche METAR-Abruf selbst
+        // bleibt unveraendert per ICAO (von aviationweather.gov zwingend
+        // verlangt), nur die Anzeige-Beschriftung hier wechselt.
+        Weather::NearestAirport na = Weather::currentNearestAirport();
+        bool useIata = SettingsStore::useIataAirportCodes() && na.iata[0];
+        const char* airportCode = useIata ? na.iata : metar.icao;
+        body += String(I18n::t(StringId::WEATHER_METAR_PREFIX)) + airportCode + ":\n";
         body += metar.raw;
     }
 
@@ -1691,6 +1700,13 @@ void setup() {
     }
 
     lastInteractionMs = millis();
+
+    // TEST DIAG (siehe CLAUDE.md "Bekannte Probleme" - unerklaerte
+    // automatische Flugzeug-Auswahl kurz nach Boot ohne Touch-Eingabe) -
+    // Zeitmarke, ab der loop() unten Touch-Eingaben entgegennimmt, um
+    // einen spaeteren "[AUTOSELECT-DIAG]"-Treffer zeitlich einordnen zu
+    // koennen, ohne exakt mitstoppen zu muessen.
+    Serial.printf("[AUTOSELECT-DIAG] radar screen active, ms=%lu\n", (unsigned long)millis());
 }
 
 void loop() {
