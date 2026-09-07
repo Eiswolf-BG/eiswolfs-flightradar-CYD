@@ -1,4 +1,5 @@
 #include "adsb_client.h"
+#include "radar_math.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -12,6 +13,89 @@ namespace {
 
     WiFiClientSecure persistentClient;
     bool clientConfigured = false;
+
+    bool isJsonSpace(char c) {
+        return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+    }
+
+    // Speicherschonendes Parsen grosser Antworten (siehe Root-Cause-
+    // Untersuchung/Design-Absprache im Chat): liest byte-weise vom Stream,
+    // bis die Zeichenfolge keyPattern (z.B. "\"ac\":") vollstaendig
+    // gelesen wurde, dann ueberspringt sie Leerzeichen bis zum
+    // oeffnenden '[' des Arrays. Reines Byte-Scannen ohne JSON-
+    // Verstaendnis - deshalb bewusst KEIN vollstaendiger Tokenizer.
+    // maxScan verhindert eine Endlosschleife, falls das Muster (z.B. bei
+    // einer unerwarteten Fehlerantwort) nie auftaucht.
+    bool skipToArrayStart(Stream& stream, const char* keyPattern, size_t maxScan) {
+        size_t patLen = strlen(keyPattern);
+        size_t matched = 0;
+        for (size_t i = 0; i < maxScan; i++) {
+            int c = stream.read();
+            if (c < 0) return false;
+            if ((char)c == keyPattern[matched]) {
+                matched++;
+                if (matched == patLen) {
+                    for (size_t j = 0; j < maxScan; j++) {
+                        int c2 = stream.read();
+                        if (c2 < 0) return false;
+                        if ((char)c2 == '[') return true;
+                        if (!isJsonSpace((char)c2)) return false;
+                    }
+                    return false;
+                }
+            } else {
+                // Kein vollstaendiges KMP noetig - das Muster ("ac":) hat
+                // keine problematische Selbstueberlappung, ein einfacher
+                // Neustart bei Fehltreffer reicht.
+                matched = ((char)c == keyPattern[0]) ? 1 : 0;
+            }
+        }
+        return false;
+    }
+
+    // Liest das naechste Nicht-Leerzeichen-Byte vom Stream, OHNE es zu
+    // verbrauchen falls es kein Leerzeichen ist (peek) - fuer die
+    // Entscheidung "naechstes Flugzeug-Objekt oder Array-Ende", bevor
+    // deserializeJson() fuer das naechste Objekt aufgerufen wird.
+    int peekNextNonSpace(Stream& stream, size_t maxScan) {
+        for (size_t i = 0; i < maxScan; i++) {
+            int p = stream.peek();
+            if (p < 0) return -1;
+            if (!isJsonSpace((char)p)) return p;
+            stream.read();
+        }
+        return -1;
+    }
+
+    // Liest UND verbraucht das naechste Nicht-Leerzeichen-Byte - fuer das
+    // Trennzeichen zwischen zwei Array-Elementen (',' oder ']').
+    int readNextNonSpace(Stream& stream, size_t maxScan) {
+        for (size_t i = 0; i < maxScan; i++) {
+            int c = stream.read();
+            if (c < 0) return -1;
+            if (!isJsonSpace((char)c)) return c;
+        }
+        return -1;
+    }
+
+    // "Naechste 40"-Auswahl (siehe Bugfix-Absprache im Chat): sobald die
+    // Tabelle voll ist, muss bei jedem Ersetzen bekannt sein, welcher der
+    // aktuell BELEGTEN Plaetze der am weitesten entfernte ist. Einfacher
+    // linearer Scan - bei nur tableCapacity (40) Eintraegen voellig
+    // unkritisch performant, bewusst nicht ueberoptimiert (siehe Absprache).
+    // Wird nur aufgerufen, wenn ALLE tableCapacity Plaetze bereits mit
+    // gueltigen Flugzeugen belegt sind.
+    void findFarthest(const Aircraft* table, uint8_t tableCapacity,
+                       uint8_t& farthestIdx, float& farthestDist) {
+        farthestIdx = 0;
+        farthestDist = table[0].distanceKm;
+        for (uint8_t j = 1; j < tableCapacity; j++) {
+            if (table[j].distanceKm > farthestDist) {
+                farthestDist = table[j].distanceKm;
+                farthestIdx = j;
+            }
+        }
+    }
 }
 
 void primeTime() {
@@ -48,7 +132,14 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
     if (!http.begin(persistentClient, url)) {
         return result;
     }
-    http.setReuse(true);
+    // Kein Connection-Reuse mehr (siehe Design-Absprache): das neue
+    // Stream-Parsing liest die Antwort nur bis zum Ende des "ac"-Arrays,
+    // NICHT den kompletten Rest (msg/now/total/...) - eine wiederverwendete
+    // Verbindung wuerde durch die undrainierten Rest-Bytes fuer den
+    // naechsten Abruf korrumpiert. Ein frischer Handshake pro Abruf
+    // (~900ms laut Messung, siehe Chat) passt komfortabel in
+    // ADSB_HTTP_TIMEOUT_MS und den Fetch-Zyklus.
+    http.setReuse(false);
     http.setUserAgent("EiswolfsFlightradarCYD/1.0 (+https://github.com/Eiswolf-BG/eiswolfs-flightradar-CYD)");
     http.addHeader("Accept", "application/json");
     // TESTWEISE - Backoff-Logik in net_task.cpp respektiert einen vom
@@ -72,33 +163,42 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
         http.end();
         return result;
     }
+    // Speicherschonendes Streaming-Parsen (siehe CLAUDE.md, Abschnitt
+    // "Bekannte Probleme" / Root-Cause-Untersuchung + Design-Absprache im
+    // Chat): FRUEHER wurde die komplette gefilterte Antwort in EIN grosses
+    // JsonDocument geparst - bei ~150 Flugzeugen lagen dadurch bis zu ~1800
+    // Nodes UND ~900 einzelne String-Allokationen GLEICHZEITIG im Speicher,
+    // bis das gesamte "ac"-Array fertig war. Das sprengte den auf diesem
+    // Geraet dauerhaft auf ~43KB begrenzten groessten zusammenhaengenden
+    // Heap-Block (live gemessen, siehe Chat) bei 100km praktisch immer
+    // (IncompleteInput/NoMemory, deterministisch 0% Erfolg).
+    //
+    // Jetzt: JEDES Flugzeug-Objekt wird EINZELN vom Stream geparst (ein
+    // deserializeJson()-Aufruf pro Objekt endet nachweislich exakt am
+    // schliessenden '}' - siehe JsonDeserializer.hpp/Latch.hpp - und
+    // hinterlaesst den Stream exakt an dieser Position fuer den naechsten
+    // Aufruf), in ein einziges WIEDERVERWENDETES kleines JsonDocument -
+    // Spitzenbedarf sinkt dadurch auf hoechstens EIN Flugzeug gleichzeitig
+    // (~1KB statt ~35KB). Der Filter ist inhaltlich unveraendert (dieselben
+    // 12 Felder), nur nicht mehr in "ac" verschachtelt, da jetzt jedes
+    // Objekt einzeln als Root geparst wird.
     JsonDocument filter;
-    JsonObject filterAc = filter["ac"].add<JsonObject>();
-    filterAc["hex"]      = true;
-    filterAc["flight"]   = true;
-    filterAc["r"]        = true;
-    filterAc["t"]        = true;
-    filterAc["lat"]      = true;
-    filterAc["lon"]      = true;
-    filterAc["alt_baro"] = true;
-    filterAc["baro_rate"]= true;
-    filterAc["gs"]       = true;
-    filterAc["track"]    = true;
-    filterAc["squawk"]   = true;
-    filterAc["category"] = true;
+    filter["hex"]       = true;
+    filter["flight"]    = true;
+    filter["r"]         = true;
+    filter["t"]         = true;
+    filter["lat"]       = true;
+    filter["lon"]       = true;
+    filter["alt_baro"]  = true;
+    filter["baro_rate"] = true;
+    filter["gs"]        = true;
+    filter["track"]     = true;
+    filter["squawk"]    = true;
+    filter["category"]  = true;
 
-    // Lokales, pro Aufruf freigegebenes JsonDocument (siehe CLAUDE.md,
-    // Abschnitt "Bekannte Probleme" - eine dauerhaft wiederverwendete
-    // Variante wurde ausprobiert und wieder zurueckgerollt, da sie ~45KB
-    // Heap permanent blockierte und dadurch TLS-Handshakes zum Scheitern
-    // brachte).
-    JsonDocument doc;
-    DeserializationError err = deserializeJson(
-        doc, http.getStream(), DeserializationOption::Filter(filter));
-
-    http.end();
-
-    if (err) {
+    Stream& stream = http.getStream();
+    if (!skipToArrayStart(stream, "\"ac\":", 512)) {
+        http.end();
         result.ok = false;
         return result;
     }
@@ -169,10 +269,54 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
         }
     }
 
-    JsonArray acArray = doc["ac"].as<JsonArray>();
+    // Wiederverwendetes kleines JsonDocument fuer JE EIN Flugzeug-Objekt
+    // (siehe Design-Absprache) - .clear() gibt dessen Pool vor jedem
+    // Objekt vollstaendig frei, sodass nie mehr als ein Flugzeug
+    // gleichzeitig im Speicher steht.
+    JsonDocument aircraftDoc;
     uint8_t idx = 0;
-    for (JsonObject ac : acArray) {
-        if (idx >= tableCapacity) break;
+    // "Naechste 40"-Auswahl (siehe Bugfix-Absprache im Chat - vorher wurden
+    // einfach die ersten tableCapacity Flugzeuge in API-Antwort-Reihenfolge
+    // uebernommen, adsb.lol liefert aber NICHT nach Entfernung sortiert).
+    // Solange idx < tableCapacity, wird ganz normal angehaengt; sobald die
+    // Tabelle voll ist, muessen wir wissen, welcher belegte Platz aktuell
+    // am weitesten entfernt ist, um ihn ggf. durch ein naeheres Flugzeug zu
+    // ersetzen - deshalb werden Index/Distanz erst dann per findFarthest()
+    // bestimmt (nicht laufend waehrend des Auffuellens mitgefuehrt, das
+    // waere unnoetig komplex fuer nur 40 Eintraege).
+    uint8_t farthestIdx = 0;
+    float farthestDist = 0.0f;
+    for (;;) {
+        int p = peekNextNonSpace(stream, 32);
+        if (p < 0) {
+            // Stream endete/Timeout, ohne dass das erwartete ']' kam -
+            // gleiches Fehlerverhalten wie ein deserializeJson()-
+            // Fehlschlag frueher (result.ok bleibt false).
+            http.end();
+            result.ok = false;
+            return result;
+        }
+        if ((char)p == ']') {
+            stream.read();
+            break;
+        }
+        // WICHTIG: hier bewusst KEIN "if (idx >= tableCapacity) break;" mehr
+        // (siehe Bugfix-Absprache) - der Stream muss vollstaendig gelesen
+        // werden, auch wenn die Tabelle schon voll ist, damit ein spaeter in
+        // der Antwort auftauchendes NAEHERES Flugzeug noch beruecksichtigt
+        // werden kann. Jedes Objekt bleibt dabei einzeln/klein geparst
+        // (aircraftDoc), der Speichervorteil des Streaming-Parsers bleibt
+        // also erhalten.
+
+        aircraftDoc.clear();
+        DeserializationError objErr = deserializeJson(
+            aircraftDoc, stream, DeserializationOption::Filter(filter));
+        if (objErr) {
+            http.end();
+            result.ok = false;
+            return result;
+        }
+        JsonObject ac = aircraftDoc.as<JsonObject>();
 
         const char* hex = ac["hex"] | "";
 
@@ -195,92 +339,134 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
                 }
             }
         }
-        if (duplicate) continue;
 
-        Aircraft& a = table[idx];
-        a = Aircraft{};
+        if (!duplicate) {
+            // In ein lokales Aircraft geparst, statt direkt in table[idx] -
+            // die Distanz zum eigenen Standort (siehe unten) entscheidet
+            // erst NACH dem Parsen, ob/wohin dieses Flugzeug in die Tabelle
+            // kommt (normal anhaengen, einen weiter entfernten Eintrag
+            // ersetzen, oder verwerfen).
+            Aircraft a{};
 
-        strncpy(a.hex, hex, sizeof(a.hex) - 1);
+            strncpy(a.hex, hex, sizeof(a.hex) - 1);
 
-        // prevAirportDistKm aus dem oben erstellten Schnappschuss
-        // wiederherstellen, falls dieses Flugzeug schon im vorherigen Zyklus
-        // bekannt war (siehe Kommentar dort) - alle anderen Felder bleiben
-        // bewusst beim Aircraft{}-Default, nur dieser eine Tracking-Wert
-        // muss ueber den Reset hinweg erhalten bleiben.
-        for (uint8_t j = 0; j < prevAirportDistCount; j++) {
-            if (strcmp(prevAirportDistByHex[j].hex, hex) == 0) {
-                a.prevAirportDistKm = prevAirportDistByHex[j].dist;
-                break;
+            // prevAirportDistKm aus dem oben erstellten Schnappschuss
+            // wiederherstellen, falls dieses Flugzeug schon im vorherigen Zyklus
+            // bekannt war (siehe Kommentar dort) - alle anderen Felder bleiben
+            // bewusst beim Aircraft{}-Default, nur dieser eine Tracking-Wert
+            // muss ueber den Reset hinweg erhalten bleiben.
+            for (uint8_t j = 0; j < prevAirportDistCount; j++) {
+                if (strcmp(prevAirportDistByHex[j].hex, hex) == 0) {
+                    a.prevAirportDistKm = prevAirportDistByHex[j].dist;
+                    break;
+                }
+            }
+            // prevDistanceKm ebenso wiederherstellen (siehe Kommentar beim
+            // Schnappschuss oben) - fuer den Naeherungs-/Entfernungs-Trend im
+            // Detail-Panel.
+            for (uint8_t j = 0; j < prevDistanceCount; j++) {
+                if (strcmp(prevDistanceByHex[j].hex, hex) == 0) {
+                    a.prevDistanceKm = prevDistanceByHex[j].dist;
+                    break;
+                }
+            }
+            // firstSeenMs/firstSeenEpoch ebenso wiederherstellen (siehe
+            // Kommentar beim Schnappschuss oben) - falls nicht gefunden,
+            // bleiben beide beim Aircraft{}-Default 0 und werden gleich unten
+            // als "gerade jetzt zum ersten Mal in dieser Sitzung gesehen"
+            // gesetzt.
+            for (uint8_t j = 0; j < prevFirstSeenCount; j++) {
+                if (strcmp(prevFirstSeenByHex[j].hex, hex) == 0) {
+                    a.firstSeenMs = prevFirstSeenByHex[j].firstSeenMs;
+                    a.firstSeenEpoch = prevFirstSeenByHex[j].firstSeenEpoch;
+                    break;
+                }
+            }
+            if (a.firstSeenMs == 0) {
+                a.firstSeenMs = millis();
+                // Echte Wanduhrzeit NUR erfassen, wenn sie GENAU JETZT (beim
+                // tatsaechlichen Erstsichten) schon NTP-synchronisiert ist -
+                // sonst bleibt firstSeenEpoch bewusst 0 (siehe Kommentar bei
+                // Aircraft::firstSeenEpoch, kein nachtraegliches "Aufholen" mit
+                // einer dann nicht mehr zutreffenden Uhrzeit).
+                time_t nowEpoch = time(nullptr);
+                if (nowEpoch > 8 * 3600 * 2) {
+                    a.firstSeenEpoch = (uint32_t)nowEpoch;
+                }
+            }
+
+            const char* flight = ac["flight"] | "";
+            strncpy(a.callsign, flight, sizeof(a.callsign) - 1);
+
+            const char* reg = ac["r"] | "";
+            strncpy(a.reg, reg, sizeof(a.reg) - 1);
+
+            const char* type = ac["t"] | "";
+            strncpy(a.typeCode, type, sizeof(a.typeCode) - 1);
+
+            a.lat = ac["lat"] | 0.0f;
+            a.lon = ac["lon"] | 0.0f;
+
+            if (ac["alt_baro"].is<const char*>()) {
+                a.altBaroFt = 0;
+            } else {
+                a.altBaroFt = ac["alt_baro"] | 0;
+            }
+
+            a.vertRateFtMin = ac["baro_rate"] | 0;
+            a.groundSpeedKt = ac["gs"] | 0.0f;
+            a.headingDeg    = ac["track"] | 0.0f;
+
+            const char* squawk = ac["squawk"] | "";
+            strncpy(a.squawk, squawk, sizeof(a.squawk) - 1);
+
+            const char* category = ac["category"] | "";
+            strncpy(a.category, category, sizeof(a.category) - 1);
+
+            a.lastSeenMs = millis();
+            a.valid = (a.lat != 0.0f || a.lon != 0.0f);
+
+            if (a.valid) {
+                // Distanz zum eigenen Standort VORGEZOGEN (wird von
+                // postFetchUpdate() spaeter ohnehin nochmal identisch
+                // berechnet und dort ueberschrieben - hier aber schon
+                // benoetigt, um zu entscheiden, ob dieses Flugzeug einen der
+                // 40 Tabellenplaetze verdient).
+                a.distanceKm = RadarMath::toPolar(homeLat, homeLon, a.lat, a.lon).distanceKm;
+
+                if (idx < tableCapacity) {
+                    table[idx] = a;
+                    idx++;
+                    if (idx == tableCapacity) {
+                        // Tabelle jetzt zum ersten Mal voll - weitesten
+                        // Eintrag einmalig bestimmen, ab jetzt braucht es
+                        // ihn fuer jede weitere Ersetzungs-Entscheidung.
+                        findFarthest(table, tableCapacity, farthestIdx, farthestDist);
+                    }
+                } else if (a.distanceKm < farthestDist) {
+                    // Tabelle voll, aber dieses Flugzeug ist naeher als der
+                    // aktuell weiteste Eintrag - ersetzen, dann den neuen
+                    // weitesten Eintrag bestimmen (linearer Scan ueber nur
+                    // tableCapacity Eintraege, siehe findFarthest()).
+                    table[farthestIdx] = a;
+                    findFarthest(table, tableCapacity, farthestIdx, farthestDist);
+                }
+                // sonst: Tabelle voll UND nicht naeher als der weiteste
+                // Eintrag - dieses Flugzeug wird verworfen, table[]
+                // unveraendert.
             }
         }
-        // prevDistanceKm ebenso wiederherstellen (siehe Kommentar beim
-        // Schnappschuss oben) - fuer den Naeherungs-/Entfernungs-Trend im
-        // Detail-Panel.
-        for (uint8_t j = 0; j < prevDistanceCount; j++) {
-            if (strcmp(prevDistanceByHex[j].hex, hex) == 0) {
-                a.prevDistanceKm = prevDistanceByHex[j].dist;
-                break;
-            }
-        }
-        // firstSeenMs/firstSeenEpoch ebenso wiederherstellen (siehe
-        // Kommentar beim Schnappschuss oben) - falls nicht gefunden,
-        // bleiben beide beim Aircraft{}-Default 0 und werden gleich unten
-        // als "gerade jetzt zum ersten Mal in dieser Sitzung gesehen"
-        // gesetzt.
-        for (uint8_t j = 0; j < prevFirstSeenCount; j++) {
-            if (strcmp(prevFirstSeenByHex[j].hex, hex) == 0) {
-                a.firstSeenMs = prevFirstSeenByHex[j].firstSeenMs;
-                a.firstSeenEpoch = prevFirstSeenByHex[j].firstSeenEpoch;
-                break;
-            }
-        }
-        if (a.firstSeenMs == 0) {
-            a.firstSeenMs = millis();
-            // Echte Wanduhrzeit NUR erfassen, wenn sie GENAU JETZT (beim
-            // tatsaechlichen Erstsichten) schon NTP-synchronisiert ist -
-            // sonst bleibt firstSeenEpoch bewusst 0 (siehe Kommentar bei
-            // Aircraft::firstSeenEpoch, kein nachtraegliches "Aufholen" mit
-            // einer dann nicht mehr zutreffenden Uhrzeit).
-            time_t nowEpoch = time(nullptr);
-            if (nowEpoch > 8 * 3600 * 2) {
-                a.firstSeenEpoch = (uint32_t)nowEpoch;
-            }
-        }
 
-        const char* flight = ac["flight"] | "";
-        strncpy(a.callsign, flight, sizeof(a.callsign) - 1);
-
-        const char* reg = ac["r"] | "";
-        strncpy(a.reg, reg, sizeof(a.reg) - 1);
-
-        const char* type = ac["t"] | "";
-        strncpy(a.typeCode, type, sizeof(a.typeCode) - 1);
-
-        a.lat = ac["lat"] | 0.0f;
-        a.lon = ac["lon"] | 0.0f;
-
-        if (ac["alt_baro"].is<const char*>()) {
-            a.altBaroFt = 0;
-        } else {
-            a.altBaroFt = ac["alt_baro"] | 0;
-        }
-
-        a.vertRateFtMin = ac["baro_rate"] | 0;
-        a.groundSpeedKt = ac["gs"] | 0.0f;
-        a.headingDeg    = ac["track"] | 0.0f;
-
-        const char* squawk = ac["squawk"] | "";
-        strncpy(a.squawk, squawk, sizeof(a.squawk) - 1);
-
-        const char* category = ac["category"] | "";
-        strncpy(a.category, category, sizeof(a.category) - 1);
-
-        a.lastSeenMs = millis();
-        a.valid = (a.lat != 0.0f || a.lon != 0.0f);
-
-        if (a.valid) idx++;
+        int sep = readNextNonSpace(stream, 32);
+        if (sep == ',') continue;
+        if (sep == ']') break;
+        // Weder ',' noch ']' - Antwort nicht wohlgeformt.
+        http.end();
+        result.ok = false;
+        return result;
     }
 
+    http.end();
     result.ok = true;
     result.aircraftCount = idx;
     return result;

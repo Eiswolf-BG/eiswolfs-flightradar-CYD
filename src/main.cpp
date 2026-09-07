@@ -785,6 +785,25 @@ namespace ScreensaverRain {
     uint32_t lastTickMs = 0;
     constexpr uint32_t TICK_INTERVAL_MS = 60; // gleicher Takt wie MenuStars
 
+    // BUGFIX (Alex' Meldung: Regen-Tropfen ueberdeckten teilweise Uhrzeit/
+    // Datum): Regen wird laut Kommentar oben ABSICHTLICH als "oberste
+    // Ebene" NACH Uhrzeit/Datum gezeichnet - beim Loeschen der eigenen
+    // Vorgaengerposition (siehe d.hasPrev-Block in update()) wurden darunter
+    // liegende Uhrzeit-/Datums-Pixel dadurch mit schwarz uebermalt, ohne
+    // dass sie (anders als das Logo, siehe drawScreensaverLogo()-Heal-
+    // Redraw im Aufrufer) je repariert wurden. Gleiches Prinzip wie der
+    // bereits vorhandene, analoge Fix bei ScreensaverSnow weiter unten
+    // (dortiges overClockOrDate()) - hier bewusst dupliziert statt geteilt,
+    // siehe CLAUDE.md-Konvention "jeder Screen/Effekt unabhaengig
+    // lauffaehig". Dieselben Grenzwerte wie dort (deckt sowohl den manuell
+    // geleerten Streifen als auch TFT_eSPI's eigenes, groesseres
+    // Hintergrund-Rechteck ab).
+    constexpr int16_t CLOCK_DATE_EXCLUDE_TOP = 210;
+    constexpr int16_t CLOCK_DATE_EXCLUDE_BOTTOM = 292;
+    bool overlapsClockOrDate(int16_t yTop, int16_t yBottom) {
+        return yBottom >= CLOCK_DATE_EXCLUDE_TOP && yTop <= CLOCK_DATE_EXCLUDE_BOTTOM;
+    }
+
     struct RainParams {
         uint8_t count;
         float speedPxPerSec;
@@ -891,7 +910,8 @@ namespace ScreensaverRain {
             int16_t y2 = (int16_t)(d.y - DROP_LENGTH); // hinteres (oberes) Ende
             int16_t x = (int16_t)d.x;
 
-            bool visible = y1 >= 0 && y2 <= Config::SCREEN_HEIGHT - 1;
+            bool visible = y1 >= 0 && y2 <= Config::SCREEN_HEIGHT - 1 &&
+                           !overlapsClockOrDate(y2, y1);
             if (visible) {
                 int16_t clipY1 = constrain(y1, (int16_t)0, (int16_t)(Config::SCREEN_HEIGHT - 1));
                 int16_t clipY2 = constrain(y2, (int16_t)0, (int16_t)(Config::SCREEN_HEIGHT - 1));

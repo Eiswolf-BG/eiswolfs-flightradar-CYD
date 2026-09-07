@@ -9,71 +9,121 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 8;
 
     const char* const CHANGELOG_EN =
-        "- Fix: with the web interface open, the automatic increase "
-        "of the query range could in rare cases cause a data fetch "
-        "error that made the device falsely show \"No connection\"\n"
-        "- Fix: a flicker on confirmation/info screens (e.g. after a "
-        "firmware update) has been fixed";
+        "- New: the radar range can now also be set from the web "
+        "interface - changes there and on the device stay in sync "
+        "automatically in both directions\n"
+        "- Fix: a large query range could fail to fetch data due to "
+        "high memory usage and falsely show \"No connection\" - "
+        "fundamentally fixed, even with very high aircraft counts\n"
+        "- Fix: when more aircraft were in range than could be shown, "
+        "the nearest ones weren't reliably prioritized - fixed\n"
+        "- Fix: the rain effect on the idle screen could partially "
+        "cover the time and date";
 
     const char* const CHANGELOG_DE =
-        "- Fix: Bei geöffneter Web-Oberfläche konnte die automatische "
-        "Erhöhung der Abfrage-Reichweite in seltenen Fällen zu einem "
-        "Datenabruf-Fehler führen, der das Gerät fälschlich \"Keine "
-        "Verbindung\" anzeigen ließ\n"
-        "- Fix: Ein Flackern auf Bestätigungs-/Info-Bildschirmen (z.B. "
-        "nach einem Firmware-Update) wurde behoben";
+        "- Neu: Die Radar-Reichweite lässt sich jetzt auch über die "
+        "Web-Oberfläche einstellen - Änderungen dort und am Gerät "
+        "selbst gleichen sich in beide Richtungen automatisch ab\n"
+        "- Fix: Bei größerer Reichweite konnte der Datenabruf durch "
+        "hohen Speicherbedarf fehlschlagen und das Gerät fälschlich "
+        "\"Keine Verbindung\" anzeigen lassen - grundlegend behoben, "
+        "auch bei sehr hoher Flugzeuganzahl\n"
+        "- Fix: Bei mehr Flugzeugen in Reichweite als angezeigt werden "
+        "können, wurden nicht zuverlässig die nächstgelegenen "
+        "bevorzugt - behoben\n"
+        "- Fix: Der Regen-Effekt auf dem Ruhebildschirm konnte Uhrzeit "
+        "und Datum teilweise verdecken";
 
     const char* const CHANGELOG_FR =
-        "- Correction : lorsque l'interface web était ouverte, "
-        "l'augmentation automatique du rayon de requête pouvait "
-        "dans de rares cas provoquer une erreur de récupération de "
-        "données faisant afficher à tort \"Pas de connexion\"\n"
-        "- Correction : un scintillement sur les écrans de "
-        "confirmation/info (par ex. après une mise à jour du "
-        "firmware) a été corrigé";
+        "- Nouveau : la portée du radar peut désormais aussi être "
+        "réglée depuis l'interface web - les modifications faites là "
+        "ou sur l'appareil se synchronisent automatiquement dans les "
+        "deux sens\n"
+        "- Correction : à grande portée, la récupération des données "
+        "pouvait échouer en raison d'une consommation mémoire élevée "
+        "et faire afficher à tort \"Pas de connexion\" - corrigé en "
+        "profondeur, même avec un très grand nombre d'avions\n"
+        "- Correction : lorsqu'il y avait plus d'avions à portée "
+        "qu'il n'était possible d'en afficher, les plus proches "
+        "n'étaient pas systématiquement privilégiés - corrigé\n"
+        "- Correction : l'effet de pluie sur l'écran de veille "
+        "pouvait partiellement masquer l'heure et la date";
 
     const char* const CHANGELOG_TR =
-        "- Düzeltme: web arayüzü açıkken, sorgu menzilinin otomatik "
-        "artırılması nadiren bir veri alma hatasına yol açarak "
-        "cihazın yanlışlıkla \"Bağlantı yok\" göstermesine neden "
-        "olabiliyordu\n"
-        "- Düzeltme: onay/bilgi ekranlarındaki (örn. bir bellenim "
-        "güncellemesinden sonra) bir titreme sorunu giderildi";
+        "- Yeni: Radar menzili artık web arayüzünden de "
+        "ayarlanabiliyor - orada ve cihazın kendisinde yapılan "
+        "değişiklikler otomatik olarak her iki yönde de senkronize "
+        "oluyor\n"
+        "- Düzeltme: Daha geniş menzilde, yüksek bellek kullanımı "
+        "nedeniyle veri alma başarısız olabiliyor ve cihaz yanlışlıkla "
+        "\"Bağlantı yok\" gösterebiliyordu - çok yüksek uçak "
+        "sayılarında bile kalıcı olarak düzeltildi\n"
+        "- Düzeltme: Menzildeki uçak sayısı gösterilebilecek sayıdan "
+        "fazla olduğunda en yakın uçaklar güvenilir şekilde öncelik "
+        "kazanmıyordu - düzeltildi\n"
+        "- Düzeltme: Bekleme ekranındaki yağmur efekti saati ve "
+        "tarihi kısmen kapatabiliyordu";
 
     const char* const CHANGELOG_ES =
-        "- Corrección: con la interfaz web abierta, el aumento "
-        "automático del alcance de consulta podía, en casos raros, "
-        "causar un error de obtención de datos que hacía que el "
-        "dispositivo mostrara erróneamente \"Sin conexión\"\n"
-        "- Corrección: se corrigió un parpadeo en las pantallas de "
-        "confirmación/información (por ejemplo, tras una "
-        "actualización de firmware)";
+        "- Novedad: el alcance del radar ahora también se puede "
+        "ajustar desde la interfaz web - los cambios allí y en el "
+        "propio dispositivo se sincronizan automáticamente en ambas "
+        "direcciones\n"
+        "- Corrección: con un alcance mayor, la obtención de datos "
+        "podía fallar por el alto uso de memoria y hacer que el "
+        "dispositivo mostrara erróneamente \"Sin conexión\" - "
+        "corregido de raíz, incluso con un número muy alto de "
+        "aviones\n"
+        "- Corrección: cuando había más aviones en alcance de los que "
+        "se podían mostrar, no siempre se priorizaban los más "
+        "cercanos - corregido\n"
+        "- Corrección: el efecto de lluvia en la pantalla de reposo "
+        "podía cubrir parcialmente la hora y la fecha";
 
     const char* const CHANGELOG_IT =
-        "- Correzione: con l'interfaccia web aperta, l'aumento "
-        "automatico del raggio di interrogazione poteva, in rari "
-        "casi, causare un errore di recupero dati che faceva "
-        "mostrare erroneamente al dispositivo \"Nessuna "
-        "connessione\"\n"
-        "- Correzione: risolto uno sfarfallio nelle schermate di "
-        "conferma/informazione (ad es. dopo un aggiornamento del "
-        "firmware)";
+        "- Novità: ora è possibile impostare il raggio del radar "
+        "anche dall'interfaccia web - le modifiche fatte lì e sul "
+        "dispositivo stesso si sincronizzano automaticamente in "
+        "entrambe le direzioni\n"
+        "- Correzione: con un raggio maggiore, il recupero dei dati "
+        "poteva fallire per l'elevato utilizzo di memoria e far "
+        "mostrare erroneamente al dispositivo \"Nessuna connessione\" "
+        "- risolto alla radice, anche con un numero molto elevato di "
+        "aerei\n"
+        "- Correzione: quando c'erano più aerei nel raggio di quanti "
+        "se ne potessero mostrare, i più vicini non venivano sempre "
+        "privilegiati - risolto\n"
+        "- Correzione: l'effetto pioggia nella schermata di riposo "
+        "poteva coprire parzialmente l'ora e la data";
 
     const char* const CHANGELOG_PT =
-        "- Correção: com a interface web aberta, o aumento "
-        "automático do alcance de consulta podia, em casos raros, "
-        "causar um erro de busca de dados que fazia o aparelho "
-        "mostrar erroneamente \"Sem conexão\"\n"
-        "- Correção: corrigido um tremular nas telas de confirmação/"
-        "informação (por exemplo, após uma atualização de firmware)";
+        "- Novo: o alcance do radar agora também pode ser ajustado "
+        "pela interface web - as alterações feitas lá e no próprio "
+        "aparelho são sincronizadas automaticamente em ambas as "
+        "direções\n"
+        "- Correção: com um alcance maior, a busca de dados podia "
+        "falhar devido ao alto uso de memória e fazer o aparelho "
+        "mostrar erroneamente \"Sem conexão\" - corrigido pela raiz, "
+        "mesmo com um número muito alto de aeronaves\n"
+        "- Correção: quando havia mais aeronaves no alcance do que "
+        "podiam ser exibidas, as mais próximas nem sempre eram "
+        "priorizadas - corrigido\n"
+        "- Correção: o efeito de chuva na tela de descanso podia "
+        "cobrir parcialmente a hora e a data";
 
     const char* const CHANGELOG_NL =
-        "- Fix: bij een geopende webinterface kon de automatische "
-        "verhoging van het zoekbereik in zeldzame gevallen een "
-        "gegevensophaalfout veroorzaken, waardoor het apparaat ten "
-        "onrechte \"Geen verbinding\" toonde\n"
-        "- Fix: een knipperprobleem op bevestigings-/infoschermen "
-        "(bijv. na een firmware-update) is verholpen";
+        "- Nieuw: het radarbereik is nu ook instelbaar via de "
+        "webinterface - wijzigingen daar en op het apparaat zelf "
+        "worden automatisch in beide richtingen gesynchroniseerd\n"
+        "- Fix: bij een groter bereik kon het ophalen van gegevens "
+        "mislukken door hoog geheugengebruik, waardoor het apparaat "
+        "ten onrechte \"Geen verbinding\" toonde - fundamenteel "
+        "verholpen, ook bij een zeer groot aantal vliegtuigen\n"
+        "- Fix: als er meer vliegtuigen binnen bereik waren dan "
+        "getoond konden worden, kregen de dichtstbijzijnde niet "
+        "altijd voorrang - verholpen\n"
+        "- Fix: het regeneffect op het rustscherm kon de tijd en "
+        "datum gedeeltelijk aan het zicht onttrekken";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT, CHANGELOG_PT, CHANGELOG_NL

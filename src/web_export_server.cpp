@@ -33,6 +33,18 @@ namespace {
     uint32_t lastRadarJsonRequestMs = 0;
     constexpr uint32_t RADAR_UI_ACTIVE_WINDOW_MS = 20000; // > 8s Poll-Intervall der Seite, mit Puffer
 
+    // Debouncing fuer den Fernsteuerungs-Endpunkt /control/range (siehe
+    // Design-Absprache im Chat) - SettingsStore::setRangeIndex() schreibt
+    // bei JEDEM Aufruf die komplette Einstellungsdatei auf die SD-Karte neu
+    // (teuer, siehe frueherer Watchdog-Vorfall bei zu haeufigen Settings-
+    // Schreibvorgaengen). Bewusst NUR hier an der Web-Schicht gedrosselt,
+    // NICHT im Setter selbst - der bleibt fuer den physischen Bedienpfad
+    // (radar_screen.cpp) unveraendert und wird bei einer tatsaechlich
+    // angenommenen Web-Aenderung 1:1 genauso aufgerufen wie bei einem Tap
+    // am Geraet (identische Persistierung).
+    uint32_t lastRangeCommandMs = 0;
+    constexpr uint32_t MIN_CONTROL_INTERVAL_MS = 400;
+
     // Web-Pendant zu UiTheme::accentColor() (siehe ui_theme.h/.cpp auf dem
     // Geraet) - Alex' Wunsch, das WebUI-Farbthema (Gruen/Amber/Blau)
     // automatisch mit dem Geraet zu synchronisieren, statt fest gruen zu
@@ -636,7 +648,22 @@ namespace {
         html += "var any=(aircraft||[]).some(function(a){return a.watched;});el.style.display=any?'inline':'none';}";
         html += "setInterval(updateFreshness,1000);";
 
-        html += "if(rangeSel){rangeSel.addEventListener('change',poll);}";
+        // Echte Fernsteuerung der Geraete-Reichweite (siehe Design-Absprache
+        // im Chat) - die Dropdown-Auswahl schickt jetzt ZUSAETZLICH zum
+        // bisherigen reinen Anzeige-Zoom einen POST an /control/range, der
+        // die Geraete-Einstellung tatsaechlich aendert (SettingsStore::
+        // setRangeIndex(), identischer Pfad wie ein physischer Tap).
+        // pendingRangeKm haelt fest, was WIR selbst gerade angefragt haben,
+        // bis der Server dies per data.device_range_km (siehe
+        // handleRadarJson()) bestaetigt hat - solange verhindert es, dass
+        // ein Poll unsere eigene, gerade abgeschickte Auswahl wieder
+        // ueberschreibt (z.B. falls das Debounce-Fenster die Persistierung
+        // kurz verzoegert hat).
+        html += "var pendingRangeKm=null;";
+        html += "if(rangeSel){rangeSel.addEventListener('change',function(){";
+        html += "pendingRangeKm=rangeSel.value;";
+        html += "fetch('/control/range',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'range_km='+rangeSel.value}).finally(poll);";
+        html += "});}";
         html += "function poll(){";
         html += "var url='/radar.json';";
         html += "if(rangeSel&&rangeSel.value){url+='?range_km='+rangeSel.value;}";
@@ -647,6 +674,21 @@ namespace {
         // auf (unnoetiges Neusetzen der CSS-Variablen bei jedem Poll waere
         // harmlos, aber unnoetig).
         html += "if(data.theme_index!==undefined&&data.theme_index!==lastThemeIndex){lastThemeIndex=data.theme_index;applyTheme(data.theme_index);}";
+        // Reichweiten-Aenderung AM GERAET (physischer Tap, waehrend die
+        // Seite offen ist) im Dropdown nachziehen - liest bewusst
+        // data.device_range_km (NIE durch den eigenen "range_km"-Query-
+        // Parameter beeinflusst, siehe handleRadarJson()), nicht data.range_km
+        // (das waere nur ein Echo unserer eigenen Anfrage und wuerde eine
+        // physische Aenderung nie zeigen). Solange eine eigene Aenderung noch
+        // nicht bestaetigt ist (pendingRangeKm!==null), wird das Dropdown
+        // nicht von aussen ueberschrieben - erst wenn der gemeldete Geraete-
+        // Wert mit der eigenen Anfrage uebereinstimmt, gilt sie als
+        // bestaetigt und die normale Synchronisation greift wieder.
+        html += "if(rangeSel&&data.device_range_km!==undefined){";
+        html += "var deviceVal=String(Math.round(data.device_range_km));";
+        html += "if(pendingRangeKm!==null&&deviceVal===pendingRangeKm){pendingRangeKm=null;}";
+        html += "if(pendingRangeKm===null&&deviceVal!==rangeSel.value){rangeSel.value=deviceVal;}";
+        html += "}";
         html += "draw(data);refreshSelectedInfo();updateWatchBadge(data.aircraft);updateMapMarkers(data);";
         html += "lastUpdateMs=Date.now();updateFreshness();updateConnStatus(true);";
         html += "}).catch(function(){status.textContent='Connection lost - retrying...';updateConnStatus(false);});";
@@ -1101,6 +1143,42 @@ namespace {
         server.send(303);
     }
 
+    // Echte Fernsteuerung der Geraete-Reichweite von der Web-UI aus (siehe
+    // Design-Absprache im Chat) - im Gegensatz zu den obigen Listen-
+    // Endpunkten KEIN volles Seiten-Redirect (wuerde die laufende Live-
+    // Radar-Ansicht unterbrechen), sondern ein leichter AJAX-Endpunkt mit
+    // knapper Klartext-Antwort, den poll() im appendRadarSection()-Skript
+    // per fetch() aufruft. Ruft SettingsStore::setRangeIndex() DIREKT auf -
+    // derselbe Code-Pfad wie ein physischer Tap in radar_screen.cpp, keine
+    // eigene Persistenz-/LED-Logik noetig.
+    void handleControlRange() {
+        if (!server.hasArg("range_km")) {
+            server.send(400, "text/plain", "missing range_km");
+            return;
+        }
+        float requested = server.arg("range_km").toFloat();
+        int8_t matchedIdx = -1;
+        for (uint8_t i = 0; i < Config::RANGE_STEP_COUNT; i++) {
+            if (fabsf(Config::RANGE_STEPS_KM[i] - requested) < 0.5f) {
+                matchedIdx = (int8_t)i;
+                break;
+            }
+        }
+        if (matchedIdx < 0) {
+            server.send(400, "text/plain", "unknown range_km");
+            return;
+        }
+        uint32_t now = millis();
+        if (now - lastRangeCommandMs >= MIN_CONTROL_INTERVAL_MS) {
+            SettingsStore::setRangeIndex((uint8_t)matchedIdx);
+            lastRangeCommandMs = now;
+        }
+        // Trotzdem 200 OK, auch wenn das Debounce-Fenster diese konkrete
+        // Anfrage uebersprungen hat - kein Fehler im Browser, der aktuelle
+        // (evtl. noch nicht ganz frischste) Wert ist ohnehin schon gesetzt.
+        server.send(200, "text/plain", "ok");
+    }
+
     // Datenquelle fuer das Live-Radar auf der Startseite (siehe
     // appendRadarSection()). Wendet dieselben Filter/Prioritaeten an wie das
     // Geraete-Display (render() in radar_screen.cpp): Reichweite, "Boden-
@@ -1130,6 +1208,19 @@ namespace {
 
         JsonDocument doc;
         doc["range_km"] = rangeKm;
+        // Anders als "range_km" oben (das bei aktivem "range_km"-Query-
+        // Parameter einfach den angefragten Anzeige-Zoom zurueckspiegelt,
+        // siehe Kommentar dort) ist dieses Feld NIEMALS durch einen
+        // Query-Parameter beeinflussbar - es liefert immer die tatsaechliche
+        // Geraete-Einstellung (SettingsStore::rangeIndex()), analog zu
+        // "theme_index" unten. Grundlage fuer die Geraet->Web-UI-
+        // Reichweiten-Synchronisation (rangeSel-Abgleich in
+        // appendRadarSection()) - ohne dieses eigene Feld liesse sich eine
+        // physische Reichweitenaenderung am Geraet aus der Web-UI heraus
+        // nie erkennen, sobald die Seite bereits einen eigenen "range_km"-
+        // Query-Wert verschickt (was nach jeder Dropdown-Auswahl der Fall
+        // ist).
+        doc["device_range_km"] = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
         // Fuer die neue Kartenansicht (Leaflet, siehe appendRadarSection()) -
         // der eigene Standort als Kartenmittelpunkt/Home-Marker. Wird bei
         // jedem Poll mitgeschickt (nicht nur einmalig beim Seitenaufbau),
@@ -1414,6 +1505,7 @@ void begin() {
     server.on("/lists/airlines/delete", HTTP_POST, handleAirlineDelete);
     server.on("/lists/watchlist/add", HTTP_POST, handleWatchlistAdd);
     server.on("/lists/watchlist/delete", HTTP_POST, handleWatchlistDelete);
+    server.on("/control/range", HTTP_POST, handleControlRange);
     server.onNotFound(handleNotFound);
     server.begin();
 }
