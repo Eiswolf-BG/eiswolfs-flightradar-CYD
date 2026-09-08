@@ -422,8 +422,9 @@ static const char* const I18N_IT[] = {
     "Diario di volo disattivato automaticamente (24h)",
     "Il diario di volo è stato appena disattivato automaticamente dopo 24 ore di attività, per evitare che la scheda SD si riempia senza che tu te ne accorga. Puoi riattivarlo dal menu se vuoi continuare a registrare.",
 
-    "Visto per la prima volta: ",
-    "Visibile da: ",
+    "Visto per la prima volta alle ",
+    "",
+    "Visibile da ",
 
     "Già visto: verifica in corso...",
     "Già visto ",
@@ -466,6 +467,8 @@ static const char* const I18N_IT[] = {
     " alto",
     "Min ",
     "Max ",
+
+    "Se la scheda non viene rilevata: formattala con il \"SD Card Formatter\" ufficiale della SD Association - questo risolve la maggior parte dei casi. Se non aiuta, prova un'altra scheda (idealmente più vecchia/piccola, di una marca conosciuta).",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

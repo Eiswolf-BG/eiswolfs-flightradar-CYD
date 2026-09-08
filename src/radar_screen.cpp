@@ -23,6 +23,7 @@
 #include "touch_input.h"
 #include "menu_stars.h"
 #include "menu_screen.h"
+#include "live_traffic_screen.h"
 #include "location_presets_screen.h"
 #include "iss_tracker.h"
 #include "weather.h"
@@ -1136,22 +1137,25 @@ namespace {
     // Peilungsanzeige im Detail-Panel (siehe drawDetailPanel() unten) -
     // ergaenzt die bereits vorhandene grafische Anzeige (drawBearingIndicator()
     // oben) um eine auf einen Blick lesbare Himmelsrichtung.
-    // Formatiert eine millis()-Dauer als "MM:SS" bzw. "HH:MM:SS", sobald
-    // eine volle Stunde erreicht ist (fuer "Sichtbar seit", siehe
-    // drawDetailPanel()) - oder IMMER als "HH:MM:SS", wenn forceHours
-    // gesetzt ist (fuer "Erstmals gesehen", das als absoluter Boot-
-    // relativer Zeitpunkt auch nach mehreren Stunden Laufzeit noch die
-    // Stunden zeigen soll, nicht erst nach einer vollen Stunde SEIT dem
-    // Ereignis selbst).
-    void formatHms(uint32_t ms, char* out, size_t outSize, bool forceHours) {
+    // Formatiert eine millis()-Dauer als beschriftete Zeitspanne fuer
+    // "Sichtbar seit" ("Xmin Ys", bzw. bei einer vollen Stunde oder mehr
+    // erweitert um die Stunden: "Xh Ymin Zs") - gleiches "min"/"s"-bleibt-
+    // unuebersetzt-Muster wie beim Ueberflug-Hinweis (siehe
+    // DETAIL_OVERFLIGHT_PREFIX/SUFFIX oben). Ersetzt die vorherige reine
+    // "MM:SS"-Ziffernanzeige, die sich neben der echten Uhrzeit bei
+    // "Erstmals gesehen" kaum unterscheiden liess (Alex' Vorgabe: eindeutig
+    // lesbar statt zum Verwechseln aehnlich).
+    void formatDurationLabeled(uint32_t ms, char* out, size_t outSize) {
         uint32_t totalSec = ms / 1000;
         uint32_t hh = totalSec / 3600;
         uint32_t mm = (totalSec % 3600) / 60;
         uint32_t ss = totalSec % 60;
-        if (forceHours || hh > 0) {
-            snprintf(out, outSize, "%02u:%02u:%02u", (unsigned)hh, (unsigned)mm, (unsigned)ss);
+        if (hh > 0) {
+            snprintf(out, outSize, "%uh %02umin %02us", (unsigned)hh, (unsigned)mm, (unsigned)ss);
+        } else if (mm > 0) {
+            snprintf(out, outSize, "%umin %02us", (unsigned)mm, (unsigned)ss);
         } else {
-            snprintf(out, outSize, "%02u:%02u", (unsigned)mm, (unsigned)ss);
+            snprintf(out, outSize, "%us", (unsigned)ss);
         }
     }
 
@@ -2234,14 +2238,28 @@ namespace {
         }
         y += LINE_H;
 
+        // Nur noch EINE Einheit statt beider gleichzeitig, abhaengig vom
+        // eingestellten Modus (Menue > Region > Einheiten, siehe
+        // SettingsStore::unitsMode() ueber LocationManager::
+        // useMetricUnits()) - gleiches Muster wie an anderen
+        // Einzel-Einheiten-Stellen im Projekt (z.B. "Naechster Flughafen").
         char buf[48];
-        snprintf(buf, sizeof(buf), "%s%.0fm / %.0fft", I18n::t(StringId::DETAIL_ALT),
-                 Units::feetToMeters((float)a.altBaroFt), (float)a.altBaroFt);
+        bool metricPanel = LocationManager::useMetricUnits();
+        if (metricPanel) {
+            snprintf(buf, sizeof(buf), "%s%.0fm", I18n::t(StringId::DETAIL_ALT),
+                     Units::feetToMeters((float)a.altBaroFt));
+        } else {
+            snprintf(buf, sizeof(buf), "%s%.0fft", I18n::t(StringId::DETAIL_ALT), (float)a.altBaroFt);
+        }
         updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.alt, String(buf), forceFull);
         y += LINE_H;
 
-        snprintf(buf, sizeof(buf), "%s%.0fkm/h / %.0fkt", I18n::t(StringId::DETAIL_SPEED),
-                 Units::ktToKmh(a.groundSpeedKt), a.groundSpeedKt);
+        if (metricPanel) {
+            snprintf(buf, sizeof(buf), "%s%.0fkm/h", I18n::t(StringId::DETAIL_SPEED),
+                     Units::ktToKmh(a.groundSpeedKt));
+        } else {
+            snprintf(buf, sizeof(buf), "%s%.0fkt", I18n::t(StringId::DETAIL_SPEED), a.groundSpeedKt);
+        }
         updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.speed, String(buf), forceFull);
         y += LINE_H;
 
@@ -2334,23 +2352,37 @@ namespace {
         // Laufzeit (Alex' Wunsch) - fehlt sie (noch nicht synchronisiert
         // gewesen, als das Flugzeug zum ersten Mal gesehen wurde), wird
         // dieser Teil bewusst KOMPLETT weggelassen statt eine falsche/
-        // unsinnige Uhrzeit zu zeigen. "Sichtbar seit" bleibt unveraendert
-        // eine reine, laufend aktualisierte Dauer aus firstSeenMs (immer
-        // aus millis() ableitbar, unabhaengig von NTP), kuerzer als "MM:SS"
-        // formatiert, solange sie unter einer Stunde liegt.
-        char seenForBuf[12];
+        // unsinnige Uhrzeit zu zeigen. Beide Werte sind bewusst als klar
+        // unterscheidbare Saetze formuliert statt zweier fast gleich
+        // aussehender "Label: HH:MM:SS"-Paare (eine echte Uhrzeit vs. eine
+        // Dauer sehen sich sonst zum Verwechseln aehnlich, siehe
+        // DETAIL_FIRST_SEEN_PREFIX/_SUFFIX-Kommentar in i18n.h) - "Sichtbar
+        // seit" nutzt dafuer formatDurationLabeled() oben statt der
+        // frueheren reinen "MM:SS"-Ziffernanzeige.
+        char seenForBuf[24];
         uint32_t seenForMs = (a.firstSeenMs > 0 && millis() >= a.firstSeenMs) ? (millis() - a.firstSeenMs) : 0;
-        formatHms(seenForMs, seenForBuf, sizeof(seenForBuf), false);
-        char firstSeenBuf[64];
+        formatDurationLabeled(seenForMs, seenForBuf, sizeof(seenForBuf));
+        char firstSeenBuf[80];
         if (a.firstSeenEpoch > 0) {
             time_t firstSeenTime = (time_t)a.firstSeenEpoch;
             struct tm firstSeenTm;
             localtime_r(&firstSeenTime, &firstSeenTm);
-            char clockBuf[9];
-            snprintf(clockBuf, sizeof(clockBuf), "%02d:%02d:%02d",
-                     firstSeenTm.tm_hour, firstSeenTm.tm_min, firstSeenTm.tm_sec);
-            snprintf(firstSeenBuf, sizeof(firstSeenBuf), "%s%s  %s%s",
-                     I18n::t(StringId::DETAIL_FIRST_SEEN_PREFIX), clockBuf,
+            // 12h mit AM/PM bei Imperial, 24h bei Metrisch - gleiche
+            // Einheiten-Einstellung und Umrechnung wie bei der Kopfzeilen-
+            // Uhr (main.cpp::updateStatusLine()), damit beide Uhrzeiten im
+            // selben Modus synchron dasselbe Format zeigen.
+            char clockBuf[12];
+            if (LocationManager::useMetricUnits()) {
+                snprintf(clockBuf, sizeof(clockBuf), "%02d:%02d:%02d",
+                         firstSeenTm.tm_hour, firstSeenTm.tm_min, firstSeenTm.tm_sec);
+            } else {
+                int hour12 = firstSeenTm.tm_hour % 12;
+                if (hour12 == 0) hour12 = 12;
+                snprintf(clockBuf, sizeof(clockBuf), "%d:%02d:%02d%s", hour12, firstSeenTm.tm_min, firstSeenTm.tm_sec,
+                         firstSeenTm.tm_hour < 12 ? "AM" : "PM");
+            }
+            snprintf(firstSeenBuf, sizeof(firstSeenBuf), "%s%s%s  %s%s",
+                     I18n::t(StringId::DETAIL_FIRST_SEEN_PREFIX), clockBuf, I18n::t(StringId::DETAIL_FIRST_SEEN_SUFFIX),
                      I18n::t(StringId::DETAIL_SEEN_FOR_PREFIX), seenForBuf);
         } else {
             snprintf(firstSeenBuf, sizeof(firstSeenBuf), "%s%s",
@@ -2427,10 +2459,23 @@ namespace {
         // ab, liefert dann nahe 90°, statt eine Division durch 0 zu riskieren.
         float elevDeg = degrees(atan2f(a.altBaroFt * 0.3048f, a.distanceKm * 1000.0f));
 
+        // Distanz-Teil auf den eingestellten Einheiten-Modus umgestellt
+        // (siehe Teil 1/Teil 2 des Auftrags): metrisch zeigt nur "Xkm",
+        // imperial bleibt bei der bisherigen "Xnm / Ymi"-Kombination (NM
+        // allein ist fuer Laien aus imperialen Laendern nicht
+        // selbsterklaerend, daher bewusst als Duo belassen - siehe
+        // Units.h-Kommentar zu kmToMi()).
+        char distValBuf[32];
+        if (LocationManager::useMetricUnits()) {
+            snprintf(distValBuf, sizeof(distValBuf), "%.0fkm", a.distanceKm);
+        } else {
+            snprintf(distValBuf, sizeof(distValBuf), "%.0fnm / %.0fmi",
+                     Units::kmToNm(a.distanceKm), Units::kmToMi(a.distanceKm));
+        }
+
         char distBuf[560]; // vergroessert (vorher 400) fuer den neuen Hoehenwinkel- und Steckbrief-Zusatz
-        snprintf(distBuf, sizeof(distBuf), "%s%.0fkm / %.0fnm / %.0fmi  %s%.0f  %s%.0f° %s · %.0f°%s  %s %s  %s  %s  %s",
-                 I18n::t(StringId::DETAIL_DIST),
-                 a.distanceKm, Units::kmToNm(a.distanceKm), Units::kmToMi(a.distanceKm),
+        snprintf(distBuf, sizeof(distBuf), "%s%s  %s%.0f  %s%.0f° %s · %.0f°%s  %s %s  %s  %s  %s",
+                 I18n::t(StringId::DETAIL_DIST), distValBuf,
                  I18n::t(StringId::DETAIL_HDG), a.headingDeg,
                  I18n::t(StringId::DETAIL_BEARING_PREFIX), a.bearingDeg, compassLabel(a.bearingDeg),
                  elevDeg, I18n::t(StringId::DETAIL_ELEVATION_SUFFIX),
@@ -2968,8 +3013,9 @@ namespace {
         // Teil des gemeinsamen "Overlay"-Schalters (Menue > System > Radar-
         // Darstellung, SettingsStore::eventCornerOverlayEnabled()) - steuert
         // zusammen mit der Flughafen-Anzeige und der Ereignis-Ecke alle drei
-        // optionalen Eckanzeigen. Der Update-Indikator (andere Funktion,
-        // drawUpdateCornerButton()) haengt bewusst NICHT an diesem Schalter.
+        // optionalen Eckanzeigen. Das Live-Verkehr-Icon (andere Funktion,
+        // drawLiveTrafficCornerButton()) haengt bewusst NICHT an diesem
+        // Schalter - es ist immer sichtbar, kein optionales Overlay.
         if (!SettingsStore::eventCornerOverlayEnabled()) return;
         Weather::Forecast fc = Weather::currentForecast();
         Weather::Condition cur = Weather::current();
@@ -3133,103 +3179,90 @@ namespace {
         }
     }
 
-    // Antippbares "!"-in-Kreis-Icon in der unteren linken Radarecke - NUR
-    // sichtbar, wenn OtaUpdate::isUpdateAvailable() true liefert (gleiche
-    // Erkennung wie roter Punkt am Menu-Button/LED-Update-Signal in
-    // led_alert.cpp). Ersetzt den fruehren Text-Button ("Update") - der
-    // liess sich trotz mehrerer Anlaeufe nicht mehr kollisionsfrei mit der
-    // horizontalen Trennlinie bei y=infoTop unterbringen (diese Ecke ist
-    // strukturell viel enger als die rechte obere mit dem Wetter-Symbol,
-    // siehe drawForecastCorner() - der Kreis reicht hier fast bis infoTop
-    // herunter). Ein kompaktes Icon passt dagegen mit klarem Puffer.
+    // Antippbares Radar-Icon in der unteren linken Radarecke - IMMER
+    // sichtbar (nicht mehr an OtaUpdate::isUpdateAvailable() gekoppelt),
+    // oeffnet direkt LiveTrafficScreen::run(). Frueher zeigte diese Ecke
+    // ein pulsierendes "!"-Icon, NUR bei verfuegbarem Update (siehe Git-
+    // Historie) - der Update-Hinweis ist auf den roten, jetzt pulsierenden
+    // Punkt am Menu-Button umgezogen (main.cpp::drawMenuButton()), damit
+    // diese Ecke dauerhaft als Live-Verkehr-Zugang dienen kann (der
+    // Live-Verkehr-Screen war vorher nur tief im Menue erreichbar und
+    // wurde praktisch nie gefunden).
     //
-    // Groesse/Position (3. Ueberarbeitung, Alex' Wunsch nach Screenshot-
-    // Feedback): der vorherige Versuch zeichnete den Ring als ZWEI
-    // ueberlagerte drawCircle()-Aufrufe (R und R-1) - bei diesem kleinen
-    // Radius zeigte TFT_eSPIs Kreis-Algorithmus dabei Luecken an den
-    // Kardinalpunkten (sichtbar als zwei offene Halbbogen statt eines
-    // geschlossenen Kreises, siehe Screenshot). Jetzt EIN einziger
-    // fillCircle()-Aufruf (garantiert luecklos, da vollflaechig statt
-    // Umriss) - das "!" wird darin in TFT_BLACK (Kontrastfarbe zur
-    // gefuellten Kreisflaeche) aus zwei einzelnen Grundformen gezeichnet
-    // (Balken + Punkt, siehe drawUpdateCornerButton() unten) statt aus dem
-    // Font-Zeichen "!", das beim vorherigen Versuch nur als duenner
-    // Strich ohne erkennbaren Punkt erschien.
-    //
-    // Position deutlich groszuegiger von Kreis UND Trennlinie abgerueckt
-    // als beim letzten Mal (dort nur 4.1px Kreis-Puffer - zu wenig, wirkte
-    // auf dem Foto wie am Kreisrand klebend). Rechnung (Standardfall,
-    // Bodenfahrzeuge ausgeblendet -> infoBarHeight()=64, L.cx=120/
-    // L.cy=147/Radius=102):
-    //   infoTop (Trennlinien-Y)  = SCREEN_HEIGHT(320) - 64             = 256
-    //   cy (Icon-Mittelpunkt)    = infoTop - CY_OFFSET_FROM_LINE(31)   = 225
-    //   cx (Icon-Mittelpunkt)    = 22 (fest)
-    //   Icon-Unterkante          = cy + R(12)                         = 237
-    //   Abstand Icon-Unterkante -> Trennlinie = 256 - 237              = 19px
-    //   Kreisrand: dx=120-22=98, dy=225-147=78
-    //     dist(Mittelpunkte) = sqrt(98^2+78^2) = 125.25
-    //     minus Icon-Radius(12) = 113.25, minus Kreisradius(102) = 11.25px Puffer
-    // Zum Vergleich die Mitte des freien Eckbereichs an dieser Stelle:
-    // horizontal (bei y=225) reicht der Kreis bis x=54.3, Mitte zum
-    // Bildschirmrand also x=27 - cx=22 liegt nah dran, leicht nach links
-    // versetzt fuer den zusaetzlichen Sicherheitsabstand. Vertikal (bei
-    // x=22) reicht der Kreis bis y=175.3, Mitte zur Trennlinie (256) also
-    // y=215.65 - cy=225 liegt nah dran, leicht nach unten versetzt fuer
-    // mehr Trennlinien-Puffer. Alternativfall (Bodenfahrzeuge sichtbar,
-    // infoBarHeight()=82, Kreisradius 93px, L.cy=138) liefert mit
-    // derselben Formel sogar noch mehr Puffer (14.9px Kreis / 19px Linie).
-    constexpr int16_t UPDATE_ICON_CX = 22;
-    constexpr int16_t UPDATE_ICON_R = 12;
-    constexpr int16_t UPDATE_ICON_CY_OFFSET_FROM_LINE = 31;
-    constexpr uint32_t UPDATE_ICON_PULSE_PERIOD_MS = 2600;
+    // Geometrie (Kreisflaeche/Position) UNVERAENDERT gegenueber dem
+    // frueheren Update-Icon uebernommen - bereits sorgfaeltig gegen
+    // Sweep-Kreis und Trennlinie abgestimmt (siehe Git-Historie fuer die
+    // urspruengliche Herleitungsrechnung, an der Geometrie selbst hat sich
+    // nichts geaendert). EIN einziger fillCircle()-Aufruf als
+    // Hintergrundflaeche (garantiert luecklos, siehe Git-Historie: zwei
+    // ueberlagerte drawCircle()-Aufrufe zeigten bei diesem kleinen Radius
+    // Luecken an den Kardinalpunkten) - das Symbol wird darauf als
+    // Aussparung in TFT_BLACK gezeichnet (Zielmarkierung: ein Ring in der
+    // Mitte, vier kurze achsenparallele Striche an den vier
+    // Himmelsrichtungen, ein Mittelpunkt-Punkt). Ersetzt das fruehere
+    // Radarschirm-Icon (zwei Ringe + diagonaler Peilstrahl + Blip-Punkt,
+    // siehe Git-Historie) - bei dieser kleinen Groesse wirkte das zu
+    // detailreich/"matschig" und die diagonale Linie rasterte unsauber.
+    constexpr int16_t LIVE_TRAFFIC_ICON_CX = 22;
+    constexpr int16_t LIVE_TRAFFIC_ICON_R = 12;
+    constexpr int16_t LIVE_TRAFFIC_ICON_CY_OFFSET_FROM_LINE = 31;
 
-    Rect updateCornerButtonRect() {
-        int16_t cy = (int16_t)(Config::SCREEN_HEIGHT - infoBarHeight() - UPDATE_ICON_CY_OFFSET_FROM_LINE);
-        return {(int16_t)(UPDATE_ICON_CX - UPDATE_ICON_R), (int16_t)(cy - UPDATE_ICON_R),
-                (int16_t)(UPDATE_ICON_R * 2), (int16_t)(UPDATE_ICON_R * 2)};
+    Rect liveTrafficCornerButtonRect() {
+        int16_t cy = (int16_t)(Config::SCREEN_HEIGHT - infoBarHeight() - LIVE_TRAFFIC_ICON_CY_OFFSET_FROM_LINE);
+        return {(int16_t)(LIVE_TRAFFIC_ICON_CX - LIVE_TRAFFIC_ICON_R), (int16_t)(cy - LIVE_TRAFFIC_ICON_R),
+                (int16_t)(LIVE_TRAFFIC_ICON_R * 2), (int16_t)(LIVE_TRAFFIC_ICON_R * 2)};
     }
 
-    void drawUpdateCornerButton(TFT_eSPI& gfx) {
-        if (!OtaUpdate::isUpdateAvailable()) return;
+    void drawLiveTrafficCornerButton(TFT_eSPI& gfx) {
+        Rect box = liveTrafficCornerButtonRect();
+        int16_t cx = (int16_t)(box.x + LIVE_TRAFFIC_ICON_R);
+        int16_t cy = (int16_t)(box.y + LIVE_TRAFFIC_ICON_R);
 
-        Rect box = updateCornerButtonRect();
-        int16_t cx = (int16_t)(box.x + UPDATE_ICON_R);
-        int16_t cy = (int16_t)(box.y + UPDATE_ICON_R);
-
-        // Sanftes "Atmen" - stateless, reine Funktion von millis(), damit
-        // tick()/render() sie beliebig oft neu aufrufen koennen, ohne
-        // eigenen Fortschritts-Zustand pflegen zu muessen (gleiches
-        // Prinzip wie die zeitbasierten Blink-Berechnungen in
-        // led_alert.cpp). 0.12..0.95 Hub - bei einer bereits gesaettigten
-        // Themenfarbe (z.B. Amber) sah ein kleinerer Hub kaum wie ein
-        // Wechsel aus (Alex' Meldung beim ersten Text-Button-Versuch).
-        // Pulsiert jetzt die FUELLFARBE des Kreises (vorher nur den
-        // duennen Ringumriss), dadurch deutlich praesenter sichtbar.
-        uint32_t phase = millis() % UPDATE_ICON_PULSE_PERIOD_MS;
-        float t = (float)phase / (float)UPDATE_ICON_PULSE_PERIOD_MS;
-        float breathe = (sinf(t * 2.0f * PI) + 1.0f) / 2.0f; // 0..1
-        float brightness = 0.12f + 0.83f * breathe; // 0.12..0.95
-        uint16_t color = UiTheme::accentColorDimmed(gfx, brightness);
+        // Dezente, NICHT pulsierende Helligkeit - gleicher gedimmter Stil
+        // wie das Wetter-Vorschau-Symbol oben rechts (drawForecastCorner(),
+        // 0.18 Helligkeitsfaktor) - dieses Icon soll ruhig/dauerhaft dort
+        // sitzen, das Pulsieren ist jetzt Sache des Update-Hinweises am
+        // Menu-Button (main.cpp).
+        uint16_t color = UiTheme::accentColorDimmed(gfx, 0.18f);
 
         // EIN einziger fillCircle()-Aufruf - garantiert geschlossen, keine
         // Umriss-Luecken (siehe Kommentar oben).
-        gfx.fillCircle(cx, cy, UPDATE_ICON_R, color);
+        gfx.fillCircle(cx, cy, LIVE_TRAFFIC_ICON_R, color);
 
-        // "!" aus zwei einzelnen Grundformen statt dem Font-Zeichen -
-        // TFT_BLACK als Kontrastfarbe zur jetzt farbig gefuellten
-        // Kreisflaeche. Balken: 3px breit, 7px hoch, oberer Teil des
-        // Kreises (Mitte des Balkens bei cy-4.5, also deutlich oberhalb
-        // des Kreiszentrums). Punkt: Radius 2px, mit sichtbarem 3px-
-        // Abstand unter dem Balken. Beide zusammen span von cy-8 bis
-        // cy+6 (14px) - passt mit deutlichem Rand in den 24px-
-        // Kreisdurchmesser (R=12).
-        constexpr int16_t BAR_W = 3;
-        constexpr int16_t BAR_H = 7;
-        constexpr int16_t BAR_TOP_OFFSET = 8; // ab cy nach oben
-        constexpr int16_t DOT_R = 2;
-        constexpr int16_t DOT_CY_OFFSET = 4; // ab cy nach unten
-        gfx.fillRect((int16_t)(cx - BAR_W / 2), (int16_t)(cy - BAR_TOP_OFFSET), BAR_W, BAR_H, TFT_BLACK);
-        gfx.fillCircle(cx, (int16_t)(cy + DOT_CY_OFFSET), DOT_R, TFT_BLACK);
+        // Zielmarkierung als Aussparung in TFT_BLACK (Kontrastfarbe zur
+        // gefuellten Kreisflaeche) - bewusst rein achsenparallel (keine
+        // Diagonalen), damit nichts unsauber rastert: ein Ring in der
+        // Mitte, vier kurze Striche an den vier Himmelsrichtungen, ein
+        // Mittelpunkt-Punkt. Alles klein genug, um mit Rand in den
+        // 24px-Kreisdurchmesser (R=12) zu passen.
+        //
+        // Der Ring wird NICHT als Linien-Umriss gezeichnet (zwei
+        // ueberlagerte drawCircle()-Aufrufe fuer Aussen-/Innenradius
+        // zeigen bei diesem kleinen Radius Luecken an den Kardinalpunkten,
+        // siehe Kommentar oben) - stattdessen "gestanzt": zuerst ein
+        // fillCircle() mit dem Aussenradius in TFT_BLACK, danach ein
+        // zweiter fillCircle() mit dem Innenradius in der gedimmten
+        // Themenfarbe darueber. Das stanzt die Ringform luecklos aus.
+        constexpr int16_t RING_OUTER_R = 6;
+        constexpr int16_t RING_INNER_R = 4;
+        constexpr int16_t CENTER_DOT_R = 1;
+        constexpr int16_t TICK_INNER = 8;  // Abstand Tick-Anfang zum Mittelpunkt
+        constexpr int16_t TICK_OUTER = 11; // Abstand Tick-Ende zum Mittelpunkt (1px Rand zu R=12)
+        constexpr int16_t TICK_LEN = TICK_OUTER - TICK_INNER;
+        constexpr int16_t TICK_W = 2; // Strichbreite in px
+
+        gfx.fillCircle(cx, cy, RING_OUTER_R, TFT_BLACK);
+        gfx.fillCircle(cx, cy, RING_INNER_R, color);
+
+        // Vier Striche als fillRect() (statt drawLine()), je knapp
+        // ausserhalb des Rings beginnend und mit sichtbarem Rand zum
+        // aeusseren Kreisrand endend.
+        gfx.fillRect((int16_t)(cx - TICK_W / 2), (int16_t)(cy - TICK_OUTER), TICK_W, TICK_LEN, TFT_BLACK); // oben
+        gfx.fillRect((int16_t)(cx - TICK_W / 2), (int16_t)(cy + TICK_INNER), TICK_W, TICK_LEN, TFT_BLACK); // unten
+        gfx.fillRect((int16_t)(cx - TICK_OUTER), (int16_t)(cy - TICK_W / 2), TICK_LEN, TICK_W, TFT_BLACK); // links
+        gfx.fillRect((int16_t)(cx + TICK_INNER), (int16_t)(cy - TICK_W / 2), TICK_LEN, TICK_W, TFT_BLACK); // rechts
+
+        gfx.fillCircle(cx, cy, CENTER_DOT_R, TFT_BLACK);
     }
 
     // "Naechster Flughafen"-Anzeige in der oberen linken Radarecke -
@@ -3342,9 +3375,9 @@ namespace {
         return active[idx];
     }
 
-    // Position spiegelbildlich zum Update-Icon (untere linke Ecke, dort
-    // bereits rechnerisch mit 11.25-19px Puffer bestaetigt, siehe
-    // drawUpdateCornerButton()) - hier cx von rechts statt links gemessen,
+    // Position spiegelbildlich zum Live-Verkehr-Icon (untere linke Ecke,
+    // dort bereits rechnerisch mit 11.25-19px Puffer bestaetigt, siehe
+    // drawLiveTrafficCornerButton()) - hier cx von rechts statt links gemessen,
     // gleiche cy-Formel. Fuer Text (Callsign/Airline-Kuerzel) zusaetzlich
     // eine per tft.textWidth() ABGESICHERTE Kuerzung (siehe
     // drawEventCorner() unten) - anders als beim vorherigen Update-Button-
@@ -3635,7 +3668,7 @@ void render(TFT_eSPI& tft, int16_t top) {
     // danach weiterhin im 80ms-Takt mit, hier nur die Luecke unmittelbar
     // NACH einem render()-Vollclear geschlossen.
     drawForecastCorner(tft, top);
-    drawUpdateCornerButton(tft);
+    drawLiveTrafficCornerButton(tft);
     drawEventCorner(tft, top);
     drawNearestAirportCorner(tft, top);
     drawNearestAircraftCorner(tft, top);
@@ -3972,7 +4005,7 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     // aufblitzen, das ist zu kurz, um als Ruckeln wahrgenommen zu werden.
     updateBgStars(tft, L, top);
     drawForecastCorner(tft, top);
-    drawUpdateCornerButton(tft);
+    drawLiveTrafficCornerButton(tft);
     drawEventCorner(tft, top);
     drawNearestAirportCorner(tft, top);
     drawNearestAircraftCorner(tft, top);
@@ -4650,15 +4683,15 @@ bool handleTap(TFT_eSPI& tft, int16_t x, int16_t y, int16_t top) {
         return true;
     }
 
-    // Antippbarer "Update"-Button in der unteren linken Radarecke (siehe
-    // drawUpdateCornerButton() oben) - nur pruefen/reagieren, wenn er
-    // gerade tatsaechlich sichtbar ist (sonst waere die Flaeche auch bei
-    // fehlendem Update unsichtbar antippbar). Springt direkt in die
-    // System-Seite des Menues (Version/"Nach Update suchen"-Button
-    // sichtbar) statt das Hauptmenue zu oeffnen - keine doppelte
-    // Update-Logik, die existiert bereits dort.
-    if (OtaUpdate::isUpdateAvailable() && updateCornerButtonRect().contains(x, y)) {
-        MenuScreen::run(tft, false, true);
+    // Antippbares Live-Verkehr-Icon in der unteren linken Radarecke (siehe
+    // drawLiveTrafficCornerButton() oben) - IMMER aktiv (nicht mehr an
+    // OtaUpdate::isUpdateAvailable() gekoppelt, das Icon ist jetzt ein
+    // dauerhafter Zugang, kein Update-Hinweis mehr). Oeffnet direkt den
+    // Live-Verkehr-Dashboard-Screen (LiveTrafficScreen::run()) - vorher
+    // nur tief im Menue erreichbar (Flugoptionen > Listen), siehe
+    // menu_screen.cpp::MENU_LIVE_TRAFFIC.
+    if (liveTrafficCornerButtonRect().contains(x, y)) {
+        LiveTrafficScreen::run(tft);
         lastPanel.valid = false;
         headerRedrawNeeded = true;
         return true;

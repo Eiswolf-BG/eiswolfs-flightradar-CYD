@@ -893,11 +893,22 @@ enum class StringId : uint16_t {
     // "First Seen"/"Seen For" im Detail-Panel (aircraft.h::firstSeenMs,
     // haengt an dieselbe Peilung/Distanz/Trend/CPA-Zeile an wie oben, siehe
     // drawDetailPanel()) - rein session-lokal (RAM, kein SD-/Logbuch-
-    // Zugriff). DETAIL_FIRST_SEEN_PREFIX endet mit einem Leerzeichen
-    // (direkt gefolgt von der HH:MM:SS-Boot-Laufzeit), ebenso
-    // DETAIL_SEEN_FOR_PREFIX (gefolgt von der laufend aktualisierten
-    // MM:SS/HH:MM:SS-Dauer).
+    // Zugriff). "Erstmals gesehen" und "Sichtbar seit" sind bewusst als
+    // klar unterscheidbare Saetze formuliert (nicht mehr zwei fast
+    // gleich aussehende "Label: HH:MM:SS"-Paare) - eine echte Uhrzeit vs.
+    // eine Dauer sehen sich sonst zum Verwechseln aehnlich.
+    // DETAIL_FIRST_SEEN_PREFIX + HH:MM:SS-Uhrzeit + DETAIL_FIRST_SEEN_SUFFIX
+    // ergeben zusammen einen vollstaendigen Satz (z.B. Deutsch "Erstmals
+    // gesehen um 16:40:25 Uhr") - SUFFIX ist in den meisten Sprachen
+    // bewusst leer, nur wo ein nachgestelltes Wort wie "Uhr" natuerlich
+    // klingt (siehe jeweilige i18n_XX.h) wird es gefuellt, nie woertlich
+    // durchuebersetzt. DETAIL_SEEN_FOR_PREFIX endet mit einem Leerzeichen,
+    // direkt gefolgt von einer beschrifteten Dauer ("Xmin Ys" bzw. bei
+    // ueber einer Stunde "Xh Ymin Zs") - gleiches "min"/"s"-bleibt-
+    // unuebersetzt-Muster wie bei DETAIL_OVERFLIGHT_PREFIX/SUFFIX oben,
+    // siehe formatDurationLabeled() in radar_screen.cpp.
     DETAIL_FIRST_SEEN_PREFIX,
+    DETAIL_FIRST_SEEN_SUFFIX,
     DETAIL_SEEN_FOR_PREFIX,
 
     // "Previously Seen" (echter Logbuch-Abgleich, siehe previously_seen.h/
@@ -1008,6 +1019,15 @@ enum class StringId : uint16_t {
     // Abkuerzungen ("Min"/"Max"), gleiches Prinzip wie "Dist:"/"Hdg:".
     DETAIL_MIN_DIST_PREFIX,
     DETAIL_MAX_SPEED_PREFIX,
+
+    // SD-Karte-fehlt-Bildschirm (main.cpp::haltWithSdRequiredScreen()) -
+    // zusaetzlicher Troubleshooting-Hinweis (haeufigste zwei Ursachen laut
+    // Facebook-Rueckmeldungen: falsches Formatierungstool des Betriebs-
+    // systems erzeugt eine Partitionstabelle, die die einfache Arduino-SD-
+    // Bibliothek nicht lesen kann, sowie inkompatible/nicht vertrauens-
+    // wuerdige Karten). Wird ueber den projektweiten layoutWrapped()-
+    // Mechanismus gerendert, nicht als feste Zeile - siehe dort.
+    SD_REQUIRED_TROUBLESHOOTING,
 
     COUNT
 };

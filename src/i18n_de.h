@@ -422,8 +422,9 @@ static const char* const I18N_DE[] = {
     "Logbuch automatisch deaktiviert (24h)",
     "Das Flugbuch wurde soeben automatisch abgeschaltet, nachdem es 24 Stunden aktiv war, um die SD-Karte vor unbemerktem Vollschreiben zu schützen. Du kannst es über das Menü wieder einschalten, wenn du weiter aufzeichnen möchtest.",
 
-    "Erstmals gesehen: ",
-    "Sichtbar seit: ",
+    "Erstmals gesehen um ",
+    " Uhr",
+    "Sichtbar seit ",
 
     "Bereits gesehen: wird geprüft...",
     "Bereits ",
@@ -466,6 +467,8 @@ static const char* const I18N_DE[] = {
     " hoch",
     "Min ",
     "Max ",
+
+    "Falls die Karte nicht erkannt wird: mit dem offiziellen \"SD Card Formatter\" der SD Association neu formatieren - das behebt die meisten Fälle. Hilft das nicht, eine andere Karte probieren (idealerweise älter/kleiner, von einer bekannten Marke).",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

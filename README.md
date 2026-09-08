@@ -139,6 +139,8 @@ The **"Reset logbook data"** button (tap twice to confirm) permanently deletes a
 #### 🛰️ Live Traffic
 A "Live traffic" button right next to the Aircraft List opens a compact dashboard summarizing the current traffic at a glance: total number of aircraft in range, a breakdown by type (airliner, private jet, turboprop, unknown, helicopter, heavy - only categories that actually have at least one aircraft are shown), and the nearest, highest, lowest, and fastest aircraft currently visible, each with its callsign and value. Pure aggregation of the same live data already used for the radar and aircraft list - no extra network requests.
 
+It's also reachable directly from the radar screen itself: a small, always-visible target icon in the bottom-left corner opens it with a single tap, without going through the menu at all.
+
 #### 🏆 Most-Seen Aircraft
 A "Top" button in the top-right of the Statistics screen opens a ranking of the 5 aircraft logged most often across the entire flight logbook (all days combined), showing each one's registration (or hex code if unknown) and total sighting count - handy for spotting the "regulars" that pass over again and again.
 
@@ -240,6 +242,14 @@ Tapping the icon opens a small info popup explaining that the shown weather refl
 | Touch (XPT2046) | CLK=25, CS=33, MOSI=32, MISO=39, IRQ=36 |
 | microSD (HSPI) | CLK=18, MISO=19, MOSI=23, CS=5 |
 | RGB LED (active-low) | R=4, G=16, B=17 |
+
+## Troubleshooting
+
+**SD card not detected:** the most common cause is a card formatted with an operating system's default formatter, which can create a partition layout the simple Arduino SD library can't read. Reformat the card with the official [SD Card Formatter](https://www.sdcard.org/downloads/formatter/) from the SD Association - this resolves most cases.
+
+If that doesn't help, the card itself may be incompatible or unreliable with this setup - try a different card, ideally an older/smaller one from a well-known brand.
+
+If problems persist, also double-check the pinout table above, especially if you're using a different or unofficial CYD clone board.
 
 ## Data sources
 - Aircraft positions: [adsb.lol](https://adsb.lol) (free, no API key)

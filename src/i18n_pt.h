@@ -422,8 +422,9 @@ static const char* const I18N_PT[] = {
     "Diário de bordo desativado automaticamente (24h)",
     "O diário de bordo acabou de ser desativado automaticamente após 24 horas ativo, para evitar que o cartão SD encha sem você perceber. Você pode reativá-lo pelo menu se quiser continuar registrando.",
 
-    "Visto pela primeira vez: ",
-    "Visível há: ",
+    "Visto pela primeira vez às ",
+    "",
+    "Visível há ",
 
     "Visto antes: verificando...",
     "Visto ",
@@ -466,6 +467,8 @@ static const char* const I18N_PT[] = {
     " alto",
     "Mín ",
     "Máx ",
+
+    "Se o cartão não for detectado: formate-o com o \"SD Card Formatter\" oficial da SD Association - isso resolve a maioria dos casos. Se não ajudar, experimente outro cartão (idealmente mais antigo/menor, de uma marca conhecida).",
 };
 
 static_assert(sizeof(I18N_PT) / sizeof(I18N_PT[0]) == (size_t)StringId::COUNT,

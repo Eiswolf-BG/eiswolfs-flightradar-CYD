@@ -268,8 +268,31 @@ void drawMenuButton() {
         // rein optisch (keine Zahl/kein Text), da hier ohnehin nur GENAU
         // EIN Zustand angezeigt werden muss (Update verfuegbar oder nicht).
         // Gleiche Bedingung wird auch fuer die Badges auf der "System"-
-        // Kachel (menu_screen.cpp) und dem Update-Button selbst benutzt.
-        tft.fillCircle((int16_t)(menuBtn.x + menuBtn.w - 3), (int16_t)(menuBtn.y + 3), 3, TFT_RED);
+        // Kachel (menu_screen.cpp) und dem Live-Verkehr-Icon in der unteren
+        // linken Radarecke (radar_screen.cpp, VOR dem Umzug hierher)
+        // benutzt.
+        //
+        // Pulsiert jetzt sanft (Alex' Wunsch): der Update-Hinweis ist von
+        // der Radarecke hierher umgezogen (siehe radar_screen.cpp::
+        // drawLiveTrafficCornerButton(), die Ecke ist jetzt ein
+        // dauerhafter, NICHT pulsierender Live-Verkehr-Zugang) - gleiche
+        // Sinus-Berechnung/Periode wie das dortige, jetzt entfernte "!"-
+        // Icon als Vorlage. Der Menu-Button wird ohnehin regelmaessig neu
+        // gezeichnet (anders als der Ruhebildschirm-Punkt neben der
+        // Versionsnummer oder der Punkt auf der "System"-Kachel im Menue -
+        // beide bewusst weiterhin einfache statische Punkte, siehe dort),
+        // das Pulsieren funktioniert hier also genauso zuverlaessig wie
+        // vorher in der Ecke.
+        constexpr uint32_t UPDATE_DOT_PULSE_PERIOD_MS = 2600;
+        uint32_t phase = millis() % UPDATE_DOT_PULSE_PERIOD_MS;
+        float t = (float)phase / (float)UPDATE_DOT_PULSE_PERIOD_MS;
+        float breathe = (sinf(t * 2.0f * PI) + 1.0f) / 2.0f; // 0..1
+        // Reiner Rot-Kanal-Wechsel (G/B sind bei TFT_RED ohnehin 0) zwischen
+        // gedimmtem und vollem Rot - kein generischer Farb-Dimm-Helfer
+        // noetig, da nur der eine 5-Bit-Kanal betroffen ist.
+        uint8_t r5 = (uint8_t)(10.0f + (31.0f - 10.0f) * breathe + 0.5f); // ~32%..100% Rot
+        uint16_t color = (uint16_t)(r5 << 11);
+        tft.fillCircle((int16_t)(menuBtn.x + menuBtn.w - 3), (int16_t)(menuBtn.y + 3), 3, color);
         tft.drawCircle((int16_t)(menuBtn.x + menuBtn.w - 3), (int16_t)(menuBtn.y + 3), 3, TFT_BLACK);
     }
 }
@@ -1391,24 +1414,73 @@ void updateAutoBrightnessBacklight() {
     ledcWrite(BACKLIGHT_PWM_CHANNEL, nightDimActive ? nightDimBacklightPwm() : normalBacklightPwm());
 }
 
+// Einfacher, wortweiser Zeilenumbruch anhand der tatsaechlichen
+// Pixelbreite (CLAUDE.md-Pflichtpruefung Textbreite/-hoehe) - gleiches
+// Grundmuster wie z.B. first_run_complete_screen.cpp, hier bewusst
+// dupliziert statt geteilt (CLAUDE.md-Konvention "jeder Screen
+// unabhaengig lauffaehig"). setCursor()+print() ist baseline-verankert
+// (eigener Font, siehe CLAUDE.md) - startY entsprechend nie kleiner als
+// ~14 bei Size 1 waehlen. Gibt die Y-Position direkt NACH der letzten
+// gezeichneten Zeile zurueck, damit der Aufrufer nachfolgende Bloecke
+// dynamisch danach positionieren kann.
+int16_t layoutWrappedSdRequired(TFT_eSPI& tft, int16_t x, int16_t startY, int16_t maxWidth,
+                                 int16_t lineHeight, const String& text) {
+    int16_t y = startY;
+    int32_t start = 0;
+    int32_t len = text.length();
+    while (start < len) {
+        while (start < len && text[start] == ' ') start++;
+        if (start >= len) break;
+        String line = text.substring(start, len);
+        while (tft.textWidth(line) > maxWidth) {
+            int32_t lastSpace = line.lastIndexOf(' ');
+            if (lastSpace <= 0) break;
+            line = line.substring(0, lastSpace);
+        }
+        tft.setCursor(x, y);
+        tft.print(line);
+        y += lineHeight;
+        start += line.length();
+    }
+    return y;
+}
+
 void haltWithSdRequiredScreen() {
     tft.invertDisplay(true);
 
     tft.fillScreen(TFT_BLACK);
     tft.setTextDatum(MC_DATUM);
     int16_t cx = Config::SCREEN_WIDTH / 2;
-    int16_t cy = Config::SCREEN_HEIGHT / 2;
 
+    // Kurzer, fest positionierter Titelblock (unveraendert gegenueber
+    // vorher, nur naeher an den oberen Rand gerueckt) - macht unterhalb
+    // mehr Platz fuer den neuen, laengeren Troubleshooting-Hinweis frei.
     tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
     tft.setTextSize(2);
-    tft.drawString(I18n::t(StringId::SD_REQUIRED_LINE1), cx, cy - 40);
-    tft.drawString(I18n::t(StringId::SD_REQUIRED_LINE2), cx, cy - 10);
-    tft.drawString(I18n::t(StringId::SD_REQUIRED_LINE3), cx, cy + 20);
+    tft.drawString(I18n::t(StringId::SD_REQUIRED_LINE1), cx, 45);
+    tft.drawString(I18n::t(StringId::SD_REQUIRED_LINE2), cx, 72);
+    tft.drawString(I18n::t(StringId::SD_REQUIRED_LINE3), cx, 99);
 
+    // Bisherige feste "Insert a card..."-Zeile PLUS die neuen zwei
+    // Troubleshooting-Tipps (SD-Formatierungstool bei Partitionstabellen-
+    // Problemen, alternativ eine andere Karte probieren - haeufigste
+    // Ursachen laut Nutzer-Rueckmeldungen) als linksbuendiger Fliesstext
+    // mit echtem Wortumbruch statt weiterer fester Zeilen - in mind. einer
+    // der 8 Sprachen waere der kombinierte Text sonst abgeschnitten oder
+    // wuerde ueberlappen. LINE_H/Startwerte bewusst knapp gewaehlt (per
+    // Live-Messung auf dem Geraet abgesichert, siehe Test im Chat) - beim
+    // ersten Versuch (LINE_H=16, Start bei 145) liefen DE/FR/PT noch ueber
+    // den unteren Bildschirmrand hinaus (329px bei 320px Hoehe).
+    tft.setTextDatum(TL_DATUM);
     tft.setTextSize(1);
     tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
-    tft.drawString(I18n::t(StringId::SD_REQUIRED_HINT), cx, cy + 60);
-    tft.setTextDatum(TL_DATUM);
+    constexpr int16_t TEXT_X = 10;
+    constexpr int16_t TEXT_MAX_W = Config::SCREEN_WIDTH - 20;
+    constexpr int16_t LINE_H = 14;
+    int16_t y = layoutWrappedSdRequired(tft, TEXT_X, 132, TEXT_MAX_W, LINE_H,
+                                         I18n::t(StringId::SD_REQUIRED_HINT));
+    layoutWrappedSdRequired(tft, TEXT_X, (int16_t)(y + 6), TEXT_MAX_W, LINE_H,
+                             I18n::t(StringId::SD_REQUIRED_TROUBLESHOOTING));
 
     while (true) {
         delay(1000);

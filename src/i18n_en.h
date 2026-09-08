@@ -423,8 +423,9 @@ static const char* const I18N_EN[] = {
     "Logbook automatically disabled (24h)",
     "The flight logbook was just switched off automatically after being active for 24 hours, to protect the SD card from filling up unnoticed. You can turn it back on via the menu if you'd like to keep logging.",
 
-    "First seen: ",
-    "Seen for: ",
+    "First seen at ",
+    "",
+    "Seen for ",
 
     "Previously seen: checking...",
     "Seen ",
@@ -467,6 +468,8 @@ static const char* const I18N_EN[] = {
     " up",
     "Min ",
     "Max ",
+
+    "If the card isn't detected: reformat it with the official \"SD Card Formatter\" from the SD Association - this fixes most cases. If that doesn't help, try a different card (ideally older/smaller, from a well-known brand).",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

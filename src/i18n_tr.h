@@ -422,8 +422,9 @@ static const char* const I18N_TR[] = {
     "Uçuş defteri otomatik olarak kapatıldı (24s)",
     "Uçuş defteri, SD kartın fark edilmeden dolmasını önlemek için 24 saat etkin kaldıktan sonra az önce otomatik olarak kapatıldı. Kayda devam etmek isterseniz menüden tekrar açabilirsiniz.",
 
-    "İlk görülme: ",
-    "Görünürlük süresi: ",
+    "İlk görülme saati: ",
+    "",
+    "Görünürlük süresi ",
 
     "Daha önce görülme: kontrol ediliyor...",
     "Daha önce ",
@@ -466,6 +467,8 @@ static const char* const I18N_TR[] = {
     " yukarı",
     "Min ",
     "Max ",
+
+    "Kart algılanmıyorsa: SD Association'ın resmi \"SD Card Formatter\" aracıyla yeniden biçimlendirin - çoğu durumda bu sorunu çözer. Bu işe yaramazsa, başka bir kart deneyin (tercihen daha eski/küçük, bilinen bir markadan).",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

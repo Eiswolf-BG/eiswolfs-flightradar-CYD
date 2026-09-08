@@ -422,8 +422,9 @@ static const char* const I18N_FR[] = {
     "Journal de vol désactivé automatiquement (24h)",
     "Le journal de vol vient d'être désactivé automatiquement après 24 heures d'activité, pour éviter que la carte SD ne se remplisse sans que vous vous en rendiez compte. Vous pouvez le réactiver via le menu si vous souhaitez continuer l'enregistrement.",
 
-    "Vu pour la première fois : ",
-    "Visible depuis : ",
+    "Vu pour la première fois à ",
+    "",
+    "Visible depuis ",
 
     "Déjà vu : vérification...",
     "Déjà vu ",
@@ -466,6 +467,8 @@ static const char* const I18N_FR[] = {
     " haut",
     "Min ",
     "Max ",
+
+    "Si la carte n'est pas détectée : reformatez-la avec le \"SD Card Formatter\" officiel de la SD Association - cela résout la plupart des cas. Si cela ne suffit pas, essayez une autre carte (idéalement plus ancienne/petite, d'une marque connue).",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

@@ -424,8 +424,9 @@ static const char* const I18N_NL[] = {
     "Logboek automatisch uitgeschakeld (24u)",
     "Het logboek is zojuist automatisch uitgeschakeld nadat het 24 uur actief was, om te voorkomen dat de SD-kaart ongemerkt volloopt. Je kunt het via het menu weer inschakelen als je wilt blijven loggen.",
 
-    "Voor het eerst gezien: ",
-    "Zichtbaar sinds: ",
+    "Voor het eerst gezien om ",
+    " uur",
+    "Zichtbaar sinds ",
 
     "Eerder gezien: controleren...",
     "Al ",
@@ -468,6 +469,8 @@ static const char* const I18N_NL[] = {
     " omhoog",
     "Min ",
     "Max ",
+
+    "Als de kaart niet wordt herkend: formatteer hem met de officiële \"SD Card Formatter\" van de SD Association - dit lost de meeste gevallen op. Helpt dat niet, probeer dan een andere kaart (bij voorkeur ouder/kleiner, van een bekend merk).",
 };
 
 static_assert(sizeof(I18N_NL) / sizeof(I18N_NL[0]) == (size_t)StringId::COUNT,

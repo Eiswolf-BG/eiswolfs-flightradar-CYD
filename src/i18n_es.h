@@ -422,8 +422,9 @@ static const char* const I18N_ES[] = {
     "Cuaderno de vuelo desactivado automáticamente (24h)",
     "El cuaderno de vuelo se acaba de desactivar automáticamente tras estar activo 24 horas, para evitar que la tarjeta SD se llene sin darte cuenta. Puedes volver a activarlo desde el menú si quieres seguir registrando.",
 
-    "Visto por primera vez: ",
-    "Visible desde hace: ",
+    "Visto por primera vez a las ",
+    "",
+    "Visible desde hace ",
 
     "Visto antes: comprobando...",
     "Visto ",
@@ -466,6 +467,8 @@ static const char* const I18N_ES[] = {
     " alto",
     "Mín ",
     "Máx ",
+
+    "Si la tarjeta no se detecta: formatéala con el \"SD Card Formatter\" oficial de la SD Association - esto soluciona la mayoría de los casos. Si no ayuda, prueba con otra tarjeta (idealmente más antigua/pequeña, de una marca conocida).",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

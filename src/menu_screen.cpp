@@ -1467,14 +1467,20 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
 
             drawButton(tft, listsBtn, I18n::t(StringId::MENU_CATEGORY_LISTS));
             drawButton(tft, statsLogbookBtn, I18n::t(StringId::MENU_CATEGORY_STATS_LOGBOOK));
-            if (!SettingsStore::flightLogbookEnabled() && SettingsStore::flightLogbookAutoOffTriggered()) {
+            if (SettingsStore::flightLogbookEnabled()) {
                 // Gleicher kleiner roter Punkt wie beim Update-Verfuegbar-
                 // Hinweis (siehe Page::System oben) - zeigt schon auf dieser
-                // Kategorie-Seite, dass sich das Flugbuch unbemerkt selbst
-                // abgeschaltet hat (24h-Sicherheitsabschaltung), statt dass
-                // Alex das erst beim Durchklicken bemerkt. Verschwindet
-                // sobald der Schalter manuell angetippt wird (aus ODER an),
-                // siehe SettingsStore::setFlightLogbookAutoOffTriggered().
+                // Kategorie-Seite als reiner Status-/"Aufzeichnung laeuft"-
+                // Punkt an, dass das Flugbuch gerade aktiv ist (und der
+                // 24h-Sicherheits-Countdown implizit mitlaeuft, siehe
+                // FlightLogbook::secondsUntilAutoOff()). Erscheint sofort
+                // beim Einschalten, verschwindet sofort beim Ausschalten -
+                // egal ob manuell oder durch die 24h-Abschaltung. Frueher
+                // war das ein Alarm-Punkt fuer "wurde automatisch
+                // abgeschaltet" (an flightLogbookAutoOffTriggered()
+                // gekoppelt) - dieser Hinweis haengt jetzt nur noch am
+                // "?"-Button in der Flugbuch-Zeile, siehe logbookAutoOffHint
+                // weiter unten.
                 tft.fillCircle((int16_t)(statsLogbookBtn.x + statsLogbookBtn.w - 8), (int16_t)(statsLogbookBtn.y + 8), 4, TFT_RED);
                 tft.drawCircle((int16_t)(statsLogbookBtn.x + statsLogbookBtn.w - 8), (int16_t)(statsLogbookBtn.y + 8), 4, TFT_BLACK);
             }
@@ -1563,16 +1569,27 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             drawButton(tft, logFilesBtn, I18n::t(StringId::MENU_LOGBOOK_FILES));
             drawButtonWithSubline(tft, logbookBtn, I18n::t(StringId::MENU_FLIGHT_LOGBOOK) + onOff(SettingsStore::flightLogbookEnabled()),
                                   SettingsStore::flightLogbookEnabled() ? logbookCountdownText() : "");
-            // Hinweis auf die 24h-Sicherheitsabschaltung, NUR solange sie
-            // tatsaechlich (und nicht durch bewusstes manuelles Ausschalten)
-            // gegriffen hat, siehe SettingsStore::flightLogbookAutoOffTriggered().
-            // Punkt oben LINKS (wie beim Update-Hinweis in Page::System) UND
-            // "?"-Button oben RECHTS (wie beim ISS-Marker) - bewusst
-            // getrennte Ecken, damit sich beide nicht ueberlappen.
-            bool logbookAutoOffHint = !SettingsStore::flightLogbookEnabled() && SettingsStore::flightLogbookAutoOffTriggered();
-            if (logbookAutoOffHint) {
+            // Punkt oben LINKS: reiner Status-/"Aufzeichnung laeuft"-Punkt,
+            // zeigt an dass das Flugbuch aktiv ist (24h-Countdown laeuft
+            // implizit mit, siehe FlightLogbook::secondsUntilAutoOff()) -
+            // erscheint sofort beim Einschalten, verschwindet sofort beim
+            // Ausschalten (manuell oder automatisch). Frueher war das ein
+            // Alarm-Punkt fuer "wurde automatisch abgeschaltet"; diese
+            // Bedeutung traegt jetzt nur noch der "?"-Button unten.
+            if (SettingsStore::flightLogbookEnabled()) {
                 tft.fillCircle((int16_t)(logbookBtn.x + 8), (int16_t)(logbookBtn.y + 8), 4, TFT_RED);
                 tft.drawCircle((int16_t)(logbookBtn.x + 8), (int16_t)(logbookBtn.y + 8), 4, TFT_BLACK);
+            }
+            // "?"-Button oben RECHTS (wie beim ISS-Marker) - unveraendert:
+            // Hinweis/Erklaerung auf die 24h-Sicherheitsabschaltung, NUR
+            // solange sie tatsaechlich (und nicht durch bewusstes manuelles
+            // Ausschalten) gegriffen hat, siehe
+            // SettingsStore::flightLogbookAutoOffTriggered(). Ueberlappt
+            // sich mit dem Punkt oben nie, da sich beide Bedingungen
+            // gegenseitig ausschliessen (Punkt nur bei eingeschaltetem,
+            // "?"-Hinweis nur bei automatisch ausgeschaltetem Flugbuch).
+            bool logbookAutoOffHint = !SettingsStore::flightLogbookEnabled() && SettingsStore::flightLogbookAutoOffTriggered();
+            if (logbookAutoOffHint) {
                 drawRowInfoButton(tft, logbookBtn);
             }
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
