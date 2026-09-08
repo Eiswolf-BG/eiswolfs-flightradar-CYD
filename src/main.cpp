@@ -249,6 +249,46 @@ void layoutHeaderOnce() {
     eyeIconRect.w = (int16_t)(eyeZoneEnd - eyeZoneStart);
 }
 
+// Zeichnet NUR den pulsierenden roten Update-Punkt oben rechts am Menu-
+// Button (ohne Rahmen/"Menu"-Text) - ausgelagert aus drawMenuButton(),
+// damit updateStatusLine() den Punkt bei JEDEM Tick neu zeichnen kann,
+// ohne jedesmal auch Rahmen+Text unnoetig mitzuzeichnen (siehe Aufrufer
+// unten). Muss vom Aufrufer selbst mit OtaUpdate::isUpdateAvailable()
+// abgesichert werden, ruft hier bewusst nicht selbst ab, um bei
+// drawMenuButton() nicht doppelt zu pruefen.
+void drawMenuUpdateDot() {
+    // Kleiner roter Punkt oben rechts am Menu-Button - "es gibt etwas
+    // Neues zu sehen", analog zu App-Badges auf dem Smartphone. Bewusst
+    // rein optisch (keine Zahl/kein Text), da hier ohnehin nur GENAU
+    // EIN Zustand angezeigt werden muss (Update verfuegbar oder nicht).
+    // Gleiche Bedingung wird auch fuer die Badges auf der "System"-
+    // Kachel (menu_screen.cpp) und dem Live-Verkehr-Icon in der unteren
+    // linken Radarecke (radar_screen.cpp, VOR dem Umzug hierher)
+    // benutzt.
+    //
+    // Pulsiert sanft (Alex' Wunsch): der Update-Hinweis ist von der
+    // Radarecke hierher umgezogen (siehe radar_screen.cpp::
+    // drawLiveTrafficCornerButton(), die Ecke ist jetzt ein dauerhafter,
+    // NICHT pulsierender Live-Verkehr-Zugang) - gleiche Sinus-Berechnung/
+    // Periode wie das dortige, jetzt entfernte "!"-Icon als Vorlage.
+    // Muss bei JEDEM updateStatusLine()-Tick (jede Sekunde) neu gezeichnet
+    // werden, nicht nur bei einer Zustandsaenderung von isUpdateAvailable()
+    // - sonst bliebe der Punkt dauerhaft bei der Helligkeit stehen, die er
+    // im einen Frame des Zustandswechsels zufaellig hatte, statt sichtbar
+    // weiterzupulsieren.
+    constexpr uint32_t UPDATE_DOT_PULSE_PERIOD_MS = 2600;
+    uint32_t phase = millis() % UPDATE_DOT_PULSE_PERIOD_MS;
+    float t = (float)phase / (float)UPDATE_DOT_PULSE_PERIOD_MS;
+    float breathe = (sinf(t * 2.0f * PI) + 1.0f) / 2.0f; // 0..1
+    // Reiner Rot-Kanal-Wechsel (G/B sind bei TFT_RED ohnehin 0) zwischen
+    // gedimmtem und vollem Rot - kein generischer Farb-Dimm-Helfer
+    // noetig, da nur der eine 5-Bit-Kanal betroffen ist.
+    uint8_t r5 = (uint8_t)(10.0f + (31.0f - 10.0f) * breathe + 0.5f); // ~32%..100% Rot
+    uint16_t color = (uint16_t)(r5 << 11);
+    tft.fillCircle((int16_t)(menuBtn.x + menuBtn.w - 3), (int16_t)(menuBtn.y + 3), 3, color);
+    tft.drawCircle((int16_t)(menuBtn.x + menuBtn.w - 3), (int16_t)(menuBtn.y + 3), 3, TFT_BLACK);
+}
+
 void drawMenuButton() {
     // Folgt dem gewaehlten Radar-Farbschema (Menue > System > Radar-
     // Darstellung) - mittlerweile wie JEDER Button im Projekt, siehe
@@ -263,37 +303,7 @@ void drawMenuButton() {
     tft.setTextDatum(TL_DATUM);
 
     if (OtaUpdate::isUpdateAvailable()) {
-        // Kleiner roter Punkt oben rechts am Menu-Button - "es gibt etwas
-        // Neues zu sehen", analog zu App-Badges auf dem Smartphone. Bewusst
-        // rein optisch (keine Zahl/kein Text), da hier ohnehin nur GENAU
-        // EIN Zustand angezeigt werden muss (Update verfuegbar oder nicht).
-        // Gleiche Bedingung wird auch fuer die Badges auf der "System"-
-        // Kachel (menu_screen.cpp) und dem Live-Verkehr-Icon in der unteren
-        // linken Radarecke (radar_screen.cpp, VOR dem Umzug hierher)
-        // benutzt.
-        //
-        // Pulsiert jetzt sanft (Alex' Wunsch): der Update-Hinweis ist von
-        // der Radarecke hierher umgezogen (siehe radar_screen.cpp::
-        // drawLiveTrafficCornerButton(), die Ecke ist jetzt ein
-        // dauerhafter, NICHT pulsierender Live-Verkehr-Zugang) - gleiche
-        // Sinus-Berechnung/Periode wie das dortige, jetzt entfernte "!"-
-        // Icon als Vorlage. Der Menu-Button wird ohnehin regelmaessig neu
-        // gezeichnet (anders als der Ruhebildschirm-Punkt neben der
-        // Versionsnummer oder der Punkt auf der "System"-Kachel im Menue -
-        // beide bewusst weiterhin einfache statische Punkte, siehe dort),
-        // das Pulsieren funktioniert hier also genauso zuverlaessig wie
-        // vorher in der Ecke.
-        constexpr uint32_t UPDATE_DOT_PULSE_PERIOD_MS = 2600;
-        uint32_t phase = millis() % UPDATE_DOT_PULSE_PERIOD_MS;
-        float t = (float)phase / (float)UPDATE_DOT_PULSE_PERIOD_MS;
-        float breathe = (sinf(t * 2.0f * PI) + 1.0f) / 2.0f; // 0..1
-        // Reiner Rot-Kanal-Wechsel (G/B sind bei TFT_RED ohnehin 0) zwischen
-        // gedimmtem und vollem Rot - kein generischer Farb-Dimm-Helfer
-        // noetig, da nur der eine 5-Bit-Kanal betroffen ist.
-        uint8_t r5 = (uint8_t)(10.0f + (31.0f - 10.0f) * breathe + 0.5f); // ~32%..100% Rot
-        uint16_t color = (uint16_t)(r5 << 11);
-        tft.fillCircle((int16_t)(menuBtn.x + menuBtn.w - 3), (int16_t)(menuBtn.y + 3), 3, color);
-        tft.drawCircle((int16_t)(menuBtn.x + menuBtn.w - 3), (int16_t)(menuBtn.y + 3), 3, TFT_BLACK);
+        drawMenuUpdateDot();
     }
 }
 
@@ -1325,17 +1335,22 @@ void updateStatusLine() {
         drawWeatherIcon();
     }
 
-    // Gleiches Prinzip wie beim Wetter-Icon oben: der rote "Update
-    // verfuegbar"-Punkt am Menu-Button wurde bisher nur bei einem vollen
-    // drawHeader() neu gezeichnet, nicht periodisch - auf dem normalen,
-    // nicht angetippten Radarscreen blieb er deshalb oft minutenlang
-    // unsichtbar, obwohl der Hintergrund-Check (siehe ota_update.cpp)
-    // laengst ein neues Release gefunden hatte. updateStatusLine() laeuft
-    // hier jede Sekunde, unabhaengig vom Ruhebildschirm.
+    // Bei einer tatsaechlichen Zustandsaenderung (kein Update -> Update
+    // verfuegbar oder umgekehrt) den kompletten Button neu zeichnen
+    // (Rahmen+Text bleiben unveraendert, muessen aber beim Umschalten des
+    // Punkts sauber neu ueberdeckt werden). updateStatusLine() laeuft hier
+    // jede Sekunde, unabhaengig vom Ruhebildschirm.
     bool updateAvailableNow = OtaUpdate::isUpdateAvailable();
     if (updateAvailableNow != lastRenderedUpdateAvailable) {
         lastRenderedUpdateAvailable = updateAvailableNow;
         drawMenuButton();
+    } else if (updateAvailableNow) {
+        // Nur den Punkt (nicht Rahmen/Text) bei JEDEM Tick neu zeichnen,
+        // solange ein Update verfuegbar ist - sonst bliebe er nach dem
+        // einen Zustandswechsel-Frame oben bei der Helligkeit stehen, die
+        // er in genau diesem Frame gerade hatte, und wuerde nie sichtbar
+        // weiterpulsieren (siehe drawMenuUpdateDot()-Kommentar).
+        drawMenuUpdateDot();
     }
 }
 
@@ -1823,7 +1838,13 @@ void loop() {
 
     if (tapped) {
         if (menuBtn.contains(tap.x, tap.y)) {
-            MenuScreen::run(tft);
+            // Bei verfuegbarem Update direkt in die System-Seite springen
+            // (startAtSystem=true) statt ins Hauptmenue - dort stehen
+            // Versionsnummer/"Nach Update suchen", vorher musste Alex nach
+            // dem Antippen des pulsierenden roten Punkts noch manuell auf
+            // "System" tippen. Ohne verfuegbares Update unveraendert das
+            // normale Hauptmenue.
+            MenuScreen::run(tft, false, OtaUpdate::isUpdateAvailable());
             // Menue lief als Vollbild-Screen und kann dabei ein evtl. noch
             // offenes Flugzeug-Detail-Panel komplett ueberschrieben haben -
             // ohne diesen Aufruf wuerde RadarScreen::render() faelschlich
