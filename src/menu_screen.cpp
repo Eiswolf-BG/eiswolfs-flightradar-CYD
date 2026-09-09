@@ -784,26 +784,80 @@ namespace {
     void drawOtaProgress(uint8_t percent) {
         if (!otaProgressTft) return;
         TFT_eSPI& t = *otaProgressTft;
-        // Zwei Zeilen statt einer langen: der Praefix-Text
-        // (OTA_INSTALLING_PREFIX) ist in manchen Sprachen zu lang, um
-        // zusammen mit der Prozentzahl auf einer Zeile bei lesbarer
-        // Schriftgroesse zu passen (lief vorher links/rechts ueber den
-        // Bildschirmrand hinaus). Jetzt: Beschriftung klein oben, Prozent
-        // gross darunter.
-        constexpr int16_t BAND_H = 60;
-        int16_t cy = Config::SCREEN_HEIGHT / 2;
-        t.fillRect(0, (int16_t)(cy - BAND_H / 2), Config::SCREEN_WIDTH, BAND_H, TFT_BLACK);
 
-        t.setTextDatum(MC_DATUM);
+        // Groesseres Band als frueher (BAND_H=60, nur kleiner Praefix +
+        // Prozent) - deckt jetzt Ueberschrift + Prozentzahl + Fortschritts-
+        // balken + Hinweistext komplett ab, damit bei den sehr haeufigen
+        // Aufrufen waehrend Download/Flash nie etwas vom vorherigen Frame
+        // stehen bleibt oder sich ueberlappt.
+        constexpr int16_t BAND_TOP = 20;
+        constexpr int16_t BAND_H = 260;
+        t.fillRect(0, BAND_TOP, Config::SCREEN_WIDTH, BAND_H, TFT_BLACK);
+
+        constexpr int16_t X_MARGIN = 15;
+        constexpr int16_t TEXT_MAX_WIDTH = Config::SCREEN_WIDTH - 2 * X_MARGIN;
+
+        // Ueberschrift: deutlich groesser als frueher (Size 2 statt 1) und
+        // weiter oben statt als kleiner Praefix direkt ueber der Prozent-
+        // zahl. OTA_INSTALLING_PREFIX ist inzwischen ein vollstaendiger Satz
+        // (statt eines kurzen Fragments), der in manchen Sprachen nicht in
+        // eine Zeile passt - deshalb zeilenumbruchsicher ueber
+        // layoutWrapped() (gleiche Technik wie beim OTA-Bestaetigungstext in
+        // confirmWarningScreen() oben) statt eines einzelnen ungeschuetzten
+        // drawString()-Aufrufs. layoutWrapped() zeichnet linksbuendig
+        // (setCursor()+print()), liefert aber die tatsaechliche Endposition
+        // zurueck, an der die naechsten Elemente (Prozentzahl/Balken/
+        // Hinweis) dynamisch anschliessen - so bleibt das Layout auch bei
+        // 1 vs. 2 Zeilen Ueberschrift stimmig statt zu ueberlappen.
         t.setTextColor(UiTheme::accentColor(t), TFT_BLACK);
-        t.setTextSize(1);
-        t.drawString(I18n::t(StringId::OTA_INSTALLING_PREFIX), Config::SCREEN_WIDTH / 2, (int16_t)(cy - 14));
+        t.setTextSize(2);
+        constexpr int16_t HEADING_LINE_H = 20;
+        int16_t headingY = (int16_t)(BAND_TOP + 14);
+        int16_t headingEndY = layoutWrapped(t, X_MARGIN, headingY, TEXT_MAX_WIDTH, HEADING_LINE_H,
+                                             I18n::t(StringId::OTA_INSTALLING_PREFIX),
+                                             0, 0, Config::SCREEN_HEIGHT, true);
 
+        // Prozentzahl bleibt gross/zentriert (Size 3), jetzt dynamisch unter
+        // der (je nach Sprache unterschiedlich langen) Ueberschrift statt an
+        // einer festen Bildschirmmitte.
+        t.setTextDatum(MC_DATUM);
         String percentLabel = String(percent) + "%";
         t.setTextSize(3);
-        t.drawString(percentLabel, Config::SCREEN_WIDTH / 2, (int16_t)(cy + 12));
+        int16_t percentY = (int16_t)(headingEndY + 22);
+        t.drawString(percentLabel, Config::SCREEN_WIDTH / 2, percentY);
+        t.setTextDatum(TL_DATUM);
 
+        // Fortschrittsbalken direkt unter der Prozentzahl - gleicher
+        // abgerundeter Stil wie die Buttons (siehe drawButton() oben,
+        // Eckenradius 4): Rahmen in Akzentfarbe, Innenflaeche schwarz,
+        // gefuellter Anteil links beginnend proportional zu percent. Wird
+        // bei jedem Aufruf komplett neu gezeichnet (kein Diffing noetig -
+        // das Band davor wurde bereits vollstaendig schwarz geloescht,
+        // dadurch kein Flackern durch stehenbleibende Altpixel).
+        constexpr int16_t BAR_MARGIN = 24;
+        constexpr int16_t BAR_W = Config::SCREEN_WIDTH - 2 * BAR_MARGIN;
+        constexpr int16_t BAR_H = 18;
+        int16_t barY = (int16_t)(percentY + 24);
+        uint16_t accent = UiTheme::accentColor(t);
+        t.fillRoundRect(BAR_MARGIN, barY, BAR_W, BAR_H, 4, TFT_BLACK);
+        t.drawRoundRect(BAR_MARGIN, barY, BAR_W, BAR_H, 4, accent);
+        uint8_t clampedPercent = percent > 100 ? 100 : percent;
+        int16_t fillW = (int16_t)((BAR_W - 4) * clampedPercent / 100);
+        if (fillW > 0) {
+            t.fillRoundRect((int16_t)(BAR_MARGIN + 2), (int16_t)(barY + 2), fillW, (int16_t)(BAR_H - 4), 3, accent);
+        }
+
+        // Dezenter Hinweistext ganz unten (OTA_INSTALLING_HINT, neue
+        // StringId) - "Geraet waehrend des Updates bitte nicht ausstecken
+        // oder ausschalten" o.ae., ebenfalls zeilenumbruchsicher ueber
+        // layoutWrapped(), falls er in einer Sprache nicht in eine Zeile
+        // passt.
         t.setTextSize(1);
+        t.setTextColor(TFT_DARKGREY, TFT_BLACK);
+        int16_t hintY = (int16_t)(barY + BAR_H + 16);
+        layoutWrapped(t, X_MARGIN, hintY, TEXT_MAX_WIDTH, 14, I18n::t(StringId::OTA_INSTALLING_HINT),
+                       0, 0, Config::SCREEN_HEIGHT, true);
+
         t.setTextDatum(TL_DATUM);
     }
 

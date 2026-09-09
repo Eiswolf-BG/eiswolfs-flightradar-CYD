@@ -821,7 +821,7 @@ namespace ScreensaverRain {
         bool hasPrev = false;
         int16_t prevY1 = 0, prevY2 = 0;
     };
-    constexpr uint8_t MAX_DROPS = 13; // Array-Kapazitaet = groesste Stufe ("stark")
+    constexpr uint8_t MAX_DROPS = 19; // Array-Kapazitaet = groesste Stufe ("stark")
     constexpr int16_t DROP_LENGTH = 7; // gleiche Tropfenlaenge wie radar_screen.cpp
     Drop drops[MAX_DROPS];
     uint32_t lastTickMs = 0;
@@ -850,12 +850,18 @@ namespace ScreensaverRain {
         uint8_t count;
         float speedPxPerSec;
     };
+    // Werte gegenueber radar_screen.cpp's Regen-Pendant (dortige eigene
+    // Kopie, NICHT betroffen) verstaerkt (Alex' Wunsch) - sowohl
+    // Tropfenanzahl als auch Fallgeschwindigkeit in allen 3 Stufen. Erst um
+    // 25% erhoeht, danach nochmal um 20% obendrauf (also insgesamt +50%
+    // gegenueber dem urspruenglichen Wert: Light 4->6, Moderate 8->12,
+    // Heavy 13->19, Geschwindigkeit analog).
     RainParams rainParamsForIntensity(Weather::RainIntensity intensity) {
         switch (intensity) {
-            case Weather::RainIntensity::Light:    return {4, 45.0f};
-            case Weather::RainIntensity::Heavy:    return {13, 100.0f};
+            case Weather::RainIntensity::Light:    return {6, 67.5f};
+            case Weather::RainIntensity::Heavy:    return {19, 150.0f};
             case Weather::RainIntensity::Moderate:
-            default:                                return {8, 70.0f};
+            default:                                return {12, 105.0f};
         }
     }
 

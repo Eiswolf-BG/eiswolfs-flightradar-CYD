@@ -358,7 +358,16 @@ enum class StringId : uint16_t {
     OTA_UP_TO_DATE_PREFIX,
     OTA_UPDATE_AVAILABLE_PREFIX,
     OTA_CONFIRM_BODY,
+    // OTA_INSTALLING_PREFIX ist trotz des Namens (historisch gewachsen,
+    // bewusst nicht umbenannt) mittlerweile ein vollstaendiger Satz statt
+    // eines kurzen Praefix-Fragments - wird als grosse Ueberschrift oben auf
+    // dem Fortschritts-Screen gezeichnet (menu_screen.cpp::
+    // drawOtaProgress()), zeilenumbruchsicher ueber layoutWrapped(), da er
+    // in manchen Sprachen nicht in eine Zeile passt. OTA_INSTALLING_HINT ist
+    // der kleine, dezente Warnhinweis ganz unten auf demselben Screen
+    // ("Geraet nicht ausstecken/ausschalten") - ebenfalls zeilenumbruchsicher.
     OTA_INSTALLING_PREFIX,
+    OTA_INSTALLING_HINT,
     OTA_UPDATE_FAILED,
     OTA_UPDATE_SUCCESS,
 
