@@ -2745,8 +2745,8 @@ namespace {
             if (TouchInput::wasTapped(tap)) {
                 if (backBtn.contains(tap.x, tap.y)) return;
             }
-            // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
-            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return;
+            // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
+            if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) return;
             MenuStars::update(gfx);
             delay(20);
         }
@@ -2814,8 +2814,8 @@ namespace {
             if (TouchInput::wasTapped(tap)) {
                 if (backBtn.contains(tap.x, tap.y)) return;
             }
-            // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
-            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return;
+            // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
+            if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) return;
             MenuStars::update(gfx);
             delay(20);
         }
@@ -3172,8 +3172,8 @@ namespace {
             if (TouchInput::wasTapped(tap)) {
                 if (backBtn.contains(tap.x, tap.y)) return;
             }
-            // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
-            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return;
+            // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
+            if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) return;
             MenuStars::update(gfx);
             delay(20);
         }

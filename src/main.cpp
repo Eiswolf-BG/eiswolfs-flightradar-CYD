@@ -823,6 +823,15 @@ namespace ScreensaverRain {
     };
     constexpr uint8_t MAX_DROPS = 19; // Array-Kapazitaet = groesste Stufe ("stark")
     constexpr int16_t DROP_LENGTH = 7; // gleiche Tropfenlaenge wie radar_screen.cpp
+    // "Glanzstrich" (Alex' Wunsch): zweite, 1px versetzte Linie in
+    // gedaempfter Helligkeit direkt neben der Hauptlinie, statt nur eines
+    // einzelnen Strichs - macht den Tropfen optisch etwas plastischer.
+    // d.x bleibt ueber die gesamte Lebensdauer eines Tropfens konstant
+    // (siehe Drop-Kommentar oben), daher braucht die zweite Linie kein
+    // eigenes gespeichertes Feld - ihre X-Position (d.x+1) ist beim
+    // Loeschen genauso deterministisch wie beim Zeichnen.
+    constexpr int16_t DROP_SECONDARY_OFFSET_X = 1;
+    constexpr float DROP_SECONDARY_BRIGHTNESS = 0.4f;
     Drop drops[MAX_DROPS];
     uint32_t lastTickMs = 0;
     constexpr uint32_t TICK_INTERVAL_MS = 60; // gleicher Takt wie MenuStars
@@ -934,7 +943,15 @@ namespace ScreensaverRain {
             // Version dieser Funktion (Git-Historie): sonst bleibt ein
             // "eingefrorenes" Geist-Segment auf dem Bildschirm stehen.
             if (d.hasPrev) {
-                tft.drawFastVLine((int16_t)d.x, d.prevY2, (int16_t)(d.prevY1 - d.prevY2 + 1), TFT_BLACK);
+                int16_t eraseX = (int16_t)d.x;
+                int16_t eraseH = (int16_t)(d.prevY1 - d.prevY2 + 1);
+                tft.drawFastVLine(eraseX, d.prevY2, eraseH, TFT_BLACK);
+                // Zweite Linie (Glanzstrich-Versatz) genauso loeschen wie
+                // gezeichnet - sonst bliebe ihr Rest sichtbar stehen.
+                int16_t eraseX2 = (int16_t)(eraseX + DROP_SECONDARY_OFFSET_X);
+                if (eraseX2 < Config::SCREEN_WIDTH) {
+                    tft.drawFastVLine(eraseX2, d.prevY2, eraseH, TFT_BLACK);
+                }
                 d.hasPrev = false;
             }
 
@@ -963,7 +980,14 @@ namespace ScreensaverRain {
             if (visible) {
                 int16_t clipY1 = constrain(y1, (int16_t)0, (int16_t)(Config::SCREEN_HEIGHT - 1));
                 int16_t clipY2 = constrain(y2, (int16_t)0, (int16_t)(Config::SCREEN_HEIGHT - 1));
-                tft.drawFastVLine(x, clipY2, (int16_t)(clipY1 - clipY2 + 1), dropColor);
+                int16_t segH = (int16_t)(clipY1 - clipY2 + 1);
+                tft.drawFastVLine(x, clipY2, segH, dropColor);
+                // Glanzstrich: zweite, 1px versetzte Linie in ca. 40%
+                // Helligkeit der Hauptlinie - gleiche Laenge, direkt daneben.
+                int16_t x2 = (int16_t)(x + DROP_SECONDARY_OFFSET_X);
+                if (x2 < Config::SCREEN_WIDTH) {
+                    tft.drawFastVLine(x2, clipY2, segH, scaleColorBrightness(dropColor, DROP_SECONDARY_BRIGHTNESS));
+                }
                 d.prevY1 = clipY1;
                 d.prevY2 = clipY2;
                 d.hasPrev = true;
@@ -997,8 +1021,29 @@ namespace ScreensaverSnow {
         bool hasPrev = false;
         int16_t prevX = 0, prevY = 0;
     };
-    constexpr uint8_t MAX_FLAKES = 13; // gleiche Array-Kapazitaet wie ScreensaverRain (groesste Stufe "stark")
-    constexpr int16_t FLAKE_RADIUS = 2; // kleiner Punkt statt Linie (Alex' Wunsch: etwas dicker als 1px)
+    constexpr uint8_t MAX_FLAKES = 20; // Array-Kapazitaet = groesste Stufe ("stark")
+
+    // "Dendrit"-Form (Option 3 aus Alex' Eiskristall-Uebersicht) statt
+    // eines einfachen Punkts: sechsstrahliger Stern aus 3 geraden
+    // Hauptlinien durch die Mitte (0°/60°/120°, ergibt 6 Spitzen bei
+    // 0°/60°/120°/180°/240°/300°) mit je einem kurzen, schraeg
+    // abzweigenden Aestchen an jeder der 6 Spitzen - 3 lange + 6 kurze
+    // Linien pro Flocke. FLAKE_ARM_LEN = Abstand Mitte->Spitze,
+    // FLAKE_BRANCH_LEN = Laenge des Aestchens ab der Spitze,
+    // FLAKE_BRANCH_ANGLE_OFFSET = Winkel des Aestchens relativ zur
+    // Hauptlinien-Richtung (30° nach aussen abgewinkelt statt genau
+    // radial, damit es wie ein echtes Verzweigungs-Aestchen aussieht statt
+    // die Hauptlinie nur zu verlaengern). Gesamtdurchmesser inkl. Aestchen
+    // liegt damit bei ca. 8-9px (Alex' Vorgabe: grob 6-8px).
+    constexpr float FLAKE_ARM_LEN = 3.0f;
+    constexpr float FLAKE_BRANCH_LEN = 2.0f;
+    constexpr float FLAKE_BRANCH_ANGLE_OFFSET = 0.5236f; // 30 Grad in Radiant
+    // Radius fuer Sichtbarkeits-Check UND zum vollstaendigen Loeschen der
+    // vorherigen Position (siehe update() unten) - deckt den kompletten,
+    // jetzt groesseren Umriss inkl. Aestchen ab (rechnerischer maximaler
+    // Abstand Mitte->Aestchen-Spitze liegt bei ca. 4,8px, hier grosszuegig
+    // aufgerundet), damit keine Geister-Pixel der Aestchen stehen bleiben.
+    constexpr int16_t FLAKE_CLEAR_RADIUS = 5;
     Flake flakes[MAX_FLAKES];
     uint32_t lastTickMs = 0;
     constexpr uint32_t TICK_INTERVAL_MS = 60; // gleicher Takt wie ScreensaverRain/MenuStars
@@ -1008,13 +1053,15 @@ namespace ScreensaverSnow {
         float speedPxPerSec;
     };
     // Deutlich langsamer als Regen (dort 45/70/100 px/s je Stufe) - Schnee
-    // soll erkennbar geruhsamer fallen als Regen.
+    // soll erkennbar geruhsamer fallen als Regen. Flocken-ANZAHL (Alex'
+    // Wunsch) um 50% erhoeht (4/8/13 -> 6/12/20), Fallgeschwindigkeit
+    // dabei bewusst unveraendert gelassen.
     SnowParams snowParamsForIntensity(Weather::RainIntensity intensity) {
         switch (intensity) {
-            case Weather::RainIntensity::Light:    return {4, 15.0f};
-            case Weather::RainIntensity::Heavy:    return {13, 35.0f};
+            case Weather::RainIntensity::Light:    return {6, 15.0f};
+            case Weather::RainIntensity::Heavy:    return {20, 35.0f};
             case Weather::RainIntensity::Moderate:
-            default:                                return {8, 25.0f};
+            default:                                return {12, 25.0f};
         }
     }
 
@@ -1046,8 +1093,44 @@ namespace ScreensaverSnow {
     // ueber das Logo fallen.
     constexpr int16_t CLOCK_DATE_EXCLUDE_TOP = 210;
     constexpr int16_t CLOCK_DATE_EXCLUDE_BOTTOM = 292;
-    bool overClockOrDate(int16_t y) {
-        return y >= CLOCK_DATE_EXCLUDE_TOP && y <= CLOCK_DATE_EXCLUDE_BOTTOM;
+    // Bereichs-Check statt nur des Mittelpunkts (frueher: bool
+    // overClockOrDate(int16_t y)) - noetig, seit die Flocke durch die
+    // Dendrit-Form einen echten Radius (FLAKE_CLEAR_RADIUS) hat, nicht mehr
+    // nur einen 2px-Punkt. Gleiches Prinzip wie ScreensaverRain::
+    // overlapsClockOrDate() oben.
+    bool overlapsClockOrDate(int16_t yTop, int16_t yBottom) {
+        return yBottom >= CLOCK_DATE_EXCLUDE_TOP && yTop <= CLOCK_DATE_EXCLUDE_BOTTOM;
+    }
+
+    // Zeichnet die Dendrit-Flocke: 3 Hauptlinien durch (cx,cy) bei 0°/60°/
+    // 120° plus je ein Aestchen an jeder der 6 Spitzen (siehe Konstanten-
+    // Kommentar oben). Dieselbe Funktion dient sowohl zum Zeichnen (color=
+    // TFT_WHITE) als auch koennte sie theoretisch zum Loeschen genutzt
+    // werden - update() unten loescht die alte Position aber bewusst
+    // einfacher per fillRect() (siehe dortiger Kommentar), daher wird
+    // dieser Pfad hier nur fuers Zeichnen gebraucht.
+    void drawFlake(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t color) {
+        for (int i = 0; i < 3; i++) {
+            float angle = i * (PI / 3.0f); // 0°, 60°, 120°
+            float dx = cosf(angle) * FLAKE_ARM_LEN;
+            float dy = sinf(angle) * FLAKE_ARM_LEN;
+            int16_t x1 = (int16_t)lroundf(cx + dx);
+            int16_t y1 = (int16_t)lroundf(cy + dy);
+            int16_t x2 = (int16_t)lroundf(cx - dx);
+            int16_t y2 = (int16_t)lroundf(cy - dy);
+            tft.drawLine(x1, y1, x2, y2, color);
+
+            // Aestchen an beiden Spitzen dieser Hauptlinie, je um
+            // FLAKE_BRANCH_ANGLE_OFFSET nach aussen abgewinkelt.
+            float branchDx1 = cosf(angle + FLAKE_BRANCH_ANGLE_OFFSET) * FLAKE_BRANCH_LEN;
+            float branchDy1 = sinf(angle + FLAKE_BRANCH_ANGLE_OFFSET) * FLAKE_BRANCH_LEN;
+            tft.drawLine(x1, y1, (int16_t)lroundf(x1 + branchDx1), (int16_t)lroundf(y1 + branchDy1), color);
+
+            float oppositeAngle = angle + PI;
+            float branchDx2 = cosf(oppositeAngle + FLAKE_BRANCH_ANGLE_OFFSET) * FLAKE_BRANCH_LEN;
+            float branchDy2 = sinf(oppositeAngle + FLAKE_BRANCH_ANGLE_OFFSET) * FLAKE_BRANCH_LEN;
+            tft.drawLine(x2, y2, (int16_t)lroundf(x2 + branchDx2), (int16_t)lroundf(y2 + branchDy2), color);
+        }
     }
 
     // Zufaellige X-Position ueber die GESAMTE Bildschirmbreite, gleiches
@@ -1096,11 +1179,16 @@ namespace ScreensaverSnow {
         for (uint8_t i = 0; i < MAX_FLAKES; i++) {
             Flake& f = flakes[i];
 
-            // Alten sichtbaren Punkt IMMER ZUERST loeschen, BEVOR irgendeine
-            // Deaktivierungs-/Neustart-Logik hasPrev anfasst - gleicher
-            // Bugfix wie in ScreensaverRain oben (siehe dortiger Kommentar).
+            // Alten sichtbaren Bereich IMMER ZUERST loeschen, BEVOR
+            // irgendeine Deaktivierungs-/Neustart-Logik hasPrev anfasst -
+            // gleicher Bugfix wie in ScreensaverRain oben (siehe dortiger
+            // Kommentar). Loeschen per fillRect() statt fillCircle() -
+            // deckt das komplette FLAKE_CLEAR_RADIUS-Quadrat um die alte
+            // Position ab und damit sicher auch die Aestchen-Spitzen der
+            // Dendrit-Form, statt nur einen einzelnen Punkt.
             if (f.hasPrev) {
-                tft.fillCircle(f.prevX, f.prevY, FLAKE_RADIUS, TFT_BLACK);
+                tft.fillRect((int16_t)(f.prevX - FLAKE_CLEAR_RADIUS), (int16_t)(f.prevY - FLAKE_CLEAR_RADIUS),
+                             (int16_t)(FLAKE_CLEAR_RADIUS * 2 + 1), (int16_t)(FLAKE_CLEAR_RADIUS * 2 + 1), TFT_BLACK);
                 f.hasPrev = false;
             }
 
@@ -1112,7 +1200,7 @@ namespace ScreensaverSnow {
 
             f.y += fallStep;
             f.phase += DRIFT_ANGULAR_SPEED * dtSec;
-            if (f.y - FLAKE_RADIUS > Config::SCREEN_HEIGHT) {
+            if (f.y - FLAKE_CLEAR_RADIUS > Config::SCREEN_HEIGHT) {
                 spawn(f);
                 continue;
             }
@@ -1121,11 +1209,11 @@ namespace ScreensaverSnow {
             int16_t x = (int16_t)xf;
             int16_t y = (int16_t)f.y;
 
-            bool visible = x >= FLAKE_RADIUS && x < Config::SCREEN_WIDTH - FLAKE_RADIUS &&
-                           y >= FLAKE_RADIUS && y < Config::SCREEN_HEIGHT - FLAKE_RADIUS &&
-                           !overClockOrDate(y);
+            bool visible = x >= FLAKE_CLEAR_RADIUS && x < Config::SCREEN_WIDTH - FLAKE_CLEAR_RADIUS &&
+                           y >= FLAKE_CLEAR_RADIUS && y < Config::SCREEN_HEIGHT - FLAKE_CLEAR_RADIUS &&
+                           !overlapsClockOrDate((int16_t)(y - FLAKE_CLEAR_RADIUS), (int16_t)(y + FLAKE_CLEAR_RADIUS));
             if (visible) {
-                tft.fillCircle(x, y, FLAKE_RADIUS, TFT_WHITE);
+                drawFlake(tft, x, y, TFT_WHITE);
                 f.prevX = x;
                 f.prevY = y;
                 f.hasPrev = true;
@@ -1272,8 +1360,8 @@ void runGithubQrScreen(TFT_eSPI& tftRef) {
         if (TouchInput::wasTapped(tap)) {
             if (backBtn.contains(tap.x, tap.y)) return;
         }
-        // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
-        if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return;
+        // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
+        if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) return;
         // gray=true - graue statt gruene Sterne (Alex' Wunsch), siehe
         // Kommentar bei MenuStars::update().
         MenuStars::update(tftRef, true);

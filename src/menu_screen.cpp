@@ -17,6 +17,7 @@
 #include "connection_status_screen.h"
 #include "brightness_screen.h"
 #include "timeout_screen.h"
+#include "menu_timeout_screen.h"
 #include "language_screen.h"
 #include "units_screen.h"
 #include "radar_theme_screen.h"
@@ -211,6 +212,19 @@ namespace {
         String prefix = I18n::t(StringId::MENU_SCREEN_TIMEOUT_PREFIX);
         if (minutes == 0) return prefix + I18n::t(StringId::NEVER);
         return prefix + String(minutes) + " min";
+    }
+
+    // Gleiches Muster wie screenTimeoutLabel() oben, fuer den neuen Menue-
+    // Timeout-Button (menu_timeout_screen.cpp) - "min"/"s" bleiben wie
+    // ueberall sonst im Projekt unuebersetzt.
+    String menuTimeoutLabel(uint16_t seconds) {
+        String prefix = I18n::t(StringId::MENU_MENU_TIMEOUT_PREFIX);
+        if (seconds == 0) return prefix + I18n::t(StringId::NEVER);
+        if (seconds < 60) return prefix + String(seconds) + "s";
+        uint16_t mins = seconds / 60;
+        uint16_t secs = seconds % 60;
+        if (secs == 0) return prefix + String(mins) + " min";
+        return prefix + String(mins) + "min " + String(secs) + "s";
     }
 
     String brightnessLabel(uint8_t percent) {
@@ -487,10 +501,10 @@ namespace {
                     redraw();
                 }
             }
-            // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+            // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
             // "false" (= Abbrechen) als sicherer Standard, da diese Funktion
             // fuer Warnungen wie die Werksreset-Bestaetigung genutzt wird.
-            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return false;
+            if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) return false;
             delay(20);
         }
     }
@@ -519,7 +533,7 @@ namespace {
     // startet - der Tipp wurde also sichtbar registriert.
     // Rueckgabewert (Alex' Meldung, ungewollter automatischer Neustart nach
     // dem OTA-Erfolgs-Screen): true = per echtem Tap auf den Button beendet,
-    // false = per Inaktivitaets-Timeout (Config::MENU_IDLE_TIMEOUT_MS)
+    // false = per Inaktivitaets-Timeout (SettingsStore::menuIdleTimeoutMs())
     // zurueckgekehrt, OHNE dass der Nutzer tatsaechlich getippt hat. Vorher
     // gab es keine Unterscheidung - ein Aufrufer, der danach ungeprueft eine
     // "gefaehrliche" Aktion wie ESP.restart() ausloeste (siehe
@@ -635,8 +649,8 @@ namespace {
                     redraw();
                 }
             }
-            // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
-            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return false;
+            // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
+            if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) return false;
             delay(20);
         }
     }
@@ -769,7 +783,7 @@ namespace {
                     redraw();
                 }
             }
-            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return;
+            if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) return;
             delay(20);
         }
     }
@@ -1050,12 +1064,12 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
-                // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+                // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
                 // Bricht die AEUSSERE Seiten-Schleife (while (!done)) mit ab,
                 // egal auf welcher Menue-Unterseite man gerade steht - kommt
                 // dadurch beim Verlassen von run() automatisch beim
                 // Radarscreen raus.
-                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
             }
@@ -1088,12 +1102,12 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
-                // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+                // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
                 // Bricht die AEUSSERE Seiten-Schleife (while (!done)) mit ab,
                 // egal auf welcher Menue-Unterseite man gerade steht - kommt
                 // dadurch beim Verlassen von run() automatisch beim
                 // Radarscreen raus.
-                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
             }
@@ -1266,12 +1280,12 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
-                // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+                // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
                 // Bricht die AEUSSERE Seiten-Schleife (while (!done)) mit ab,
                 // egal auf welcher Menue-Unterseite man gerade steht - kommt
                 // dadurch beim Verlassen von run() automatisch beim
                 // Radarscreen raus.
-                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
             }
@@ -1310,22 +1324,27 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             // "Radar-Darstellung" (RadarThemeScreen, enthaelt u.a. den
             // Radar-Puls/CRT-Phosphor-Effekt-Schalter) ganz nach oben, vor
             // "Helligkeit" (Alex' Wunsch nach besserer Auffindbarkeit).
-            Rect radarThemeBtn = subMenuRowRect(0, 7);
-            Rect brightnessBtn = subMenuRowRect(1, 7);
-            Rect timeoutBtn    = subMenuRowRect(2, 7);
-            Rect nightDimBtn   = subMenuRowRect(3, 7);
-            Rect invertBtn     = subMenuRowRect(4, 7);
+            Rect radarThemeBtn  = subMenuRowRect(0, 8);
+            Rect brightnessBtn  = subMenuRowRect(1, 8);
+            Rect timeoutBtn     = subMenuRowRect(2, 8);
+            // Direkt neben dem Bildschirm-Timeout-Button (Alex' Wunsch,
+            // beide thematisch zusammengehoerig) - eigener Screen, siehe
+            // menu_timeout_screen.cpp.
+            Rect menuTimeoutBtn = subMenuRowRect(3, 8);
+            Rect nightDimBtn    = subMenuRowRect(4, 8);
+            Rect invertBtn      = subMenuRowRect(5, 8);
             // Fuer Tischmontage (GitHub-Meldung: Radarkreise "waschen" von
             // oben betrachtet aus, wegen der eingeschraenkten vertikalen
             // Blickwinkel des TFT-Panels) - dreht Bild UND Touch-Mapping um
             // 180 Grad, siehe SettingsStore::displayRotated180() und
             // TouchInput::setRotated180().
-            Rect rotateBtn     = subMenuRowRect(5, 7);
-            Rect backBtn       = subMenuRowRect(6, 7);
+            Rect rotateBtn      = subMenuRowRect(6, 8);
+            Rect backBtn        = subMenuRowRect(7, 8);
 
             drawButton(tft, radarThemeBtn, I18n::t(StringId::MENU_RADAR_THEME));
             drawButton(tft, brightnessBtn, brightnessLabel(SettingsStore::brightnessPercent()));
             drawButton(tft, timeoutBtn, screenTimeoutLabel(SettingsStore::screenTimeoutMinutes()));
+            drawButton(tft, menuTimeoutBtn, menuTimeoutLabel(SettingsStore::menuIdleTimeoutSeconds()));
             drawButton(tft, nightDimBtn, I18n::t(StringId::MENU_NIGHT_DIMMING) + onOff(SettingsStore::nightDimmingEnabled()));
             String invertLabel = SettingsStore::displayInverted()
                                       ? I18n::t(StringId::MENU_DISPLAY_INVERTED)
@@ -1337,7 +1356,7 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
-                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
             }
@@ -1352,6 +1371,8 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 // Ruhebildschirm-Umschalter (inhaltlich eng verwandt, und
                 // dort ist Platz fuer eine kurze Erklaerung).
                 TimeoutScreen::run(tft);
+            } else if (menuTimeoutBtn.contains(tap.x, tap.y)) {
+                MenuTimeoutScreen::run(tft);
             } else if (nightDimBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setNightDimmingEnabled(!SettingsStore::nightDimmingEnabled());
             } else if (invertBtn.contains(tap.x, tap.y)) {
@@ -1398,7 +1419,7 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
-                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
             }
@@ -1440,12 +1461,12 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
-                // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
+                // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
                 // Bricht die AEUSSERE Seiten-Schleife (while (!done)) mit ab,
                 // egal auf welcher Menue-Unterseite man gerade steht - kommt
                 // dadurch beim Verlassen von run() automatisch beim
                 // Radarscreen raus.
-                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
             }
@@ -1546,7 +1567,7 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
-                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
             }
@@ -1585,7 +1606,7 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
-                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
             }
@@ -1651,7 +1672,7 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
-                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
             }
@@ -1722,7 +1743,7 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
-                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
             }
@@ -1788,7 +1809,7 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             TouchInput::Point tap;
             while (true) {
                 if (TouchInput::wasTapped(tap)) break;
-                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+                if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) { done = true; break; }
                 MenuStars::update(tft);
                 delay(20);
             }

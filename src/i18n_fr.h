@@ -56,6 +56,7 @@ static const char* const I18N_FR[] = {
     "Gérer les réseaux WiFi",
     "Positions enregistrées",
     "Extinction écran : ",
+    "Délai menu : ",
     "Assombrissement nuit (soleil) : ",
     "Statistiques",
     "Historique",
@@ -258,6 +259,8 @@ static const char* const I18N_FR[] = {
     "La mise à jour n'a pas pu être téléchargée ou installée. L'appareil continue de fonctionner normalement avec le micrologiciel précédent. Merci de vérifier votre connexion WiFi et de réessayer plus tard.",
     "Délai d'inactivité",
     "Après ce délai sans contact, l'écran s'éteint pour économiser l'énergie. Avec l'écran de veille activé, il affiche à la place un ciel étoilé tamisé avec l'heure.",
+    "Délai d'inactivité du menu",
+    "Après ce délai sans contact dans un menu ou un écran de réglages, l'appareil revient automatiquement à l'écran radar.",
     "Le plus proche : ",
 
     "Affichage radar",

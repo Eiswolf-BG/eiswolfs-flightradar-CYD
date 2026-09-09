@@ -813,8 +813,8 @@ int runCandidatePickScreen(TFT_eSPI& tft, const GeocodeCandidate* candidates, ui
             }
             if (tryAgainBtn.contains(tap.x, tap.y)) return -1;
         }
-        // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
-        if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return -1;
+        // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
+        if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) return -1;
         MenuStars::update(tft);
         delay(20);
     }

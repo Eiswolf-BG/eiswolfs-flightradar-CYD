@@ -3,6 +3,7 @@
 #include "touch_input.h"
 #include "menu_stars.h"
 #include "config.h"
+#include "settings_store.h"
 #include "i18n.h"
 #include "units.h"
 #include "location_manager.h"
@@ -159,8 +160,8 @@ void run(TFT_eSPI& tft) {
                 redraw();
             }
         }
-        // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
-        if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) done = true;
+        // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
+        if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) done = true;
         MenuStars::update(tft);
         delay(20);
     }

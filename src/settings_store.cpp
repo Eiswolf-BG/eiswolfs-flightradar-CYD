@@ -75,6 +75,11 @@ namespace {
     char mqttUserBuf[33] = {0};
     char mqttPassBuf[33] = {0};
     char lastSeenVersionBuf[16] = {0};
+    // Default 120s = Config::MENU_IDLE_TIMEOUT_MS (bisheriger fester Wert) -
+    // damit aendert sich fuer niemanden ungefragt etwas, bis der neue
+    // Regler (menu_timeout_screen.cpp) aktiv genutzt wird. 0 = "Nie" (kein
+    // automatischer Ruecksprung), analog zu screenTimeoutMin oben.
+    uint16_t menuIdleTimeoutSec = 120;
 
     // MUSS auf SD persistiert werden (nicht nur im RAM halten): wird kurz
     // vor ESP.restart() gesetzt und erst im NAECHSTEN Boot-Zyklus gelesen -
@@ -127,6 +132,11 @@ namespace {
         } else if (key == "screen_timeout_min") {
             int v = value.toInt();
             if (v >= 0 && v <= Config::SCREEN_TIMEOUT_MAX_MINUTES) screenTimeoutMin = (uint8_t)v;
+        } else if (key == "menu_idle_timeout_sec") {
+            int v = value.toInt();
+            if (v == 0 || (v >= Config::MENU_IDLE_TIMEOUT_MIN_SECONDS && v <= Config::MENU_IDLE_TIMEOUT_MAX_SECONDS)) {
+                menuIdleTimeoutSec = (uint16_t)v;
+            }
         } else if (key == "night_dimming") {
             nightDimmingOn = (value.toInt() != 0);
         } else if (key == "screensaver") {
@@ -240,6 +250,7 @@ void save() {
     f.printf("peak_traffic_epoch=%lu\n", (unsigned long)peakTrafficEpochVal);
     f.printf("led_heartbeat=%d\n", ledHeartbeatOn ? 1 : 0);
     f.printf("screen_timeout_min=%d\n", screenTimeoutMin);
+    f.printf("menu_idle_timeout_sec=%u\n", menuIdleTimeoutSec);
     f.printf("night_dimming=%d\n", nightDimmingOn ? 1 : 0);
     f.printf("screensaver=%d\n", screensaverOn ? 1 : 0);
     f.printf("hide_ground_vehicles=%d\n", hideGroundVehiclesOn ? 1 : 0);
@@ -391,6 +402,29 @@ void setScreenTimeoutMinutes(uint8_t minutes) {
         screenTimeoutMin = minutes;
         save();
     }
+}
+
+uint16_t menuIdleTimeoutSeconds() { return menuIdleTimeoutSec; }
+
+void setMenuIdleTimeoutSeconds(uint16_t seconds) {
+    if (seconds == 0 || (seconds >= Config::MENU_IDLE_TIMEOUT_MIN_SECONDS && seconds <= Config::MENU_IDLE_TIMEOUT_MAX_SECONDS)) {
+        menuIdleTimeoutSec = seconds;
+        save();
+    }
+}
+
+// Convenience-Helfer fuer alle Timeout-Check-Stellen im Projekt (ersetzt
+// die frueher dort direkt verwendete Konstante Config::MENU_IDLE_TIMEOUT_MS)
+// - rechnet den eingestellten Sekundenwert in Millisekunden um und behandelt
+// 0 ("Nie") als Sonderfall: liefert dafuer den groesstmoeglichen uint32_t-
+// Wert, damit ein "TouchInput::msSinceLastTap() >= menuIdleTimeoutMs()"-
+// Vergleich praktisch nie auslöst (msSinceLastTap() muesste dafuer laenger
+// als ca. 49 Tage seit dem letzten Tap vergangen sein - kein realistisches
+// Szenario, das Geraet wird lange vorher neu gestartet/der Timer laeuft
+// durch millis()-Ueberlauf ohnehin regelmaessig zurueck).
+uint32_t menuIdleTimeoutMs() {
+    if (menuIdleTimeoutSec == 0) return UINT32_MAX;
+    return (uint32_t)menuIdleTimeoutSec * 1000UL;
 }
 
 bool nightDimmingEnabled() { return nightDimmingOn; }

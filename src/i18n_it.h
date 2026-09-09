@@ -56,6 +56,7 @@ static const char* const I18N_IT[] = {
     "Gestisci reti WiFi",
     "Posizioni salvate",
     "Spegnimento schermo: ",
+    "Timeout menu: ",
     "Attenuazione notte (solare): ",
     "Statistiche",
     "Cronologia",
@@ -258,6 +259,8 @@ static const char* const I18N_IT[] = {
     "Non è stato possibile scaricare o installare l'aggiornamento. Il dispositivo continua a funzionare senza modifiche con il firmware precedente. Controlla la connessione WiFi e riprova più tardi.",
     "Timeout schermo",
     "Dopo questo tempo senza tocchi, lo schermo si spegne per risparmiare energia. Con il salvaschermo attivo, mostra invece un cielo stellato attenuato con l'orario.",
+    "Timeout menu",
+    "Dopo questo tempo senza tocchi in un menu o schermata delle impostazioni, il dispositivo torna automaticamente alla schermata radar.",
     "Il più vicino: ",
 
     "Visualizzazione radar",

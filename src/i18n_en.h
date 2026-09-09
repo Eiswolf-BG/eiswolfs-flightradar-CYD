@@ -56,6 +56,7 @@ static const char* const I18N_EN[] = {
     "Manage WiFi networks",
     "Location presets",
     "Screen timeout: ",
+    "Menu timeout: ",
     "Night dimming (sun-based): ",
     "Statistics",
     "History chart",
@@ -259,6 +260,8 @@ static const char* const I18N_EN[] = {
     "The update could not be downloaded or installed. The device is still running the previous firmware, unchanged. Please check your WiFi connection and try again later.",
     "Screen Timeout",
     "After this time without touch, the display turns off to save power. With the screensaver on, it dims to a starfield with a clock instead.",
+    "Menu Timeout",
+    "After this time without touch inside a menu or settings screen, it automatically jumps back to the radar screen.",
     "Nearest: ",
 
     "Radar Display",

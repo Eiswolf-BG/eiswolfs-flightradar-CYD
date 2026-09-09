@@ -56,6 +56,7 @@ static const char* const I18N_PT[] = {
     "Gerenciar redes WiFi",
     "Locais salvos",
     "Desligamento da tela: ",
+    "Tempo limite do menu: ",
     "Escurecimento noturno (solar): ",
     "Estatísticas",
     "Histórico",
@@ -258,6 +259,8 @@ static const char* const I18N_PT[] = {
     "Não foi possível baixar ou instalar a atualização. O dispositivo continua funcionando normalmente com o firmware anterior. Verifique sua conexão WiFi e tente novamente mais tarde.",
     "Tempo de espera da tela",
     "Após esse tempo sem toques, a tela se apaga para economizar energia. Com a proteção de tela ativada, mostra em vez disso um céu estrelado atenuado com o horário.",
+    "Tempo de espera do menu",
+    "Após esse tempo sem toques dentro de um menu ou tela de configurações, o dispositivo volta automaticamente para a tela de radar.",
     "Mais próximo: ",
 
     "Visualização do radar",

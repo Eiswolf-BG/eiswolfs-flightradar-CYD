@@ -420,8 +420,8 @@ namespace {
         while (true) {
             TouchInput::Point tap;
             if (!TouchInput::wasTapped(tap)) {
-                // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
-                if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return false;
+                // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
+                if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) return false;
                 MenuStars::update(tft);
                 delay(20);
                 continue;
@@ -816,8 +816,8 @@ void run(TFT_eSPI& tft) {
         TouchInput::Point tap;
         while (true) {
             if (TouchInput::wasTapped(tap)) break;
-            // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
-            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+            // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
+            if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) { done = true; break; }
             MenuStars::update(tft);
             drawMarquee(tft, AIRPORT_LINE_X, airportLineY, AIRPORT_LINE_W, 20);
             if (autoMarquee.needsScroll) {

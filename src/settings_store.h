@@ -110,6 +110,17 @@ namespace SettingsStore {
     uint8_t screenTimeoutMinutes();
     void setScreenTimeoutMinutes(uint8_t minutes);
 
+    // Inaktivitaets-Timeout INNERHALB von Vollbild-Menues/Einstellungs-
+    // Screens (siehe Config::MENU_IDLE_TIMEOUT_MIN/MAX_SECONDS in config.h
+    // und menu_timeout_screen.cpp) - Sekunden, 0 = "Nie" (kein automatischer
+    // Ruecksprung zum Radarscreen). Default 120s entspricht dem bisherigen
+    // fest einprogrammierten Verhalten. menuIdleTimeoutMs() ist der
+    // Convenience-Helfer, den alle Timeout-Check-Stellen im Projekt
+    // verwenden (rechnet in Millisekunden um, 0 -> UINT32_MAX).
+    uint16_t menuIdleTimeoutSeconds();
+    void setMenuIdleTimeoutSeconds(uint16_t seconds);
+    uint32_t menuIdleTimeoutMs();
+
     bool nightDimmingEnabled();
     void setNightDimmingEnabled(bool on);
 

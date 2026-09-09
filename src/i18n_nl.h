@@ -56,6 +56,7 @@ static const char* const I18N_NL[] = {
     "WiFi-netwerken beheren",
     "Locatievoorinstellingen",
     "Time-out scherm: ",
+    "Time-out menu: ",
     "Nachtdimming (op basis van zon): ",
     "Statistieken",
     "Geschiedenis",
@@ -259,6 +260,8 @@ static const char* const I18N_NL[] = {
     "De update kon niet worden gedownload of geïnstalleerd. Het apparaat draait nog steeds ongewijzigd op de vorige firmware. Controleer je WiFi-verbinding en probeer het later opnieuw.",
     "Time-out scherm",
     "Na deze tijd zonder aanraking gaat het scherm uit om stroom te besparen. Met de schermbeveiliging aan wordt in plaats daarvan een gedimde sterrenhemel met een klok getoond.",
+    "Time-out menu",
+    "Na deze tijd zonder aanraking in een menu- of instellingenscherm keert het apparaat automatisch terug naar het radarscherm.",
     "Dichtstbijzijnde: ",
 
     "Radarweergave",

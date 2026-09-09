@@ -56,6 +56,7 @@ static const char* const I18N_DE[] = {
     "WLAN-Netzwerke verwalten",
     "Standort-Presets",
     "Bildschirm-Timeout: ",
+    "Menü-Timeout: ",
     "Nachtdimmung (Sonnenzeit): ",
     "Statistik",
     "Verlauf",
@@ -258,6 +259,8 @@ static const char* const I18N_DE[] = {
     "Das Update konnte nicht heruntergeladen oder installiert werden. Das Gerät läuft unverändert mit der bisherigen Firmware weiter. Bitte WLAN-Verbindung prüfen und es später erneut versuchen.",
     "Bildschirm-Timeout",
     "Nach dieser Zeit ohne Berührung schaltet sich das Display ab, um Strom zu sparen. Ist der Ruhebildschirm aktiviert, zeigt es stattdessen einen gedimmten Sternenhimmel mit Uhrzeit.",
+    "Menü-Timeout",
+    "Nach dieser Zeit ohne Berührung in einem Menü- oder Einstellungs-Bildschirm springt das Gerät automatisch zurück zum Radarscreen.",
     "Nächstes: ",
 
     "Radar-Darstellung",

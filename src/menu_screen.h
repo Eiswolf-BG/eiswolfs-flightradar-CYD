@@ -25,7 +25,7 @@ namespace MenuScreen {
     // Firmware-Update anzuzeigen (siehe dortige showWhatsNewIfNeeded()) -
     // ohne dafuer das komplette Scroll-/Box-Layout ein zweites Mal zu bauen.
     // Rueckgabe: true = per echtem Tap auf den Button beendet, false = per
-    // Inaktivitaets-Timeout (Config::MENU_IDLE_TIMEOUT_MS) zurueckgekehrt,
+    // Inaktivitaets-Timeout (SettingsStore::menuIdleTimeoutMs()) zurueckgekehrt,
     // ohne dass tatsaechlich getippt wurde - siehe Kommentar bei infoScreen()
     // in menu_screen.cpp. Aufrufer ohne gefaehrliche Folgeaktion (Neustart
     // o.ae.) koennen den Rueckgabewert wie bisher ignorieren.

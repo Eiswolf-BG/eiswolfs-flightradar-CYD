@@ -10,7 +10,9 @@
 #include "location_manager.h"
 #include "units.h"
 #include "weather.h"
+#include "sun_times.h"
 #include "web_pwa_icon.h"
+#include "web_avatar_logo.h"
 #include <WebServer.h>
 #include <ArduinoJson.h>
 #include <SD.h>
@@ -102,17 +104,196 @@ namespace {
         return false;
     }
 
-    // "Auffaellig" (oranger Ring) beschraenkt sich aktuell auf gar nichts -
-    // der Teil ueber Militaer-/Regierungs-Rufzeichen-Praefixe
-    // (Config::NOTABLE_CALLSIGN_PREFIXES) ist NICHT umgesetzt, weil diese
-    // Konstante nirgends im Projekt existiert (auch nicht in
-    // radar_screen.cpp) - das zugehoerige Feature wurde bisher nie
-    // tatsaechlich spezifiziert/implementiert. "notable" wird deshalb unten
-    // in handleRadarJson() fest auf false gesetzt. Sobald es eine echte
-    // Praefixliste gibt, hier eine isNotableCallsignWeb()-Funktion analog zu
-    // isEmergencySquawkWeb() ergaenzen.
+    // Militaer-/Behoerdenflug-Erkennung ueber Squawk-Code-Bereiche -
+    // gleiche Duplikations-Begruendung wie bei isEmergencySquawkWeb() oben,
+    // Bereiche 1:1 aus radar_screen.cpp's MILITARY_SQUAWK_RANGES/
+    // isMilitaryGovSquawk() uebernommen (NORAD USA/Kanada + Australien,
+    // siehe dortiger ausfuehrlicher Kommentar zur Herkunft der einzelnen
+    // Bereiche). Faerbt den "auffaellig"-Ring (oranger Ring, "notable" im
+    // JSON) fuer die betroffenen Flugzeuge ein - Rufzeichen-Praefixe
+    // (isNotableCallsign() am Geraet) sind hier bewusst NICHT nachgebaut,
+    // da die zugehoerige Praefixliste im Projekt nirgends existiert (siehe
+    // radar_screen.cpp, isNotableCallsign() liefert dort ebenfalls immer
+    // false).
+    struct SquawkRangeWeb { uint16_t lo, hi; };
+    constexpr SquawkRangeWeb MILITARY_SQUAWK_RANGES_WEB[] = {
+        {4400, 4477},
+        {5000, 5000},
+        {5400, 5400},
+        {6000, 6000},
+        {6100, 6100},
+        {6400, 6400},
+        {7501, 7577},
+    };
+    constexpr uint8_t MILITARY_SQUAWK_RANGE_WEB_COUNT =
+        sizeof(MILITARY_SQUAWK_RANGES_WEB) / sizeof(MILITARY_SQUAWK_RANGES_WEB[0]);
+
+    bool isMilitaryGovSquawkWeb(const char* squawk) {
+        if (!squawk[0]) return false;
+        uint16_t val = (uint16_t)atoi(squawk);
+        for (uint8_t i = 0; i < MILITARY_SQUAWK_RANGE_WEB_COUNT; i++) {
+            if (val >= MILITARY_SQUAWK_RANGES_WEB[i].lo && val <= MILITARY_SQUAWK_RANGES_WEB[i].hi) return true;
+        }
+        return false;
+    }
+
     bool isHeavyCategoryWeb(const char* category) {
         return category[0] == 'A' && category[1] == '5';
+    }
+
+    // Gleiche Logik wie radar_screen.cpp::isNightHours() - Nacht = zwischen
+    // Sonnenuntergang und Sonnenaufgang am aktiven Standort (SunTimes::
+    // compute()), mit Rueckfall auf ein festes 22:00-06:00-Fenster, solange
+    // Standort/Uhrzeit noch nicht bekannt sind. Gleiche Duplikations-
+    // Begruendung wie isEmergencySquawkWeb()/isMilitaryGovSquawkWeb() oben.
+    bool isNightHoursWeb() {
+        time_t now = time(nullptr);
+        if (now <= 8 * 3600 * 2) return false; // Uhrzeit noch nicht per NTP synchronisiert
+
+        struct tm tmNow;
+        localtime_r(&now, &tmNow);
+
+        double lat = 0, lon = 0;
+        LocationManager::getHomeLocation(lat, lon);
+        if (lat != 0.0 || lon != 0.0) {
+            SunTimes::Result sun = SunTimes::compute(lat, lon, tmNow.tm_year + 1900, tmNow.tm_mon + 1,
+                                                      tmNow.tm_mday, LocationManager::utcOffsetSeconds());
+            if (sun.valid) {
+                if (sun.alwaysDay) return false;
+                if (sun.alwaysNight) return true;
+                float hourNow = tmNow.tm_hour + tmNow.tm_min / 60.0f;
+                return (hourNow < sun.sunriseHour) || (hourNow >= sun.sunsetHour);
+            }
+        }
+
+        int hour = tmNow.tm_hour;
+        return (hour >= 22 || hour < 6);
+    }
+
+    // Typ-Silhouette-Klassifizierung (Linienflugzeug/Privatjet/Turboprop)
+    // fuer die Marker-Form auf der Live-Radar-Webseite - gleiche
+    // Duplikations-Begruendung wie isEmergencySquawkWeb()/
+    // isMilitaryGovSquawkWeb() oben, Praefix-Tabelle UND die beiden Neo-/
+    // MAX-Sonderfaelle 1:1 aus radar_screen.cpp's TYPE_SILHOUETTE_TABLE/
+    // classifyTypeSilhouette() uebernommen. Ergebnis wird unten in
+    // handleRadarJson() als einfacher String ("airliner"/"privatejet"/
+    // "turboprop"/"unknown") ins JSON geschrieben, statt eines Enums -
+    // einfacher fuers JavaScript auf der Empfaengerseite zu konsumieren.
+    enum class TypeSilhouetteWeb { Unknown, Airliner, PrivateJet, Turboprop };
+
+    struct TypePrefixEntryWeb {
+        const char* prefix;
+        TypeSilhouetteWeb cls;
+    };
+
+    constexpr TypePrefixEntryWeb TYPE_SILHOUETTE_TABLE_WEB[] = {
+        // -- Privatjets --
+        {"LJ",   TypeSilhouetteWeb::PrivateJet},
+        {"C25",  TypeSilhouetteWeb::PrivateJet},
+        {"C5",   TypeSilhouetteWeb::PrivateJet},
+        {"C6",   TypeSilhouetteWeb::PrivateJet},
+        {"C7",   TypeSilhouetteWeb::PrivateJet},
+        {"GLF",  TypeSilhouetteWeb::PrivateJet},
+        {"G280", TypeSilhouetteWeb::PrivateJet},
+        {"G650", TypeSilhouetteWeb::PrivateJet},
+        {"H25",  TypeSilhouetteWeb::PrivateJet},
+        {"BE40", TypeSilhouetteWeb::PrivateJet},
+        {"FA7",  TypeSilhouetteWeb::PrivateJet},
+        {"FA8",  TypeSilhouetteWeb::PrivateJet},
+        {"F900", TypeSilhouetteWeb::PrivateJet},
+        {"F2TH", TypeSilhouetteWeb::PrivateJet},
+        {"CL30", TypeSilhouetteWeb::PrivateJet},
+        {"CL60", TypeSilhouetteWeb::PrivateJet},
+        {"GLEX", TypeSilhouetteWeb::PrivateJet},
+        {"GL5T", TypeSilhouetteWeb::PrivateJet},
+        {"GL6T", TypeSilhouetteWeb::PrivateJet},
+        {"E50P", TypeSilhouetteWeb::PrivateJet},
+        {"E55P", TypeSilhouetteWeb::PrivateJet},
+        {"PC24", TypeSilhouetteWeb::PrivateJet},
+
+        // -- Turboprops --
+        {"AT4",  TypeSilhouetteWeb::Turboprop},
+        {"AT7",  TypeSilhouetteWeb::Turboprop},
+        {"DH8",  TypeSilhouetteWeb::Turboprop},
+        {"SF34", TypeSilhouetteWeb::Turboprop},
+        {"SB20", TypeSilhouetteWeb::Turboprop},
+        {"BE20", TypeSilhouetteWeb::Turboprop},
+        {"BE30", TypeSilhouetteWeb::Turboprop},
+        {"BE9L", TypeSilhouetteWeb::Turboprop},
+        {"B350", TypeSilhouetteWeb::Turboprop},
+        {"C208", TypeSilhouetteWeb::Turboprop},
+        {"PC12", TypeSilhouetteWeb::Turboprop},
+        {"DHC6", TypeSilhouetteWeb::Turboprop},
+        {"SW4",  TypeSilhouetteWeb::Turboprop},
+        {"F50",  TypeSilhouetteWeb::Turboprop},
+        {"L410", TypeSilhouetteWeb::Turboprop},
+
+        // -- Airliner --
+        {"A3",   TypeSilhouetteWeb::Airliner},
+        {"B7",   TypeSilhouetteWeb::Airliner},
+        {"MD",   TypeSilhouetteWeb::Airliner},
+        {"CRJ",  TypeSilhouetteWeb::Airliner},
+        {"E1",   TypeSilhouetteWeb::Airliner},
+        {"E29",  TypeSilhouetteWeb::Airliner},
+        {"SU9",  TypeSilhouetteWeb::Airliner},
+        {"BCS",  TypeSilhouetteWeb::Airliner},
+    };
+    constexpr uint8_t TYPE_SILHOUETTE_WEB_COUNT =
+        sizeof(TYPE_SILHOUETTE_TABLE_WEB) / sizeof(TYPE_SILHOUETTE_TABLE_WEB[0]);
+
+    bool isAirbusNeoCodeWeb(const char* t) {
+        return t[0] == 'A' && t[1] >= '1' && t[1] <= '3' &&
+               t[2] >= '0' && t[2] <= '9' && t[3] == 'N' && t[4] == '\0';
+    }
+
+    bool isBoeingMaxCodeWeb(const char* t) {
+        return t[0] == 'B' && t[1] == '3' && t[2] >= '0' && t[2] <= '9' &&
+               t[3] == 'M' && t[4] == '\0';
+    }
+
+    TypeSilhouetteWeb classifyTypeSilhouetteWeb(const char* typeCode) {
+        if (!typeCode[0]) return TypeSilhouetteWeb::Unknown;
+        size_t len = strlen(typeCode);
+        if (len == 4 && (isAirbusNeoCodeWeb(typeCode) || isBoeingMaxCodeWeb(typeCode))) {
+            return TypeSilhouetteWeb::Airliner;
+        }
+        for (uint8_t i = 0; i < TYPE_SILHOUETTE_WEB_COUNT; i++) {
+            size_t plen = strlen(TYPE_SILHOUETTE_TABLE_WEB[i].prefix);
+            if (len >= plen && strncmp(typeCode, TYPE_SILHOUETTE_TABLE_WEB[i].prefix, plen) == 0) {
+                return TYPE_SILHOUETTE_TABLE_WEB[i].cls;
+            }
+        }
+        return TypeSilhouetteWeb::Unknown;
+    }
+
+    const char* typeSilhouetteWebLabel(TypeSilhouetteWeb cls) {
+        switch (cls) {
+            case TypeSilhouetteWeb::Airliner:   return "airliner";
+            case TypeSilhouetteWeb::PrivateJet: return "privatejet";
+            case TypeSilhouetteWeb::Turboprop:  return "turboprop";
+            case TypeSilhouetteWeb::Unknown:
+            default:                             return "unknown";
+        }
+    }
+
+    // String-Version von Weather::Condition fuers JSON (handleRadarJson()
+    // unten) - fuer "weather_condition" UND "forecast_condition", das
+    // Client-JS steuert damit sowohl das Wetter-Icon als auch den
+    // Vorhersage-Text im Info-Popup. Gleiche 6 Werte wie
+    // Weather::Condition, "unknown" fuer Condition::Unknown (noch keine
+    // erfolgreiche Abfrage) - das Icon zeichnet dann bewusst nichts,
+    // genau wie main.cpp::drawWeatherIcon() am Geraet.
+    const char* weatherConditionWebLabel(Weather::Condition c) {
+        switch (c) {
+            case Weather::Condition::Clear:        return "clear";
+            case Weather::Condition::PartlyCloudy: return "partly_cloudy";
+            case Weather::Condition::Cloudy:       return "cloudy";
+            case Weather::Condition::Rain:         return "rain";
+            case Weather::Condition::Snow:         return "snow";
+            case Weather::Condition::Thunderstorm: return "thunderstorm";
+            case Weather::Condition::Unknown:
+            default:                                return "unknown";
+        }
     }
 
     // Vollbild-Sternenhintergrund fuer die ganze Seite (nicht nur innerhalb
@@ -167,18 +348,34 @@ namespace {
         // NICHT direkt sichtbar, daher der Umweg ueber "window". Auf Seiten
         // ohne Radar-Canvas (z.B. Listen-Seiten) bleibt "window.__radarData"
         // undefined, das Overlay bleibt dann einfach inaktiv.
-        html += "var SNOW_MAX=13,SNOW_R=2;var snowFlakes=[];var snowInited=false;var lastSnowMs=null;";
-        html += "function snowParamsFor(level){if(level>=3)return{count:13,speed:35};if(level===1)return{count:4,speed:15};return{count:8,speed:25};}";
+        // Werte/Form 1:1 an ScreensaverSnow (main.cpp) angeglichen - dort
+        // dupliziert statt geteilt (CLAUDE.md-Konvention), bitte bei
+        // Aenderungen synchron halten. SNOW_MAX = groesste Stufe ("stark").
+        html += "var SNOW_MAX=20;var snowFlakes=[];var snowInited=false;var lastSnowMs=null;";
+        html += "function snowParamsFor(level){if(level>=3)return{count:20,speed:35};if(level===1)return{count:6,speed:15};return{count:12,speed:25};}";
         html += "function snowSpawn(f){f.baseX=Math.random()*canvas.width;f.y=-Math.random()*canvas.height/2;f.phase=Math.random()*6.28;}";
+        // "Dendrit"-Form (main.cpp::drawFlake()) statt eines einfachen
+        // Punkts - sechsstrahliger Stern aus 3 Hauptlinien (0/60/120 Grad)
+        // mit je einem Aestchen an jeder der 6 Spitzen, gleiche Masse wie
+        // am Geraet (Arm 3px, Aestchen 2px, 30 Grad Abwinkelung).
+        html += "function drawSnowFlake(x,y){var ARM=3,BR=2,ANG=0.5236;";
+        html += "for(var i=0;i<3;i++){var angle=i*(Math.PI/3);";
+        html += "var dx=Math.cos(angle)*ARM,dy=Math.sin(angle)*ARM;";
+        html += "var x1=x+dx,y1=y+dy,x2=x-dx,y2=y-dy;";
+        html += "ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();";
+        html += "var b1x=Math.cos(angle+ANG)*BR,b1y=Math.sin(angle+ANG)*BR;";
+        html += "ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x1+b1x,y1+b1y);ctx.stroke();";
+        html += "var opp=angle+Math.PI;var b2x=Math.cos(opp+ANG)*BR,b2y=Math.sin(opp+ANG)*BR;";
+        html += "ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(x2+b2x,y2+b2y);ctx.stroke();}}";
         html += "function drawSnow(level){var p=snowParamsFor(level);";
         html += "var now=performance.now();var dt=lastSnowMs?Math.min(now-lastSnowMs,300):16;lastSnowMs=now;var step=p.speed*dt/1000;";
         html += "if(!snowInited){snowFlakes=[];for(var i=0;i<SNOW_MAX;i++){var f={};snowSpawn(f);snowFlakes.push(f);}snowInited=true;}";
-        html += "ctx.save();ctx.fillStyle='#ffffff';";
+        html += "ctx.save();ctx.strokeStyle='#ffffff';ctx.lineWidth=1;";
         html += "for(var i=0;i<snowFlakes.length;i++){var f=snowFlakes[i];f.y+=step;f.phase+=2.5*dt/1000;";
-        html += "if(f.y-SNOW_R>canvas.height){snowSpawn(f);}";
+        html += "if(f.y-6>canvas.height){snowSpawn(f);}";
         html += "if(i>=p.count)continue;";
         html += "var x=f.baseX+10*Math.sin(f.phase);";
-        html += "ctx.beginPath();ctx.arc(x,f.y,SNOW_R,0,Math.PI*2);ctx.fill();}";
+        html += "drawSnowFlake(x,f.y);}";
         html += "ctx.restore();}";
 
         html += "function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);";
@@ -280,11 +477,33 @@ namespace {
         // sichtbar reagieren, egal was danach passiert oder wie lange es
         // dauert - siehe gleiche Ueberlegung beim OTA-Neustart-Button.
         html += "#acInfo a:active{background:#ff3b3b;color:#0a0f0d;}";
+        // Wetter-Info-Popup (siehe weatherIcon-Canvas unten) - exakt derselbe
+        // visuelle Stil wie #acInfo oben (Alex' Vorgabe), eigene ID statt
+        // Wiederverwendung von #acInfo, damit sich beide Popups nicht
+        // gegenseitig ueberschreiben/verstecken (Flugzeug-Auswahl und
+        // Wetter-Icon sind unabhaengige Interaktionen).
+        html += "#weatherInfo{display:none;max-width:400px;margin-top:8px;padding:8px 10px;border:1px solid var(--accent);border-radius:6px;font-size:13px;line-height:1.7;}";
+        html += "#weatherInfo a{color:#ff3b3b;text-decoration:none;border:1px solid #ff3b3b;border-radius:4px;padding:2px 8px;display:inline-block;margin-top:4px;}";
+        html += "#weatherInfo a:active{background:#ff3b3b;color:#0a0f0d;}";
         // Umschalter "Radar"/"Map" (siehe appendRadarSection()) - gleicher
         // Button-Stil wie die restliche Seite, aktiver Tab invertiert
         // (gefuellte Akzentfarbe, dunkler Text), genau wie aktive Eintraege
         // ueberall sonst im Projekt (siehe Geraete-UI-Konvention).
-        html += "#viewTabs{margin-bottom:8px;}";
+        // #viewTabs ist jetzt eine Flex-Zeile: Radar/Map-Buttons links
+        // (eigener #viewTabsButtons-Wrapper, damit "justify-content:
+        // space-between" genau 2 Elemente auseinanderschiebt statt die
+        // beiden Buttons selbst), Wetter-Icon rechts (siehe weiter unten,
+        // umgezogen aus der "Updated Xs ago"-Zeile - dort hat sich die
+        // Icon-Position bei jeder Sekundenaenderung sichtbar mitverschoben,
+        // Alex' Meldung "hüpft hin und her"). Hier bleibt die Position fix.
+        // BUGFIX (Alex' Meldung: Icon klebt auf breiten/Desktop-Fenstern am
+        // rechten Rand): #viewTabs spannte sich vorher ueber die volle
+        // Seitenbreite (kein max-width), waehrend #radarCanvas & Co. auf
+        // 400px begrenzt sind - "justify-content:space-between" schob das
+        // Icon dadurch bis ganz an den Fensterrand statt neben "Map".
+        // Gleiches max-width wie #radarCanvas oben haelt beide in derselben
+        // schmalen Inhaltsspalte.
+        html += "#viewTabs{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;max-width:400px;}";
         html += "#viewTabs button{background:#0a0f0d;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:4px 14px;font-family:inherit;cursor:pointer;margin-right:6px;}";
         html += "#viewTabs button.active{background:var(--accent);color:#0a0f0d;}";
         // Leaflet verlangt eine feste Hoehe auf dem Karten-Container (kein
@@ -304,6 +523,15 @@ namespace {
         // z-index:0 vor dem normal fliessenden Seiteninhalt liegen.
         html += "#star-bg{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;}";
         html += ".page{position:relative;z-index:1;}";
+        // Dezenter GitHub-Link unten rechts (Alex' Avatar-Logo, siehe
+        // handleAvatar()/appendRadarSection()) - "position:fixed" haelt ihn
+        // in der Bildschirmecke, unabhaengig vom Scroll-Stand, ueber allem
+        // anderen (hoeherer z-index als ".page"). Reduzierte Deckkraft im
+        // Ruhezustand (0.55), geht bei Hover/Tap auf voll hoch - klar
+        // erkennbar interaktiv, aber nicht ablenkend vom eigentlichen Radar.
+        html += "#avatarLink{position:fixed;right:12px;bottom:12px;z-index:500;opacity:0.55;transition:opacity 0.2s;line-height:0;}";
+        html += "#avatarLink:hover,#avatarLink:active{opacity:1;}";
+        html += "#avatarLink img{width:44px;height:44px;border-radius:50%;border:2px solid var(--accent);display:block;}";
         html += "</style></head><body>";
         // Service-Worker-Registrierung (siehe handleServiceWorker() unten) -
         // "in navigator"-Check noetig, weil Service Worker nur ueber HTTPS
@@ -361,7 +589,20 @@ namespace {
         // jeder externen Bibliothek im Projekt ueblich.
         html += "<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css\">";
         html += "<script src=\"https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js\"></script>";
-        html += "<div id=\"viewTabs\"><button id=\"tabRadar\" class=\"active\" type=\"button\">Radar</button><button id=\"tabMap\" type=\"button\">Map</button></div>";
+        // Wetter-Icon (Canvas, gleicher Zeichenstil wie main.cpp::
+        // drawWeatherIcon() am Geraet, siehe drawWeatherIconCanvas() weiter
+        // unten im Skript) hier rechtsbuendig in der Radar/Map-Tab-Zeile,
+        // statt wie vorher winzig direkt in der sich staendig aendernden
+        // "Updated Xs ago"-Zeile (siehe #viewTabs-CSS-Kommentar oben) -
+        // deutlich groesser (40x40 statt vorher 28x28) und an fester
+        // Position, kein Hin-und-her-Huepfen mehr.
+        html += "<div id=\"viewTabs\"><div id=\"viewTabsButtons\"><button id=\"tabRadar\" class=\"active\" type=\"button\">Radar</button><button id=\"tabMap\" type=\"button\">Map</button></div>";
+        // "transform" verschiebt das Icon rein optisch (Alex' Vorgabe: 100px
+        // runter, 250px nach links ausgehend von der bisherigen Position),
+        // ohne den restlichen Flex-Zeilenablauf (Radar/Map-Buttons) zu
+        // beeinflussen - der urspruengliche Platz in der Zeile bleibt
+        // reserviert, nur das Icon selbst rutscht optisch daneben.
+        html += "<canvas id=\"weatherIconCanvas\" width=\"120\" height=\"120\" style=\"cursor:pointer;flex-shrink:0;transform:translate(-130px,50px);\" title=\"Weather info\"></canvas></div>";
         html += "<div id=\"radarView\">";
         html += "<div id=\"radarControls\">Range: <select id=\"radarRange\">";
         for (uint8_t i = 0; i < Config::RANGE_STEP_COUNT; i++) {
@@ -384,6 +625,7 @@ namespace {
         html += "<canvas id=\"radarCanvas\" width=\"360\" height=\"360\"></canvas>";
         html += "<p id=\"radarStatus\">Loading...</p>";
         html += "<div id=\"acInfo\"></div>";
+        html += "<div id=\"weatherInfo\"></div>";
         html += "</div>"; // #radarView
         html += "<div id=\"mapView\"><div id=\"leafletMap\"></div></div>";
         html += "<script>(function(){";
@@ -391,6 +633,9 @@ namespace {
         html += "var ctx=canvas.getContext('2d');";
         html += "var status=document.getElementById('radarStatus');";
         html += "var infoBox=document.getElementById('acInfo');";
+        html += "var weatherIconCanvas=document.getElementById('weatherIconCanvas');";
+        html += "var weatherIconCtx=weatherIconCanvas.getContext('2d');";
+        html += "var weatherInfoBox=document.getElementById('weatherInfo');";
         html += "var rangeSel=document.getElementById('radarRange');";
         html += "var W=canvas.width,H=canvas.height,cx=W/2,cy=H/2,R=Math.min(W,H)/2-24;";
         html += "var lastData={range_km:" + String(deviceRangeKm, 0) + ",aircraft:[]};";
@@ -403,8 +648,21 @@ namespace {
         // Aenderung an einer der drei Farben bitte BEIDE Stellen synchron
         // halten.
         html += "var THEME_PALETTES=[['#39ff14','#1f3a2b','#7a9a86'],['#ffb000','#3a2c1a','#a08a5a'],['#00c8ff','#1a2c3a','#6a90a0'],['#ff0000','#3a1a1a','#a06a6a'],['#b400ff','#2a1a3a','#8a6aa0']];";
+        // Gedimmte Gegenstuecke fuer die Nachtdimmung (Alex' Wunsch) - Akzent-
+        // farben 1:1 von radar_screen.cpp's Nacht-Farben uebernommen (siehe
+        // themeDimColor() dort), Rand-/Hintergrundfarbe proportional im
+        // gleichen Verhaeltnis abgedunkelt (ca. 60% Helligkeit) wie die
+        // jeweilige Akzentfarbe - reiner Web-Optik-Wert, dafuer gibt es kein
+        // 1:1-Geraete-Aequivalent.
+        html += "var NIGHT_THEME_PALETTES=[['#00A000','#13231a','#495c50'],['#A06E00','#231a10','#605336'],['#0078A0','#101a23','#405660'],['#A00101','#231010','#604040'],['#7100A0','#191023','#534060']];";
         html += "var lastThemeIndex=" + String(SettingsStore::radarThemeIndex()) + ";";
-        html += "function applyTheme(idx){var p=THEME_PALETTES[idx]||THEME_PALETTES[0];var s=document.documentElement.style;";
+        html += "var lastIsNight=false;";
+        // Laufend (bei JEDEM Poll, nicht nur bei Aenderung) aktuell gehalten
+        // - altColor() unten liest das direkt, unabhaengig davon, ob sich
+        // seit dem letzten Poll ueberhaupt etwas geaendert hat (der Ring/
+        // Marker wird ja ohnehin bei jedem draw()-Aufruf neu gezeichnet).
+        html += "var currentIsNight=false;";
+        html += "function applyTheme(idx,isNight){var pal=isNight?NIGHT_THEME_PALETTES:THEME_PALETTES;var p=pal[idx]||pal[0];var s=document.documentElement.style;";
         html += "s.setProperty('--accent',p[0]);s.setProperty('--accent-border',p[1]);s.setProperty('--accent-muted',p[2]);}";
         html += "function hexToRgb(hex){var v=parseInt(hex.replace('#',''),16);return [(v>>16)&255,(v>>8)&255,v&255];}";
         html += "function cssVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}";
@@ -469,7 +727,10 @@ namespace {
         // "eingefroren" beim naechsten Hochstufen ploetzlich aus dem Stand
         // an, sondern ist schon in Bewegung.
         html += "var RAIN_LEN=10,RAIN_MAX=20;";
-        html += "function rainParamsFor(level){if(level>=3)return{count:20,speed:130};if(level===1)return{count:6,speed:60};return{count:12,speed:90};}";
+        // Geschwindigkeiten 1:1 an ScreensaverRain::rainParamsForIntensity()
+        // (main.cpp) angeglichen (67.5/105/150 statt vorher veralteter
+        // 60/90/130) - Anzahl war bereits korrekt (6/12/20).
+        html += "function rainParamsFor(level){if(level>=3)return{count:20,speed:150};if(level===1)return{count:6,speed:67.5};return{count:12,speed:105};}";
         html += "var rainDrops=[];var rainInited=false;var lastRainMs=null;";
         html += "function rainSpawn(d,windDirDeg){var spread=Math.random()*140-70;";
         html += "var entryRad=(windDirDeg+spread)*Math.PI/180;d.x=cx+R*Math.sin(entryRad);d.y=cy-R*Math.cos(entryRad);";
@@ -477,19 +738,112 @@ namespace {
         html += "function drawRain(windDirDeg,level,accentColor){var p=rainParamsFor(level);";
         html += "var now=performance.now();var dt=lastRainMs?Math.min(now-lastRainMs,300):16;lastRainMs=now;var step=p.speed*dt/1000;";
         html += "if(!rainInited){rainDrops=[];for(var i=0;i<RAIN_MAX;i++){var d={};rainSpawn(d,windDirDeg);rainDrops.push(d);}rainInited=true;}";
-        html += "ctx.save();ctx.strokeStyle=accentColor;ctx.globalAlpha=0.45;ctx.lineWidth=1;";
+        html += "ctx.save();ctx.strokeStyle=accentColor;ctx.lineWidth=1;";
         html += "for(var i=0;i<rainDrops.length;i++){var d=rainDrops[i];d.x+=d.vx*step;d.y+=d.vy*step;";
         html += "var ddx=d.x-cx,ddy=d.y-cy;if(ddx*ddx+ddy*ddy>R*R){rainSpawn(d,windDirDeg);}";
         html += "if(i>=p.count)continue;";
         html += "var x1=d.x,y1=d.y,x2=d.x-d.vx*RAIN_LEN,y2=d.y-d.vy*RAIN_LEN;";
         html += "var d1=(x1-cx)*(x1-cx)+(y1-cy)*(y1-cy),d2=(x2-cx)*(x2-cx)+(y2-cy)*(y2-cy);";
-        html += "if(d1<=R*R&&d2<=R*R){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();}}";
+        html += "if(d1<=R*R&&d2<=R*R){";
+        // "Glanzstrich" (ScreensaverRain in main.cpp) - Hauptlinie normal,
+        // zweite Linie 1px seitlich versetzt (senkrecht zur Falllinie, da
+        // die Tropfen hier schraeg nach Windrichtung fallen statt rein
+        // vertikal) in ca. 40% Deckkraft der Hauptlinie.
+        html += "ctx.globalAlpha=0.45;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();";
+        html += "var px=-d.vy,py=d.vx;";
+        html += "ctx.globalAlpha=0.18;ctx.beginPath();ctx.moveTo(x1+px,y1+py);ctx.lineTo(x2+px,y2+py);ctx.stroke();";
+        html += "}}";
         html += "ctx.restore();}";
 
         // altColor() bildet die Flughoehe ab (Notfall-/Warnfarben) - bleibt
         // AUSDRUECKLICH themenunabhaengig, exakt wie colorForAltitude() am
         // Geraete-Display (radar_screen.cpp) - NICHT anfassen/umfaerben.
-        html += "function altColor(ft){if(ft<3000)return '#ff4d4d';if(ft<10000)return '#ffb84d';if(ft<25000)return '#ffe14d';if(ft<35000)return '#39ff14';return '#4dd2ff';}";
+        // Bei Nachtdimmung (currentIsNight, siehe is_night-Feld oben) grob
+        // um ca. 38% abgedunkelte Varianten derselben 5 Farben - reiner
+        // Web-Optik-Wert (die Web-Hoehenfarbskala ist ohnehin schon eine
+        // eigene, unabhaengige Kopie mit anderen Stufen als am Geraet, kein
+        // 1:1-Aequivalent noetig).
+        html += "function altColor(ft){if(currentIsNight){";
+        html += "if(ft<3000)return '#9e3030';if(ft<10000)return '#9e7230';if(ft<25000)return '#9e8c30';if(ft<35000)return '#239e0c';return '#30829e';}";
+        html += "if(ft<3000)return '#ff4d4d';if(ft<10000)return '#ffb84d';if(ft<25000)return '#ffe14d';if(ft<35000)return '#39ff14';return '#4dd2ff';}";
+
+        // Wetter-Icon fuer die Live-Radar-Webseite (Alex' Wunsch) - bildet
+        // main.cpp::drawWeatherIcon()/drawCloudShape()/drawSunShape() am
+        // Geraet nach (gleiche relative Proportionen/Versaetze), nur auf
+        // einem eigenen Canvas statt TFT_eSPI-Aufrufen, hochskaliert um den
+        // Faktor "s" (Alex' Wunsch: deutlich groesser als das urspruengliche
+        // 28x28-Icon, jetzt 40x40 - alle urspruenglichen Geraete-Pixel-
+        // Versaetze mit s multipliziert, damit die Proportionen zueinander
+        // gleich bleiben). "unknown" zeichnet bewusst nichts, genau wie am
+        // Geraet.
+        html += "function drawCloudIcon(c,cx,cy,color,s){c.fillStyle=color;";
+        html += "c.beginPath();c.arc(cx-5*s,cy+1*s,3*s,0,Math.PI*2);c.fill();";
+        html += "c.beginPath();c.arc(cx-1*s,cy-2*s,4*s,0,Math.PI*2);c.fill();";
+        html += "c.beginPath();c.arc(cx+4*s,cy,4*s,0,Math.PI*2);c.fill();";
+        html += "c.fillRect(cx-8*s,cy,13*s,3*s);}";
+        html += "function drawSunIcon(c,cx,cy,r,color,s){c.fillStyle=color;c.strokeStyle=color;c.lineWidth=s;";
+        html += "c.beginPath();c.arc(cx,cy,r,0,Math.PI*2);c.fill();";
+        html += "for(var i=0;i<8;i++){var ang=i*(Math.PI/4);";
+        html += "var x1=cx+(r+2*s)*Math.cos(ang),y1=cy+(r+2*s)*Math.sin(ang);";
+        html += "var x2=cx+(r+4*s)*Math.cos(ang),y2=cy+(r+4*s)*Math.sin(ang);";
+        html += "c.beginPath();c.moveTo(x1,y1);c.lineTo(x2,y2);c.stroke();}}";
+        html += "function drawWeatherIconCanvas(cond){var c=weatherIconCtx;";
+        html += "c.clearRect(0,0,weatherIconCanvas.width,weatherIconCanvas.height);";
+        // 120x120 statt vorher 40x40 (Alex' Wunsch: nochmal verdreifacht) -
+        // s und die Mittelpunkt-Koordinaten proportional mit Faktor 3
+        // mitskaliert (1.43->4.29, 20/16->60/48), Form/Proportionen bleiben
+        // dadurch unveraendert, nur groesser.
+        html += "var s=4.29,cx=60,cy=48;";
+        // Bei Nachtdimmung (currentIsNight, siehe is_night-Feld/altColor()
+        // oben) dieselbe grobe ~38%-Abdunkelung wie bei den Hoehenfarben -
+        // Sonne/Blitz-Gelb, Wolken-Hellgrau, Regen-Hellblau und Schnee-Weiss
+        // bekommen je eine gedaempfte Nacht-Variante, statt bei Nacht
+        // weiterhin grell hell zu leuchten.
+        html += "var sunColor=currentIsNight?'#9e8300':'#ffd400';";
+        html += "var cloudColor=currentIsNight?'#808386':'#cfd4d8';";
+        html += "var rainColor=currentIsNight?'#3d7b9e':'#63c7ff';";
+        html += "var snowColor=currentIsNight?'#9e9e9e':'#ffffff';";
+        html += "if(cond==='clear'){drawSunIcon(c,cx,cy,6*s,sunColor,s);}";
+        html += "else if(cond==='partly_cloudy'){drawSunIcon(c,cx-4*s,cy-3*s,4*s,sunColor,s);drawCloudIcon(c,cx+3*s,cy+2*s,cloudColor,s);}";
+        html += "else if(cond==='cloudy'){drawCloudIcon(c,cx,cy,cloudColor,s);}";
+        html += "else if(cond==='rain'){drawCloudIcon(c,cx,cy-3*s,cloudColor,s);c.strokeStyle=rainColor;c.lineWidth=s;";
+        html += "c.beginPath();c.moveTo(cx-4*s,cy+4*s);c.lineTo(cx-6*s,cy+8*s);c.stroke();";
+        html += "c.beginPath();c.moveTo(cx,cy+4*s);c.lineTo(cx-2*s,cy+8*s);c.stroke();";
+        html += "c.beginPath();c.moveTo(cx+4*s,cy+4*s);c.lineTo(cx+2*s,cy+8*s);c.stroke();}";
+        html += "else if(cond==='snow'){drawCloudIcon(c,cx,cy-3*s,cloudColor,s);c.fillStyle=snowColor;";
+        html += "c.beginPath();c.arc(cx-4*s,cy+6*s,1.2*s,0,Math.PI*2);c.fill();";
+        html += "c.beginPath();c.arc(cx,cy+7*s,1.2*s,0,Math.PI*2);c.fill();";
+        html += "c.beginPath();c.arc(cx+4*s,cy+6*s,1.2*s,0,Math.PI*2);c.fill();}";
+        html += "else if(cond==='thunderstorm'){drawCloudIcon(c,cx,cy-3*s,cloudColor,s);c.strokeStyle=sunColor;c.lineWidth=s;";
+        html += "c.beginPath();c.moveTo(cx,cy+3*s);c.lineTo(cx-3*s,cy+7*s);c.lineTo(cx+1*s,cy+7*s);c.lineTo(cx-2*s,cy+11*s);c.stroke();}";
+        html += "}"; // drawWeatherIconCanvas
+
+        // Textform der Condition-Werte fuers Popup (gleicher Zweck wie
+        // main.cpp::conditionLabel(), hier als reines JS-Pendant).
+        html += "function weatherConditionText(cond){switch(cond){";
+        html += "case 'clear':return 'Clear';case 'partly_cloudy':return 'Partly cloudy';case 'cloudy':return 'Cloudy';";
+        html += "case 'rain':return 'Rain';case 'snow':return 'Snow';case 'thunderstorm':return 'Thunderstorm';";
+        html += "default:return 'Unknown';}}";
+
+        // Wetter-Info-Popup (Antippen/Klicken des Icons) - gleicher Inhalt
+        // wie main.cpp::showWeatherInfo() am Geraet (Standort-Hinweis,
+        // METAR, Sonnenauf-/-untergang, Kurzvorhersage), alle Werte kommen
+        // bereits server-seitig fertig aufgeloest aus handleRadarJson().
+        html += "function showWeatherInfoPopup(){var d=lastData;var lines=[];";
+        html += "lines.push('Weather shown is for the currently active location.');";
+        html += "if(d.metar_available){lines.push('<br>METAR ('+d.metar_airport_code+'):<br>'+d.metar_raw);}";
+        html += "if(d.sun_available){if(d.sun_always_day){lines.push('<br>Sun: up all day today (polar day)');}";
+        html += "else if(d.sun_always_night){lines.push('<br>Sun: down all day today (polar night)');}";
+        html += "else{lines.push('<br>Sunrise: '+d.sunrise_local+'&emsp;Sunset: '+d.sunset_local);}}";
+        html += "if(d.forecast_available){var t=metric?d.forecast_temp_c:(d.forecast_temp_c*9/5+32);";
+        html += "lines.push('<br>Forecast (+'+d.forecast_hours_ahead+'h): '+Math.round(t)+'\\u00b0'+(metric?'C':'F')+', '+weatherConditionText(d.forecast_condition));}";
+        html += "weatherInfoBox.innerHTML=lines.join('<br>')+'<br><a href=\"#\" id=\"weatherInfoClose\">Close</a>';";
+        html += "weatherInfoBox.style.display='block';";
+        html += "document.getElementById('weatherInfoClose').onclick=function(e){e.preventDefault();hideWeatherInfo();};";
+        html += "}";
+        html += "function hideWeatherInfo(){weatherInfoBox.style.display='none';}";
+        html += "weatherIconCanvas.addEventListener('click',function(){";
+        html += "if(weatherInfoBox.style.display==='block'){hideWeatherInfo();}else{showWeatherInfoPopup();}});";
 
         html += "function draw(data){";
         html += "lastData=data;";
@@ -532,13 +886,33 @@ namespace {
         html += "ctx.fillStyle=color;ctx.strokeStyle=color;";
         html += "if(a.ground_vehicle){ctx.fillRect(x-3,y-3,6,6);}";
         html += "else if(a.rotorcraft){ctx.beginPath();ctx.moveTo(x,y-5);ctx.lineTo(x+5,y);ctx.lineTo(x,y+5);ctx.lineTo(x-5,y);ctx.closePath();ctx.fill();}";
-        html += "else if(a.heavy){ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.stroke();";
-        html += "var hr2=a.track_deg*Math.PI/180;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+10*Math.sin(hr2),y-10*Math.cos(hr2));ctx.stroke();}";
-        html += "else{ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();";
-        html += "var hr=a.track_deg*Math.PI/180;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+10*Math.sin(hr),y-10*Math.cos(hr));ctx.stroke();}";
-        html += "if(a.emergency){ctx.strokeStyle='#ff3b3b';ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.stroke();}";
-        html += "else if(a.watched){ctx.strokeStyle='#00e5ff';ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.stroke();}";
-        html += "else if(a.notable){ctx.strokeStyle='#ff9f1a';ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.stroke();}";
+        // Typ-Silhouette (Rumpf- + Tragflaechen-Linie statt Kreis+Strich,
+        // gleiches Grundprinzip wie drawTypedMarker() in radar_screen.cpp,
+        // nur als zwei einfache Linien statt versetzter Doppellinien - auf
+        // dem Canvas reicht dafuer ctx.lineWidth statt manuellem Versatz).
+        // "type_class" kommt aus handleRadarJson() (classifyTypeSilhouetteWeb()
+        // unten) - "airliner"/"unknown" nutzen dieselbe Groesse, "privatejet"
+        // ist kleiner, "turboprop" wie "airliner" plus zwei Triebwerks-
+        // Punkte auf der Tragflaeche. "heavy" vergroessert alle Masse UND
+        // die Linienbreite, ersetzt die fruehere separate Ring+Kreis-Form.
+        html += "else{var hr=a.track_deg*Math.PI/180,pr=hr+Math.PI/2;var tc=a.type_class||'unknown';";
+        html += "var noseLen,tailLen,wingLen;";
+        html += "if(tc==='privatejet'){noseLen=a.heavy?10:7;tailLen=a.heavy?7:5;wingLen=a.heavy?8:6;}";
+        html += "else{noseLen=a.heavy?12:9;tailLen=a.heavy?9:7;wingLen=a.heavy?10:8;}";
+        html += "ctx.lineWidth=a.heavy?2:1;";
+        html += "ctx.beginPath();ctx.moveTo(x-tailLen*Math.sin(hr),y+tailLen*Math.cos(hr));ctx.lineTo(x+noseLen*Math.sin(hr),y-noseLen*Math.cos(hr));ctx.stroke();";
+        html += "ctx.beginPath();ctx.moveTo(x-wingLen*Math.sin(pr),y+wingLen*Math.cos(pr));ctx.lineTo(x+wingLen*Math.sin(pr),y-wingLen*Math.cos(pr));ctx.stroke();";
+        html += "if(tc==='turboprop'){var engDist=a.heavy?7:5,engR=a.heavy?3:2;";
+        html += "ctx.beginPath();ctx.arc(x+engDist*Math.sin(pr),y-engDist*Math.cos(pr),engR,0,Math.PI*2);ctx.fill();";
+        html += "ctx.beginPath();ctx.arc(x-engDist*Math.sin(pr),y+engDist*Math.cos(pr),engR,0,Math.PI*2);ctx.fill();}";
+        html += "ctx.lineWidth=1;}";
+        // Ring-Radius etwas groesser bei "heavy" (Alex' Vorgabe), damit der
+        // Notfall-/Beobachtungs-/Militaer-Ring nicht durch die jetzt
+        // groessere Silhouette (Nase bis zu 12px) schneidet.
+        html += "var ringR=a.heavy?13:9;";
+        html += "if(a.emergency){ctx.strokeStyle='#ff3b3b';ctx.beginPath();ctx.arc(x,y,ringR,0,Math.PI*2);ctx.stroke();}";
+        html += "else if(a.watched){ctx.strokeStyle='#00e5ff';ctx.beginPath();ctx.arc(x,y,ringR,0,Math.PI*2);ctx.stroke();}";
+        html += "else if(a.notable){ctx.strokeStyle='#ff9f1a';ctx.beginPath();ctx.arc(x,y,ringR,0,Math.PI*2);ctx.stroke();}";
         // Ausgewaehltes Flugzeug (per Klick/Tap, siehe unten) bekommt einen
         // weissen Auswahlring, gleiches Prinzip wie isSelected auf dem
         // Geraete-Display (radar_screen.cpp render()).
@@ -547,6 +921,8 @@ namespace {
         html += "markers.push({x:x,y:y,a:a});";
         html += "});";
         html += "if(data.raining){drawRain(data.wind_dir_deg||0,data.rain_intensity||2,accentColor);}else{lastRainMs=null;rainInited=false;}";
+        html += "drawWeatherIconCanvas(data.weather_condition||'unknown');";
+        html += "if(weatherInfoBox.style.display==='block'){showWeatherInfoPopup();}"; // haelt das offene Popup mit frischen Werten synchron (poll() alle 8s)
         html += "status.textContent=(data.aircraft||[]).length+' aircraft \\u00b7 range '+fmtRange(data.range_km);";
         html += "}";
 
@@ -569,6 +945,65 @@ namespace {
         html += "if(found){showInfo(found.a);}else{selectedHex=null;hideInfo();}";
         html += "}";
 
+        // Airline-Logo oben links im Flugzeug-Info-Panel (Alex' Wunsch,
+        // NUR fuer die Webseite - am Geraet selbst gibt es das nicht).
+        // images.kiwi.com liefert saubere PNG-Logos ueber den 2-stelligen
+        // IATA-Code, kennt aber KEINE 3-stelligen ICAO-Praefixe - das
+        // Projekt identifiziert Airlines bisher nur ueber den ICAO-Praefix
+        // aus dem Callsign (siehe airline_lookup.cpp::extractAirlinePrefix()
+        // am Geraet, hier als JS-Pendant nachgebaut). Deshalb eine eigene
+        // kleine ICAO->IATA-Tabelle (haeufige internationale/europaeische
+        // Carrier, bewusst nicht vollstaendig - unbekannte Praefixe liefern
+        // einfach null und damit das gezeichnete Fallback-Icon unten).
+        html += "var ICAO_TO_IATA={DLH:'LH',BAW:'BA',AFR:'AF',KLM:'KL',SWR:'LX',AUA:'OS',IBE:'IB',TAP:'TP',SAS:'SK',FIN:'AY',"
+                "THY:'TK',AEE:'A3',RYR:'FR',EZY:'U2',WZZ:'W6',VLG:'VY',EWG:'EW',NAX:'DY',IBS:'I2',TRA:'HV',"
+                "PGT:'PC',BEL:'SN',CFG:'DE',EXS:'LS',TOM:'BY',LGL:'LG',BTI:'BT',LOT:'LO',CSA:'OK',ROT:'RO',"
+                "AFL:'SU',UAE:'EK',QTR:'QR',ETD:'EY',SVA:'SV',MSR:'MS',RJA:'RJ',ELY:'LY',GFA:'GF',KAC:'KU',"
+                "OMA:'WY',MEA:'ME',RAM:'AT',TUN:'TU',ETH:'ET',SAA:'SA',KQA:'KQ',DAH:'AH',ICE:'FI',"
+                "UAL:'UA',AAL:'AA',DAL:'DL',SWA:'WN',JBU:'B6',ASA:'AS',FFT:'F9',NKS:'NK',ACA:'AC',WJA:'WS',"
+                "CPA:'CX',SIA:'SQ',ANA:'NH',JAL:'JL',KAL:'KE',AAR:'OZ',CCA:'CA',CES:'MU',CSN:'CZ',THA:'TG',"
+                "MAS:'MH',GIA:'GA',PAL:'PR',CAL:'CI',EVA:'BR',AIC:'AI',IGO:'6E',QFA:'QF',ANZ:'NZ',VOZ:'VA',"
+                "PIA:'PK',LAN:'LA',TAM:'JJ',ARG:'AR',AVA:'AV',CMP:'CM',AMX:'AM',GLO:'G3',AZU:'AD',"
+                "FDX:'FX',UPS:'5X',GTI:'5Y',CLX:'CV',ITY:'AZ',EIN:'EI',CRL:'SS',TSC:'TS'};";
+        // Extrahiert bis zu 3 Buchstaben vom Callsign-Anfang (gleiche simple
+        // Logik wie extractAirlinePrefix() am Geraet) und schlaegt sie in
+        // der Tabelle oben nach - null bei keinem Treffer.
+        html += "function airlineLogoUrl(callsign){";
+        html += "if(!callsign)return null;";
+        html += "var m=callsign.match(/^[A-Za-z]{1,3}/);";
+        html += "if(!m)return null;";
+        html += "var iata=ICAO_TO_IATA[m[0].toUpperCase()];";
+        html += "return iata?('https://images.kiwi.com/airlines/64x64/'+iata+'.png'):null;";
+        html += "}";
+        // Fallback: selbst gezeichnetes "durchgestrichenes Flugzeug"-Icon
+        // (Inline-SVG statt Bild, damit keine weitere externe Anfrage noetig
+        // ist) - fuer keinen Tabellentreffer UND fuer den Fall, dass das
+        // echte Logo beim Laden fehlschlaegt (onerror unten). "fill/stroke:
+        // var(--accent)" faerbt es automatisch in der aktuell aktiven
+        // Radar-Themefarbe ein, genau wie das restliche UI.
+        html += "function airlineLogoFallbackSvg(){";
+        html += "return '<svg viewBox=\"0 0 24 24\" width=\"100%\" height=\"100%\" style=\"display:block;\">'+"
+                "'<path d=\"M21,16v-2l-8-5V3.5C13,2.67,12.33,2,11.5,2S10,2.67,10,3.5V9l-8,5v2l8-2.5V19l-2,1.5V22l3.5-1l3.5,1v-1.5L13,19v-5.5L21,16z\" style=\"fill:var(--accent);opacity:0.85;\"></path>'+"
+                "'<line x1=\"2\" y1=\"2\" x2=\"22\" y2=\"22\" style=\"stroke:var(--accent);stroke-width:2;opacity:0.85;\"></line>'+"
+                "'</svg>';";
+        html += "}";
+        // Baut das komplette Logo-Element (echtes, entsaettigt+eingefaerbtes
+        // Logo ODER Fallback-SVG) fuer showInfo() unten. Das echte Logo
+        // bleibt ein normales <img> (fuer die onerror-Fehlererkennung),
+        // "filter:grayscale(1)" entsaettigt es, die halbtransparente
+        // Akzentfarb-Flaeche darueber mit "mix-blend-mode:color" faerbt es
+        // ein UND behaelt dabei die urspruengliche Helligkeit/Zeichnung des
+        // Logos (Standard-CSS-Trick fuer eingefaerbte Graustufenbilder) -
+        // insgesamt dezent statt bunt-aufdringlich (Alex' Vorgabe).
+        html += "function airlineLogoHtml(a){";
+        html += "var url=a.has_callsign?airlineLogoUrl(a.callsign):null;";
+        html += "var inner=url?";
+        html += "('<img src=\"'+url+'\" alt=\"\" style=\"width:100%;height:100%;object-fit:contain;filter:grayscale(1);display:block;\" onerror=\"this.parentNode.innerHTML=airlineLogoFallbackSvg();\">'+"
+                "'<span style=\"position:absolute;inset:0;background:var(--accent);mix-blend-mode:color;pointer-events:none;\"></span>')";
+        html += ":airlineLogoFallbackSvg();";
+        html += "return '<span style=\"position:relative;display:inline-block;width:36px;height:36px;flex-shrink:0;opacity:0.85;\">'+inner+'</span>';";
+        html += "}";
+
         // Info-Panel fuer ein angetipptes Flugzeug - bewusst eine eigene,
         // stehenbleibende Box (kein Tooltip/Popup, das beim naechsten
         // Neuzeichnen einfach verschwindet), mit explizitem Schliessen-Link,
@@ -577,11 +1012,48 @@ namespace {
         html += "function showInfo(a){";
         html += "var lines=[];";
         html += "lines.push('<b>'+(a.callsign||a.hex)+'</b> ('+a.hex+')');";
+        // Airline-Name, Registrierung, Typcode - dieselben Werte, die
+        // radar_screen.cpp::drawDetailPanel() am Geraet schon lange zeigt
+        // (a.airlineName/a.reg/a.typeCode), bisher aber nicht im Web-JSON
+        // standen. Route/Flugbuch-Historie bewusst NICHT mit dabei (siehe
+        // Kommentar bei handleRadarJson() oben).
+        html += "if(a.airline_name){lines.push(a.airline_name);}";
+        html += "var regType=[];if(a.reg){regType.push('Reg: '+a.reg);}if(a.type_code){regType.push('Type: '+a.type_code);}";
+        html += "if(regType.length){lines.push(regType.join(' \\u00b7 '));}";
         html += "lines.push('Altitude: '+Math.round(a.alt_ft)+' ft');";
         html += "if(a.speed_kt){lines.push('Speed: '+Math.round(a.speed_kt)+' kt');}";
-        html += "lines.push('Distance: '+fmtDist(a.dist_km)+', bearing '+Math.round(a.bearing_deg)+'\\u00b0');";
+        // Steig-/Sinkrate, gleiche Schwelle (+-100ft/min) wie DETAIL_CLIMB/
+        // DETAIL_DESCENT/DETAIL_LEVEL am Geraet.
+        html += "if(a.vert_rate_ft_min>100){lines.push('Climbing +'+a.vert_rate_ft_min+'ft/min');}";
+        html += "else if(a.vert_rate_ft_min<-100){lines.push('Descending '+a.vert_rate_ft_min+'ft/min');}";
+        html += "else{lines.push('Level');}";
+        // Hoehenwinkel rein clientseitig aus alt_ft/dist_km berechnet (gleiche
+        // einfache atan2-Formel wie am Geraet) - kein eigenes JSON-Feld
+        // noetig, direkt neben Distanz/Peilung mit angezeigt.
+        html += "var elevDeg=Math.atan2(a.alt_ft*0.3048,a.dist_km*1000)*180/Math.PI;";
+        html += "lines.push('Distance: '+fmtDist(a.dist_km)+', bearing '+Math.round(a.bearing_deg)+'\\u00b0, elevation '+Math.round(elevDeg)+'\\u00b0');";
         html += "lines.push('Heading: '+Math.round(a.track_deg)+'\\u00b0');";
+        // Naeherungs-/Entfernungs-Trend, gleiche 3 Zustaende wie
+        // DETAIL_APPROACHING/_DEPARTING/_PASSING am Geraet (dort Text-Pfeile
+        // "v"/"^"/"->" mangels Unicode-Glyphen im TFT-Font - hier echte
+        // Pfeilsymbole, da der Browser sie problemlos darstellt).
+        html += "var trendSymbols={approaching:'\\u2193 Approaching',departing:'\\u2191 Departing',passing:'\\u2192 Passing'};";
+        html += "if(trendSymbols[a.distance_trend]){lines.push(trendSymbols[a.distance_trend]);}";
         html += "if(a.squawk){lines.push('Squawk: '+a.squawk);}";
+        // "Sichtbar seit" - gleiche Xmin Ys-Beschriftung wie am Geraet
+        // (DETAIL_SEEN_FOR_PREFIX + formatDurationLabeled()).
+        html += "var sfMin=Math.floor(a.seen_for_sec/60),sfSec=a.seen_for_sec%60;";
+        html += "lines.push('Seen for '+(sfMin>0?(sfMin+'min '+sfSec+'s'):(sfSec+'s')));";
+        // Anflug-Hinweis (Best-Effort-Erkennung, siehe aircraft_table.cpp::
+        // postFetchUpdate()) - nur wenn approach_likely true ist.
+        html += "if(a.approach_likely){lines.push('Approaching, ETA ~'+a.approach_eta_min+' min');}";
+        // "Ueberflug"-CPA - nur wenn cpa_relevant true ist.
+        html += "if(a.cpa_relevant){lines.push('Fly-by in ~'+Math.round(a.cpa_eta_min)+' min');}";
+        // "Steckbrief" (kuerzeste Distanz/hoechste Geschwindigkeit seit dem
+        // ersten Sichten in dieser Sitzung) - nur wenn BEIDE Werte gesetzt
+        // sind (ArduinoJson liefert fehlende Felder als undefined, nicht 0).
+        html += "if(a.session_min_distance_km!==undefined&&a.session_max_speed_kt!==undefined){";
+        html += "lines.push('Closest: '+a.session_min_distance_km.toFixed(1)+'km \\u00b7 Fastest: '+Math.round(a.session_max_speed_kt)+'kt');}";
         // Link auf dieselbe FlightAware-Tracking-Seite, die auch der
         // QR-Code am Geraete-Display zeigt (siehe runFlightQrScreen() in
         // radar_screen.cpp) - keine eigene Foto-Logik noetig, FlightAware
@@ -593,7 +1065,13 @@ namespace {
         // Hex-Code zeigen und ins Leere fuehren.
         html += "var hasTrackLink=!!a.has_callsign;";
         html += "if(hasTrackLink){lines.push('<a href=\"https://flightaware.com/live/flight/'+encodeURIComponent(a.callsign)+'\" target=\"_blank\" rel=\"noopener\" id=\"acInfoTrack\">Track &amp; photo on FlightAware &rarr;</a>');}";
-        html += "infoBox.innerHTML=lines.join('<br>')+'<br><a href=\"#\" id=\"acInfoClose\">Close</a>';";
+        // Logo/Fallback-Icon oben links, Textzeilen daneben (align-items:
+        // flex-start haelt das Icon am oberen Rand des Textblocks) - wird
+        // bei JEDEM showInfo()-Aufruf neu gebaut, aktualisiert sich also
+        // automatisch bei jedem neu ausgewaehlten Flugzeug UND bei jedem
+        // Poll-Refresh (siehe refreshSelectedInfo() oben).
+        html += "infoBox.innerHTML='<div style=\"display:flex;gap:10px;align-items:flex-start;\">'+airlineLogoHtml(a)+"
+                "'<div>'+lines.join('<br>')+'<br><a href=\"#\" id=\"acInfoClose\">Close</a></div></div>';";
         html += "infoBox.style.display='block';";
         // Sofortiges Feedback beim Antippen des FlightAware-Links, damit klar
         // ist, dass der Tipp angekommen ist, waehrend der neue Tab noch
@@ -673,7 +1151,13 @@ namespace {
         // bekannten Wert, ruft applyTheme() nur bei tatsaechlicher Aenderung
         // auf (unnoetiges Neusetzen der CSS-Variablen bei jedem Poll waere
         // harmlos, aber unnoetig).
-        html += "if(data.theme_index!==undefined&&data.theme_index!==lastThemeIndex){lastThemeIndex=data.theme_index;applyTheme(data.theme_index);}";
+        // Wie beim Themenwechsel oben, jetzt zusaetzlich auf is_night
+        // reagierend (Nachtdimmung, siehe NIGHT_THEME_PALETTES oben) -
+        // applyTheme() wird bei JEDER Aenderung eines der beiden Werte neu
+        // aufgerufen, damit Tag<->Nacht-Wechsel automatisch bei jedem Poll
+        // (alle 8s) live uebernommen wird.
+        html += "var curIsNight=!!data.is_night;currentIsNight=curIsNight;";
+        html += "if(data.theme_index!==undefined&&(data.theme_index!==lastThemeIndex||curIsNight!==lastIsNight)){lastThemeIndex=data.theme_index;lastIsNight=curIsNight;applyTheme(data.theme_index,curIsNight);}";
         // Reichweiten-Aenderung AM GERAET (physischer Tap, waehrend die
         // Seite offen ist) im Dropdown nachziehen - liest bewusst
         // data.device_range_km (NIE durch den eigenen "range_km"-Query-
@@ -818,6 +1302,12 @@ namespace {
         uint8_t dayCount = FlightLogbook::listDays(days, MAX_DAYS_QUERIED);
 
         String html = htmlHeader("Eiswolfs Flightradar");
+
+        // Dezenter, fest positionierter GitHub-Link unten rechts (Alex'
+        // Avatar-Logo, siehe web_avatar_logo.h/handleAvatar() oben und
+        // #avatarLink-CSS in htmlHeader()) - verlinkt auf dasselbe Repo wie
+        // der QR-Code am Geraete-Display (runGithubQrScreen() in main.cpp).
+        html += "<a id=\"avatarLink\" href=\"https://github.com/Eiswolf-BG/eiswolfs-flightradar-CYD\" target=\"_blank\" rel=\"noopener\" title=\"Eiswolfs Flightradar on GitHub\"><img src=\"/avatar.png\" alt=\"GitHub\"></a>";
 
         appendRadarSection(html);
         // Logbuch-Tabelle danach ist variabel lang (bis MAX_DAYS_QUERIED
@@ -1205,6 +1695,7 @@ namespace {
         bool hideGround = SettingsStore::hideGroundVehicles();
         bool onlyHeli = SettingsStore::onlyHelicopters();
         bool emergencyOn = SettingsStore::emergencyAlertEnabled();
+        bool militaryOn = SettingsStore::militarySquawkDetectionEnabled();
 
         JsonDocument doc;
         doc["range_km"] = rangeKm;
@@ -1240,6 +1731,14 @@ namespace {
         // uebernommen wird (siehe applyTheme() in appendRadarSection()),
         // ohne dass die Seite neu geladen werden muss.
         doc["theme_index"] = SettingsStore::radarThemeIndex();
+        // Nachtdimmung auch fuer die Live-Radar-Webseite (Alex' Wunsch) -
+        // exakt dieselbe Bedingung wie radar_screen.cpp::
+        // nightDimActiveNow() (Schalter an UND aktuell Nachtstunden am
+        // Heimatstandort, siehe isNightHoursWeb() oben). Client-JS nutzt das
+        // fuer die gedimmte NIGHT_THEME_PALETTES-Variante (applyTheme())
+        // UND fuer abgedunkelte Hoehenfarben (altColor()), siehe
+        // appendRadarSection().
+        doc["is_night"] = SettingsStore::nightDimmingEnabled() && isNightHoursWeb();
         // Regen-Overlay im WebUI-Radar (Alex' Wunsch: "Spiegel des CYD-
         // Radarscreens") - EXAKT dieselbe Bedingung UND Windrichtungs-Logik
         // wie beim Radarscreen-Regen (radar_screen.cpp::spawnRainDrop()):
@@ -1278,6 +1777,76 @@ namespace {
             doc["snowing"] = SettingsStore::rainEffectEnabled() &&
                               cond == Weather::Condition::Snow;
             doc["snow_intensity"] = (int)Weather::currentSnowIntensity(); // 0=None,1=Light,2=Moderate,3=Heavy
+
+            // Wetter-Icon + Info-Popup fuer die Live-Radar-Webseite (Alex'
+            // Wunsch) - bildet main.cpp::drawWeatherIcon()/showWeatherInfo()
+            // am Geraet nach, alle Werte server-seitig fertig aufgeloest
+            // (inkl. IATA/ICAO-Auswahl und Sonnenauf-/-untergangsberechnung),
+            // damit das Client-JS keine eigene Logik dafuer braucht.
+            doc["weather_condition"] = weatherConditionWebLabel(cond);
+
+            Weather::Metar metar = Weather::currentMetar();
+            Weather::NearestAirport nearestAirport = Weather::currentNearestAirport();
+            doc["metar_available"] = metar.available;
+            if (metar.available) {
+                // Gleiche IATA/ICAO-Auswahl wie main.cpp::showWeatherInfo()
+                // (SettingsStore::useIataAirportCodes()), hier server-seitig
+                // aufgeloest statt im Client-JS nachzubauen.
+                bool useIata = SettingsStore::useIataAirportCodes() && nearestAirport.iata[0];
+                doc["metar_airport_code"] = useIata ? nearestAirport.iata : metar.icao;
+                doc["metar_raw"] = metar.raw;
+            }
+
+            // Sonnenauf-/-untergang fuer den aktuell aktiven Standort -
+            // gleiche SunTimes::compute()-Berechnung wie main.cpp::
+            // showWeatherInfo(), hier ebenfalls server-seitig statt im
+            // Client-JS (das kennt weder Standort noch hat es eine
+            // Sonnenstand-Formel).
+            {
+                double lat = 0, lon = 0;
+                LocationManager::getHomeLocation(lat, lon);
+                bool sunAvailable = false;
+                bool alwaysDay = false;
+                bool alwaysNight = false;
+                char sunriseBuf[6] = {0};
+                char sunsetBuf[6] = {0};
+                time_t now = time(nullptr);
+                if ((lat != 0.0 || lon != 0.0) && now > 8 * 3600 * 2) {
+                    struct tm tmNow;
+                    localtime_r(&now, &tmNow);
+                    SunTimes::Result sun = SunTimes::compute(lat, lon, tmNow.tm_year + 1900, tmNow.tm_mon + 1,
+                                                              tmNow.tm_mday, LocationManager::utcOffsetSeconds());
+                    if (sun.valid) {
+                        sunAvailable = true;
+                        alwaysDay = sun.alwaysDay;
+                        alwaysNight = sun.alwaysNight;
+                        if (!alwaysDay && !alwaysNight) {
+                            int sunriseMin = (int)roundf(sun.sunriseHour * 60.0f) % (24 * 60);
+                            int sunsetMin = (int)roundf(sun.sunsetHour * 60.0f) % (24 * 60);
+                            snprintf(sunriseBuf, sizeof(sunriseBuf), "%02d:%02d", sunriseMin / 60, sunriseMin % 60);
+                            snprintf(sunsetBuf, sizeof(sunsetBuf), "%02d:%02d", sunsetMin / 60, sunsetMin % 60);
+                        }
+                    }
+                }
+                doc["sun_available"] = sunAvailable;
+                doc["sun_always_day"] = alwaysDay;
+                doc["sun_always_night"] = alwaysNight;
+                doc["sunrise_local"] = sunriseBuf;
+                doc["sunset_local"] = sunsetBuf;
+            }
+
+            // Kurzvorhersage (main.cpp::showWeatherInfo() bzw.
+            // Weather::currentForecast()) - Temperatur bleibt bewusst in
+            // Celsius (roh), das Client-JS rechnet mit der bereits
+            // vorhandenen "metric"-Variable selbst in Fahrenheit um, genau
+            // wie es das schon fuer andere Werte auf der Seite tut.
+            Weather::Forecast forecast = Weather::currentForecast();
+            doc["forecast_available"] = forecast.available;
+            if (forecast.available) {
+                doc["forecast_temp_c"] = forecast.temperatureC;
+                doc["forecast_condition"] = weatherConditionWebLabel(forecast.condition);
+                doc["forecast_hours_ahead"] = forecast.hoursAhead;
+            }
         }
         JsonArray arr = doc["aircraft"].to<JsonArray>();
 
@@ -1304,14 +1873,17 @@ namespace {
             // Squawk-Code (nicht das Rufzeichen) beobachtet wird, waere im
             // WebUI faelschlich als "nicht beobachtet" erschienen.
             bool isWatched = AircraftWatchlist::isWatched(a.callsign) || SquawkWatchlist::isWatched(a.squawk);
-            // "notable" (oranger Ring) ist fuer auffaellige Rufzeichen
-            // (Militaer/Regierung) reserviert - Heavy-Flugzeuge bekommen
-            // stattdessen die eigene Markerform (siehe "heavy" oben). Es
-            // gibt aktuell aber keine Militaer-/Regierungs-Praefixliste im
-            // Projekt (auch nicht am Geraete-Display, siehe
-            // radar_screen.cpp) - "notable" bleibt daher bis auf Weiteres
-            // immer false.
-            bool isNotable = false;
+            // "notable" (oranger Ring) ist fuer Militaer-/Behoerdenfluege
+            // reserviert - Heavy-Flugzeuge bekommen stattdessen die eigene
+            // Markerform (siehe "heavy" oben). Erkennung ueber Squawk-Code-
+            // Bereiche (isMilitaryGovSquawkWeb() oben, 1:1 aus
+            // radar_screen.cpp uebernommen), gleiches "?"-Best-Effort-
+            // Prinzip wie am Geraete-Display - Rufzeichen-Praefixe
+            // (isNotableCallsign() am Geraet) bleiben unnachgebaut, da die
+            // zugehoerige Praefixliste im Projekt nirgends existiert.
+            // militaryOn spiegelt denselben Schalter wie am Geraet
+            // (SettingsStore::militarySquawkDetectionEnabled()).
+            bool isNotable = militaryOn && isMilitaryGovSquawkWeb(a.squawk);
 
             JsonObject o = arr.add<JsonObject>();
             o["hex"] = a.hex;
@@ -1330,6 +1902,10 @@ namespace {
             o["ground_vehicle"] = isGroundVehicle;
             o["rotorcraft"] = isRotorcraft;
             o["heavy"] = isHeavy;
+            // Typ-Silhouette (Linienflugzeug/Privatjet/Turboprop/Unknown)
+            // fuer die Marker-Form im JS-draw() oben - siehe
+            // classifyTypeSilhouetteWeb() weiter oben in dieser Datei.
+            o["type_class"] = typeSilhouetteWebLabel(classifyTypeSilhouetteWeb(a.typeCode));
             o["emergency"] = isEmergency;
             o["watched"] = isWatched;
             o["notable"] = isNotable;
@@ -1346,6 +1922,35 @@ namespace {
             // Geraete-Display, der aus demselben Grund nur bei a.callsign[0]
             // ueberhaupt angezeigt wird, siehe radar_screen.cpp).
             o["has_callsign"] = a.callsign[0] != 0;
+
+            // Weitere Detail-Panel-Werte fuers Web-Popup (Alex' Wunsch) -
+            // alle bereits fertig im Aircraft-Snapshot berechnet (siehe
+            // aircraft.h/aircraft_table.cpp::postFetchUpdate()), genau wie
+            // radar_screen.cpp::drawDetailPanel() sie am Geraet anzeigt.
+            // Route (hexdb) und Flugbuch-Historie bewusst NICHT dabei -
+            // brauchen zusaetzliche Netzwerk-/SD-Zugriffe, eigene Baustelle.
+            o["reg"] = a.reg;
+            o["type_code"] = a.typeCode;
+            o["airline_name"] = a.airlineName;
+            o["vert_rate_ft_min"] = a.vertRateFtMin;
+            switch (a.distanceTrend) {
+                case Aircraft::DistanceTrend::Approaching: o["distance_trend"] = "approaching"; break;
+                case Aircraft::DistanceTrend::Departing:   o["distance_trend"] = "departing";   break;
+                case Aircraft::DistanceTrend::Passing:     o["distance_trend"] = "passing";     break;
+                case Aircraft::DistanceTrend::Unknown:
+                default:                                    o["distance_trend"] = "unknown";     break;
+            }
+            // Sekunden statt des rohen millis()-Werts - "wie lange her" ist
+            // fuer den Webclient portabel, ein absoluter Geraete-millis()-
+            // Zeitstempel waere es nicht (andere Uhr/Ursprung).
+            uint32_t seenForMs = (a.firstSeenMs > 0 && millis() >= a.firstSeenMs) ? (millis() - a.firstSeenMs) : 0;
+            o["seen_for_sec"] = seenForMs / 1000;
+            o["approach_likely"] = a.approachLikely;
+            if (a.approachLikely) o["approach_eta_min"] = a.approachEtaMin;
+            o["cpa_relevant"] = a.cpaRelevant;
+            if (a.cpaRelevant) o["cpa_eta_min"] = a.cpaEtaMin;
+            if (a.sessionMinDistanceKm >= 0) o["session_min_distance_km"] = a.sessionMinDistanceKm;
+            if (a.sessionMaxSpeedKt >= 0) o["session_max_speed_kt"] = a.sessionMaxSpeedKt;
         }
         AircraftTable::unlock();
 
@@ -1397,6 +2002,14 @@ namespace {
     // handleManifest()) sowie als normales Browser-Favicon.
     void handleIcon() {
         server.send_P(200, "image/png", (PGM_P)PWA_ICON_PNG, PWA_ICON_PNG_LEN);
+    }
+
+    // Alex' Avatar-Logo (siehe web_avatar_logo.h) fuer den dezenten
+    // GitHub-Link unten rechts auf der Live-Radar-Webseite (siehe
+    // appendRadarSection()) - gleiches Ausliefer-Muster wie handleIcon()
+    // oben.
+    void handleAvatar() {
+        server.send_P(200, "image/png", (PGM_P)WEB_AVATAR_LOGO_PNG, WEB_AVATAR_LOGO_PNG_LEN);
     }
 
     // Minimaler Service Worker fuers Offline-Caching der SEITENHUELLE
@@ -1495,6 +2108,7 @@ void begin() {
     server.on("/", handleRoot);
     server.on("/manifest.json", handleManifest);
     server.on("/icon.png", handleIcon);
+    server.on("/avatar.png", handleAvatar);
     server.on("/sw.js", handleServiceWorker);
     server.on("/radar.json", handleRadarJson);
     server.on("/export.csv", handleExportCsv);

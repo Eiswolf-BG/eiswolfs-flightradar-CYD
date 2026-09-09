@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "5.8.6";
+    constexpr const char* APP_VERSION = "5.9.0";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -149,7 +149,19 @@ namespace Config {
     // greift (Alex' Bugmeldung). Nach dieser Zeit ohne Tap springt der
     // jeweilige Screen automatisch zum Radarscreen zurueck, danach greift
     // der normale Timeout wieder ganz regulaer.
-    constexpr uint32_t MENU_IDLE_TIMEOUT_MS = 2UL * 60UL * 1000UL; // 2 Minuten
+    //
+    // Per Schieberegler einstellbar (Menue > System > Anzeige > Menue-
+    // Timeout, siehe menu_timeout_screen.cpp), gleiches Muster wie
+    // SCREEN_TIMEOUT_MIN/MAX_MINUTES oben - in 30-Sekunden-Schritten, danach
+    // folgt "Nie" (kein automatischer Ruecksprung) als eigene Endposition.
+    // MENU_IDLE_TIMEOUT_MS bleibt als Default-Wert erhalten (siehe
+    // SettingsStore::menuIdleTimeoutSeconds(), Default 120s = exakt dieser
+    // bisherige feste Wert) - damit aendert sich fuer niemanden ungefragt
+    // etwas, bis der neue Regler aktiv genutzt wird.
+    constexpr uint16_t MENU_IDLE_TIMEOUT_MIN_SECONDS = 30;
+    constexpr uint16_t MENU_IDLE_TIMEOUT_MAX_SECONDS = 300; // 5 Minuten
+    constexpr uint16_t MENU_IDLE_TIMEOUT_STEP_SECONDS = 30;
+    constexpr uint32_t MENU_IDLE_TIMEOUT_MS = 2UL * 60UL * 1000UL; // 2 Minuten (Default)
 
     constexpr float DEFAULT_PROXIMITY_ALERT_KM = 8.0f;
 

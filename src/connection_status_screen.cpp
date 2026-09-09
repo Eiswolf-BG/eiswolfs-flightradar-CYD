@@ -1,6 +1,7 @@
 #include "connection_status_screen.h"
 #include "aircraft_table.h"
 #include "config.h"
+#include "settings_store.h"
 #include "i18n.h"
 #include "touch_input.h"
 #include "menu_stars.h"
@@ -172,7 +173,7 @@ void run(TFT_eSPI& tft) {
         uint32_t waitStartMs = millis();
         while (true) {
             if (TouchInput::wasTapped(tap)) { tapped = true; break; }
-            if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) { done = true; break; }
+            if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) { done = true; break; }
             if (millis() - waitStartMs >= 500) break;
             MenuStars::update(tft);
             delay(20);

@@ -3,6 +3,7 @@
 #include "menu_stars.h"
 #include "menu_screen.h"
 #include "config.h"
+#include "settings_store.h"
 #include "i18n.h"
 #include <WiFi.h>
 #include <qrcode.h>
@@ -198,8 +199,8 @@ void run(TFT_eSPI& tft) {
                 redraw();
             }
         }
-        // Inaktivitaets-Timeout - siehe Config::MENU_IDLE_TIMEOUT_MS.
-        if (TouchInput::msSinceLastTap() >= Config::MENU_IDLE_TIMEOUT_MS) return;
+        // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
+        if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) return;
         MenuStars::update(tft);
         delay(20);
     }

@@ -56,6 +56,7 @@ static const char* const I18N_ES[] = {
     "Gestionar redes WiFi",
     "Ubicaciones guardadas",
     "Apagado de pantalla: ",
+    "Tiempo de espera del menú: ",
     "Atenuación nocturna (solar): ",
     "Estadísticas",
     "Historial",
@@ -258,6 +259,8 @@ static const char* const I18N_ES[] = {
     "No se pudo descargar o instalar la actualización. El dispositivo sigue funcionando sin cambios con el firmware anterior. Comprueba tu conexión WiFi e inténtalo de nuevo más tarde.",
     "Tiempo de espera de pantalla",
     "Tras este tiempo sin toques, la pantalla se apaga para ahorrar energía. Con el salvapantallas activado, muestra en su lugar un cielo estrellado atenuado con la hora.",
+    "Tiempo de espera del menú",
+    "Tras este tiempo sin toques dentro de un menú o pantalla de ajustes, el dispositivo vuelve automáticamente a la pantalla de radar.",
     "Más cercano: ",
 
     "Pantalla del radar",

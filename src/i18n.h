@@ -56,6 +56,11 @@ enum class StringId : uint16_t {
     MENU_MANAGE_WIFI,
     MENU_LOCATION_PRESETS,
     MENU_SCREEN_TIMEOUT_PREFIX,
+    // Button-Label auf der System > Anzeige-Seite fuer den neuen
+    // Menue-Timeout-Regler (menu_timeout_screen.cpp) - direkt neben dem
+    // Bildschirm-Timeout-Button (MENU_SCREEN_TIMEOUT_PREFIX oben), da beide
+    // thematisch zusammengehoeren.
+    MENU_MENU_TIMEOUT_PREFIX,
     MENU_NIGHT_DIMMING,
     MENU_STATISTICS,
     MENU_STATS_HISTORY,
@@ -400,6 +405,16 @@ enum class StringId : uint16_t {
     // kurze Erklaerung ist.
     TIMEOUT_SCREEN_TITLE,
     TIMEOUT_SCREENSAVER_DESC,
+
+    // Neuer Menue-Timeout-Screen (menu_timeout_screen.cpp, Menue > System >
+    // Anzeige) - eigener Schieberegler fuer den Inaktivitaets-Timeout
+    // INNERHALB von Vollbild-Menues (Config::MENU_IDLE_TIMEOUT_MIN/
+    // MAX_SECONDS), bisher fest auf 2 Minuten einprogrammiert
+    // (Config::MENU_IDLE_TIMEOUT_MS). Gleicher Aufbau wie TIMEOUT_SCREEN_
+    // TITLE/_DESC oben, nur ohne den Ruhebildschirm-Umschalter (der gehoert
+    // inhaltlich zum Bildschirm-Timeout, nicht zu diesem Screen).
+    MENU_TIMEOUT_SCREEN_TITLE,
+    MENU_TIMEOUT_SCREEN_DESC,
 
     // Dezente "naechstes Flugzeug"-Distanzanzeige - genutzt sowohl auf dem
     // Ruhebildschirm (main.cpp::drawScreensaverNearestAircraft()) als auch

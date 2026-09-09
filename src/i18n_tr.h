@@ -56,6 +56,7 @@ static const char* const I18N_TR[] = {
     "WiFi ağlarını yönet",
     "Konum ön ayarları",
     "Ekran zaman aşımı: ",
+    "Menü zaman aşımı: ",
     "Gece kısma (güneşe göre): ",
     "İstatistikler",
     "Geçmiş",
@@ -258,6 +259,8 @@ static const char* const I18N_TR[] = {
     "Güncelleme indirilemedi veya yüklenemedi. Cihaz değişmeden önceki donanım yazılımıyla çalışmaya devam ediyor. Lütfen WiFi bağlantınızı kontrol edip daha sonra tekrar deneyin.",
     "Ekran Zaman Aşımı",
     "Bu süre boyunca dokunulmazsa ekran güç tasarrufu için kapanır. Ekran koruyucu açıksa, bunun yerine saatli, sönük bir yıldızlı gökyüzü gösterir.",
+    "Menü Zaman Aşımı",
+    "Bir menü veya ayarlar ekranında bu süre boyunca dokunulmazsa, cihaz otomatik olarak radar ekranına döner.",
     "En yakın: ",
 
     "Radar Görünümü",
