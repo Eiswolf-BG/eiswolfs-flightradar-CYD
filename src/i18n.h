@@ -376,19 +376,27 @@ enum class StringId : uint16_t {
     OTA_UPDATE_FAILED,
     OTA_UPDATE_SUCCESS,
 
-    // Erfolgs-/Fehler-Ergebnis nach Download+Flash wird jetzt als
-    // dauerhafter Info-Screen mit explizitem Button angezeigt (statt
-    // automatischem Neustart bzw. kurzer, automatisch verschwindender
-    // Meldung) - der Nutzer muss bei einer sicherheitsrelevanten Aktion wie
-    // einem Firmware-Update IMMER aktiv informiert werden und selbst
-    // bestaetigen, siehe menu_screen.cpp::infoScreen().
+    // Erfolgs-Ergebnis nach Download+Flash wird kurz angezeigt, dann
+    // startet das Geraet automatisch neu (siehe menu_screen.cpp::
+    // runOtaUpdateScreen()) - KEIN Bestaetigen-Button mehr noetig. Frueher
+    // gab es hier einen "Jetzt neu starten"-Button mit einer Warteschleife,
+    // die bei Erreichen des (mittlerweile einstellbaren) Menue-Timeouts
+    // denselben Screen immer wieder komplett neu zeichnete, wenn seit dem
+    // letzten ECHTEN Tap (z.B. dem Antippen von "Nach Update suchen" ganz
+    // am Anfang) schon laenger nichts mehr angetippt wurde - das erzeugte
+    // ein sichtbares Dauer-Flackern (Alex' Meldung). Automatischer Neustart
+    // nach einer kurzen, fest bemessenen Lesepause umgeht dieses Problem
+    // grundsaetzlich, siehe OTA_AUTO_RESTART_HINT unten.
     OTA_SUCCESS_BODY,
     // Dezenter, zusaetzlicher Absatz auf demselben Erfolgs-Screen (siehe
     // menu_screen.cpp) - bittet um einen GitHub-Stern, ohne den
-    // Haupttext/Button zu verdraengen (per "\n\n" als eigener Absatz
-    // angehaengt, gleiches Muster wie main.cpp::showWeatherInfo()).
+    // Haupttext zu verdraengen (per "\n\n" als eigener Absatz angehaengt,
+    // gleiches Muster wie main.cpp::showWeatherInfo()).
     OTA_GITHUB_STAR_HINT,
-    OTA_RESTART_BUTTON,
+    // Hinweis, dass das Geraet jetzt automatisch neu startet (kein Tap
+    // mehr noetig) - zwischen OTA_SUCCESS_BODY und OTA_GITHUB_STAR_HINT
+    // eingeblendet, siehe menu_screen.cpp::runOtaUpdateScreen().
+    OTA_AUTO_RESTART_HINT,
     // Feste Beschriftung ueber dem Changelog-Text auf dem Erfolgs-Screen
     // (Config::CHANGELOG_LATEST, siehe changelog.h) - bewusst regulaer
     // mehrsprachig, da sich NUR dieses Label nie aendert, anders als der

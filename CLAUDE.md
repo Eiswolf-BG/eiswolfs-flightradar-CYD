@@ -607,6 +607,41 @@ aktualisieren können; zeigt das Testgerät zwischendurch schon eine neue
 (aber noch nicht veröffentlichte) Nummer an, funktioniert dieser Versions-
 vergleich nicht mehr zuverlässig.
 
+## "Rochade" - echten OTA-Ablauf testen, ohne neues Release zu brauchen
+
+Wenn Alex sagt "wir machen eine Rochade" (oder "mach nochmal eine
+Rochade"), ist damit folgender Test-Trick gemeint: `Config::APP_VERSION`
+in `src/config.h` WIRD hier (bewusste Ausnahme von der obigen Regel,
+gilt NUR fuer diesen expliziten Auftrag) einmalig testweise auf eine
+aeltere, bereits veroeffentlichte Versionsnummer gesetzt (z.B. die vorige
+Release-Version), damit das Geraet beim naechsten "Nach Update suchen"
+die aktuell schon veroeffentlichte, echte GitHub-Release-Version wieder
+als neu erkennt - so kann der komplette echte OTA-Download-/Install-/
+Neustart-Ablauf (inkl. Fortschrittsanzeige, Erfolgs-Screen) am echten
+Geraet getestet werden, ohne dass Alex dafuer auf einen neuen
+Release-Zyklus warten muss.
+
+Ablauf bei jeder Rochade (immer alle Schritte, in dieser Reihenfolge):
+
+1. `Config::APP_VERSION` testweise auf eine aeltere, bereits
+   veroeffentlichte Nummer setzen (z.B. die direkt vorherige Version).
+2. `pio run` bauen.
+3. Flashen (`pio run --target upload`, ggf. mit explizitem
+   `--upload-port`, falls mehrere serielle Geraete angeschlossen sind).
+4. `Config::APP_VERSION` SOFORT direkt danach im Working Tree wieder auf
+   die echte, aktuelle Versionsnummer zuruecksetzen.
+5. Mit `git diff --stat HEAD -- src/config.h` bestaetigen, dass die Datei
+   wieder exakt dem letzten Commit entspricht (leere Ausgabe erwartet) -
+   es darf NIE eine testweise geaenderte Versionsnummer im Working Tree
+   stehen bleiben.
+6. Alex kurz Bescheid geben, dass sie auf dem Geraet "Nach Update suchen"
+   antippen kann.
+
+Eine Rochade wird NIE committet/getaggt/gepusht - sie ist ausschliesslich
+ein lokaler Test-Kniff auf dem Testgeraet. Gilt unabhaengig vom sonstigen
+Kontext (auch mitten in einer laufenden Diagnose- oder Bugfix-Aufgabe),
+sobald Alex das Wort "Rochade" benutzt.
+
 ## Wann temporäre Diagnose-Instrumentierung sinnvoll ist
 
 Nur bei Aufgaben, die explizit Fehlersuche/Verhalten-zur-Laufzeit betreffen

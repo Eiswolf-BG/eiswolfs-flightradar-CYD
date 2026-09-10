@@ -28,6 +28,7 @@
 #include "menu_stars.h"
 #include "i18n.h"
 #include "config.h"
+#include "github_screen_logo_image.h"
 #include "changelog.h"
 #include <time.h>
 #include "ui_theme.h"
@@ -509,6 +510,118 @@ namespace {
         }
     }
 
+    // Kleine, herunterskalierte Kopie von Alex' Avatar-Bild (siehe
+    // github_screen_logo_image.h, dort normalerweise 240x240px fuer den
+    // GitHub-QR-Screen) fuer die OTA-Screens unten - Alex' Wunsch: "unten
+    // mittig noch mein Logo platzieren". Dekodiert den RLE-Strom wie
+    // main.cpp::drawGithubScreenLogo() zeilenweise (kein 115.200-Byte-
+    // Vollbild-Puffer noetig), tastet dabei aber pro Ausgabezeile/-spalte
+    // nur den naechstgelegenen Quellpixel ab (Nearest-Neighbor) statt
+    // wirklich zu mitteln - fuer ein derart kleines Deko-Icon ausreichend
+    // und ohne zusaetzlichen Rechenaufwand. Bricht die Dekodierung ab,
+    // sobald alle "size" Ausgabezeilen gezeichnet sind, statt immer den
+    // kompletten 240-Zeilen-Strom zu lesen.
+    void drawSmallAvatarLogo(TFT_eSPI& t, int16_t centerX, int16_t topY, int16_t size) {
+        uint16_t lineBuf[GITHUB_SCREEN_LOGO_W];
+        uint16_t outBuf[GITHUB_SCREEN_LOGO_W]; // "size" bleibt <= 240 (Quellbildbreite), siehe Aufrufer
+        int16_t lineFill = 0;
+        int16_t row = 0;
+        int16_t outRow = 0;
+        size_t pos = 0;
+        int16_t x = (int16_t)(centerX - size / 2);
+        while (row < GITHUB_SCREEN_LOGO_H && outRow < size && pos + 2 < GITHUB_SCREEN_LOGO_RLE_LEN) {
+            uint8_t count = GITHUB_SCREEN_LOGO_RLE[pos];
+            uint16_t value = (uint16_t)GITHUB_SCREEN_LOGO_RLE[pos + 1] |
+                              ((uint16_t)GITHUB_SCREEN_LOGO_RLE[pos + 2] << 8);
+            pos += 3;
+
+            while (count > 0) {
+                int16_t spaceInLine = GITHUB_SCREEN_LOGO_W - lineFill;
+                int16_t take = count < spaceInLine ? count : spaceInLine;
+                for (int16_t i = 0; i < take; i++) lineBuf[lineFill + i] = value;
+                lineFill += take;
+                count -= take;
+                if (lineFill == GITHUB_SCREEN_LOGO_W) {
+                    int32_t srcForOutRow = (int32_t)outRow * GITHUB_SCREEN_LOGO_H / size;
+                    if (row == srcForOutRow) {
+                        for (int16_t c = 0; c < size; c++) {
+                            int16_t srcCol = (int16_t)((int32_t)c * GITHUB_SCREEN_LOGO_W / size);
+                            outBuf[c] = lineBuf[srcCol];
+                        }
+                        t.pushImage(x, (int16_t)(topY + outRow), size, 1, outBuf);
+                        outRow++;
+                    }
+                    lineFill = 0;
+                    row++;
+                }
+            }
+        }
+    }
+
+    // Rein informativer, NICHT-interaktiver Erfolgs-Screen fuer den
+    // automatischen Neustart nach einem OTA-Update (siehe
+    // runOtaUpdateScreen() unten) - zeigt Titel + Text kurz an, OHNE
+    // Button/Touch-Warteschleife. Ersetzt den frueheren "Jetzt neu
+    // starten"-Button-Screen: dessen Warteschleife rief bei erreichtem
+    // (mittlerweile einstellbarem) Menue-Timeout immer wieder komplett neu
+    // infoScreen() auf, wenn seit dem letzten ECHTEN Tap (z.B. dem
+    // Antippen von "Nach Update suchen" ganz am Anfang) schon laenger
+    // nichts mehr angetippt wurde - das erzeugte ein sichtbares Dauer-
+    // Flackern (Alex' Meldung). Ein automatischer Neustart nach einer
+    // kurzen, fest bemessenen Lesepause (siehe Aufrufer) braucht keine
+    // Touch-Warteschleife mehr und kann dieses Problem grundsaetzlich
+    // nicht mehr haben. Gleicher Kasten-/Titel-/Text-Aufbau wie
+    // infoScreen() unten, nur ohne Button/Scroll (der kurze Text passt in
+    // allen 8 Sprachen ohne Scrollen).
+    void drawOtaSuccessMessage(TFT_eSPI& tft, const String& title, const String& body, uint16_t accentColor) {
+        constexpr int16_t BOX_X = 4;
+        constexpr int16_t BOX_Y = 4;
+        constexpr int16_t BOX_W = Config::SCREEN_WIDTH - 2 * BOX_X;
+        constexpr int16_t BOX_H = Config::SCREEN_HEIGHT - 2 * BOX_Y;
+        constexpr int16_t TEXT_MAX_WIDTH = BOX_W - 20;
+        constexpr int16_t LINE_H = 16;
+        constexpr int16_t TITLE_Y = BOX_Y + 16;
+
+        tft.fillScreen(TFT_BLACK);
+        tft.drawRoundRect(BOX_X, BOX_Y, BOX_W, BOX_H, 6, accentColor);
+
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextColor(accentColor, TFT_BLACK);
+        tft.setTextSize(2);
+        uint8_t titleTextSize = 2;
+        if (tft.textWidth(title) > TEXT_MAX_WIDTH) {
+            tft.setTextSize(1);
+            titleTextSize = 1;
+        }
+        constexpr int MAX_TITLE_LINES = 3;
+        String titleLines[MAX_TITLE_LINES];
+        int titleLineCount = wrapTitleLines(tft, title, TEXT_MAX_WIDTH, titleLines, MAX_TITLE_LINES);
+        tft.setTextSize(titleTextSize);
+        for (int i = 0; i < titleLineCount; i++) {
+            tft.drawString(titleLines[i], BOX_X + BOX_W / 2, (int16_t)(TITLE_Y + i * LINE_H));
+        }
+        tft.setTextSize(1);
+        tft.setTextDatum(TL_DATUM);
+
+        // Logo unten mittig (Alex' Wunsch) - der Text-Bereich bekommt dafuer
+        // ein reduziertes viewBottom, statt den Logo-Platz erst NACH dem
+        // Zeichnen zu reservieren - so kann eine laengere Uebersetzung das
+        // Logo nie ueberlappen (wird stattdessen wie ein normaler
+        // Sichtfenster-Rand einfach nicht mehr gezeichnet, siehe
+        // layoutWrapped()-Sichtfenster-Parameter oben).
+        // 300% groesser (Alex' Wunsch) - 3x 28px -> 84px.
+        constexpr int16_t LOGO_SIZE = 84;
+        constexpr int16_t LOGO_BOTTOM_MARGIN = 8;
+        int16_t logoTopY = (int16_t)(BOX_Y + BOX_H - LOGO_SIZE - LOGO_BOTTOM_MARGIN);
+        int16_t textViewBottom = (int16_t)(logoTopY - 6);
+
+        int16_t viewTop = (int16_t)(TITLE_Y + titleLineCount * LINE_H + 12);
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+        layoutWrapped(tft, BOX_X + 10, viewTop, TEXT_MAX_WIDTH, LINE_H, body, 0, 0, textViewBottom, true);
+
+        drawSmallAvatarLogo(tft, Config::SCREEN_WIDTH / 2, logoTopY, LOGO_SIZE);
+    }
+
     // Einfacher Info-Screen mit nur EINEM Button (kein Abbrechen) - fuer
     // Endzustaende, bei denen es nichts mehr zu entscheiden gibt, nur zu
     // bestaetigen (z.B. Ergebnis eines OTA-Updates). Anders als
@@ -520,30 +633,15 @@ namespace {
     // Kasten-/Scroll-Aufbau wie confirmWarningScreen(), nur mit einem
     // einzigen, ueber die volle Breite gehenden Button statt OK/Zurueck.
     //
-    // tappedLabel (optional, Standard leer): Manche Aufrufer (siehe
-    // runOtaUpdateScreen() unten, Erfolgsfall) fuehren nach dem Antippen
-    // noch eine kurze, aber spuerbar dauernde Aktion aus (hier:
-    // ESP.restart(), das WLAN/Netzwerk-Cleanup vor dem eigentlichen Neustart
-    // macht) - ohne sichtbare Rueckmeldung wirkte der Screen in dieser Zeit
-    // eingefroren, und Alex' Testbericht zeigte mehrfaches frustriertes
-    // Nachtippen auf den (eigentlich schon "erledigten") Button. Ist
-    // tappedLabel gesetzt, wird der Button-Text beim Antippen SOFORT darauf
-    // umgeschaltet (z.B. "Bitte warten, Geraet startet neu..."), bevor
-    // infoScreen() zurueckkehrt und der Aufrufer seine (dauernde) Aktion
-    // startet - der Tipp wurde also sichtbar registriert.
-    // Rueckgabewert (Alex' Meldung, ungewollter automatischer Neustart nach
-    // dem OTA-Erfolgs-Screen): true = per echtem Tap auf den Button beendet,
-    // false = per Inaktivitaets-Timeout (SettingsStore::menuIdleTimeoutMs())
-    // zurueckgekehrt, OHNE dass der Nutzer tatsaechlich getippt hat. Vorher
-    // gab es keine Unterscheidung - ein Aufrufer, der danach ungeprueft eine
-    // "gefaehrliche" Aktion wie ESP.restart() ausloeste (siehe
-    // runOtaUpdateScreen() unten), tat das dadurch auch im Timeout-Fall,
-    // ohne dass der Nutzer den Text ueberhaupt gelesen hatte. Die meisten
-    // bestehenden Aufrufer brauchen den Rueckgabewert nicht und koennen ihn
-    // wie bisher ignorieren (in C++ gefahrlos moeglich) - nur Aufrufer mit
-    // einer unbedingten Folgeaktion muessen ihn jetzt auswerten.
+    // Rueckgabewert: true = per echtem Tap auf den Button beendet, false =
+    // per Inaktivitaets-Timeout (SettingsStore::menuIdleTimeoutMs())
+    // zurueckgekehrt, ohne dass der Nutzer tatsaechlich getippt hat - fuer
+    // Aufrufer mit einer unbedingten, potenziell gefaehrlichen Folgeaktion
+    // (z.B. ein Neustart) relevant, die meisten bestehenden Aufrufer
+    // brauchen ihn nicht und koennen ihn wie bisher ignorieren (in C++
+    // gefahrlos moeglich).
     bool infoScreen(TFT_eSPI& tft, const String& title, const String& body, uint16_t accentColor,
-                     const String& buttonLabel, const String& tappedLabel = "") {
+                     const String& buttonLabel) {
         constexpr int16_t BOX_X = 4;
         constexpr int16_t BOX_Y = 4;
         constexpr int16_t BOX_W = Config::SCREEN_WIDTH - 2 * BOX_X;
@@ -631,12 +729,6 @@ namespace {
             TouchInput::Point tap;
             if (TouchInput::wasTapped(tap)) {
                 if (okBtn.contains(tap.x, tap.y)) {
-                    // Siehe Kommentar bei tappedLabel oben - sofortige
-                    // Rueckmeldung, dass der Tipp angekommen ist, bevor die
-                    // (evtl. spuerbar dauernde) Aktion des Aufrufers startet.
-                    if (tappedLabel.length() > 0) {
-                        drawButton(tft, okBtn, tappedLabel);
-                    }
                     return true;
                 }
                 if (scrollable && upBtn.contains(tap.x, tap.y) && scrollY > 0) {
@@ -795,84 +887,173 @@ namespace {
     // Lambda-Capture erlaubt.
     TFT_eSPI* otaProgressTft = nullptr;
 
+    // Layout-/Dedupe-Status fuer drawOtaProgress() unten - auf Namespace-
+    // Ebene statt als function-static, damit resetOtaProgressLayout() sie
+    // von aussen (runOtaUpdateScreen(), VOR dem ersten drawOtaProgress(0)-
+    // Aufruf eines neuen Update-Versuchs) explizit zuruecksetzen kann. Ohne
+    // diesen expliziten Reset gab es keine zuverlaessige Methode, "neuer
+    // Versuch" von "normaler Aufruf mit percent==0" zu unterscheiden (siehe
+    // Git-Historie: eine fruehere Version erkannte das faelschlich an
+    // "percent==0", aber httpUpdate's Fortschritts-Callback liefert am
+    // Downloadanfang oft MEHRERE Aufrufe mit noch abgerundet 0% - jeder
+    // davon loeste faelschlich einen kompletten Band-Redraw aus, was genau
+    // das gemeldete Flackern "bis ca. 2%" erklaerte).
+    int16_t otaProgressPercentY = 0;
+    int16_t otaProgressBarY = 0;
+    int16_t otaProgressLastFillW = -1;
+    int16_t otaProgressLastDrawnPercent = -1;
+
+    void resetOtaProgressLayout() {
+        otaProgressLastDrawnPercent = -1;
+        otaProgressLastFillW = -1;
+    }
+
+    // BUGFIX (Alex' Meldung: Download-Fortschrittsscreen flackert im Takt
+    // der Prozentzahl): der Fortschritts-Callback von httpUpdate feuert pro
+    // empfangenem Netzwerk-Chunk, nicht nur pro tatsaechlicher Prozent-
+    // Aenderung (siehe ota_update.cpp::performUpdate()) - teilweise mehrere
+    // echte Prozent-Aenderungen pro Sekunde in schnellen Download-Phasen
+    // (per Diagnose-Log bestaetigt). Die fruehere Version loeschte bei
+    // JEDEM Aufruf das KOMPLETTE Band (inkl. der eigentlich unveraenderten
+    // Ueberschrift und des Hinweistexts) schwarz, bevor alles neu gezeichnet
+    // wurde - das ergab bei mehreren Aufrufen pro Sekunde einen sichtbaren
+    // Dauer-Flackerblitz des GESAMTEN Bands. Jetzt: Ueberschrift, Balken-
+    // Rahmen und Hinweistext werden nur EINMAL pro Update-Versuch gezeichnet
+    // (erkannt an einem Wechsel von otaProgressTft, siehe "freshStart"
+    // unten), danach wird bei jedem weiteren Aufruf NUR noch die Prozent-
+    // zahl (kleinflaechig geloescht+neu gezeichnet statt des ganzen Bands)
+    // und die Balken-Fuellung (waechst nur, kein Loeschen noetig, da neue
+    // Fuellung die alte immer vollstaendig ueberdeckt) aktualisiert.
     void drawOtaProgress(uint8_t percent) {
         if (!otaProgressTft) return;
         TFT_eSPI& t = *otaProgressTft;
 
-        // Groesseres Band als frueher (BAND_H=60, nur kleiner Praefix +
-        // Prozent) - deckt jetzt Ueberschrift + Prozentzahl + Fortschritts-
-        // balken + Hinweistext komplett ab, damit bei den sehr haeufigen
-        // Aufrufen waehrend Download/Flash nie etwas vom vorherigen Frame
-        // stehen bleibt oder sich ueberlappt.
         constexpr int16_t BAND_TOP = 20;
-        constexpr int16_t BAND_H = 260;
-        t.fillRect(0, BAND_TOP, Config::SCREEN_WIDTH, BAND_H, TFT_BLACK);
-
         constexpr int16_t X_MARGIN = 15;
         constexpr int16_t TEXT_MAX_WIDTH = Config::SCREEN_WIDTH - 2 * X_MARGIN;
-
-        // Ueberschrift: deutlich groesser als frueher (Size 2 statt 1) und
-        // weiter oben statt als kleiner Praefix direkt ueber der Prozent-
-        // zahl. OTA_INSTALLING_PREFIX ist inzwischen ein vollstaendiger Satz
-        // (statt eines kurzen Fragments), der in manchen Sprachen nicht in
-        // eine Zeile passt - deshalb zeilenumbruchsicher ueber
-        // layoutWrapped() (gleiche Technik wie beim OTA-Bestaetigungstext in
-        // confirmWarningScreen() oben) statt eines einzelnen ungeschuetzten
-        // drawString()-Aufrufs. layoutWrapped() zeichnet linksbuendig
-        // (setCursor()+print()), liefert aber die tatsaechliche Endposition
-        // zurueck, an der die naechsten Elemente (Prozentzahl/Balken/
-        // Hinweis) dynamisch anschliessen - so bleibt das Layout auch bei
-        // 1 vs. 2 Zeilen Ueberschrift stimmig statt zu ueberlappen.
-        t.setTextColor(UiTheme::accentColor(t), TFT_BLACK);
-        t.setTextSize(2);
         constexpr int16_t HEADING_LINE_H = 20;
-        int16_t headingY = (int16_t)(BAND_TOP + 14);
-        int16_t headingEndY = layoutWrapped(t, X_MARGIN, headingY, TEXT_MAX_WIDTH, HEADING_LINE_H,
-                                             I18n::t(StringId::OTA_INSTALLING_PREFIX),
-                                             0, 0, Config::SCREEN_HEIGHT, true);
-
-        // Prozentzahl bleibt gross/zentriert (Size 3), jetzt dynamisch unter
-        // der (je nach Sprache unterschiedlich langen) Ueberschrift statt an
-        // einer festen Bildschirmmitte.
-        t.setTextDatum(MC_DATUM);
-        String percentLabel = String(percent) + "%";
-        t.setTextSize(3);
-        int16_t percentY = (int16_t)(headingEndY + 22);
-        t.drawString(percentLabel, Config::SCREEN_WIDTH / 2, percentY);
-        t.setTextDatum(TL_DATUM);
-
-        // Fortschrittsbalken direkt unter der Prozentzahl - gleicher
-        // abgerundeter Stil wie die Buttons (siehe drawButton() oben,
-        // Eckenradius 4): Rahmen in Akzentfarbe, Innenflaeche schwarz,
-        // gefuellter Anteil links beginnend proportional zu percent. Wird
-        // bei jedem Aufruf komplett neu gezeichnet (kein Diffing noetig -
-        // das Band davor wurde bereits vollstaendig schwarz geloescht,
-        // dadurch kein Flackern durch stehenbleibende Altpixel).
         constexpr int16_t BAR_MARGIN = 24;
         constexpr int16_t BAR_W = Config::SCREEN_WIDTH - 2 * BAR_MARGIN;
         constexpr int16_t BAR_H = 18;
-        int16_t barY = (int16_t)(percentY + 24);
-        uint16_t accent = UiTheme::accentColor(t);
-        t.fillRoundRect(BAR_MARGIN, barY, BAR_W, BAR_H, 4, TFT_BLACK);
-        t.drawRoundRect(BAR_MARGIN, barY, BAR_W, BAR_H, 4, accent);
-        uint8_t clampedPercent = percent > 100 ? 100 : percent;
-        int16_t fillW = (int16_t)((BAR_W - 4) * clampedPercent / 100);
-        if (fillW > 0) {
-            t.fillRoundRect((int16_t)(BAR_MARGIN + 2), (int16_t)(barY + 2), fillW, (int16_t)(BAR_H - 4), 3, accent);
+        // Grosszuegige Loesch-Box um die Size-3-Prozentzahl herum (deckt
+        // Ziffernhoehe inkl. Unterlaenge sicher ab, siehe UiFont11pt).
+        constexpr int16_t PERCENT_BOX_HALF_H = 14;
+
+        // BUGFIX (Alex' Meldung: flackert weiterhin bis ca. 2%): "neuer
+        // Versuch" wurde vorher zusaetzlich an "percent==0" erkannt - aber
+        // httpUpdate's Fortschritts-Callback liefert am Downloadanfang oft
+        // MEHRERE Aufrufe, bei denen der abgerundete Prozentwert noch 0
+        // ist, bevor er auf 1 springt. Jeder dieser 0%-Aufrufe loeste
+        // faelschlich wieder den kompletten Band-Redraw aus. Jetzt wird
+        // "neuer Versuch" stattdessen EXPLIZIT von aussen signalisiert
+        // (resetOtaProgressLayout(), von runOtaUpdateScreen() VOR dem
+        // allerersten drawOtaProgress(0)-Aufruf jedes Versuchs aufgerufen) -
+        // otaProgressLastDrawnPercent bleibt bis dahin auf seinem Ausgangs-
+        // wert -1 stehen, ein echter Prozentwert (auch 0) erreicht diesen
+        // Wert nie erneut.
+        bool freshStart = (otaProgressLastDrawnPercent == -1);
+        if (freshStart) {
+            otaProgressLastFillW = -1;
+
+            // Einmaliger Aufbau: Band leeren, Ueberschrift, Balken-Rahmen,
+            // Hinweistext - alles, was sich waehrend des restlichen
+            // Downloads nicht mehr aendert. Band reicht bis knapp an den
+            // Bildschirmrand (statt vorher 260px), damit auch das jetzt
+            // 84px grosse Logo (Alex' Wunsch: "300% groesser") beim naechsten
+            // Versuch zuverlaessig mit geloescht wird.
+            constexpr int16_t BAND_H = Config::SCREEN_HEIGHT - BAND_TOP - 4;
+            t.fillRect(0, BAND_TOP, Config::SCREEN_WIDTH, BAND_H, TFT_BLACK);
+
+            // Ueberschrift: deutlich groesser als frueher (Size 2 statt 1)
+            // und weiter oben statt als kleiner Praefix direkt ueber der
+            // Prozentzahl. OTA_INSTALLING_PREFIX ist inzwischen ein
+            // vollstaendiger Satz (statt eines kurzen Fragments), der in
+            // manchen Sprachen nicht in eine Zeile passt - deshalb
+            // zeilenumbruchsicher ueber layoutWrapped() (gleiche Technik
+            // wie beim OTA-Bestaetigungstext in confirmWarningScreen()
+            // oben) statt eines einzelnen ungeschuetzten drawString()-
+            // Aufrufs. layoutWrapped() liefert die tatsaechliche
+            // Endposition zurueck, an der die naechsten Elemente
+            // (Prozentzahl/Balken/Hinweis) dynamisch anschliessen - so
+            // bleibt das Layout auch bei 1 vs. 2 Zeilen Ueberschrift
+            // stimmig statt zu ueberlappen.
+            t.setTextColor(UiTheme::accentColor(t), TFT_BLACK);
+            t.setTextSize(2);
+            int16_t headingY = (int16_t)(BAND_TOP + 14);
+            int16_t headingEndY = layoutWrapped(t, X_MARGIN, headingY, TEXT_MAX_WIDTH, HEADING_LINE_H,
+                                                 I18n::t(StringId::OTA_INSTALLING_PREFIX),
+                                                 0, 0, Config::SCREEN_HEIGHT, true);
+
+            otaProgressPercentY = (int16_t)(headingEndY + 22);
+            // 34 statt vorher 24px Abstand zur Prozentzahl (Alex' Meldung:
+            // Balken beruehrte die Prozentzahl, 10px mehr Luft noetig).
+            otaProgressBarY = (int16_t)(otaProgressPercentY + 34);
+
+            // Fortschrittsbalken-RAHMEN direkt unter der Prozentzahl -
+            // gleicher abgerundeter Stil wie die Buttons (siehe
+            // drawButton() oben, Eckenradius 4). Nur der Rahmen wird hier
+            // einmalig gezeichnet, die Fuellung kommt weiter unten bei
+            // jedem Aufruf dazu.
+            t.fillRoundRect(BAR_MARGIN, otaProgressBarY, BAR_W, BAR_H, 4, TFT_BLACK);
+            t.drawRoundRect(BAR_MARGIN, otaProgressBarY, BAR_W, BAR_H, 4, UiTheme::accentColor(t));
+
+            // Dezenter Hinweistext ganz unten (OTA_INSTALLING_HINT) -
+            // "Geraet waehrend des Updates bitte nicht ausstecken oder
+            // ausschalten" o.ae., ebenfalls zeilenumbruchsicher ueber
+            // layoutWrapped(), falls er in einer Sprache nicht in eine
+            // Zeile passt.
+            t.setTextSize(1);
+            t.setTextColor(TFT_DARKGREY, TFT_BLACK);
+            int16_t hintY = (int16_t)(otaProgressBarY + BAR_H + 16);
+            int16_t hintEndY = layoutWrapped(t, X_MARGIN, hintY, TEXT_MAX_WIDTH, 14,
+                                              I18n::t(StringId::OTA_INSTALLING_HINT),
+                                              0, 0, Config::SCREEN_HEIGHT, true);
+            t.setTextDatum(TL_DATUM);
+
+            // Logo unten mittig (Alex' Wunsch, jetzt 300% groesser = 3x
+            // 28px -> 84px) - Teil des einmaligen Aufbaus, da es sich
+            // waehrend des Downloads nie aendert und sonst bei jedem
+            // Prozent-Update unnoetig erneut gezeichnet wuerde. Position
+            // dynamisch UNTER dem tatsaechlichen Ende des Hinweistexts
+            // (layoutWrapped()-Rueckgabewert) statt an einer festen
+            // Bildschirmposition - so kann das jetzt deutlich groessere
+            // Logo den Hinweistext in keiner der 8 Sprachen ueberlappen,
+            // selbst wenn dieser dort mal auf 2 Zeilen umbricht.
+            constexpr int16_t LOGO_SIZE = 84;
+            int16_t logoTopY = (int16_t)(hintEndY + 10);
+            drawSmallAvatarLogo(t, Config::SCREEN_WIDTH / 2, logoTopY, LOGO_SIZE);
         }
 
-        // Dezenter Hinweistext ganz unten (OTA_INSTALLING_HINT, neue
-        // StringId) - "Geraet waehrend des Updates bitte nicht ausstecken
-        // oder ausschalten" o.ae., ebenfalls zeilenumbruchsicher ueber
-        // layoutWrapped(), falls er in einer Sprache nicht in eine Zeile
-        // passt.
-        t.setTextSize(1);
-        t.setTextColor(TFT_DARKGREY, TFT_BLACK);
-        int16_t hintY = (int16_t)(barY + BAR_H + 16);
-        layoutWrapped(t, X_MARGIN, hintY, TEXT_MAX_WIDTH, 14, I18n::t(StringId::OTA_INSTALLING_HINT),
-                       0, 0, Config::SCREEN_HEIGHT, true);
+        // Echte Aenderung? Sonst gibt es nichts zu aktualisieren (deckt den
+        // Fall ab, dass der Chunk-Callback oefter feuert, als sich der
+        // ganzzahlige Prozentwert tatsaechlich aendert).
+        if (percent == otaProgressLastDrawnPercent) return;
+        otaProgressLastDrawnPercent = percent;
 
+        // Prozentzahl: nur die kleine Box um den Text herum loeschen, NICHT
+        // das ganze Band - vermeidet den Schwarz-Blitz bei jeder
+        // Aktualisierung.
+        t.fillRect(0, (int16_t)(otaProgressPercentY - PERCENT_BOX_HALF_H), Config::SCREEN_WIDTH,
+                   (int16_t)(PERCENT_BOX_HALF_H * 2), TFT_BLACK);
+        t.setTextDatum(MC_DATUM);
+        t.setTextColor(UiTheme::accentColor(t), TFT_BLACK);
+        t.setTextSize(3);
+        t.drawString(String(percent) + "%", Config::SCREEN_WIDTH / 2, otaProgressPercentY);
         t.setTextDatum(TL_DATUM);
+        t.setTextSize(1);
+
+        // Balken-Fuellung waechst nur (percent steigt monoton) - die neue,
+        // breitere Fuellung ueberdeckt die alte vollstaendig, kein
+        // Loeschen noetig. Ueberspringt redundante Aufrufe, wenn sich die
+        // gerundete Pixel-Breite trotz Prozent-Aenderung nicht veraendert
+        // hat (z.B. bei 1%-Schritten auf einer 210px breiten Leiste).
+        uint8_t clampedPercent = percent > 100 ? 100 : percent;
+        int16_t fillW = (int16_t)((BAR_W - 4) * clampedPercent / 100);
+        if (fillW > otaProgressLastFillW) {
+            t.fillRoundRect((int16_t)(BAR_MARGIN + 2), (int16_t)(otaProgressBarY + 2), fillW, (int16_t)(BAR_H - 4), 3,
+                             UiTheme::accentColor(t));
+            otaProgressLastFillW = fillW;
+        }
     }
 
     // Kompletter Ablauf fuer "Nach Update suchen" (System-Menue) - Pruefung
@@ -928,6 +1109,7 @@ namespace {
         if (!confirmed) return;
 
         otaProgressTft = &tft;
+        resetOtaProgressLayout(); // siehe dortiger Kommentar - Pflicht vor jedem neuen Versuch
         tft.fillScreen(TFT_BLACK);
         drawOtaProgress(0);
         // Gleicher Grund wie oben bei checkForUpdate() - waehrend des
@@ -943,10 +1125,11 @@ namespace {
         otaProgressTft = nullptr;
 
         if (ok) {
-            // Bewusst KEIN automatischer Neustart mehr - der Nutzer
-            // bestaetigt aktiv per Button, damit er den Erfolg auch wirklich
-            // mitbekommt (vorher lief die Meldung nur 1,5s an, dann
-            // Neustart - leicht zu verpassen).
+            // Automatischer Neustart nach kurzer Lesepause, KEIN Button/
+            // KEINE Touch-Warteschleife mehr (Alex' Entscheidung, nachdem
+            // der vorherige "Jetzt neu starten"-Button-Screen ein Dauer-
+            // Flackern verursachte - siehe drawOtaSuccessMessage()-Kommentar
+            // oben fuer die ausfuehrliche Vorgeschichte/Begruendung).
             //
             // BEWUSST OHNE Changelog an dieser Stelle (war testweise kurz
             // drin, siehe Git-Historie): hier laeuft noch die ALTE, gerade
@@ -956,47 +1139,20 @@ namespace {
             // zeigt main.cpp::showWhatsNewIfNeeded() den Changelog beim
             // naechsten Boot an, wenn wirklich schon die neue Firmware
             // laeuft (siehe dort).
-            // BEWUSST OHNE tappedLabel: ESP.restart() direkt danach ist so
-            // schnell, dass ein umgeschalteter Button-Text ohnehin nicht
-            // mehr lesbar ist - er hat aber, weil er laenger als "Jetzt neu
-            // starten" war, den Button-Text ueberlaufen lassen (Alex'
-            // Meldung). Der Button zeigt jetzt einfach durchgehend nur noch
-            // "Jetzt neu starten".
-            // GitHub-Stern-Hinweis als zusaetzlicher Absatz angehaengt
-            // (gleiches "\n\n"-Absatz-Muster wie main.cpp::showWeatherInfo())
-            // - dezent unterhalb des Haupttexts, verdraengt den Button nicht,
-            // da auf diesem Screen laut Screenshot reichlich freier Platz war.
+            // GitHub-Stern-Hinweis und Auto-Neustart-Hinweis als
+            // zusaetzliche Absaetze angehaengt (gleiches "\n\n"-Absatz-
+            // Muster wie main.cpp::showWeatherInfo()).
             String successBody = String(I18n::t(StringId::OTA_SUCCESS_BODY)) + "\n\n" +
+                                  I18n::t(StringId::OTA_AUTO_RESTART_HINT) + "\n\n" +
                                   I18n::t(StringId::OTA_GITHUB_STAR_HINT);
-            // In einer Schleife anzeigen, bis infoScreen() per ECHTEM Tap
-            // (nicht per Inaktivitaets-Timeout) beendet wird (Alex' Meldung:
-            // das Geraet startete bisher auch dann automatisch neu, wenn der
-            // 2-Minuten-Timeout waehrend des Downloads/Flashens schon fast
-            // abgelaufen war und der Nutzer den Erfolgs-Text dadurch gar
-            // nicht mehr lesen konnte, bevor ESP.restart() unbedingt lief).
-            // Bei Timeout wird der Screen einfach erneut angezeigt statt
-            // automatisch neuzustarten - der Neustart bleibt eine bewusste
-            // Nutzer-Aktion.
-            //
-            // delay(50) im Schleifenkoerper ist Pflicht, kein optionales
-            // Detail: ist msSinceLastTap() beim Eintritt in infoScreen()
-            // BEREITS ueber dem Timeout (z.B. weil der 2-Minuten-Timer schon
-            // waehrend des vorherigen Downloads/Flashens fast ganz verbraucht
-            // wurde), kehrt infoScreen() sofort mit false zurueck, OHNE
-            // jemals das eigene interne delay(20) (siehe dortige
-            // Timeout-Pruefung, die VOR dem delay() liegt) zu erreichen -
-            // ohne diese Pause hier waere das eine enge Dauerschleife ganz
-            // ohne delay()/yield() zwischen den Aufrufen, die auf dem ESP32
-            // den Task-Watchdog des laufenden Cores ausloesen und zu einem
-            // unkontrollierten Reset fuehren kann (Alex' Meldung: Geraet
-            // startete "von selbst" neu, ohne echten Tap - per Diagnose
-            // reproduziert, siehe Chat-Verlauf).
-            bool tapped = false;
-            while (!tapped) {
-                tapped = infoScreen(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), successBody.c_str(),
-                                     UiTheme::accentColor(tft), I18n::t(StringId::OTA_RESTART_BUTTON));
-                if (!tapped) delay(50);
-            }
+            drawOtaSuccessMessage(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), successBody,
+                                  UiTheme::accentColor(tft));
+            // Feste Lesepause statt einer Touch-Warteschleife - lang genug,
+            // um den kurzen Text zu erfassen, kurz genug, um nicht
+            // unnoetig zu nerven. Kein delay()/Watchdog-Risiko wie bei der
+            // frueheren Touch-Schleife, da hier keine Bedingung wiederholt
+            // geprueft wird.
+            delay(4000);
             // Setzt das Flag, das main.cpp::showWhatsNewIfNeeded() beim
             // naechsten Boot ausliest - siehe settings_store.h fuer die
             // Begruendung (Changelog-Screen soll NUR nach einem echten
