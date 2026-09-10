@@ -1061,6 +1061,66 @@ enum class StringId : uint16_t {
     // Mechanismus gerendert, nicht als feste Zeile - siehe dort.
     SD_REQUIRED_TROUBLESHOOTING,
 
+    // Live-Radar-WebUI (web_export_server.cpp) - war bisher komplett hart
+    // auf Englisch codiert, laeuft aber als normaler C++-Code auf dem
+    // Geraet und kann daher genau wie jeder andere Screen I18n::t()
+    // aufrufen (serverseitig zum Zeitpunkt des Seitenaufbaus aufgeloest -
+    // ein Sprachwechsel am Geraet wird erst beim naechsten Laden der Seite
+    // sichtbar, genau wie beim bestehenden Einheiten-Flag). Bereits
+    // vorhandene, inhaltlich passende StringIds (DETAIL_*, WEATHER_*,
+    // AIRLINE_FILTER_*, WATCHLIST_*, AIRCRAFT_LIST_SORT_CALLSIGN,
+    // LOGFILES_EMPTY, RADAR_AIRCRAFT_COUNT_*) werden dafuer 1:1
+    // wiederverwendet, siehe dortige Einsatzstellen - diese WEB_*-Gruppe
+    // deckt nur die verbleibenden, rein webseiten-eigenen Texte ab, fuer
+    // die es kein Geraete-Aequivalent gibt.
+    WEB_CLOSE,
+    // Steht vor dem FlightAware-Link, das "-> " kommt als fester,
+    // nicht uebersetzter Pfeil dahinter (siehe web_export_server.cpp).
+    WEB_TRACK_LINK,
+    WEB_OPENING_PLEASE_WAIT,
+    WEB_CHECKING,
+    WEB_CONNECTED,
+    WEB_NO_CONNECTION,
+    WEB_WAITING_FIRST_UPDATE,
+    WEB_UPDATED_JUST_NOW,
+    // WEB_UPDATED_PREFIX + Sekundenzahl + WEB_SECONDS_AGO_SUFFIX (Zahl+"s"
+    // bleibt wie ueberall sonst im Projekt unuebersetzt, siehe
+    // DETAIL_OVERFLIGHT_*-Kommentar weiter oben) fuer den Fall, dass die
+    // letzte Aktualisierung laenger als 1s zurueckliegt.
+    WEB_UPDATED_PREFIX,
+    WEB_SECONDS_AGO_SUFFIX,
+    WEB_CONNECTION_LOST,
+    // Zwischen Flugzeuganzahl (RADAR_AIRCRAFT_COUNT_SINGULAR/_PLURAL_SUFFIX,
+    // wiederverwendet) und der Reichweite in der Statuszeile.
+    WEB_STATUS_RANGE_PREFIX,
+    WEB_WATCHLIST_MATCH,
+    WEB_PWA_HINT_IOS,
+    WEB_PWA_HINT_OTHER,
+    // Arrow ("->") kommt fest/unuebersetzt dahinter, wie bei WEB_TRACK_LINK.
+    WEB_MANAGE_LISTS_LINK,
+    WEB_LOGBOOK_HEADING,
+    WEB_DELETING,
+    WEB_PREPARING,
+    WEB_SEARCH_PLACEHOLDER,
+    WEB_DOWNLOAD_CSV_LINK,
+    WEB_DATE_HEADER,
+    WEB_AIRCRAFT_HEADER,
+    WEB_DOWNLOAD,
+    WEB_DELETE,
+    WEB_REMOVE,
+    WEB_AIRLINE_FILTER_EMPTY,
+    WEB_ICAO_PREFIX_HEADER,
+    WEB_BACK_TO_LOGBOOK,
+    WEB_ICAO_PLACEHOLDER,
+    WEB_CALLSIGN_PLACEHOLDER,
+    // Registrierungs-Praefix im Flugzeug-Popup (kein Geraete-Aequivalent -
+    // DETAIL_TYPE gibt es schon fuers Typcode-Label direkt daneben, wird
+    // wiederverwendet, siehe web_export_server.cpp).
+    WEB_REG_PREFIX,
+    WEB_LIVE_RADAR_HEADING,
+    // Tooltip des Leaflet-Standort-Markers in der Kartenansicht.
+    WEB_HOME_TOOLTIP,
+
     COUNT
 };
 

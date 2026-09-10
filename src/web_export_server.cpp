@@ -13,6 +13,7 @@
 #include "sun_times.h"
 #include "web_pwa_icon.h"
 #include "web_avatar_logo.h"
+#include "i18n.h"
 #include <WebServer.h>
 #include <ArduinoJson.h>
 #include <SD.h>
@@ -46,6 +47,16 @@ namespace {
     // am Geraet (identische Persistierung).
     uint32_t lastRangeCommandMs = 0;
     constexpr uint32_t MIN_CONTROL_INTERVAL_MS = 400;
+
+    // Gleicher Debounce-Gedanke wie oben, hier fuer die neuen Mode-Menue-
+    // Fernsteuerungs-Endpunkte (/control/theme, /control/toggle) - alle
+    // betroffenen SettingsStore-Setter schreiben ebenfalls bei jedem Aufruf
+    // komplett auf die SD-Karte (siehe settings_store.cpp). Einzelne
+    // Klicks/Checkbox-Toggles (kein Slider-Drag wie bei der Reichweite)
+    // sind unkritisch, aber ein gemeinsamer Zeitstempel schuetzt trotzdem
+    // guenstig vor z.B. versehentlichen Doppel-Taps oder mehreren schnell
+    // hintereinander umgelegten Checkboxen.
+    uint32_t lastModeCommandMs = 0;
 
     // Web-Pendant zu UiTheme::accentColor() (siehe ui_theme.h/.cpp auf dem
     // Geraet) - Alex' Wunsch, das WebUI-Farbthema (Gruen/Amber/Blau)
@@ -86,6 +97,28 @@ namespace {
         if (name.indexOf('/') >= 0 || name.indexOf('\\') >= 0) return false;
         if (name.indexOf("..") >= 0) return false;
         return true;
+    }
+
+    // Baut aus einem beliebigen (uebersetzten) C-String ein sicheres,
+    // einfach-gequotetes JS-String-Literal INKLUSIVE der Anfuehrungszeichen -
+    // noetig, weil ab jetzt echte I18n::t()-Uebersetzungen (statt fester
+    // englischer Literale) in die per "html +=" zusammengebaute JS-Seite
+    // eingefuegt werden: ohne Escaping wuerde z.B. ein Apostroph in einer
+    // Uebersetzung ("d'un" o.ae.) das umgebende JS-String-Literal aufbrechen
+    // und die ganze Seite zerschiessen. Escaped Backslash, einfaches
+    // Anfuehrungszeichen und Zeilenumbruch - fuer die kurzen UI-Label-Texte
+    // hier mehr als ausreichend (kein voller JSON-Encoder noetig).
+    String jsLit(const char* s) {
+        String out;
+        out += '\'';
+        for (const char* p = s; *p; p++) {
+            char c = *p;
+            if (c == '\'' || c == '\\') { out += '\\'; out += c; }
+            else if (c == '\n') { out += "\\n"; }
+            else { out += c; }
+        }
+        out += '\'';
+        return out;
     }
 
     // Absichtliche Duplikate der gleichnamigen (lokalen/statischen) Funktionen
@@ -467,6 +500,14 @@ namespace {
         html += "#radarStatus{font-size:12px;color:var(--accent-muted);margin-top:4px;}";
         html += "#radarControls{font-size:12px;margin-bottom:8px;}";
         html += "#radarControls select{background:#0a0f0d;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:2px 6px;font-family:inherit;}";
+        // Mode-Kontrollbereich (Farbschema-Dropdown + 6 Checkboxen, siehe
+        // appendRadarSection()) - gleicher Select-Stil wie #radarRange
+        // oben, "accent-color" faerbt die Checkbox-Haekchen selbst passend
+        // zum aktuellen Farbthema ein (von allen gaengigen Browsern
+        // unterstuetzt, kein eigenes Checkbox-Icon noetig).
+        html += "#modeControls select{background:#0a0f0d;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:2px 6px;font-family:inherit;}";
+        html += "#modeControls label{display:inline-flex;align-items:center;gap:3px;color:var(--accent-muted);cursor:pointer;white-space:nowrap;}";
+        html += "#modeControls input[type=checkbox]{accent-color:var(--accent);cursor:pointer;}";
         html += "#acInfo{display:none;max-width:400px;margin-top:8px;padding:8px 10px;border:1px solid var(--accent);border-radius:6px;font-size:13px;line-height:1.7;}";
         html += "#acInfo a{color:#ff3b3b;text-decoration:none;border:1px solid #ff3b3b;border-radius:4px;padding:2px 8px;display:inline-block;margin-top:4px;}";
         // Sofortige optische Rueckmeldung beim Antippen/Klicken - reine
@@ -579,7 +620,7 @@ namespace {
         // Geraete-Display selbst (siehe radar_screen.cpp, "%.0fnm").
         bool metric = LocationManager::useMetricUnits();
 
-        html += "<h2>Live Radar</h2>";
+        html += "<h2>" + String(I18n::t(StringId::WEB_LIVE_RADAR_HEADING)) + "</h2>";
         // Karten-Tab (Leaflet + OpenStreetMap-Kacheln, beide per CDN aus dem
         // Browser des Nutzers geladen - NICHT im ESP32-Flash eingebettet,
         // siehe Alex' ausdruecklicher Vorgabe). Radar-Canvas bleibt
@@ -602,7 +643,15 @@ namespace {
         // ohne den restlichen Flex-Zeilenablauf (Radar/Map-Buttons) zu
         // beeinflussen - der urspruengliche Platz in der Zeile bleibt
         // reserviert, nur das Icon selbst rutscht optisch daneben.
-        html += "<canvas id=\"weatherIconCanvas\" width=\"120\" height=\"120\" style=\"cursor:pointer;flex-shrink:0;transform:translate(-130px,50px);\" title=\"Weather info\"></canvas></div>";
+        html += "<canvas id=\"weatherIconCanvas\" width=\"120\" height=\"120\" style=\"cursor:pointer;flex-shrink:0;transform:translate(-110px,50px);\" title=\"Weather info\"></canvas></div>";
+        // Hoehenfarben-Legende (Alex' Wunsch) - AUSSERHALB von #radarView/
+        // #mapView platziert (die per CSS ueber "display:none" umgeschaltet
+        // werden, siehe #tabRadar/#tabMap-Handler weiter unten), damit sie
+        // in BEIDEN Ansichten sichtbar bleibt, da die Markerfarben in beiden
+        // dieselbe altColor()-Funktion nutzen. Inhalt wird rein per JS
+        // gefuellt (renderAltLegend(), siehe dort) - leer hier, damit keine
+        // Server/Client-Farblogik dupliziert werden muss.
+        html += "<div id=\"altLegend\" style=\"font-size:11px;color:var(--accent-muted);display:flex;flex-wrap:wrap;align-items:center;gap:3px 10px;margin-bottom:8px;\"></div>";
         html += "<div id=\"radarView\">";
         html += "<div id=\"radarControls\">Range: <select id=\"radarRange\">";
         for (uint8_t i = 0; i < Config::RANGE_STEP_COUNT; i++) {
@@ -613,6 +662,47 @@ namespace {
             html += ">" + String(labelValue, 0) + (metric ? " km</option>" : " nm</option>");
         }
         html += "</select></div>";
+        // Fernsteuerung des physischen "Mode"-Menues (radar_theme_screen.cpp,
+        // Alex' Wunsch) - 5 Farbschema-Optionen (Dropdown, gleicher Stil wie
+        // #radarRange oben) plus 6 Checkboxen fuer die restlichen Toggles.
+        // Beschriftung ueber dieselben, bereits in alle 8 Sprachen
+        // uebersetzten StringIds wie auf dem Geraete-Mode-Screen selbst -
+        // keine neuen Uebersetzungen fuer diese Labels noetig. Aktueller
+        // Wert server-seitig beim Seitenaufbau aus SettingsStore vorbefuellt,
+        // Sync waehrend die Seite offen ist siehe poll()/applyTheme()/
+        // pendingMode* weiter unten (gleiches Prinzip wie pendingRangeKm).
+        // BEWUSST NUR Farbschema + Regen-Effekt + Militaer/Behoerde hier -
+        // CRT-Phosphor/Radar-Puls/Klassik-Radar/Overlay wurden testweise
+        // ergaenzt, dann auf Alex' Wunsch wieder entfernt: diese vier haben
+        // KEINE sichtbare Entsprechung im Browser (reine Geraete-Radarbild-
+        // Effekte), sollen deshalb ausschliesslich am physischen Mode-Menue
+        // steuerbar bleiben.
+        {
+            uint8_t themeIdx = SettingsStore::radarThemeIndex();
+            html += "<div id=\"modeControls\" style=\"font-size:12px;margin-bottom:8px;display:flex;flex-wrap:wrap;align-items:center;gap:3px 10px;\">";
+            html += "<select id=\"themeSel\">";
+            const StringId themeLabels[5] = {StringId::RADAR_THEME_GREEN, StringId::RADAR_THEME_AMBER,
+                                              StringId::RADAR_THEME_BLUE, StringId::RADAR_THEME_RED,
+                                              StringId::RADAR_THEME_PURPLE};
+            for (uint8_t i = 0; i < 5; i++) {
+                html += "<option value=\"" + String(i) + "\"";
+                if (i == themeIdx) html += " selected";
+                html += ">" + String(I18n::t(themeLabels[i])) + "</option>";
+            }
+            html += "</select>";
+
+            struct ModeCheckbox { const char* id; StringId label; bool checked; };
+            const ModeCheckbox checkboxes[2] = {
+                {"toggleMilitary", StringId::MENU_MILITARY_SQUAWK, SettingsStore::militarySquawkDetectionEnabled()},
+                {"toggleRain", StringId::MENU_RAIN_EFFECT, SettingsStore::rainEffectEnabled()},
+            };
+            for (uint8_t i = 0; i < 2; i++) {
+                html += "<label><input type=\"checkbox\" id=\"" + String(checkboxes[i].id) + "\"";
+                if (checkboxes[i].checked) html += " checked";
+                html += "> " + String(I18n::t(checkboxes[i].label)) + "</label>";
+            }
+            html += "</div>";
+        }
         // Live mitzaehlende "zuletzt aktualisiert"-Anzeige (Alex' Wunsch) -
         // eigenes Element ueber dem Canvas statt in #radarStatus verbaut
         // (das zeigt weiterhin nur Flugzeuganzahl/Reichweite nach jedem
@@ -621,9 +711,10 @@ namespace {
         // Informationen. Aktualisiert sich per eigenem 1s-Intervall
         // (updateFreshness() unten), NICHT nur einmalig beim Laden - direkt
         // erkennbar, ob die Verbindung gerade frisch ist oder hakt.
-        html += "<div id=\"radarFreshness\" style=\"font-size:12px;color:var(--accent-muted);margin-bottom:6px;\">Waiting for first update...</div>";
+        html += "<div id=\"radarFreshness\" style=\"font-size:12px;color:var(--accent-muted);margin-bottom:6px;\">" +
+                String(I18n::t(StringId::WEB_WAITING_FIRST_UPDATE)) + "</div>";
         html += "<canvas id=\"radarCanvas\" width=\"360\" height=\"360\"></canvas>";
-        html += "<p id=\"radarStatus\">Loading...</p>";
+        html += "<p id=\"radarStatus\">" + String(I18n::t(StringId::LOADING)) + "</p>";
         html += "<div id=\"acInfo\"></div>";
         html += "<div id=\"weatherInfo\"></div>";
         html += "</div>"; // #radarView
@@ -678,6 +769,19 @@ namespace {
         html += "var metric=" + String(metric ? "true" : "false") + ";";
         html += "function fmtRange(km){return metric?(Math.round(km)+' km'):(Math.round(km/1.852)+' nm');}";
         html += "function fmtDist(km){return metric?(km.toFixed(1)+' km'):((km/1.852).toFixed(1)+' nm');}";
+        // Teil 2 des Auftrags: dieselbe Auto/Metrisch/Imperial-Umschaltung
+        // (metric-Flag oben) jetzt auch fuer Altitude/Speed/Steig-Sinkrate
+        // im Flugzeug-Popup (beide Bloecke, siehe showInfo()/popupHtml()
+        // unten) - bisher hart auf ft/kt/ft-min, unabhaengig von der
+        // Geraete-Einstellung. Gleiche Umrechnungsfaktoren wie ueberall
+        // sonst im Projekt (Units::ftToM()/0.3048, Units::ktToKmh()/1.852).
+        // Der "Steckbrief" (Closest/Fastest) bleibt bewusst UNVERAENDERT bei
+        // km/kt (siehe Aufruf weiter unten) - exakt das bestehende Verhalten
+        // des Geraete-Detail-Panels (DETAIL_MIN_DIST_PREFIX/
+        // DETAIL_MAX_SPEED_PREFIX), dort auch immer km/kt.
+        html += "function fmtAlt(ft){return metric?(Math.round(ft*0.3048)+'m'):(Math.round(ft)+'ft');}";
+        html += "function fmtSpeed(kt){return metric?(Math.round(kt*1.852)+'km/h'):(Math.round(kt)+'kt');}";
+        html += "function fmtVrate(ftMin){return metric?(Math.round(ftMin*0.3048)+'m/min'):(Math.round(ftMin)+'ft/min');}";
 
         // Hintergrund-Sterne AUSSERHALB des Radarkreises - gleiches Prinzip
         // wie updateBgStars()/initBgStarsIfNeeded() in radar_screen.cpp
@@ -767,6 +871,31 @@ namespace {
         html += "if(ft<3000)return '#9e3030';if(ft<10000)return '#9e7230';if(ft<25000)return '#9e8c30';if(ft<35000)return '#239e0c';return '#30829e';}";
         html += "if(ft<3000)return '#ff4d4d';if(ft<10000)return '#ffb84d';if(ft<25000)return '#ffe14d';if(ft<35000)return '#39ff14';return '#4dd2ff';}";
 
+        // Kompakte Hoehenfarben-Legende (#altLegend, siehe appendRadarSection()
+        // oben) - Alex' Wunsch: bildet die bestehende, ABSICHTLICH vom
+        // Geraet abweichende 5-stufige Web-Farbskala ab (siehe altColor()-
+        // Kommentar oben), NICHT radar_screen.cpp's 3-stufige colorForAltitude().
+        // Ruft altColor() mit je einem repraesentativen ft-Wert pro Band auf
+        // (0/5000/15000/30000/40000), statt die Farben hier ein zweites Mal
+        // zu definieren - bleibt dadurch automatisch pixelgleich mit den
+        // echten Marker-Farben, inklusive Nachtdimmung (currentIsNight).
+        // Zahlenbereiche analog zu radar_screen.cpp::altitudeLegendLabels()
+        // (gleiche 100er-Abrundung bei Metrisch statt der krummen 1:1-
+        // Umrechnungswerte), nur fuer die 5 Web-eigenen Schwellwerte
+        // (3000/10000/25000/35000ft statt der 2 Geraete-Schwellwerte).
+        html += "function altLegendLabels(){";
+        html += "if(metric){";
+        html += "var b1=Math.floor(3000*0.3048/100)*100,b2=Math.floor(10000*0.3048/100)*100,";
+        html += "b3=Math.floor(25000*0.3048/100)*100,b4=Math.floor(35000*0.3048/100)*100;";
+        html += "return ['<'+b1+'m',b1+'-'+b2+'m',b2+'-'+b3+'m',b3+'-'+b4+'m','>'+b4+'m'];}";
+        html += "return ['<3k ft','3-10k ft','10-25k ft','25-35k ft','>35k ft'];}";
+        html += "function renderAltLegend(){var el=document.getElementById('altLegend');if(!el)return;";
+        html += "var vals=[0,5000,15000,30000,40000],labels=altLegendLabels(),out='';";
+        html += "for(var i=0;i<5;i++){out+='<span style=\"display:inline-flex;align-items:center;gap:3px;\">'+";
+        html += "'<span style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:'+altColor(vals[i])+';\"></span>'+labels[i]+'</span>';}";
+        html += "el.innerHTML=out;}";
+        html += "renderAltLegend();";
+
         // Wetter-Icon fuer die Live-Radar-Webseite (Alex' Wunsch) - bildet
         // main.cpp::drawWeatherIcon()/drawCloudShape()/drawSunShape() am
         // Geraet nach (gleiche relative Proportionen/Versaetze), nur auf
@@ -819,25 +948,41 @@ namespace {
         html += "}"; // drawWeatherIconCanvas
 
         // Textform der Condition-Werte fuers Popup (gleicher Zweck wie
-        // main.cpp::conditionLabel(), hier als reines JS-Pendant).
+        // main.cpp::conditionLabel(), hier als reines JS-Pendant) - nutzt
+        // jetzt dieselben WEATHER_CONDITION_*-StringIds wie das Geraet
+        // selbst (Teil 1 des Auftrags), statt fester englischer Woerter.
         html += "function weatherConditionText(cond){switch(cond){";
-        html += "case 'clear':return 'Clear';case 'partly_cloudy':return 'Partly cloudy';case 'cloudy':return 'Cloudy';";
-        html += "case 'rain':return 'Rain';case 'snow':return 'Snow';case 'thunderstorm':return 'Thunderstorm';";
-        html += "default:return 'Unknown';}}";
+        html += "case 'clear':return " + jsLit(I18n::t(StringId::WEATHER_CONDITION_CLEAR)) + ";";
+        html += "case 'partly_cloudy':return " + jsLit(I18n::t(StringId::WEATHER_CONDITION_PARTLY_CLOUDY)) + ";";
+        html += "case 'cloudy':return " + jsLit(I18n::t(StringId::WEATHER_CONDITION_CLOUDY)) + ";";
+        html += "case 'rain':return " + jsLit(I18n::t(StringId::WEATHER_CONDITION_RAIN)) + ";";
+        html += "case 'snow':return " + jsLit(I18n::t(StringId::WEATHER_CONDITION_SNOW)) + ";";
+        html += "case 'thunderstorm':return " + jsLit(I18n::t(StringId::WEATHER_CONDITION_THUNDERSTORM)) + ";";
+        html += "default:return '';}}";
 
         // Wetter-Info-Popup (Antippen/Klicken des Icons) - gleicher Inhalt
         // wie main.cpp::showWeatherInfo() am Geraet (Standort-Hinweis,
         // METAR, Sonnenauf-/-untergang, Kurzvorhersage), alle Werte kommen
         // bereits server-seitig fertig aufgeloest aus handleRadarJson().
+        // Jetzt dieselben WEATHER_*-StringIds wie showWeatherInfo() am
+        // Geraet (Teil 1 des Auftrags) - WEATHER_FORECAST_PREFIX hat die
+        // "in 3 Stunden" schon fest eingebaut (siehe dortiger Kommentar in
+        // i18n.h), das vorher hier dynamisch eingesetzte
+        // "d.forecast_hours_ahead" entfaellt deshalb, genau wie am Geraet.
         html += "function showWeatherInfoPopup(){var d=lastData;var lines=[];";
-        html += "lines.push('Weather shown is for the currently active location.');";
-        html += "if(d.metar_available){lines.push('<br>METAR ('+d.metar_airport_code+'):<br>'+d.metar_raw);}";
-        html += "if(d.sun_available){if(d.sun_always_day){lines.push('<br>Sun: up all day today (polar day)');}";
-        html += "else if(d.sun_always_night){lines.push('<br>Sun: down all day today (polar night)');}";
-        html += "else{lines.push('<br>Sunrise: '+d.sunrise_local+'&emsp;Sunset: '+d.sunset_local);}}";
+        html += "lines.push(" + jsLit(I18n::t(StringId::WEATHER_INFO_BODY)) + ");";
+        html += "if(d.metar_available){lines.push('<br>'+" + jsLit(I18n::t(StringId::WEATHER_METAR_PREFIX)) +
+                "+d.metar_airport_code+':<br>'+d.metar_raw);}";
+        html += "if(d.sun_available){if(d.sun_always_day){lines.push('<br>'+" +
+                jsLit(I18n::t(StringId::WEATHER_POLAR_DAY)) + ");}";
+        html += "else if(d.sun_always_night){lines.push('<br>'+" + jsLit(I18n::t(StringId::WEATHER_POLAR_NIGHT)) + ");}";
+        html += "else{lines.push('<br>'+" + jsLit(I18n::t(StringId::WEATHER_SUNRISE_PREFIX)) +
+                "+d.sunrise_local+'&emsp;'+" + jsLit(I18n::t(StringId::WEATHER_SUNSET_PREFIX)) + "+d.sunset_local);}}";
         html += "if(d.forecast_available){var t=metric?d.forecast_temp_c:(d.forecast_temp_c*9/5+32);";
-        html += "lines.push('<br>Forecast (+'+d.forecast_hours_ahead+'h): '+Math.round(t)+'\\u00b0'+(metric?'C':'F')+', '+weatherConditionText(d.forecast_condition));}";
-        html += "weatherInfoBox.innerHTML=lines.join('<br>')+'<br><a href=\"#\" id=\"weatherInfoClose\">Close</a>';";
+        html += "lines.push('<br>'+" + jsLit(I18n::t(StringId::WEATHER_FORECAST_PREFIX)) +
+                "+Math.round(t)+'\\u00b0'+(metric?'C':'F')+', '+weatherConditionText(d.forecast_condition));}";
+        html += "weatherInfoBox.innerHTML=lines.join('<br>')+'<br><a href=\"#\" id=\"weatherInfoClose\">'+" +
+                jsLit(I18n::t(StringId::WEB_CLOSE)) + "+'</a>';";
         html += "weatherInfoBox.style.display='block';";
         html += "document.getElementById('weatherInfoClose').onclick=function(e){e.preventDefault();hideWeatherInfo();};";
         html += "}";
@@ -871,10 +1016,10 @@ namespace {
         // Alle vier Himmelsrichtungen (N/E/S/W), genau wie
         // drawStaticBackground() in radar_screen.cpp - vorher stand hier nur
         // "N", was auf Nachfrage ergaenzt wurde.
-        html += "ctx.fillStyle=accentColor;ctx.textAlign='center';ctx.fillText('N',cx,cy-R-8);";
-        html += "ctx.fillText('S',cx,cy+R+16);";
-        html += "ctx.textAlign='left';ctx.fillText('E',cx+R+4,cy+3);";
-        html += "ctx.textAlign='right';ctx.fillText('W',cx-R-4,cy+3);";
+        html += "ctx.fillStyle=accentColor;ctx.textAlign='center';ctx.fillText(" + jsLit(I18n::t(StringId::COMPASS_N)) + ",cx,cy-R-8);";
+        html += "ctx.fillText(" + jsLit(I18n::t(StringId::COMPASS_S)) + ",cx,cy+R+16);";
+        html += "ctx.textAlign='left';ctx.fillText(" + jsLit(I18n::t(StringId::COMPASS_E)) + ",cx+R+4,cy+3);";
+        html += "ctx.textAlign='right';ctx.fillText(" + jsLit(I18n::t(StringId::COMPASS_W)) + ",cx-R-4,cy+3);";
         html += "ctx.textAlign='center';";
         html += "ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);ctx.fill();";
         html += "markers=[];";
@@ -923,7 +1068,14 @@ namespace {
         html += "if(data.raining){drawRain(data.wind_dir_deg||0,data.rain_intensity||2,accentColor);}else{lastRainMs=null;rainInited=false;}";
         html += "drawWeatherIconCanvas(data.weather_condition||'unknown');";
         html += "if(weatherInfoBox.style.display==='block'){showWeatherInfoPopup();}"; // haelt das offene Popup mit frischen Werten synchron (poll() alle 8s)
-        html += "status.textContent=(data.aircraft||[]).length+' aircraft \\u00b7 range '+fmtRange(data.range_km);";
+        // Aircraft-Anzahl jetzt ueber dieselben RADAR_AIRCRAFT_COUNT_SINGULAR/
+        // _PLURAL_SUFFIX-StringIds wie am Geraet selbst (radar_screen.cpp),
+        // statt eines fest englischen " aircraft" - deckt automatisch auch
+        // den Singular/Plural-Fall wie am Geraet ab.
+        html += "var acCount=(data.aircraft||[]).length;";
+        html += "status.textContent=(acCount===1?" + jsLit(I18n::t(StringId::RADAR_AIRCRAFT_COUNT_SINGULAR)) +
+                ":acCount+" + jsLit(I18n::t(StringId::RADAR_AIRCRAFT_COUNT_PLURAL_SUFFIX)) + ")+" +
+                jsLit(I18n::t(StringId::WEB_STATUS_RANGE_PREFIX)) + "+fmtRange(data.range_km);";
         html += "}";
 
         // WICHTIG: Das erneute Aufbauen der Infobox (showInfo(), baut u.a.
@@ -1018,42 +1170,69 @@ namespace {
         // standen. Route/Flugbuch-Historie bewusst NICHT mit dabei (siehe
         // Kommentar bei handleRadarJson() oben).
         html += "if(a.airline_name){lines.push(a.airline_name);}";
-        html += "var regType=[];if(a.reg){regType.push('Reg: '+a.reg);}if(a.type_code){regType.push('Type: '+a.type_code);}";
+        // Teil 1 (Sprache) + Teil 2 (Einheiten) des Auftrags: Reg/Type
+        // haben kein Geraete-Aequivalent (WEB_REG_PREFIX neu, DETAIL_TYPE
+        // wiederverwendet), Altitude/Speed/Climb-Descend-Level laufen jetzt
+        // ueber dieselben DETAIL_*-StringIds wie das Geraete-Detail-Panel
+        // UND ueber fmtAlt()/fmtSpeed()/fmtVrate() (metric-Flag, siehe
+        // oben) statt fest ft/kt/ft-min.
+        html += "var regType=[];if(a.reg){regType.push(" + jsLit(I18n::t(StringId::WEB_REG_PREFIX)) + "+a.reg);}";
+        html += "if(a.type_code){regType.push(" + jsLit(I18n::t(StringId::DETAIL_TYPE)) + "+a.type_code);}";
         html += "if(regType.length){lines.push(regType.join(' \\u00b7 '));}";
-        html += "lines.push('Altitude: '+Math.round(a.alt_ft)+' ft');";
-        html += "if(a.speed_kt){lines.push('Speed: '+Math.round(a.speed_kt)+' kt');}";
-        // Steig-/Sinkrate, gleiche Schwelle (+-100ft/min) wie DETAIL_CLIMB/
-        // DETAIL_DESCENT/DETAIL_LEVEL am Geraet.
-        html += "if(a.vert_rate_ft_min>100){lines.push('Climbing +'+a.vert_rate_ft_min+'ft/min');}";
-        html += "else if(a.vert_rate_ft_min<-100){lines.push('Descending '+a.vert_rate_ft_min+'ft/min');}";
-        html += "else{lines.push('Level');}";
+        html += "lines.push(" + jsLit(I18n::t(StringId::DETAIL_ALT)) + "+fmtAlt(a.alt_ft));";
+        html += "if(a.speed_kt){lines.push(" + jsLit(I18n::t(StringId::DETAIL_SPEED)) + "+fmtSpeed(a.speed_kt));}";
+        // Steig-/Sinkrate, gleiche Schwelle (+-100ft/min, Vergleich bleibt
+        // in ft/min - nur die ANZEIGE via fmtVrate() wechselt die Einheit)
+        // wie DETAIL_CLIMB/DETAIL_DESCENT/DETAIL_LEVEL am Geraet.
+        html += "if(a.vert_rate_ft_min>100){lines.push(" + jsLit(I18n::t(StringId::DETAIL_CLIMB)) + "+'+'+fmtVrate(a.vert_rate_ft_min));}";
+        html += "else if(a.vert_rate_ft_min<-100){lines.push(" + jsLit(I18n::t(StringId::DETAIL_DESCENT)) + "+fmtVrate(a.vert_rate_ft_min));}";
+        html += "else{lines.push(" + jsLit(I18n::t(StringId::DETAIL_LEVEL)) + ");}";
         // Hoehenwinkel rein clientseitig aus alt_ft/dist_km berechnet (gleiche
         // einfache atan2-Formel wie am Geraet) - kein eigenes JSON-Feld
         // noetig, direkt neben Distanz/Peilung mit angezeigt.
         html += "var elevDeg=Math.atan2(a.alt_ft*0.3048,a.dist_km*1000)*180/Math.PI;";
-        html += "lines.push('Distance: '+fmtDist(a.dist_km)+', bearing '+Math.round(a.bearing_deg)+'\\u00b0, elevation '+Math.round(elevDeg)+'\\u00b0');";
-        html += "lines.push('Heading: '+Math.round(a.track_deg)+'\\u00b0');";
+        html += "lines.push(" + jsLit(I18n::t(StringId::DETAIL_DIST)) + "+fmtDist(a.dist_km)+', '+" +
+                jsLit(I18n::t(StringId::DETAIL_BEARING_PREFIX)) + "+Math.round(a.bearing_deg)+'\\u00b0, '+Math.round(elevDeg)+'\\u00b0'+" +
+                jsLit(I18n::t(StringId::DETAIL_ELEVATION_SUFFIX)) + ");";
+        html += "lines.push(" + jsLit(I18n::t(StringId::DETAIL_HDG)) + "+Math.round(a.track_deg)+'\\u00b0');";
         // Naeherungs-/Entfernungs-Trend, gleiche 3 Zustaende wie
         // DETAIL_APPROACHING/_DEPARTING/_PASSING am Geraet (dort Text-Pfeile
         // "v"/"^"/"->" mangels Unicode-Glyphen im TFT-Font - hier echte
         // Pfeilsymbole, da der Browser sie problemlos darstellt).
-        html += "var trendSymbols={approaching:'\\u2193 Approaching',departing:'\\u2191 Departing',passing:'\\u2192 Passing'};";
+        html += "var trendSymbols={approaching:'\\u2193 '+" + jsLit(I18n::t(StringId::DETAIL_APPROACHING)) +
+                ",departing:'\\u2191 '+" + jsLit(I18n::t(StringId::DETAIL_DEPARTING)) +
+                ",passing:'\\u2192 '+" + jsLit(I18n::t(StringId::DETAIL_PASSING)) + "};";
         html += "if(trendSymbols[a.distance_trend]){lines.push(trendSymbols[a.distance_trend]);}";
-        html += "if(a.squawk){lines.push('Squawk: '+a.squawk);}";
+        html += "if(a.squawk){lines.push(" + jsLit(I18n::t(StringId::DETAIL_SQUAWK)) + "+a.squawk);}";
         // "Sichtbar seit" - gleiche Xmin Ys-Beschriftung wie am Geraet
-        // (DETAIL_SEEN_FOR_PREFIX + formatDurationLabeled()).
+        // (DETAIL_SEEN_FOR_PREFIX + formatDurationLabeled(), "min"/"s"
+        // bleiben unuebersetzt wie ueberall sonst im Projekt).
         html += "var sfMin=Math.floor(a.seen_for_sec/60),sfSec=a.seen_for_sec%60;";
-        html += "lines.push('Seen for '+(sfMin>0?(sfMin+'min '+sfSec+'s'):(sfSec+'s')));";
+        html += "lines.push(" + jsLit(I18n::t(StringId::DETAIL_SEEN_FOR_PREFIX)) +
+                "+(sfMin>0?(sfMin+'min '+sfSec+'s'):(sfSec+'s')));";
         // Anflug-Hinweis (Best-Effort-Erkennung, siehe aircraft_table.cpp::
-        // postFetchUpdate()) - nur wenn approach_likely true ist.
-        html += "if(a.approach_likely){lines.push('Approaching, ETA ~'+a.approach_eta_min+' min');}";
-        // "Ueberflug"-CPA - nur wenn cpa_relevant true ist.
-        html += "if(a.cpa_relevant){lines.push('Fly-by in ~'+Math.round(a.cpa_eta_min)+' min');}";
+        // postFetchUpdate()) - nur wenn approach_likely true ist. Nutzt
+        // DETAIL_APPROACH_PREFIX/_ETA/_SUFFIX wie am Geraet - dort steht
+        // zwischen Praefix und ETA normalerweise der Flughafencode, hier
+        // gibt es (noch) keinen im JSON, deshalb direkt aneinandergereiht.
+        html += "if(a.approach_likely){lines.push(" + jsLit(I18n::t(StringId::DETAIL_APPROACH_PREFIX)) + "+" +
+                jsLit(I18n::t(StringId::DETAIL_APPROACH_ETA)) + "+a.approach_eta_min+" +
+                jsLit(I18n::t(StringId::DETAIL_APPROACH_SUFFIX)) + ");}";
+        // "Ueberflug"-CPA - nur wenn cpa_relevant true ist, ueber dieselben
+        // DETAIL_OVERFLIGHT_PREFIX/_SUFFIX-StringIds wie am Geraet.
+        html += "if(a.cpa_relevant){lines.push(" + jsLit(I18n::t(StringId::DETAIL_OVERFLIGHT_PREFIX)) +
+                "+Math.round(a.cpa_eta_min)+'min'+" + jsLit(I18n::t(StringId::DETAIL_OVERFLIGHT_SUFFIX)) + ");}";
         // "Steckbrief" (kuerzeste Distanz/hoechste Geschwindigkeit seit dem
         // ersten Sichten in dieser Sitzung) - nur wenn BEIDE Werte gesetzt
         // sind (ArduinoJson liefert fehlende Felder als undefined, nicht 0).
+        // Bleibt bewusst bei km/kt, UNABHAENGIG von der Einheiten-
+        // Einstellung (Teil 2 des Auftrags) - exakt das bestehende
+        // Verhalten von DETAIL_MIN_DIST_PREFIX/DETAIL_MAX_SPEED_PREFIX am
+        // Geraete-Detail-Panel, nur die Label-Uebersetzung wechselt.
         html += "if(a.session_min_distance_km!==undefined&&a.session_max_speed_kt!==undefined){";
-        html += "lines.push('Closest: '+a.session_min_distance_km.toFixed(1)+'km \\u00b7 Fastest: '+Math.round(a.session_max_speed_kt)+'kt');}";
+        html += "lines.push(" + jsLit(I18n::t(StringId::DETAIL_MIN_DIST_PREFIX)) +
+                "+a.session_min_distance_km.toFixed(1)+'km \\u00b7 '+" + jsLit(I18n::t(StringId::DETAIL_MAX_SPEED_PREFIX)) +
+                "+Math.round(a.session_max_speed_kt)+'kt');}";
         // Link auf dieselbe FlightAware-Tracking-Seite, die auch der
         // QR-Code am Geraete-Display zeigt (siehe runFlightQrScreen() in
         // radar_screen.cpp) - keine eigene Foto-Logik noetig, FlightAware
@@ -1064,14 +1243,16 @@ namespace {
         // anzeigen (has_callsign), sonst wuerde der Link auf einen
         // Hex-Code zeigen und ins Leere fuehren.
         html += "var hasTrackLink=!!a.has_callsign;";
-        html += "if(hasTrackLink){lines.push('<a href=\"https://flightaware.com/live/flight/'+encodeURIComponent(a.callsign)+'\" target=\"_blank\" rel=\"noopener\" id=\"acInfoTrack\">Track &amp; photo on FlightAware &rarr;</a>');}";
+        html += "if(hasTrackLink){lines.push('<a href=\"https://flightaware.com/live/flight/'+encodeURIComponent(a.callsign)+'\" target=\"_blank\" rel=\"noopener\" id=\"acInfoTrack\">'+" +
+                jsLit(I18n::t(StringId::WEB_TRACK_LINK)) + "+' &rarr;</a>');}";
         // Logo/Fallback-Icon oben links, Textzeilen daneben (align-items:
         // flex-start haelt das Icon am oberen Rand des Textblocks) - wird
         // bei JEDEM showInfo()-Aufruf neu gebaut, aktualisiert sich also
         // automatisch bei jedem neu ausgewaehlten Flugzeug UND bei jedem
         // Poll-Refresh (siehe refreshSelectedInfo() oben).
         html += "infoBox.innerHTML='<div style=\"display:flex;gap:10px;align-items:flex-start;\">'+airlineLogoHtml(a)+"
-                "'<div>'+lines.join('<br>')+'<br><a href=\"#\" id=\"acInfoClose\">Close</a></div></div>';";
+                "'<div>'+lines.join('<br>')+'<br><a href=\"#\" id=\"acInfoClose\">'+" + jsLit(I18n::t(StringId::WEB_CLOSE)) +
+                "+'</a></div></div>';";
         html += "infoBox.style.display='block';";
         // Sofortiges Feedback beim Antippen des FlightAware-Links, damit klar
         // ist, dass der Tipp angekommen ist, waehrend der neue Tab noch
@@ -1080,9 +1261,12 @@ namespace {
         // frueher Teil von draw()), nicht eine fehlende Rueckmeldung. Setzt
         // sich von selbst zurueck, sobald die Infobox beim naechsten
         // Poll-Zyklus (alle 8s) oder durch erneutes Antippen neu aufgebaut
-        // wird - kein manueller Reset noetig.
+        // wird - kein manueller Reset noetig. Der Hinweistext war bisher
+        // ein liegengebliebener hart-deutscher String (Bug, unabhaengig
+        // von der Geraete-Spracheinstellung) - jetzt WEB_OPENING_PLEASE_WAIT.
         html += "if(hasTrackLink){var trackLink=document.getElementById('acInfoTrack');";
-        html += "trackLink.addEventListener('click',function(){trackLink.textContent='Seite wird geöffnet, bitte warten...';});}";
+        html += "trackLink.addEventListener('click',function(){trackLink.textContent=" +
+                jsLit(I18n::t(StringId::WEB_OPENING_PLEASE_WAIT)) + ";});}";
         html += "document.getElementById('acInfoClose').onclick=function(e){e.preventDefault();selectedHex=null;hideInfo();draw(lastData);};";
         html += "}";
         html += "function hideInfo(){infoBox.style.display='none';}";
@@ -1106,8 +1290,11 @@ namespace {
         // Fehlschlag, daher hier gemeinsam verdrahtet statt zwei getrennter
         // Mechanismen.
         html += "var freshEl=document.getElementById('radarFreshness');";
-        html += "function updateFreshness(){if(!freshEl)return;if(lastUpdateMs===null){freshEl.textContent='Waiting for first update...';return;}";
-        html += "var s=Math.round((Date.now()-lastUpdateMs)/1000);freshEl.textContent='Updated '+(s<=1?'just now':s+'s ago');}";
+        html += "function updateFreshness(){if(!freshEl)return;if(lastUpdateMs===null){freshEl.textContent=" +
+                jsLit(I18n::t(StringId::WEB_WAITING_FIRST_UPDATE)) + ";return;}";
+        html += "var s=Math.round((Date.now()-lastUpdateMs)/1000);freshEl.textContent=s<=1?" +
+                jsLit(I18n::t(StringId::WEB_UPDATED_JUST_NOW)) + ":" + jsLit(I18n::t(StringId::WEB_UPDATED_PREFIX)) +
+                "+s+" + jsLit(I18n::t(StringId::WEB_SECONDS_AGO_SUFFIX)) + ";}";
         // WICHTIG: #connDot/#connText liegen im Footer, der im HTML ERST
         // NACH diesem <script>-Block folgt (Logbuch-Tabelle dazwischen) -
         // document.getElementById() darf deshalb NICHT einmalig beim Parsen
@@ -1116,7 +1303,8 @@ namespace {
         // null) - stattdessen bei JEDEM updateConnStatus()-Aufruf frisch
         // nachschlagen.
         html += "function updateConnStatus(ok){var connDot=document.getElementById('connDot'),connText=document.getElementById('connText');if(!connDot||!connText)return;";
-        html += "connDot.style.background=ok?cssVar('--accent'):'#ff3b3b';connText.textContent=ok?'Connected':'No connection';}";
+        html += "connDot.style.background=ok?cssVar('--accent'):'#ff3b3b';connText.textContent=ok?" +
+                jsLit(I18n::t(StringId::WEB_CONNECTED)) + ":" + jsLit(I18n::t(StringId::WEB_NO_CONNECTION)) + ";}";
         // Watchlist-/Squawk-Wachposten-Badge (#watchBadge im Footer, siehe
         // handleRoot()) - zeigt/versteckt sich je nachdem, ob mindestens ein
         // Flugzeug im AKTUELLSTEN poll()-Ergebnis a.watched===true hat.
@@ -1142,22 +1330,64 @@ namespace {
         html += "pendingRangeKm=rangeSel.value;";
         html += "fetch('/control/range',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'range_km='+rangeSel.value}).finally(poll);";
         html += "});}";
+
+        // Echte Fernsteuerung des physischen "Mode"-Menues (radar_theme_
+        // screen.cpp, Alex' Wunsch) - gleiches pending-Prinzip wie
+        // pendingRangeKm oben: die eigene Auswahl wird sofort optisch
+        // uebernommen und erst wieder von einem Poll ueberschrieben, wenn
+        // der gemeldete Geraete-Wert von aussen abweicht UND die eigene
+        // Anfrage noch nicht bestaetigt wurde. themeSel bekommt zusaetzlich
+        // (Teil 5 des Auftrags) SOFORT beim Klicken applyTheme() aufgerufen,
+        // statt auf den naechsten Poll zu warten.
+        html += "var themeSel=document.getElementById('themeSel');";
+        html += "var pendingTheme=null;";
+        html += "if(themeSel){themeSel.addEventListener('change',function(){";
+        html += "pendingTheme=themeSel.value;";
+        html += "lastThemeIndex=parseInt(themeSel.value,10);lastIsNight=currentIsNight;applyTheme(lastThemeIndex,currentIsNight);";
+        html += "fetch('/control/theme',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'idx='+themeSel.value}).finally(poll);";
+        html += "});}";
+        // Die 2 verbliebenen Checkboxen (Militaer/Behoerde, Regen-Effekt)
+        // teilen sich EINEN generischen /control/toggle-Endpunkt (siehe
+        // handleControlToggle() in C++) - name/checked-Zustand wandern als
+        // Formularfeld mit, serverseitig ueber eine kleine Dispatch-Tabelle
+        // auf den jeweils passenden SettingsStore-Setter abgebildet
+        // (identischer Codepfad wie ein physischer Tap im Mode-Menue).
+        // CRT-Phosphor/Radar-Puls/Klassik-Radar/Overlay bewusst NICHT hier -
+        // siehe Kommentar bei den Checkboxen in appendRadarSection() oben.
+        html += "var TOGGLE_CONTROLS=[";
+        html += "{id:'toggleMilitary',name:'military_squawk'},";
+        html += "{id:'toggleRain',name:'rain_effect'}];";
+        html += "var pendingToggles={};";
+        html += "TOGGLE_CONTROLS.forEach(function(tc){tc.el=document.getElementById(tc.id);if(!tc.el)return;";
+        html += "tc.el.addEventListener('change',function(){pendingToggles[tc.name]=tc.el.checked;";
+        html += "fetch('/control/toggle',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'name='+tc.name+'&on='+(tc.el.checked?1:0)}).finally(poll);});});";
+
         html += "function poll(){";
         html += "var url='/radar.json';";
         html += "if(rangeSel&&rangeSel.value){url+='?range_km='+rangeSel.value;}";
         html += "fetch(url).then(function(r){return r.json();}).then(function(data){";
         // Themenwechsel am Geraet (waehrend die Seite offen ist) live
-        // uebernehmen - vergleicht data.theme_index gegen den zuletzt
-        // bekannten Wert, ruft applyTheme() nur bei tatsaechlicher Aenderung
-        // auf (unnoetiges Neusetzen der CSS-Variablen bei jedem Poll waere
-        // harmlos, aber unnoetig).
-        // Wie beim Themenwechsel oben, jetzt zusaetzlich auf is_night
-        // reagierend (Nachtdimmung, siehe NIGHT_THEME_PALETTES oben) -
-        // applyTheme() wird bei JEDER Aenderung eines der beiden Werte neu
-        // aufgerufen, damit Tag<->Nacht-Wechsel automatisch bei jedem Poll
-        // (alle 8s) live uebernommen wird.
-        html += "var curIsNight=!!data.is_night;currentIsNight=curIsNight;";
-        html += "if(data.theme_index!==undefined&&(data.theme_index!==lastThemeIndex||curIsNight!==lastIsNight)){lastThemeIndex=data.theme_index;lastIsNight=curIsNight;applyTheme(data.theme_index,curIsNight);}";
+        // uebernehmen - jetzt pending-geschuetzt wie pendingRangeKm (siehe
+        // dortigen Kommentar): eine eigene, gerade abgeschickte Auswahl
+        // (pendingTheme) darf nicht von einem Poll ueberschrieben werden,
+        // der die Persistierung noch nicht mitbekommen hat. Reagiert
+        // weiterhin zusaetzlich auf is_night (Nachtdimmung), damit ein
+        // Tag<->Nacht-Wechsel unabhaengig vom Theme-Dropdown alle 8s live
+        // uebernommen wird.
+        html += "var curIsNight=!!data.is_night;currentIsNight=curIsNight;renderAltLegend();";
+        html += "if(data.theme_index!==undefined){";
+        html += "var devTheme=String(data.theme_index);";
+        html += "if(pendingTheme!==null&&devTheme===pendingTheme){pendingTheme=null;}";
+        html += "if(pendingTheme===null&&themeSel&&devTheme!==themeSel.value){themeSel.value=devTheme;}";
+        html += "if(pendingTheme===null&&(data.theme_index!==lastThemeIndex||curIsNight!==lastIsNight)){lastThemeIndex=data.theme_index;lastIsNight=curIsNight;applyTheme(data.theme_index,curIsNight);}";
+        html += "}";
+        // Die 6 Mode-Checkboxen - gleiches pending-Prinzip, generisch ueber
+        // TOGGLE_CONTROLS statt 6 einzelner if-Bloecke.
+        html += "TOGGLE_CONTROLS.forEach(function(tc){if(!tc.el||data[tc.name]===undefined)return;";
+        html += "var val=!!data[tc.name];";
+        html += "if(pendingToggles[tc.name]!==undefined&&val===pendingToggles[tc.name]){delete pendingToggles[tc.name];}";
+        html += "if(pendingToggles[tc.name]===undefined&&tc.el.checked!==val){tc.el.checked=val;}";
+        html += "});";
         // Reichweiten-Aenderung AM GERAET (physischer Tap, waehrend die
         // Seite offen ist) im Dropdown nachziehen - liest bewusst
         // data.device_range_km (NIE durch den eigenen "range_km"-Query-
@@ -1175,7 +1405,8 @@ namespace {
         html += "}";
         html += "draw(data);refreshSelectedInfo();updateWatchBadge(data.aircraft);updateMapMarkers(data);";
         html += "lastUpdateMs=Date.now();updateFreshness();updateConnStatus(true);";
-        html += "}).catch(function(){status.textContent='Connection lost - retrying...';updateConnStatus(false);});";
+        html += "}).catch(function(){status.textContent=" + jsLit(I18n::t(StringId::WEB_CONNECTION_LOST)) +
+                ";updateConnStatus(false);});";
         html += "}";
         html += "poll();";
         // Vorher alle 3s - staerker gedrosselt auf 8s (genau der Takt, in
@@ -1213,14 +1444,20 @@ namespace {
         // kann seine Kachel-/Kartengroesse nicht zuverlaessig ermitteln,
         // solange der Container per "display:none" verborgen ist.
         html += "var map=null,aircraftLayer=null,homeMarker=null;";
+        // Gleiche StringIds/Einheiten-Umschaltung wie showInfo() oben
+        // (Teil 1+2 des Auftrags) - bewusst OHNE Climb/Descend/Elevation/
+        // Trend/Seen-for/Approach/Steckbrief (die gab es hier vorher auch
+        // nicht, kein Funktionsumfang-Ausbau, nur Sprache/Einheiten).
         html += "function popupHtml(a){var lines=[];";
         html += "lines.push('<b>'+(a.callsign||a.hex)+'</b> ('+a.hex+')');";
-        html += "lines.push('Altitude: '+Math.round(a.alt_ft)+' ft');";
-        html += "if(a.speed_kt){lines.push('Speed: '+Math.round(a.speed_kt)+' kt');}";
-        html += "lines.push('Distance: '+fmtDist(a.dist_km)+', bearing '+Math.round(a.bearing_deg)+'\\u00b0');";
-        html += "lines.push('Heading: '+Math.round(a.track_deg)+'\\u00b0');";
-        html += "if(a.squawk){lines.push('Squawk: '+a.squawk);}";
-        html += "if(a.has_callsign){lines.push('<a href=\"https://flightaware.com/live/flight/'+encodeURIComponent(a.callsign)+'\" target=\"_blank\" rel=\"noopener\">Track &amp; photo on FlightAware &rarr;</a>');}";
+        html += "lines.push(" + jsLit(I18n::t(StringId::DETAIL_ALT)) + "+fmtAlt(a.alt_ft));";
+        html += "if(a.speed_kt){lines.push(" + jsLit(I18n::t(StringId::DETAIL_SPEED)) + "+fmtSpeed(a.speed_kt));}";
+        html += "lines.push(" + jsLit(I18n::t(StringId::DETAIL_DIST)) + "+fmtDist(a.dist_km)+', '+" +
+                jsLit(I18n::t(StringId::DETAIL_BEARING_PREFIX)) + "+Math.round(a.bearing_deg)+'\\u00b0');";
+        html += "lines.push(" + jsLit(I18n::t(StringId::DETAIL_HDG)) + "+Math.round(a.track_deg)+'\\u00b0');";
+        html += "if(a.squawk){lines.push(" + jsLit(I18n::t(StringId::DETAIL_SQUAWK)) + "+a.squawk);}";
+        html += "if(a.has_callsign){lines.push('<a href=\"https://flightaware.com/live/flight/'+encodeURIComponent(a.callsign)+'\" target=\"_blank\" rel=\"noopener\">'+" +
+                jsLit(I18n::t(StringId::WEB_TRACK_LINK)) + "+' &rarr;</a>');}";
         html += "return lines.join('<br>');}";
         // Kleiner, in Fluglinie zeigender Pfeil pro Flugzeug (analog zum
         // neuen Richtungs-Chevron auf dem Geraete-Radar) - per CSS
@@ -1251,7 +1488,7 @@ namespace {
         html += "aircraftLayer=L.layerGroup().addTo(map);";
         html += "var hLat=lastData.home_lat||0,hLon=lastData.home_lon||0;";
         html += "homeMarker=L.circleMarker([hLat,hLon],{radius:7,color:'#ffffff',weight:2,fillColor:cssVar('--accent')||'#39ff14',fillOpacity:1}).addTo(map);";
-        html += "homeMarker.bindTooltip('Home');";
+        html += "homeMarker.bindTooltip(" + jsLit(I18n::t(StringId::WEB_HOME_TOOLTIP)) + ");";
         // Anfangs-Zoom NUR hier beim allerersten Anlegen der Karte
         // (initMap() laeuft laut obigem Kommentar genau einmal) automatisch
         // an die tatsaechlichen Daten anpassen, statt einer festen
@@ -1316,11 +1553,14 @@ namespace {
         // htmlHeader() zum selben Hintergrund).
         html.reserve(html.length() + 4096);
 
-        html += "<nav><a href=\"/lists\">Manage Airline Filter &amp; Watchlist &rarr;</a></nav>";
+        html += "<nav><a href=\"/lists\">" + String(I18n::t(StringId::WEB_MANAGE_LISTS_LINK)) + " &rarr;</a></nav>";
 
-        html += "<h2>Flight Logbook</h2>";
+        html += "<h2>" + String(I18n::t(StringId::WEB_LOGBOOK_HEADING)) + "</h2>";
         if (dayCount == 0) {
-            html += "<p>No logbook entries yet.</p>";
+            // LOGFILES_EMPTY - identischer Text wie auf dem
+            // Geraete-Logbuch-Dateien-Screen (logbook_files_screen.cpp),
+            // 1:1 wiederverwendet statt eines neuen Strings.
+            html += "<p>" + String(I18n::t(StringId::LOGFILES_EMPTY)) + "</p>";
         } else {
             // Sofortige optische Rueckmeldung bei Delete/Download (Alex'
             // Meldung: SD-Kartenzugriff dauert spuerbar, ohne Rueckmeldung
@@ -1343,9 +1583,10 @@ namespace {
             // da es keine verlaessliche "Download fertig"-Callback-Methode
             // fuer einen einfachen <a>-Klick gibt.
             html += "<script>";
-            html += "function prepareDelete(f){var b=f.querySelector('button');b.disabled=true;b.textContent='Deleting...';return true;}";
+            html += "function prepareDelete(f){var b=f.querySelector('button');b.disabled=true;b.textContent=" +
+                    jsLit(I18n::t(StringId::WEB_DELETING)) + ";return true;}";
             html += "function prepareDownload(a){if(a.dataset.busy)return false;a.dataset.busy='1';";
-            html += "var orig=a.textContent;a.textContent='Preparing...';a.style.opacity='.6';";
+            html += "var orig=a.textContent;a.textContent=" + jsLit(I18n::t(StringId::WEB_PREPARING)) + ";a.style.opacity='.6';";
             html += "setTimeout(function(){a.textContent=orig;a.style.opacity='';delete a.dataset.busy;},1500);return true;}";
             // Suchfeld + sortierbare Spaltenkoepfe (Alex' Wunsch, "sobald die
             // Liste mit der Zeit laenger wird") - rein clientseitig auf der
@@ -1358,7 +1599,8 @@ namespace {
             // numerisch verglichen, alles andere (Datum) als String -
             // reicht fuer die "JJJJ-MM-TT"-Formate von FlightLogbook, auch
             // mit dem "_2"-Suffix bei mehreren Sitzungen am selben Tag.
-            html += "<input type=\"text\" id=\"logSearch\" placeholder=\"Filter by date...\" style=\"margin-bottom:8px;width:100%;max-width:300px;box-sizing:border-box;\">";
+            html += "<input type=\"text\" id=\"logSearch\" placeholder=\"" + String(I18n::t(StringId::WEB_SEARCH_PLACEHOLDER)) +
+                    "\" style=\"margin-bottom:8px;width:100%;max-width:300px;box-sizing:border-box;\">";
             html += "<script>";
             html += "function sortLog(col){var t=document.getElementById('logTable');var tbody=t.tBodies[0];";
             html += "var rows=Array.prototype.slice.call(tbody.rows);";
@@ -1373,18 +1615,21 @@ namespace {
             html += "Array.prototype.forEach.call(t.tBodies[0].rows,function(r){";
             html += "r.style.display=r.cells[0].textContent.toLowerCase().indexOf(q)>=0?'':'none';});});";
             html += "</script>";
-            html += "<p><a class=\"dl\" href=\"/export.csv\" onclick=\"return prepareDownload(this);\">Download merged CSV (all days)</a></p>";
+            html += "<p><a class=\"dl\" href=\"/export.csv\" onclick=\"return prepareDownload(this);\">" +
+                    String(I18n::t(StringId::WEB_DOWNLOAD_CSV_LINK)) + "</a></p>";
             html += "<table id=\"logTable\"><tr>";
-            html += "<th onclick=\"sortLog(0);\" style=\"cursor:pointer;\">Date &#8645;</th>";
-            html += "<th onclick=\"sortLog(1);\" style=\"cursor:pointer;\">Aircraft &#8645;</th>";
+            html += "<th onclick=\"sortLog(0);\" style=\"cursor:pointer;\">" + String(I18n::t(StringId::WEB_DATE_HEADER)) + " &#8645;</th>";
+            html += "<th onclick=\"sortLog(1);\" style=\"cursor:pointer;\">" + String(I18n::t(StringId::WEB_AIRCRAFT_HEADER)) + " &#8645;</th>";
             html += "<th></th><th></th></tr>";
+            String downloadLabel = I18n::t(StringId::WEB_DOWNLOAD);
+            String deleteLabel = I18n::t(StringId::WEB_DELETE);
             for (uint8_t i = 0; i < dayCount; i++) {
                 String date = String(days[i].date);
                 html += "<tr><td>" + date + "</td><td>" + String(days[i].count) + "</td>";
-                html += "<td><a class=\"dl\" href=\"/csv?date=" + date + "\" onclick=\"return prepareDownload(this);\">Download</a></td>";
+                html += "<td><a class=\"dl\" href=\"/csv?date=" + date + "\" onclick=\"return prepareDownload(this);\">" + downloadLabel + "</a></td>";
                 html += "<td><form method=\"POST\" action=\"/logbook/delete\" onsubmit=\"return prepareDelete(this);\">";
                 html += "<input type=\"hidden\" name=\"date\" value=\"" + date + "\">";
-                html += "<button type=\"submit\">Delete</button></form></td></tr>";
+                html += "<button type=\"submit\">" + deleteLabel + "</button></form></td></tr>";
             }
             html += "</table>";
         }
@@ -1402,7 +1647,7 @@ namespace {
         html += "<footer style=\"margin-top:24px;padding-top:10px;border-top:1px solid var(--accent-border);font-size:11px;color:var(--accent-muted);\">";
         html += "Eiswolfs Flightradar v" + String(Config::APP_VERSION) + " &middot; ";
         html += "<span id=\"connDot\" style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent-muted);margin-right:4px;\"></span>";
-        html += "<span id=\"connText\">Checking...</span>";
+        html += "<span id=\"connText\">" + String(I18n::t(StringId::WEB_CHECKING)) + "</span>";
         // Watchlist-/Squawk-Wachposten-Badge (Alex' Wunsch) - zeigt an, ob
         // GERADE (im aktuellsten poll()-Ergebnis) mindestens ein Flugzeug
         // sichtbar ist, das entweder auf der Rufzeichen-Watchlist steht oder
@@ -1413,7 +1658,8 @@ namespace {
         // wie der Beobachtungs-Ring um den Marker selbst im Radar-Canvas
         // (semantischer Alarm-/Status-Ton, kein UI-Chrome). Standardmaessig
         // versteckt, erscheint nur bei tatsaechlichem Treffer.
-        html += " &middot; <span id=\"watchBadge\" style=\"display:none;color:#00e5ff;\">&#9679; Watchlist match</span>";
+        html += " &middot; <span id=\"watchBadge\" style=\"display:none;color:#00e5ff;\">&#9679; " +
+                String(I18n::t(StringId::WEB_WATCHLIST_MATCH)) + "</span>";
         // Feature 12 Nachtrag - dezenter Hinweis auf die PWA-Installierbarkeit
         // (siehe /manifest.json, /icon.png, /sw.js oben) direkt auf der
         // Seite selbst, da das bisher nur in der README stand, die niemand
@@ -1439,8 +1685,8 @@ namespace {
         html += "var el=document.getElementById('pwaHint');if(!el)return;";
         html += "var isIOS=window.navigator.standalone!==undefined;";
         html += "document.getElementById('pwaHintText').textContent=isIOS";
-        html += "?'Add to Home Screen (Share button) for the full-screen app view'";
-        html += ":'Add to Home screen (browser menu) for the full-screen app view';";
+        html += "?" + jsLit(I18n::t(StringId::WEB_PWA_HINT_IOS));
+        html += ":" + jsLit(I18n::t(StringId::WEB_PWA_HINT_OTHER)) + ";";
         html += "el.style.display='';";
         html += "})();</script>";
         html += "</footer>";
@@ -1543,45 +1789,56 @@ namespace {
     void handleLists() {
         String html = htmlHeader("Eiswolfs Flightradar - Lists");
 
-        html += "<nav><a href=\"/\">&larr; Logbook</a></nav>";
+        html += "<nav><a href=\"/\">&larr; " + String(I18n::t(StringId::WEB_BACK_TO_LOGBOOK)) + "</a></nav>";
 
-        html += "<h2>Hidden Airlines</h2>";
-        html += "<p>Aircraft from these airlines (matched by callsign prefix, e.g. \"DLH\") are hidden from the radar.</p>";
+        // AIRLINE_FILTER_TITLE/_DESC1/_DESC2/_ADD - dieselben StringIds wie
+        // auf dem Geraete-Airline-Filter-Screen (Teil 1 des Auftrags),
+        // WEB_AIRLINE_FILTER_EMPTY/WEB_ICAO_PREFIX_HEADER/WEB_REMOVE/
+        // WEB_ICAO_PLACEHOLDER sind neu (kein Geraete-Aequivalent).
+        html += "<h2>" + String(I18n::t(StringId::AIRLINE_FILTER_TITLE)) + "</h2>";
+        html += "<p>" + String(I18n::t(StringId::AIRLINE_FILTER_DESC1)) + " " +
+                I18n::t(StringId::AIRLINE_FILTER_DESC2) + "</p>";
         uint8_t airlineCount = AirlineFilter::count();
+        String removeLabel = I18n::t(StringId::WEB_REMOVE);
         if (airlineCount == 0) {
-            html += "<p>No hidden airlines yet.</p>";
+            html += "<p>" + String(I18n::t(StringId::WEB_AIRLINE_FILTER_EMPTY)) + "</p>";
         } else {
-            html += "<table><tr><th>ICAO prefix</th><th></th></tr>";
+            html += "<table><tr><th>" + String(I18n::t(StringId::WEB_ICAO_PREFIX_HEADER)) + "</th><th></th></tr>";
             for (uint8_t i = 0; i < airlineCount; i++) {
                 html += "<tr><td>" + AirlineFilter::icaoAt(i) + "</td><td>";
                 html += "<form method=\"POST\" action=\"/lists/airlines/delete\">";
                 html += "<input type=\"hidden\" name=\"index\" value=\"" + String(i) + "\">";
-                html += "<button type=\"submit\">Remove</button></form></td></tr>";
+                html += "<button type=\"submit\">" + removeLabel + "</button></form></td></tr>";
             }
             html += "</table>";
         }
         html += "<form method=\"POST\" action=\"/lists/airlines/add\">";
-        html += "<input type=\"text\" name=\"icao\" maxlength=\"3\" placeholder=\"e.g. DLH\"> ";
-        html += "<button class=\"addbtn\" type=\"submit\">Add</button></form>";
+        html += "<input type=\"text\" name=\"icao\" maxlength=\"3\" placeholder=\"" +
+                String(I18n::t(StringId::WEB_ICAO_PLACEHOLDER)) + "\"> ";
+        html += "<button class=\"addbtn\" type=\"submit\">" + String(I18n::t(StringId::AIRLINE_FILTER_ADD)) + "</button></form>";
 
-        html += "<h2>Watched Aircraft</h2>";
-        html += "<p>The blue LED blinks when any of these exact callsigns appears on the radar (up to 5).</p>";
+        // WATCHLIST_TITLE/_DESC1/_DESC2/_ADD/_EMPTY sowie
+        // AIRCRAFT_LIST_SORT_CALLSIGN ("Callsign") - ebenfalls dieselben
+        // StringIds wie auf dem Geraete-Beobachtungslisten-Screen.
+        html += "<h2>" + String(I18n::t(StringId::WATCHLIST_TITLE)) + "</h2>";
+        html += "<p>" + String(I18n::t(StringId::WATCHLIST_DESC1)) + " " + I18n::t(StringId::WATCHLIST_DESC2) + "</p>";
         uint8_t watchCount = AircraftWatchlist::count();
         if (watchCount == 0) {
-            html += "<p>No watched aircraft yet.</p>";
+            html += "<p>" + String(I18n::t(StringId::WATCHLIST_EMPTY)) + "</p>";
         } else {
-            html += "<table><tr><th>Callsign</th><th></th></tr>";
+            html += "<table><tr><th>" + String(I18n::t(StringId::AIRCRAFT_LIST_SORT_CALLSIGN)) + "</th><th></th></tr>";
             for (uint8_t i = 0; i < watchCount; i++) {
                 html += "<tr><td>" + AircraftWatchlist::callsignAt(i) + "</td><td>";
                 html += "<form method=\"POST\" action=\"/lists/watchlist/delete\">";
                 html += "<input type=\"hidden\" name=\"index\" value=\"" + String(i) + "\">";
-                html += "<button type=\"submit\">Remove</button></form></td></tr>";
+                html += "<button type=\"submit\">" + removeLabel + "</button></form></td></tr>";
             }
             html += "</table>";
         }
         html += "<form method=\"POST\" action=\"/lists/watchlist/add\">";
-        html += "<input type=\"text\" name=\"callsign\" maxlength=\"8\" placeholder=\"e.g. DLH441\"> ";
-        html += "<button class=\"addbtn\" type=\"submit\">Add</button></form>";
+        html += "<input type=\"text\" name=\"callsign\" maxlength=\"8\" placeholder=\"" +
+                String(I18n::t(StringId::WEB_CALLSIGN_PLACEHOLDER)) + "\"> ";
+        html += "<button class=\"addbtn\" type=\"submit\">" + String(I18n::t(StringId::WATCHLIST_ADD)) + "</button></form>";
 
         html += "</div></body></html>";
         server.send(200, "text/html", html);
@@ -1669,6 +1926,67 @@ namespace {
         server.send(200, "text/plain", "ok");
     }
 
+    // Fernsteuerung des Farbschemas (Teil des "Mode"-Menues, siehe
+    // radar_theme_screen.cpp) - ruft SettingsStore::setRadarThemeIndex()
+    // DIREKT auf, identischer Codepfad wie ein physischer Tap auf eine der
+    // 5 Farbschema-Kacheln am Geraet.
+    void handleControlTheme() {
+        if (!server.hasArg("idx")) {
+            server.send(400, "text/plain", "missing idx");
+            return;
+        }
+        int idx = server.arg("idx").toInt();
+        if (idx < 0 || idx > 4) {
+            server.send(400, "text/plain", "unknown idx");
+            return;
+        }
+        uint32_t now = millis();
+        if (now - lastModeCommandMs >= MIN_CONTROL_INTERVAL_MS) {
+            SettingsStore::setRadarThemeIndex((uint8_t)idx);
+            lastModeCommandMs = now;
+        }
+        server.send(200, "text/plain", "ok");
+    }
+
+    // Fernsteuerung der 2 Mode-Menue-Checkboxen mit sichtbarer Web-
+    // Entsprechung (Militaer/Behoerde, Regen-Effekt) - EIN gemeinsamer
+    // Endpunkt statt eigener Handler/server.on()-Registrierungen, ueber
+    // eine kleine Dispatch-Tabelle auf den jeweils passenden SettingsStore-
+    // Setter abgebildet. Ruft auch hier 1:1 denselben Setter wie
+    // radar_theme_screen.cpp auf - keine eigene Persistenz-/LED-Logik.
+    // CRT-Phosphor/Radar-Puls/Klassik-Radar/Overlay bewusst NICHT hier -
+    // siehe Kommentar bei den JSON-Feldern in handleRadarJson().
+    struct ModeToggleControl {
+        const char* name;
+        void (*setter)(bool);
+    };
+    constexpr ModeToggleControl MODE_TOGGLE_CONTROLS[] = {
+        {"military_squawk", SettingsStore::setMilitarySquawkDetectionEnabled},
+        {"rain_effect", SettingsStore::setRainEffectEnabled},
+    };
+    constexpr uint8_t MODE_TOGGLE_CONTROL_COUNT = sizeof(MODE_TOGGLE_CONTROLS) / sizeof(MODE_TOGGLE_CONTROLS[0]);
+
+    void handleControlToggle() {
+        if (!server.hasArg("name") || !server.hasArg("on")) {
+            server.send(400, "text/plain", "missing name/on");
+            return;
+        }
+        String name = server.arg("name");
+        bool on = server.arg("on").toInt() != 0;
+        for (uint8_t i = 0; i < MODE_TOGGLE_CONTROL_COUNT; i++) {
+            if (name == MODE_TOGGLE_CONTROLS[i].name) {
+                uint32_t now = millis();
+                if (now - lastModeCommandMs >= MIN_CONTROL_INTERVAL_MS) {
+                    MODE_TOGGLE_CONTROLS[i].setter(on);
+                    lastModeCommandMs = now;
+                }
+                server.send(200, "text/plain", "ok");
+                return;
+            }
+        }
+        server.send(400, "text/plain", "unknown name");
+    }
+
     // Datenquelle fuer das Live-Radar auf der Startseite (siehe
     // appendRadarSection()). Wendet dieselben Filter/Prioritaeten an wie das
     // Geraete-Display (render() in radar_screen.cpp): Reichweite, "Boden-
@@ -1731,6 +2049,24 @@ namespace {
         // uebernommen wird (siehe applyTheme() in appendRadarSection()),
         // ohne dass die Seite neu geladen werden muss.
         doc["theme_index"] = SettingsStore::radarThemeIndex();
+        // Fernsteuerung des restlichen "Mode"-Menues (radar_theme_screen.cpp,
+        // Alex' Wunsch) - NUR die beiden Toggles mit sichtbarer Web-
+        // Entsprechung (Militaer/Behoerde-Ring, Regen-Effekt), NIEMALS durch
+        // einen Query-Parameter beeinflussbar (es gibt hierfuer auch keinen),
+        // analog zu "theme_index"/"device_range_km" oben. CRT-Phosphor/
+        // Radar-Puls/Klassik-Radar/Overlay bewusst NICHT hier - reine
+        // Geraete-Radarbild-Effekte ohne Web-Entsprechung, sollen nur am
+        // physischen Mode-Menue steuerbar bleiben (Alex' Korrektur).
+        // "military_squawk" nutzt die bereits weiter oben fuer die Marker-
+        // Ring-Logik gelesene militaryOn-Variable, statt SettingsStore
+        // erneut abzufragen. "rain_effect" ist bewusst der RAW-Schalter
+        // (SettingsStore::rainEffectEnabled()) - anders als "raining"/
+        // "snowing" unten, die ZUSAETZLICH noch an die aktuelle Wetterlage
+        // gekoppelt sind und daher fuer die Checkbox-Synchronisation
+        // ungeeignet waeren (die Checkbox soll den SCHALTER zeigen, nicht
+        // ob es gerade tatsaechlich regnet).
+        doc["military_squawk"] = militaryOn;
+        doc["rain_effect"] = SettingsStore::rainEffectEnabled();
         // Nachtdimmung auch fuer die Live-Radar-Webseite (Alex' Wunsch) -
         // exakt dieselbe Bedingung wie radar_screen.cpp::
         // nightDimActiveNow() (Schalter an UND aktuell Nachtstunden am
@@ -2120,6 +2456,8 @@ void begin() {
     server.on("/lists/watchlist/add", HTTP_POST, handleWatchlistAdd);
     server.on("/lists/watchlist/delete", HTTP_POST, handleWatchlistDelete);
     server.on("/control/range", HTTP_POST, handleControlRange);
+    server.on("/control/theme", HTTP_POST, handleControlTheme);
+    server.on("/control/toggle", HTTP_POST, handleControlToggle);
     server.onNotFound(handleNotFound);
     server.begin();
 }

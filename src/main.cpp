@@ -66,6 +66,17 @@ uint32_t lastStatusLineMs = 0;
 uint32_t lastRenderedVersion = 0xFFFFFFFF;
 Weather::Condition lastRenderedWeather = Weather::Condition::Unknown;
 bool lastRenderedUpdateAvailable = false;
+// Zuletzt fuer die Kopfzeilen-Buttons (Menu/Mode/Augen-Icon) tatsaechlich
+// gezeichnetes Farbschema (SettingsStore::radarThemeIndex()) - siehe
+// updateStatusLine(). Bug (Alex' Meldung): ein Farbschema-Wechsel ueber
+// die neue Web-Fernsteuerung (/control/theme), waehrend niemand das
+// Geraet antippt, wurde vorher gar nicht erkannt, weil diese drei Buttons
+// nur bei einem Update-Verfuegbar-Zustandswechsel oder beim einmaligen
+// drawHeader() neu gezeichnet wurden - reines "hat sich der ANGEZEIGTE
+// INHALT geaendert"-Gating, nie auf die Themenfarbe selbst geprueft.
+// 0xFF als Startwert stellt sicher, dass der allererste drawHeader()-
+// Aufruf/updateStatusLine()-Tick den Wert sicher als "neu" erkennt.
+uint8_t lastRenderedThemeIndex = 0xFF;
 bool forceRedraw = false;
 bool wasEmergency = false;
 bool bannerBlinkOn = false;
@@ -642,6 +653,13 @@ void formatLocalizedDate(const struct tm& tmNow, char* out, size_t outLen) {
 // erste Zeichnen nach dem Betreten immer passiert.
 String lastScreensaverTimeText;
 String lastScreensaverDateText;
+// Gleiches Bug-Muster/gleicher Fix wie lastRenderedThemeIndex oben, nur
+// fuer den Ruhebildschirm: Uhrzeit/Datum werden hier nur bei tatsaechlicher
+// TEXTaenderung neu gezeichnet (Anti-Flacker-Cache, siehe Kommentar oben
+// bei lastScreensaverTimeText) - ein reiner Farbschema-Wechsel aendert den
+// Text nicht und wurde deshalb vorher nicht erkannt. 0xFF als Startwert
+// wie bei lastRenderedThemeIndex.
+uint8_t lastScreensaverThemeIndex = 0xFF;
 
 void drawScreensaverClock() {
     time_t now = time(nullptr);
@@ -1380,6 +1398,7 @@ void drawHeader() {
     drawWeatherIcon();
     lastRenderedWeather = Weather::current();
     lastRenderedUpdateAvailable = OtaUpdate::isUpdateAvailable();
+    lastRenderedThemeIndex = SettingsStore::radarThemeIndex();
 }
 
 void updateStatusLine() {
@@ -1429,22 +1448,39 @@ void updateStatusLine() {
         drawWeatherIcon();
     }
 
-    // Bei einer tatsaechlichen Zustandsaenderung (kein Update -> Update
-    // verfuegbar oder umgekehrt) den kompletten Button neu zeichnen
-    // (Rahmen+Text bleiben unveraendert, muessen aber beim Umschalten des
-    // Punkts sauber neu ueberdeckt werden). updateStatusLine() laeuft hier
-    // jede Sekunde, unabhaengig vom Ruhebildschirm.
-    bool updateAvailableNow = OtaUpdate::isUpdateAvailable();
-    if (updateAvailableNow != lastRenderedUpdateAvailable) {
-        lastRenderedUpdateAvailable = updateAvailableNow;
+    // Farbschema-Wechsel (z.B. ueber /control/theme aus der Web-UI, waehrend
+    // niemand das Geraet antippt) auf denselben drei themenfarbigen
+    // Kopfzeilen-Elementen nachziehen wie ein physischer Themenwechsel im
+    // Menue es taete - siehe lastRenderedThemeIndex-Kommentar oben. Kommt
+    // VOR der Update-Verfuegbar-Pruefung, da ein Neuzeichnen hier
+    // drawMenuButton() (inkl. Punkt, falls verfuegbar) ohnehin schon mit
+    // abdeckt - der else-Zweig unten greift dann einfach erst wieder beim
+    // naechsten Tick.
+    uint8_t themeIdxNow = SettingsStore::radarThemeIndex();
+    if (themeIdxNow != lastRenderedThemeIndex) {
+        lastRenderedThemeIndex = themeIdxNow;
         drawMenuButton();
-    } else if (updateAvailableNow) {
-        // Nur den Punkt (nicht Rahmen/Text) bei JEDEM Tick neu zeichnen,
-        // solange ein Update verfuegbar ist - sonst bliebe er nach dem
-        // einen Zustandswechsel-Frame oben bei der Helligkeit stehen, die
-        // er in genau diesem Frame gerade hatte, und wuerde nie sichtbar
-        // weiterpulsieren (siehe drawMenuUpdateDot()-Kommentar).
-        drawMenuUpdateDot();
+        drawModesButton();
+        drawEyeFilterIcon();
+        lastRenderedUpdateAvailable = OtaUpdate::isUpdateAvailable();
+    } else {
+        // Bei einer tatsaechlichen Zustandsaenderung (kein Update -> Update
+        // verfuegbar oder umgekehrt) den kompletten Button neu zeichnen
+        // (Rahmen+Text bleiben unveraendert, muessen aber beim Umschalten des
+        // Punkts sauber neu ueberdeckt werden). updateStatusLine() laeuft hier
+        // jede Sekunde, unabhaengig vom Ruhebildschirm.
+        bool updateAvailableNow = OtaUpdate::isUpdateAvailable();
+        if (updateAvailableNow != lastRenderedUpdateAvailable) {
+            lastRenderedUpdateAvailable = updateAvailableNow;
+            drawMenuButton();
+        } else if (updateAvailableNow) {
+            // Nur den Punkt (nicht Rahmen/Text) bei JEDEM Tick neu zeichnen,
+            // solange ein Update verfuegbar ist - sonst bliebe er nach dem
+            // einen Zustandswechsel-Frame oben bei der Helligkeit stehen, die
+            // er in genau diesem Frame gerade hatte, und wuerde nie sichtbar
+            // weiterpulsieren (siehe drawMenuUpdateDot()-Kommentar).
+            drawMenuUpdateDot();
+        }
     }
 }
 
@@ -2106,6 +2142,7 @@ void loop() {
                 lastScreensaverTimeText = "";
                 lastScreensaverDateText = "";
                 lastScreensaverAircraftText = "";
+                lastScreensaverThemeIndex = SettingsStore::radarThemeIndex();
                 lastScreensaverClockMs = 0; // sofortiges erstes Zeichnen erzwingen
             } else {
                 // Bewusst ganz aus (0) statt nur gedimmt - fuer den
@@ -2141,6 +2178,22 @@ void loop() {
         // tatsaechlichen Textaenderung von selbst.
         if (nowMs - lastScreensaverClockMs >= 1000) {
             lastScreensaverClockMs = nowMs;
+            // Farbschema-Wechsel (z.B. per Web-Fernsteuerung, siehe
+            // lastRenderedThemeIndex-Kommentar weiter oben) auf Uhrzeit/
+            // Datum/naechstes-Flugzeug nachziehen: deren Redraw ist auf eine
+            // reine TEXTaenderung gegated (Anti-Flacker-Cache), eine reine
+            // Farbaenderung wuerde dort sonst nie erkannt. Die drei Caches
+            // hier einfach ungueltig machen (leerer String) - die
+            // bestehende Diff-Logik in den jeweiligen Funktionen zeichnet
+            // dadurch im SELBEN Tick automatisch in der neuen Farbe neu,
+            // kein zusaetzlicher paralleler Zeichenaufruf noetig.
+            uint8_t screensaverThemeIdxNow = SettingsStore::radarThemeIndex();
+            if (screensaverThemeIdxNow != lastScreensaverThemeIndex) {
+                lastScreensaverThemeIndex = screensaverThemeIdxNow;
+                lastScreensaverTimeText = "";
+                lastScreensaverDateText = "";
+                lastScreensaverAircraftText = "";
+            }
             drawScreensaverLogo();
             drawScreensaverVersion();
             drawScreensaverClock();
