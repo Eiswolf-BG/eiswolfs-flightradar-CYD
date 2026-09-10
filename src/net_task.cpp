@@ -44,12 +44,27 @@ namespace {
     // Von NetTask (Core 0) geschrieben, von pause() (Core 1, siehe unten)
     // gelesen - std::atomic statt eines ungeschuetzten bool, gleiches
     // Muster wie beim Heartbeat-Race-Fix in led_alert.cpp. true, solange
-    // NetTask NICHT mitten in einer ADS-B-Netzwerkoperation steckt (also
-    // "sicher" fuer eine Suspendierung) - wird NUR um AdsbClient::fetch()
-    // herum kurzzeitig auf false gesetzt, sonst bleibt es true (inkl.
-    // WifiMgr/Weather/OTA-Hintergrundcheck/50ms-Delay). pause() unten
-    // wartet aktiv auf true, bevor es wirklich suspendiert - siehe
-    // net_task.h fuer die ausfuehrliche Begruendung.
+    // NetTask NICHT mitten in EINER der Netzwerkoperationen dieser
+    // Schleifeniteration steckt (also "sicher" fuer eine Suspendierung) -
+    // umspannt seit dem Bugfix (Alex' Meldung: OTA-Download durch spaeter
+    // hinzugekommene Hintergrund-Netzwerkaufrufe verlangsamt) die GESAMTE
+    // Schleifeniteration (WifiMgr/LocationManager/WebExportServer/
+    // AircraftDetails/PreviouslySeen/Weather/IssTracker/OTA-Hintergrund-
+    // check/MQTT/ADS-B-Abruf), nicht mehr nur AdsbClient::fetch() -
+    // false ganz am Schleifenanfang, true erst unmittelbar vor dem
+    // 50ms-Schlaf am Ende. Frueher deckte es NUR den ADS-B-Abruf ab, jeder
+    // andere, spaeter hinzugekommene Netzwerkaufruf in dieser Schleife
+    // galt faelschlich als "idle" - pause() (siehe unten) konnte dadurch
+    // mitten in einem dieser Aufrufe vTaskSuspend() ausloesen, ohne dass
+    // die betroffene WiFiClient(Secure)-Verbindung je sauber geschlossen
+    // wurde (das Stack-Objekt friert einfach mitten in der Funktion ein) -
+    // diese verwaiste, aber technisch weiterhin offene Verbindung wurde
+    // von den system­eigenen WLAN-/lwIP-Tasks (von vTaskSuspend() NICHT
+    // betroffen) fuer den Rest des Suspendierungs-Zeitraums am Leben
+    // gehalten und kostete dabei durchgehend WLAN-Bandbreite, die einem
+    // gleichzeitigen OTA-Download fehlte. pause() unten wartet aktiv auf
+    // true, bevor es wirklich suspendiert - siehe net_task.h fuer die
+    // ausfuehrliche Begruendung.
     std::atomic<bool> netTaskIdle{true};
 
     Aircraft tempTable[Config::MAX_TRACKED_AIRCRAFT];
@@ -60,6 +75,33 @@ namespace {
         MqttClient::init();
 
         for (;;) {
+            // BUGFIX (Alex' Meldung: OTA-Download seit Weather-/MQTT-/ISS-/
+            // Update-Hintergrundcheck & Co. spuerbar langsamer, obwohl
+            // NetTask::pause() waehrend eines OTA-Downloads doch eigentlich
+            // suspendiert werden sollte) - netTaskIdle war bisher NUR waehrend
+            // AdsbClient::fetch() false (siehe historischer Kommentar beim
+            // vorherigen Deklarationsort), alle spaeter hinzugekommenen
+            // Netzwerkaufrufe in dieser Schleife (Weather::update(),
+            // IssTracker::update(), OtaUpdate::pollBackground(),
+            // MqttClient::loop(), WebExportServer::update(), WifiMgr::
+            // update(), LocationManager::update()) meldeten sich nie als
+            // "nicht idle". pause() (Core 1) konnte dadurch mitten in einem
+            // DIESER Aufrufe vTaskSuspend() ausloesen - der zugehoerige
+            // WiFiClient/WiFiClientSecure wird dabei NIE sauber geschlossen
+            // (die Funktion friert einfach mitten in ihrer Ausfuehrung ein,
+            // ihr Stack-Objekt wird nie destruiert), die offene TCP-/TLS-
+            // Verbindung blieb danach fuer die GESAMTE Downloaddauer bestehen
+            // und wurde von den systemeigenen WLAN-/lwIP-Tasks (die von
+            // vTaskSuspend() NICHT betroffen sind) im Hintergrund weiter am
+            // Leben gehalten - das kostete durchgehend WLAN-Bandbreite, die
+            // dem eigentlichen OTA-Download fehlte. Jetzt umspannt
+            // netTaskIdle=false/true die GESAMTE Schleifeniteration (alle
+            // Netzwerkaufrufe), nicht mehr nur den ADS-B-Abruf - pause()
+            // wartet dadurch immer auf eine wirklich sichere Luecke
+            // (unmittelbar vor dem vTaskDelay(50) am Schleifenende), in der
+            // KEINE Verbindung dieser Schleife mehr offen ist.
+            netTaskIdle.store(false, std::memory_order_release);
+
             WifiMgr::update();
             LocationManager::update();
 
@@ -160,10 +202,9 @@ namespace {
                         rangeKm = WEB_UI_MAX_AUTO_RANGE_KM;
                     }
 
-                    // Ab hier bis zum Ende der Ergebnisverarbeitung unten
-                    // NICHT idle - siehe Kommentar bei netTaskIdle oben.
-                    netTaskIdle.store(false, std::memory_order_release);
-
+                    // netTaskIdle ist bereits seit Schleifenbeginn false
+                    // (siehe dortiger Kommentar) - kein erneutes Setzen hier
+                    // noetig.
                     auto result = AdsbClient::fetch(lat, lon, rangeKm,
                                                      tempTable, Config::MAX_TRACKED_AIRCRAFT);
 
@@ -334,11 +375,14 @@ namespace {
                         Serial.printf("[NetTask] Abfrage fehlgeschlagen (HTTP %d), naechster Versuch in %lums\n",
                                       result.httpCode, (unsigned long)currentIntervalMs);
                     }
-
-                    netTaskIdle.store(true, std::memory_order_release);
                 }
             }
 
+            // Erst hier, unmittelbar vor dem Schlafen, wirklich idle - siehe
+            // ausfuehrlichen Kommentar am Schleifenanfang: deckt jetzt ALLE
+            // Netzwerkaufrufe dieser Iteration ab, nicht mehr nur den
+            // ADS-B-Abruf.
+            netTaskIdle.store(true, std::memory_order_release);
             vTaskDelay(pdMS_TO_TICKS(50));
         }
     }
