@@ -641,7 +641,7 @@ namespace {
     // brauchen ihn nicht und koennen ihn wie bisher ignorieren (in C++
     // gefahrlos moeglich).
     bool infoScreen(TFT_eSPI& tft, const String& title, const String& body, uint16_t accentColor,
-                     const String& buttonLabel) {
+                     const String& buttonLabel, bool ignoreIdleTimeout = false) {
         constexpr int16_t BOX_X = 4;
         constexpr int16_t BOX_Y = 4;
         constexpr int16_t BOX_W = Config::SCREEN_WIDTH - 2 * BOX_X;
@@ -742,7 +742,18 @@ namespace {
                 }
             }
             // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
-            if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) return false;
+            // Bewusst uebersprungen, wenn ignoreIdleTimeout gesetzt ist
+            // (Alex' Wunsch, Bugfix) - einziger bisheriger Aufrufer:
+            // showWhatsNewIfNeeded() in main.cpp fuer den automatischen
+            // "Was ist neu?"-Changelog-Screen direkt nach einem echten
+            // OTA-Update. Dieser eine Screen MUSS stehen bleiben, bis aktiv
+            // bestaetigt wird, unabhaengig vom konfigurierten Menue-
+            // Timeout - ein potenziell kritischer Update-Hinweis darf nicht
+            // im Hintergrund wegtimeouten, waehrend der Nutzer kurz
+            // abgelenkt ist. Alle anderen ca. 15+ Aufrufer lassen den neuen
+            // Parameter auf seinem Default (false) und unterliegen dem
+            // Timeout weiterhin ganz normal.
+            if (!ignoreIdleTimeout && TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) return false;
             delay(20);
         }
     }
@@ -1995,8 +2006,8 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
 }
 
 bool showInfoScreen(TFT_eSPI& tft, const String& title, const String& body,
-                     uint16_t accentColor, const String& buttonLabel) {
-    return infoScreen(tft, title, body, accentColor, buttonLabel);
+                     uint16_t accentColor, const String& buttonLabel, bool ignoreIdleTimeout) {
+    return infoScreen(tft, title, body, accentColor, buttonLabel, ignoreIdleTimeout);
 }
 
 int layoutTitleLines(TFT_eSPI& tft, const String& text, int16_t maxWidth,

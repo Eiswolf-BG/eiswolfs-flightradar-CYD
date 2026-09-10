@@ -29,8 +29,16 @@ namespace MenuScreen {
     // ohne dass tatsaechlich getippt wurde - siehe Kommentar bei infoScreen()
     // in menu_screen.cpp. Aufrufer ohne gefaehrliche Folgeaktion (Neustart
     // o.ae.) koennen den Rueckgabewert wie bisher ignorieren.
+    // ignoreIdleTimeout (Default false, aendert das Verhalten bestehender
+    // Aufrufer nicht): true unterdrueckt den Inaktivitaets-Timeout komplett,
+    // der Screen bleibt dann bis zu einem echten Tap stehen - fuer Screens
+    // mit potenziell kritischem Inhalt, die nicht unbemerkt im Hintergrund
+    // wegtimeouten duerfen (aktuell einziger Nutzer: main.cpp::
+    // showWhatsNewIfNeeded(), der automatische "Was ist neu?"-Screen direkt
+    // nach einem echten OTA-Update).
     bool showInfoScreen(TFT_eSPI& tft, const String& title, const String& body,
-                         uint16_t accentColor, const String& buttonLabel);
+                         uint16_t accentColor, const String& buttonLabel,
+                         bool ignoreIdleTimeout = false);
 
     // Oeffentliche Huelle um das interne wrapTitleLines() (siehe
     // menu_screen.cpp) - zerlegt einen Titel-Text in bis zu maxLines Zeilen,

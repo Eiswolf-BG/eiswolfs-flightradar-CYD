@@ -1703,8 +1703,13 @@ void showWhatsNewIfNeeded(TFT_eSPI& tftRef) {
     if (!versionChanged || !otaFlag) return;
 
     String body = String(I18n::t(StringId::OTA_CHANGELOG_LABEL)) + "\n" + Config::changelogLatest();
+    // ignoreIdleTimeout=true (Alex' Wunsch, Bugfix): dieser Screen zeigt
+    // den Changelog eines gerade installierten Updates und muss stehen
+    // bleiben, bis aktiv bestaetigt wird - unabhaengig vom konfigurierten
+    // Menue-Timeout (Menue > System > Anzeige). Ein potenziell kritischer
+    // Update-Hinweis darf nicht unbemerkt im Hintergrund wegtimeouten.
     MenuScreen::showInfoScreen(tftRef, I18n::t(StringId::OTA_UPDATE_SUCCESS), body,
-                                UiTheme::accentColor(tft), I18n::t(StringId::OK));
+                                UiTheme::accentColor(tft), I18n::t(StringId::OK), true);
 }
 
 void setup() {
