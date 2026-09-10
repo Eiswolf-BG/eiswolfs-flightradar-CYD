@@ -913,10 +913,17 @@ namespace {
     int16_t otaProgressBarY = 0;
     int16_t otaProgressLastFillW = -1;
     int16_t otaProgressLastDrawnPercent = -1;
+    // Zeitstempel des letzten TATSAECHLICHEN Prozent-/Balken-Redraws (Alex'
+    // Meldung: "OTA-Download dauert seit dem Fortschrittsbalken spuerbar
+    // laenger") - siehe Drossel-Kommentar unten in drawOtaProgress(). 0 hat
+    // hier keine Sonderbedeutung (anders als otaProgressLastDrawnPercent's
+    // -1), einfach nur der Startwert vor dem allerersten Redraw.
+    uint32_t otaProgressLastDrawMs = 0;
 
     void resetOtaProgressLayout() {
         otaProgressLastDrawnPercent = -1;
         otaProgressLastFillW = -1;
+        otaProgressLastDrawMs = 0;
     }
 
     // BUGFIX (Alex' Meldung: Download-Fortschrittsscreen flackert im Takt
@@ -1040,6 +1047,30 @@ namespace {
         // ganzzahlige Prozentwert tatsaechlich aendert).
         if (percent == otaProgressLastDrawnPercent) return;
         otaProgressLastDrawnPercent = percent;
+
+        // BUGFIX (Alex' Meldung: OTA-Download dauert seit dem Fortschritts-
+        // balken spuerbar laenger als vorher mit der reinen Prozentzahl) -
+        // dieser Callback laeuft SYNCHRON auf demselben Download-Lese-Loop
+        // wie httpUpdate.update() selbst (siehe ota_update.cpp): jede hier
+        // verbrachte Millisekunde verzoegert den naechsten Netzwerk-Lese-
+        // Aufruf direkt. drawString() mit dem eigenen FreeFont (UiFont11pt,
+        // siehe CLAUDE.md) bei Size 3 sowie der wachsende fillRoundRect()-
+        // Balken sind pro Aufruf zwar einzeln guenstig, laufen bei feiner
+        // Chunk-Groesse aber leicht 100x waehrend eines einzigen Downloads -
+        // das summiert sich spuerbar auf. Deshalb hier zusaetzlich zeitlich
+        // gedrosselt (min. 150ms zwischen zwei tatsaechlichen Redraws), statt
+        // bei JEDER Prozent-Aenderung sofort neu zu zeichnen. otaProgress-
+        // LastDrawnPercent oben wird trotzdem bei JEDER Aenderung aktualisiert
+        // (verhindert nur doppelte Arbeit bei identischem Prozentwert), die
+        // Drossel greift NUR bei der eigentlichen Zeichenoperation - der
+        // allererste Redraw (otaProgressLastDrawMs==0) sowie 100% (damit der
+        // Endzustand garantiert sichtbar wird, auch wenn der letzte Chunk
+        // innerhalb des Drossel-Fensters liegt) sind davon ausgenommen.
+        constexpr uint32_t MIN_REDRAW_INTERVAL_MS = 150;
+        uint32_t nowMs = millis();
+        bool mustDraw = (percent >= 100) || (otaProgressLastDrawMs == 0);
+        if (!mustDraw && (nowMs - otaProgressLastDrawMs) < MIN_REDRAW_INTERVAL_MS) return;
+        otaProgressLastDrawMs = nowMs;
 
         // Prozentzahl: nur die kleine Box um den Text herum loeschen, NICHT
         // das ganze Band - vermeidet den Schwarz-Blitz bei jeder
