@@ -214,32 +214,9 @@ bool performUpdate(const char* url, void (*onProgress)(uint8_t percent)) {
     // Erfolgsmeldung an, bevor das Geraet neu startet - siehe
     // menu_screen.cpp::runOtaUpdateScreen().
     httpUpdate.rebootOnUpdate(false);
-    // TEMP-DIAG (Alex' Meldung: Download trotz Redraw-Drossel weiterhin sehr
-    // langsam) - misst, WIE die Zeit waehrend performUpdate() tatsaechlich
-    // verteilt ist: Zeit bis zum ersten Fortschritts-Callback (TLS-Handshake/
-    // Redirect-Kette/Verbindungsaufbau, BEVOR ueberhaupt ein Byte der .bin
-    // ankommt), Anzahl Callback-Aufrufe, und kumulierte Zeit INNERHALB von
-    // onProgress() (also inkl. Zeichnen) - damit sich zeigt, ob die
-    // Download-Zeit selbst (Netzwerk) oder die Zeit VOR dem eigentlichen
-    // Download (Verbindungsaufbau) den groesseren Anteil hat.
-    uint32_t diagUpdateStartMs = millis();
-    static uint32_t diagCallCount = 0;
-    static uint32_t diagFirstCallMs = 0;
-    static uint64_t diagDrawTotalUs = 0;
-    diagCallCount = 0;
-    diagFirstCallMs = 0;
-    diagDrawTotalUs = 0;
-    httpUpdate.onProgress([onProgress, diagUpdateStartMs](int cur, int total) {
-        if (diagCallCount == 0) {
-            diagFirstCallMs = millis();
-            Serial.printf("[OTA-DIAG] Erster Fortschritts-Callback nach %ums (Verbindungsaufbau/TLS/Redirect)\n",
-                          (unsigned)(diagFirstCallMs - diagUpdateStartMs));
-        }
-        diagCallCount++;
+    httpUpdate.onProgress([onProgress](int cur, int total) {
         if (onProgress && total > 0) {
-            uint32_t drawStartUs = micros();
             onProgress((uint8_t)((cur * 100) / total));
-            diagDrawTotalUs += (uint64_t)(micros() - drawStartUs);
         }
         // Nur gelegentlich loggen (alle ~10%), sonst quillt der Seriell-
         // Monitor bei grossen Dateien mit hunderten Zeilen ueber.
@@ -255,16 +232,6 @@ bool performUpdate(const char* url, void (*onProgress)(uint8_t percent)) {
     });
 
     t_httpUpdate_return result = httpUpdate.update(client, url);
-
-    // TEMP-DIAG Zusammenfassung - siehe Kommentar oben, bitte nach dem
-    // naechsten Test wieder komplett entfernen.
-    uint32_t diagTotalMs = millis() - diagUpdateStartMs;
-    Serial.printf("[OTA-DIAG] Gesamtdauer performUpdate()=%ums, Callback-Aufrufe=%u, "
-                  "kumulierte Zeit IN onProgress() (inkl. Zeichnen)=%ums (%.1f%% der Gesamtzeit), "
-                  "Zeit bis 1. Callback=%ums\n",
-                  (unsigned)diagTotalMs, (unsigned)diagCallCount, (unsigned)(diagDrawTotalUs / 1000),
-                  diagTotalMs > 0 ? (100.0 * (diagDrawTotalUs / 1000.0) / diagTotalMs) : 0.0,
-                  (unsigned)(diagFirstCallMs - diagUpdateStartMs));
 
     if (result != HTTP_UPDATE_OK) {
         Serial.printf("[OTA] Fehlgeschlagen: result=%d error=%d (%s) freeHeap=%u\n", (int)result,
