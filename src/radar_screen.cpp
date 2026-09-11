@@ -2969,35 +2969,48 @@ namespace {
     // statt die Formen ein zweites Mal nachzubauen - beide Aufrufer sind
     // im selben File, kein Bruch der sonstigen Pro-Screen-Unabhaengigkeit
     // (die betrifft nur getrennte Screen-Dateien, siehe CLAUDE.md).
-    void drawWeatherConditionIcon(TFT_eSPI& gfx, int16_t cx, int16_t cy, Weather::Condition condition, uint16_t color) {
+    // colorful=true verwendet fuer Sonne/Wolke/Regen/Schnee/Blitz dieselben
+    // festen Farben wie das bereits bestehende bunte Wetter-Icon in
+    // main.cpp (drawWeatherIcon()/drawCloudShape()/drawSunShape(), z.B. auf
+    // dem Ruhebildschirm) statt der uebergebenen "color" - Alex' Wunsch fuer
+    // den grossen Vollbild-Stundenverlauf-Screen (showForecastTimelineInfo()
+    // unten). Die kleine, bewusst gedimmte Eckanzeige (drawForecastCorner())
+    // bleibt beim Default false, also weiterhin einfarbig/gedimmt.
+    void drawWeatherConditionIcon(TFT_eSPI& gfx, int16_t cx, int16_t cy, Weather::Condition condition, uint16_t color, bool colorful = false) {
+        uint16_t sunColor = colorful ? TFT_YELLOW : color;
+        uint16_t cloudColor = colorful ? TFT_LIGHTGREY : color;
+        uint16_t rainColor = colorful ? TFT_SKYBLUE : color;
+        uint16_t snowColor = colorful ? TFT_WHITE : color;
+        uint16_t boltColor = colorful ? TFT_YELLOW : color;
+
         switch (condition) {
             case Weather::Condition::Clear:
-                drawForecastSunShape(gfx, cx, cy, 9, color);
+                drawForecastSunShape(gfx, cx, cy, 9, sunColor);
                 break;
             case Weather::Condition::PartlyCloudy:
-                drawForecastSunShape(gfx, (int16_t)(cx - 6), (int16_t)(cy - 4), 6, color);
-                drawForecastCloudShape(gfx, (int16_t)(cx + 5), (int16_t)(cy + 3), color);
+                drawForecastSunShape(gfx, (int16_t)(cx - 6), (int16_t)(cy - 4), 6, sunColor);
+                drawForecastCloudShape(gfx, (int16_t)(cx + 5), (int16_t)(cy + 3), cloudColor);
                 break;
             case Weather::Condition::Cloudy:
-                drawForecastCloudShape(gfx, cx, cy, color);
+                drawForecastCloudShape(gfx, cx, cy, cloudColor);
                 break;
             case Weather::Condition::Rain:
-                drawForecastCloudShape(gfx, cx, (int16_t)(cy - 4), color);
-                gfx.drawLine((int16_t)(cx - 6), (int16_t)(cy + 6), (int16_t)(cx - 9), (int16_t)(cy + 12), color);
-                gfx.drawLine(cx,                (int16_t)(cy + 6), (int16_t)(cx - 3), (int16_t)(cy + 12), color);
-                gfx.drawLine((int16_t)(cx + 6), (int16_t)(cy + 6), (int16_t)(cx + 3), (int16_t)(cy + 12), color);
+                drawForecastCloudShape(gfx, cx, (int16_t)(cy - 4), cloudColor);
+                gfx.drawLine((int16_t)(cx - 6), (int16_t)(cy + 6), (int16_t)(cx - 9), (int16_t)(cy + 12), rainColor);
+                gfx.drawLine(cx,                (int16_t)(cy + 6), (int16_t)(cx - 3), (int16_t)(cy + 12), rainColor);
+                gfx.drawLine((int16_t)(cx + 6), (int16_t)(cy + 6), (int16_t)(cx + 3), (int16_t)(cy + 12), rainColor);
                 break;
             case Weather::Condition::Snow:
-                drawForecastCloudShape(gfx, cx, (int16_t)(cy - 4), color);
-                gfx.drawPixel((int16_t)(cx - 6), (int16_t)(cy + 9), color);
-                gfx.drawPixel(cx,                (int16_t)(cy + 11), color);
-                gfx.drawPixel((int16_t)(cx + 6), (int16_t)(cy + 9), color);
+                drawForecastCloudShape(gfx, cx, (int16_t)(cy - 4), cloudColor);
+                gfx.drawPixel((int16_t)(cx - 6), (int16_t)(cy + 9), snowColor);
+                gfx.drawPixel(cx,                (int16_t)(cy + 11), snowColor);
+                gfx.drawPixel((int16_t)(cx + 6), (int16_t)(cy + 9), snowColor);
                 break;
             case Weather::Condition::Thunderstorm:
-                drawForecastCloudShape(gfx, cx, (int16_t)(cy - 4), color);
-                gfx.drawLine(cx,                (int16_t)(cy + 4),  (int16_t)(cx - 4), (int16_t)(cy + 10), color);
-                gfx.drawLine((int16_t)(cx - 4), (int16_t)(cy + 10), (int16_t)(cx + 1), (int16_t)(cy + 10), color);
-                gfx.drawLine((int16_t)(cx + 1), (int16_t)(cy + 10), (int16_t)(cx - 3), (int16_t)(cy + 16), color);
+                drawForecastCloudShape(gfx, cx, (int16_t)(cy - 4), cloudColor);
+                gfx.drawLine(cx,                (int16_t)(cy + 4),  (int16_t)(cx - 4), (int16_t)(cy + 10), boltColor);
+                gfx.drawLine((int16_t)(cx - 4), (int16_t)(cy + 10), (int16_t)(cx + 1), (int16_t)(cy + 10), boltColor);
+                gfx.drawLine((int16_t)(cx + 1), (int16_t)(cy + 10), (int16_t)(cx - 3), (int16_t)(cy + 16), boltColor);
                 break;
             default:
                 break;
@@ -3118,7 +3131,7 @@ namespace {
                 if (!p.available) continue;
                 int16_t cx = (int16_t)(COL_W * i + COL_W / 2);
 
-                drawWeatherConditionIcon(gfx, cx, iconCy, p.condition, themeBaseColor(gfx));
+                drawWeatherConditionIcon(gfx, cx, iconCy, p.condition, themeBaseColor(gfx), true);
 
                 gfx.setTextColor(themeBaseColor(gfx), TFT_BLACK);
                 if (i == 0) {
@@ -4825,6 +4838,12 @@ void updateProximityAlert(uint32_t nowMs) {
     bool anyClose = false;
     bool anyEmergency = false;
     bool anyWatched = false;
+    // Wird true, wenn in DIESEM Zyklus mindestens ein Flugzeug frisch in
+    // den Watchlist-Zustand gewechselt ist (false->true, siehe
+    // Aircraft::wasWatched in aircraft.h) - loest den kurzen Einzelton des
+    // SPK-Lautsprecher-Alarms aus (speaker_alert.h), analog zu
+    // playWatchedAlert() im Web-Pendant.
+    bool newWatchHit = false;
 
     bool proximityOn = SettingsStore::proximityAlertEnabled();
     bool smartOn = SettingsStore::proximityAlertSmartMode();
@@ -4864,8 +4883,13 @@ void updateProximityAlert(uint32_t nowMs) {
             // ein Watchlist-Treffer loest den Alarm immer aus, kein Ein/Aus
             // dafuer (der fruehere watchlistAlertEnabled()-Schalter wurde
             // entfernt).
-            if (AircraftWatchlist::isWatched(table[i].callsign) ||
-                SquawkWatchlist::isWatched(table[i].squawk)) anyWatched = true;
+            bool isWatchedNow = AircraftWatchlist::isWatched(table[i].callsign) ||
+                                SquawkWatchlist::isWatched(table[i].squawk);
+            if (isWatchedNow) {
+                anyWatched = true;
+                if (!table[i].wasWatched) newWatchHit = true;
+            }
+            table[i].wasWatched = isWatchedNow;
 
             // Einfacher UND intelligenter Naeherungsalarm dagegen NUR fuer
             // Flugzeuge, die auch tatsaechlich auf dem Radar sichtbar waeren
@@ -4934,13 +4958,18 @@ void updateProximityAlert(uint32_t nowMs) {
     bool updateBlinkWanted = SettingsStore::updateLedSignalEnabled() && OtaUpdate::isUpdateAvailable();
     ledBlinkOn = LedAlert::update(mode, nowMs, updateBlinkWanted);
 
-    // Optionaler Notfall-Alarmton ueber den SPK-Steckverbinder (Alex'
-    // Wunsch, siehe speaker_alert.h) - wiederverwendet denselben Schalter
-    // wie der Browser-Alarmton (SettingsStore::webAudioAlertEnabled()),
-    // reagiert NUR auf anyEmergency (nicht auf Watchlist-Treffer), laeuft
+    // Optionaler Alarmton ueber den SPK-Steckverbinder (Alex' Wunsch, siehe
+    // speaker_alert.h) - wiederverwendet denselben Schalter wie der
+    // Browser-Alarmton (SettingsStore::webAudioAlertEnabled()), laeuft
     // unabhaengig vom LedAlert::update()-Aufruf direkt darueber - beide
-    // duerfen gleichzeitig aktiv sein.
-    SpeakerAlert::update(anyEmergency && SettingsStore::webAudioAlertEnabled());
+    // duerfen gleichzeitig aktiv sein. Notfall-Squawk loest die durchgehende
+    // Sirene aus, ein NEUER Watchlist-Treffer (newWatchHit) einen kurzen
+    // Einzelton - analog zum Browser-Alarmton (Dauer-Sirene vs. einmaliger
+    // Beep). Treffen beide im selben Zyklus zusammen, hat die Sirene
+    // Vorrang (siehe speaker_alert.cpp) - kein Sonderfall noetig, ein
+    // PWM-Kanal kann ohnehin nur einen Ton gleichzeitig ausgeben.
+    bool speakerOn = SettingsStore::webAudioAlertEnabled();
+    SpeakerAlert::update(anyEmergency && speakerOn, newWatchHit && speakerOn);
 }
 
 EmergencyInfo checkEmergency() {

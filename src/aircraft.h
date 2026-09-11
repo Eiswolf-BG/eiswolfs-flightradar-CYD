@@ -33,6 +33,17 @@ struct Aircraft {
     // gespeicherte Wert ist (= echte Annaeherung, nicht nur "noch drin").
     uint8_t  proximityZone  = 0;
 
+    // Zuletzt bekannter Watchlist-Zustand (Rufzeichen- oder Squawk-
+    // Wachliste, siehe radar_screen.cpp::updateProximityAlert()) - JEDEN
+    // Zyklus aktualisiert, analog zum proximityZone-Mechanismus oben.
+    // Damit laesst sich der Uebergang "war nicht beobachtet -> wird jetzt
+    // beobachtet" erkennen (fuer den kurzen Einzelton des SPK-Lautsprecher-
+    // Alarms, siehe speaker_alert.h) - ein reiner Zustandsvergleich wie
+    // false->true statt einer separaten Hex-Liste wie im JS-Pendant der
+    // Web-Seite, da die Aircraft-Tabelle hier bereits die passendere Stelle
+    // dafuer bietet.
+    bool     wasWatched     = false;
+
     // Best-Effort-Anflug-Erkennung auf den naechstgelegenen Flughafen
     // (Weather::currentNearestAirport(), dieselbe Referenz wie die
     // "Naechster Flughafen"-Eckanzeige) - rein geometrisch aus bereits

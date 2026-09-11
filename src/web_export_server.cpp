@@ -722,20 +722,18 @@ namespace {
         // deutlich groesser (40x40 statt vorher 28x28) und an fester
         // Position, kein Hin-und-her-Huepfen mehr.
         html += "<div id=\"viewTabs\"><div id=\"viewTabsButtons\"><button id=\"tabRadar\" class=\"active\" type=\"button\">Radar</button><button id=\"tabMap\" type=\"button\">Map</button></div>";
-        // "transform" verschiebt das Icon rein optisch (Alex' Vorgabe: 100px
-        // runter, 250px nach links ausgehend von der bisherigen Position),
-        // ohne den restlichen Flex-Zeilenablauf (Radar/Map-Buttons) zu
-        // beeinflussen - der urspruengliche Platz in der Zeile bleibt
-        // reserviert, nur das Icon selbst rutscht optisch daneben.
-        html += "<canvas id=\"weatherIconCanvas\" width=\"120\" height=\"120\" style=\"cursor:pointer;flex-shrink:0;transform:translate(-110px,45px);\" title=\"Weather info\"></canvas></div>";
-        // Hoehenfarben-Legende (Alex' Wunsch) - AUSSERHALB von #radarView/
-        // #mapView platziert (die per CSS ueber "display:none" umgeschaltet
-        // werden, siehe #tabRadar/#tabMap-Handler weiter unten), damit sie
-        // in BEIDEN Ansichten sichtbar bleibt, da die Markerfarben in beiden
-        // dieselbe altColor()-Funktion nutzen. Inhalt wird rein per JS
-        // gefuellt (renderAltLegend(), siehe dort) - leer hier, damit keine
-        // Server/Client-Farblogik dupliziert werden muss.
-        html += "<div id=\"altLegend\" style=\"font-size:11px;color:var(--accent-muted);display:flex;flex-wrap:wrap;align-items:center;gap:3px 10px;margin-bottom:8px;\"></div>";
+        // Horizontal bleibt "transform:translateX" richtig - das verschiebt
+        // nur die X-Achse rein optisch, ohne den Flex-Zeilenablauf (Radar/
+        // Map-Buttons) zu beeinflussen. Fuer die Y-Achse dagegen bewusst
+        // "margin-top" statt "transform:translateY" (fruehere Version): ein
+        // transform verschiebt nur optisch, OHNE dass der dafuer benoetigte
+        // Platz im Layout mitwaechst - die #viewTabs-Zeile blieb dadurch zu
+        // niedrig und die nachfolgende Range-/Mode-Zeile (#radarControls)
+        // ueberschnitt sich mit dem nach unten verschobenen Icon.
+        // margin-top zaehlt dagegen zur echten Boxgroesse und
+        // vergroessert die Flex-Zeilenhoehe entsprechend mit, wodurch alles
+        // Nachfolgende zuverlaessig verdraengt statt ueberdeckt wird.
+        html += "<canvas id=\"weatherIconCanvas\" width=\"120\" height=\"120\" style=\"cursor:pointer;flex-shrink:0;transform:translateX(-110px);margin-top:30px;\" title=\"Weather info\"></canvas></div>";
         html += "<div id=\"radarView\">";
         html += "<div id=\"radarControls\">Range: <select id=\"radarRange\">";
         for (uint8_t i = 0; i < Config::RANGE_STEP_COUNT; i++) {
@@ -810,6 +808,20 @@ namespace {
         html += "<div id=\"weatherInfo\"></div>";
         html += "</div>"; // #radarView
         html += "<div id=\"mapView\"><div id=\"leafletMap\"></div></div>";
+        // Hoehenfarben-Legende (Alex' Wunsch) - AUSSERHALB von #radarView/
+        // #mapView platziert (die per CSS ueber "display:none" umgeschaltet
+        // werden, siehe #tabRadar/#tabMap-Handler weiter unten), damit sie
+        // in BEIDEN Ansichten sichtbar bleibt, da die Markerfarben in beiden
+        // dieselbe altColor()-Funktion nutzen. Inhalt wird rein per JS
+        // gefuellt (renderAltLegend(), siehe dort) - leer hier, damit keine
+        // Server/Client-Farblogik dupliziert werden muss. Bewusst NACH
+        // #radarView/#mapView im Fluss platziert (Alex' Wunsch): oberhalb
+        // quetschte sie sich zwischen Tabs/Wetter-Icon und der Range-/Mode-
+        // Zeile zu eng ein - unterhalb bleibt sie weiterhin ein direktes
+        // Geschwister beider Views (nicht in eine von beiden verschachtelt),
+        // ist also in BEIDEN Tabs weiterhin sichtbar, nur jetzt visuell
+        // unterhalb statt oberhalb.
+        html += "<div id=\"altLegend\" style=\"font-size:11px;color:var(--accent-muted);display:flex;flex-wrap:wrap;align-items:center;gap:3px 10px;margin-bottom:8px;\"></div>";
         html += "<script>(function(){";
         html += "var canvas=document.getElementById('radarCanvas');";
         html += "var ctx=canvas.getContext('2d');";
