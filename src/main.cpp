@@ -34,6 +34,7 @@
 #include "radar_screen.h"
 #include "splash_screen.h"
 #include "led_alert.h"
+#include "speaker_alert.h"
 #include "flight_logbook.h"
 #include "weather.h"
 #include "i18n.h"
@@ -448,6 +449,25 @@ const char* conditionLabel(Weather::Condition c) {
 // Weather::currentMetar()) den Zurueck-Button ueberlappte (Alex'
 // Fotomeldung). showInfoScreen() blendet bei Bedarf automatisch Pfeil-
 // Buttons zum Scrollen ein, siehe dortiger Kommentar.
+// Gleiches 8-Sektoren-Kompass-Prinzip wie compassLabel() in radar_screen.cpp
+// (dort lokal in dessen eigener anonymer Namespace, hier fuer die neue
+// Wind-Zeile in showWeatherInfo() unten dupliziert - Projekt-Konvention,
+// siehe CLAUDE.md "jeder Screen dupliziert seine eigenen kleinen Helfer").
+const char* windCompassLabel(int16_t bearingDeg) {
+    int sector = ((int)lround((float)bearingDeg + 22.5f) / 45) % 8;
+    if (sector < 0) sector += 8;
+    switch (sector) {
+        case 0: return I18n::t(StringId::COMPASS_N);
+        case 1: return I18n::t(StringId::COMPASS_NE);
+        case 2: return I18n::t(StringId::COMPASS_E);
+        case 3: return I18n::t(StringId::COMPASS_SE);
+        case 4: return I18n::t(StringId::COMPASS_S);
+        case 5: return I18n::t(StringId::COMPASS_SW);
+        case 6: return I18n::t(StringId::COMPASS_W);
+        default: return I18n::t(StringId::COMPASS_NW);
+    }
+}
+
 void showWeatherInfo(TFT_eSPI& tftRef) {
     String body = I18n::t(StringId::WEATHER_INFO_BODY);
 
@@ -469,6 +489,36 @@ void showWeatherInfo(TFT_eSPI& tftRef) {
         const char* airportCode = useIata ? na.iata : metar.icao;
         body += String(I18n::t(StringId::WEATHER_METAR_PREFIX)) + airportCode + ":\n";
         body += metar.raw;
+
+        // Windzeile (Alex' Wunsch) - aus demselben METAR-Rohtext geparst
+        // (Weather::parseMetarWind()), KEINE eigene Netzwerkabfrage. Bewusst
+        // NICHT der Open-Meteo-Wind (Weather::currentWindDirectionDeg()/
+        // currentWindSpeedKmh(), steuert den Regen-Effekt) - das hier ist
+        // der "echte" Flugwetter-Wind vom naechstgelegenen Flughafen.
+        // Peilungs-Konvention wie beim Flugzeug-Detailpanel (Gradzahl +
+        // Kompass-Kuerzel) - KEIN grafischer Pfeil hier, der eigene
+        // TFT-Font deckt nur U+0020-U+015F ab (siehe CLAUDE.md), Unicode-
+        // Pfeilglyphen sind darin nicht enthalten.
+        Weather::ParsedWind wind = Weather::parseMetarWind(metar.raw);
+        if (wind.available) {
+            body += "\n\n";
+            body += I18n::t(StringId::WEATHER_FORECAST_INFO_WIND_PREFIX);
+            if (wind.calm) {
+                body += I18n::t(StringId::WEATHER_WIND_CALM);
+            } else {
+                bool metric = LocationManager::useMetricUnits();
+                float speedDisplay = metric ? wind.speedKt * 1.852f : wind.speedKt;
+                char windBuf[40];
+                if (wind.variableDirection) {
+                    snprintf(windBuf, sizeof(windBuf), "%s, %.0f%s", I18n::t(StringId::WEATHER_WIND_VARIABLE),
+                             speedDisplay, metric ? "km/h" : "kt");
+                } else {
+                    snprintf(windBuf, sizeof(windBuf), "%d° %s, %.0f%s", wind.directionDeg,
+                             windCompassLabel(wind.directionDeg), speedDisplay, metric ? "km/h" : "kt");
+                }
+                body += windBuf;
+            }
+        }
     }
 
     // Sonnenauf-/untergang fuer den aktuell aktiven Standort (gleiche
@@ -1736,6 +1786,7 @@ void setup() {
 
     TouchInput::begin();
     LedAlert::begin();
+    SpeakerAlert::begin();
 
     bool sdOk = SdStorage::init();
     if (!sdOk) {

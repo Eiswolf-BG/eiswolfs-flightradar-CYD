@@ -329,6 +329,91 @@ namespace {
         }
     }
 
+    // STRUKTURELLER FIX (Alex' Diagnose per [WEB-DIAG]-Log): die Live-Radar-
+    // Seite wurde bisher komplett in EINEM grossen Arduino-String
+    // aufgebaut und erst am Ende per server.send() komplett rausgeschickt.
+    // ESP.getMaxAllocHeap() bleibt auf diesem Geraet aber DAUERHAFT bei
+    // ~43KB gedeckelt, sobald einmal eine TLS-Verbindung (Wetter, OTA)
+    // gelaufen ist - derselbe strukturelle Speicher-Deckel wie beim
+    // 100km-ADS-B-Bug (v5.7.8, siehe adsb_client.cpp). Ein einzelner
+    // String, der ueber diese Grenze waechst (bei dayCount=10 bereits
+    // >38KB), kann von String::reserve()/concat() schlicht NIE MEHR einen
+    // ausreichend grossen zusammenhaengenden Block bekommen, egal wie die
+    // Reservierungsgroesse gewaehlt wird - das ist keine Fragmentierungs-
+    // frage mehr, sondern eine harte Obergrenze.
+    //
+    // Fix (gleiches Prinzip wie beim 100km-Bug: Streaming statt eines
+    // grossen Puffers): ChunkedResponse wickelt genau wie ein normaler
+    // Arduino String per operator+= befuellt (JEDE bestehende
+    // "html += ..."-Aufrufstelle im ganzen File funktioniert dadurch
+    // unveraendert weiter, keine Massen-Umschreibung noetig), haelt aber
+    // selbst nie mehr als FLUSH_THRESHOLD Bytes im Speicher - sobald der
+    // interne Puffer diese Schwelle erreicht, wird er per
+    // server.sendContent() direkt an den Client gestreamt und geleert.
+    // Jeder einzelne Reservierungsbedarf bleibt dadurch weit unter der
+    // ~43KB-Grenze, unabhaengig davon, wie gross die Seite insgesamt wird
+    // (mehr Logbuch-Tage, mehr Features - der Puffer selbst waechst nie
+    // mit). reserve()/length() bleiben als duenne Kompatibilitaets-
+    // Wrapper erhalten, damit die zahlreichen bestehenden
+    // "html.reserve(...)"-Aufrufstellen (aus den fruehereren, jetzt
+    // ueberholten Fragmentierungs-Fixversuchen) nicht einzeln entfernt
+    // werden muessen - sie sind beim Streaming schlicht wirkungslos, aber
+    // harmlos.
+    class ChunkedResponse {
+    public:
+        // 4KB - deutlich unter der ~43KB-Deckelung, mit grossem Puffer nach
+        // oben fuer eine einzelne besonders lange Zeile (z.B. der komplette
+        // <script>-Block einer JS-Funktion), die den Schwellenwert in einem
+        // Rutsch ueberschreiten kann.
+        static constexpr size_t FLUSH_THRESHOLD = 4096;
+
+        ChunkedResponse() { buf.reserve(FLUSH_THRESHOLD + 1024); }
+
+        ChunkedResponse& operator+=(const char* s) {
+            buf += s;
+            maybeFlush();
+            return *this;
+        }
+        ChunkedResponse& operator+=(const String& s) {
+            buf += s;
+            maybeFlush();
+            return *this;
+        }
+
+        // No-Op-Kompatibilitaetswrapper - siehe Klassenkommentar oben.
+        bool reserve(size_t) { return true; }
+        // Gesamtlaenge der bisher aufgebauten Antwort (bereits gestreamte
+        // Bytes + aktueller Pufferinhalt) - NICHT mehr fuer irgendeine
+        // Reservierungsentscheidung relevant, aber weiterhin von Aufrufern
+        // genutzt, die die bisherige Laenge fuer String-Konkatenation
+        // brauchen (z.B. html.length()-Vergleiche in bestehenden
+        // Call-Sites).
+        size_t length() const { return totalSent + buf.length(); }
+
+        // Muss nach dem letzten += aufgerufen werden, um den restlichen
+        // Pufferinhalt rauszuschicken - server.send() gibt es beim
+        // Streaming-Pfad nicht mehr, siehe handleRoot()/handleLists().
+        void flushAll() {
+            if (buf.length() > 0) {
+                server.sendContent(buf);
+                totalSent += buf.length();
+                buf = "";
+            }
+        }
+
+    private:
+        String buf;
+        size_t totalSent = 0;
+
+        void maybeFlush() {
+            if (buf.length() >= FLUSH_THRESHOLD) {
+                server.sendContent(buf);
+                totalSent += buf.length();
+                buf = "";
+            }
+        }
+    };
+
     // Vollbild-Sternenhintergrund fuer die ganze Seite (nicht nur innerhalb
     // des kleinen Radar-Canvas) - 1:1 uebernommen vom Web-Flasher
     // (index.html, separat gehostet auf GitHub Pages, nicht Teil dieses
@@ -343,7 +428,7 @@ namespace {
     // restliche Seiteninhalt in einen ".page"-Wrapper mit z-index:1
     // gepackt wird (siehe htmlHeader()/handleRoot()/handleLists()), damit
     // die Sterne zuverlaessig HINTER Text/Tabellen/Buttons bleiben.
-    void appendStarBackground(String& html) {
+    void appendStarBackground(ChunkedResponse& html) {
         html += "<canvas id=\"star-bg\"></canvas>";
         html += "<script>(function(){";
         html += "var canvas=document.getElementById('star-bg');";
@@ -424,23 +509,23 @@ namespace {
         html += "})();</script>";
     }
 
-    String htmlHeader(const String& title) {
-        String html;
-        // Einmalige, grosszuegige Vorab-Reservierung statt hunderter
-        // einzelner "+="-Reallozierungen: Arduino Strings scheitern bei
-        // einem fehlgeschlagenen realloc() (fragmentierter ESP32-Heap)
-        // STILL - der Rueckgabewert von concat() wird ueberall im Projekt
-        // ungeprueft verworfen, ein einzelner missgluecketer "+=" mitten in
-        // dieser sehr grossen Seite laesst dann klanglos genau das
-        // dahinterstehende Stueck HTML/JS (z.B. den Leaflet-<script>-Tag)
-        // verschwinden, ohne Fehler/Crash - der Browser bekommt dadurch ein
-        // kaputtes <script src="..."> und laedt stattdessen faelschlich die
-        // ESP32-eigene 404-Seite als "JavaScript" (siehe Bugreport: "Map"-
-        // Tab, "Unexpected token '<'" + 404). Eine einzige fruehe grosse
-        // Reservierung (statt vieler kleiner, spaeter im schon
-        // fragmentierteren Heap) macht diesen Fehlschlag deutlich
-        // unwahrscheinlicher.
-        html.reserve(20480);
+    // BUGFIX-VERLAUF (Alex' Meldung, mehrere Runden): erst fehlende Logbuch-
+    // Tabelle, dann nach zwei Fragmentierungs-Fixversuchen (grosse
+    // Einzelreservierung, danach mehrere kleinere gestaffelte
+    // Reservierungen) eine noch schlimmere Regression. Alex' [WEB-DIAG]-
+    // Log hat die eigentliche Ursache schliesslich zweifelsfrei gezeigt:
+    // ESP.getMaxAllocHeap() bleibt auf diesem Geraet DAUERHAFT bei ~43KB
+    // gedeckelt, sobald einmal eine TLS-Verbindung gelaufen ist (Wetter,
+    // OTA) - keine Fragmentierungsfrage, eine harte Obergrenze, die keine
+    // Reservierungsgroesse je umgehen kann (derselbe strukturelle Deckel
+    // wie beim 100km-ADS-B-Bug, v5.7.8). Der eigentliche Fix ist deshalb
+    // jetzt Streaming statt eines grossen Puffers - siehe ChunkedResponse
+    // weiter oben in dieser Datei fuer die Begruendung im Detail. html ist
+    // hier deshalb kein von dieser Funktion angelegter/zurueckgegebener
+    // String mehr, sondern ein von handleRoot()/handleLists() bereits
+    // angelegter ChunkedResponse, der ueber server.sendContent() direkt
+    // an den Client streamt.
+    void htmlHeader(ChunkedResponse& html, const String& title) {
         WebTheme wt = currentWebTheme();
         html += "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">";
         html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
@@ -587,7 +672,6 @@ namespace {
         appendStarBackground(html);
         html += "<div class=\"page\">";
         html += "<h1>" + title + "</h1>";
-        return html;
     }
 
     // Live-Radar-Ansicht fuer die Startseite: ein <canvas>, das per JavaScript
@@ -603,7 +687,7 @@ namespace {
     // /radar.json mitgeschickt (siehe handleRadarJson()) und erlaubt so ein
     // unabhaengiges Herein-/Herauszoomen auf dem Handy, ohne das Geraete-
     // Display zu beeinflussen. Default ist die aktuelle Geraete-Reichweite.
-    void appendRadarSection(String& html) {
+    void appendRadarSection(ChunkedResponse& html) {
         float deviceRangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
         // Gleiche Auto/Metrisch/Imperial-Logik wie ueberall sonst am Geraet
@@ -643,7 +727,7 @@ namespace {
         // ohne den restlichen Flex-Zeilenablauf (Radar/Map-Buttons) zu
         // beeinflussen - der urspruengliche Platz in der Zeile bleibt
         // reserviert, nur das Icon selbst rutscht optisch daneben.
-        html += "<canvas id=\"weatherIconCanvas\" width=\"120\" height=\"120\" style=\"cursor:pointer;flex-shrink:0;transform:translate(-110px,50px);\" title=\"Weather info\"></canvas></div>";
+        html += "<canvas id=\"weatherIconCanvas\" width=\"120\" height=\"120\" style=\"cursor:pointer;flex-shrink:0;transform:translate(-110px,45px);\" title=\"Weather info\"></canvas></div>";
         // Hoehenfarben-Legende (Alex' Wunsch) - AUSSERHALB von #radarView/
         // #mapView platziert (die per CSS ueber "display:none" umgeschaltet
         // werden, siehe #tabRadar/#tabMap-Handler weiter unten), damit sie
@@ -701,6 +785,13 @@ namespace {
                 if (checkboxes[i].checked) html += " checked";
                 html += "> " + String(I18n::t(checkboxes[i].label)) + "</label>";
             }
+            // Web-Alarmton-Mute-Icon (Alex' Wunsch) - rein lokaler Mute-
+            // Zustand pro Browser (localStorage), NICHT mit dem Geraet
+            // synchronisiert. Inhalt/Titel wird komplett per JS befuellt
+            // (updateAudioIcon(), siehe unten) - server-seitig bewusst leer,
+            // da der Mute-Zustand serverseitig gar nicht bekannt ist (jeder
+            // Browser hat seinen eigenen).
+            html += "<span id=\"audioAlertIcon\" style=\"cursor:pointer;font-size:16px;line-height:1;\"></span>";
             html += "</div>";
         }
         // Live mitzaehlende "zuletzt aktualisiert"-Anzeige (Alex' Wunsch) -
@@ -960,6 +1051,16 @@ namespace {
         html += "case 'thunderstorm':return " + jsLit(I18n::t(StringId::WEATHER_CONDITION_THUNDERSTORM)) + ";";
         html += "default:return '';}}";
 
+        // Windrichtungs-Kompass-Kuerzel fuers Wetter-Popup (Alex' Wunsch) -
+        // gleiches 8-Sektoren-Prinzip wie windCompassLabel() in main.cpp
+        // (Geraet) und compassLabel() in radar_screen.cpp, hier als reines
+        // JS-Pendant mit denselben COMPASS_*-Uebersetzungen.
+        html += "var COMPASS8=[" + jsLit(I18n::t(StringId::COMPASS_N)) + "," + jsLit(I18n::t(StringId::COMPASS_NE)) +
+                "," + jsLit(I18n::t(StringId::COMPASS_E)) + "," + jsLit(I18n::t(StringId::COMPASS_SE)) + "," +
+                jsLit(I18n::t(StringId::COMPASS_S)) + "," + jsLit(I18n::t(StringId::COMPASS_SW)) + "," +
+                jsLit(I18n::t(StringId::COMPASS_W)) + "," + jsLit(I18n::t(StringId::COMPASS_NW)) + "];";
+        html += "function windCompassLabel(deg){var s=Math.round((deg+22.5)/45)%8;if(s<0)s+=8;return COMPASS8[s];}";
+
         // Wetter-Info-Popup (Antippen/Klicken des Icons) - gleicher Inhalt
         // wie main.cpp::showWeatherInfo() am Geraet (Standort-Hinweis,
         // METAR, Sonnenauf-/-untergang, Kurzvorhersage), alle Werte kommen
@@ -973,6 +1074,22 @@ namespace {
         html += "lines.push(" + jsLit(I18n::t(StringId::WEATHER_INFO_BODY)) + ");";
         html += "if(d.metar_available){lines.push('<br>'+" + jsLit(I18n::t(StringId::WEATHER_METAR_PREFIX)) +
                 "+d.metar_airport_code+':<br>'+d.metar_raw);}";
+        // Windzeile (Alex' Wunsch) - aus demselben METAR-Rohtext geparst wie
+        // am Geraet, server-seitig bereits in metar_wind_*-Felder aufgeloest
+        // (siehe handleRadarJson()). Reuse von fmtSpeed() (bereits fuers
+        // Flugzeug-Popup vorhanden) fuer die Metrisch/Imperial-Umschaltung -
+        // gleiches Prinzip wie dort. Pfeil zeigt per CSS-Rotation in die
+        // Windrichtung (0deg=Norden/oben, im Uhrzeigersinn) - "woher der
+        // Wind kommt", wie in der Luftfahrt ueblich, kein Vorzeichen-
+        // Umrechnen noetig (gleiche Konvention wie beim Flugzeug-Richtungs-
+        // Chevron in der Kartenansicht).
+        html += "if(d.metar_wind_available){var windLine=" + jsLit(I18n::t(StringId::WEATHER_FORECAST_INFO_WIND_PREFIX)) + ";";
+        html += "if(d.metar_wind_calm){windLine+=" + jsLit(I18n::t(StringId::WEATHER_WIND_CALM)) + ";}";
+        html += "else if(d.metar_wind_variable){windLine+=" + jsLit(I18n::t(StringId::WEATHER_WIND_VARIABLE)) +
+                "+', '+fmtSpeed(d.metar_wind_speed_kt);}";
+        html += "else{windLine+=Math.round(d.metar_wind_dir_deg)+'\\u00b0 '+windCompassLabel(d.metar_wind_dir_deg)+', '+fmtSpeed(d.metar_wind_speed_kt)+";
+        html += "' <span style=\"display:inline-block;transform:rotate('+d.metar_wind_dir_deg+'deg);\">\\u2191</span>';}";
+        html += "lines.push('<br>'+windLine);}";
         html += "if(d.sun_available){if(d.sun_always_day){lines.push('<br>'+" +
                 jsLit(I18n::t(StringId::WEATHER_POLAR_DAY)) + ");}";
         html += "else if(d.sun_always_night){lines.push('<br>'+" + jsLit(I18n::t(StringId::WEATHER_POLAR_NIGHT)) + ");}";
@@ -1314,6 +1431,96 @@ namespace {
         html += "var any=(aircraft||[]).some(function(a){return a.watched;});el.style.display=any?'inline':'none';}";
         html += "setInterval(updateFreshness,1000);";
 
+        // Web-Alarmton (Alex' Wunsch) - CYD hat keinen brauchbaren
+        // Lautsprecher (bereits getestet/verworfen), der Ton laeuft
+        // stattdessen per Web Audio API im Browser jedes Betrachters, der
+        // diese Seite gerade offen hat - komplett selbst synthetisiert,
+        // keine eingebettete Audiodatei (Flash-Puffer ist mit >92% zu knapp
+        // dafuer). Zwei bewusst unterschiedliche Toene, angelehnt an die
+        // Unterscheidung, die es LED-seitig zwischen Notfall (Morsecode-
+        // Muster) und Watchlist (einfaches Cyan) bereits gibt: ein
+        // einzelner ruhiger Ton fuer "watched" (einmalig bei Neu-Eintritt),
+        // eine durchgehende, auf-/abschwellende Sirene fuer "emergency"
+        // (laeuft in Dauerschleife, solange IRGENDEIN sichtbares Flugzeug
+        // als Notfall markiert ist - Alex' Meldung: ein kurzer Dreifach-
+        // Beep war nicht unueberhoerbar genug).
+        html += "var audioMuted=(function(){try{return localStorage.getItem('cydAudioMuted')==='1';}catch(e){return false;}})();";
+        // Browser blockieren Audio-Wiedergabe, bis der Nutzer mit der Seite
+        // interagiert hat - der AudioContext wird deshalb beim allerersten
+        // Klick/Tap IRGENDWO auf der Seite "geprimt", damit ein Alarm, der
+        // VOR der ersten Interaktion eintrifft, nicht lautlos verpufft und
+        // erst beim naechsten Poll (bis zu 8s spaeter) wieder eine Chance
+        // haette. {once:true} entfernt den Listener nach dem ersten Treffer
+        // automatisch wieder.
+        html += "var audioCtx=null;";
+        html += "function primeAudioContext(){if(audioCtx)return;try{audioCtx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}";
+        html += "document.addEventListener('click',primeAudioContext,{once:true});";
+        html += "document.addEventListener('touchstart',primeAudioContext,{once:true});";
+        html += "function playBeep(freq,durationMs,startDelayMs){if(!audioCtx)return;";
+        html += "var osc=audioCtx.createOscillator(),gain=audioCtx.createGain();osc.type='sine';osc.frequency.value=freq;";
+        html += "osc.connect(gain);gain.connect(audioCtx.destination);";
+        html += "var t0=audioCtx.currentTime+(startDelayMs||0)/1000;";
+        html += "gain.gain.setValueAtTime(0.0001,t0);gain.gain.exponentialRampToValueAtTime(0.3,t0+0.01);";
+        html += "gain.gain.exponentialRampToValueAtTime(0.0001,t0+durationMs/1000);";
+        html += "osc.start(t0);osc.stop(t0+durationMs/1000+0.05);}";
+        html += "function playWatchedAlert(){playBeep(880,220,0);}";
+
+        // Sirene: ein Haupt-Oszillator (Saegezahn statt Sinus - durchdringen-
+        // der, sirenenartiger Klang) liefert den Ton, ein zweiter, langsamer
+        // "Modulations"-Oszillator (0.35Hz, also ~1.4s pro Auf- oder
+        // Abschwung) ist ueber einen Gain-Node (skaliert dessen -1..+1-
+        // Ausgang auf +-300Hz) DIREKT mit dem AudioParam
+        // mainOsc.frequency verbunden - Web-Audio-Standardtrick fuer
+        // Frequenzmodulation, addiert sich laufend zum Basiswert (700Hz)
+        // dazu und ergibt damit ein kontinuierliches 400-1000Hz-Auf-und-Ab,
+        // ganz ohne eigene Zeitschleife/Timer. Hauptlautstaerke bewusst auf
+        // volle 1.0 (Alex' Wunsch: unueberhoerbar), nur ein winziger 15ms-
+        // Ein-/Ausblend-Ramp gegen ein hoerbares Knacken beim Start/Stop.
+        html += "var sirenOsc=null,sirenLfo=null,sirenGain=null;";
+        html += "function startSiren(){if(sirenOsc||!audioCtx)return;";
+        html += "sirenOsc=audioCtx.createOscillator();sirenOsc.type='sawtooth';sirenOsc.frequency.value=700;";
+        html += "sirenGain=audioCtx.createGain();sirenGain.gain.setValueAtTime(0.0001,audioCtx.currentTime);";
+        html += "sirenGain.gain.exponentialRampToValueAtTime(1.0,audioCtx.currentTime+0.015);";
+        html += "sirenLfo=audioCtx.createOscillator();sirenLfo.type='sine';sirenLfo.frequency.value=0.35;";
+        html += "var lfoGain=audioCtx.createGain();lfoGain.gain.value=300;";
+        html += "sirenLfo.connect(lfoGain);lfoGain.connect(sirenOsc.frequency);";
+        html += "sirenOsc.connect(sirenGain);sirenGain.connect(audioCtx.destination);";
+        html += "sirenOsc.start();sirenLfo.start();}";
+        html += "function stopSiren(){if(!sirenOsc)return;";
+        html += "var osc=sirenOsc,lfo=sirenLfo,gain=sirenGain;sirenOsc=null;sirenLfo=null;sirenGain=null;";
+        html += "gain.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+0.05);";
+        html += "setTimeout(function(){osc.stop();lfo.stop();},80);}";
+
+        html += "var audioIcon=document.getElementById('audioAlertIcon');";
+        html += "function updateAudioIcon(){if(!audioIcon)return;audioIcon.textContent=audioMuted?'\\uD83D\\uDD07':'\\uD83D\\uDD0A';";
+        html += "audioIcon.title=audioMuted?" + jsLit(I18n::t(StringId::WEB_AUDIO_ICON_MUTED_TITLE)) + ":" +
+                jsLit(I18n::t(StringId::WEB_AUDIO_ICON_ON_TITLE)) + ";}";
+        html += "updateAudioIcon();";
+        // Sofortiges Stoppen der Sirene beim Muten ueber das Icon - nicht
+        // erst beim naechsten Poll (bis zu 8s spaeter) warten.
+        html += "if(audioIcon){audioIcon.addEventListener('click',function(){audioMuted=!audioMuted;";
+        html += "try{localStorage.setItem('cydAudioMuted',audioMuted?'1':'0');}catch(e){}updateAudioIcon();";
+        html += "if(audioMuted)stopSiren();});}";
+
+        // Watchlist: vergleicht bei JEDEM Poll die Menge der aktuell
+        // watched-markierten Flugzeuge (per hex) gegen die Menge vom
+        // VORHERIGEN Poll - ein Ton kommt nur fuer ein Flugzeug, das NEU
+        // markiert wird, nicht bei jedem Poll erneut, solange dasselbe
+        // Flugzeug markiert bleibt (sonst nervt es alle 8s). Emergency:
+        // die Sirene laeuft/stoppt rein danach, ob JETZT irgendein
+        // Flugzeug als Notfall markiert ist - kein "neu"-Vergleich noetig,
+        // da es ein Dauerzustand statt eines einmaligen Ereignisses ist.
+        html += "var prevWatchedHex={};";
+        html += "function checkAudioAlerts(aircraft,webAudioAlertOn){";
+        html += "var curWatched={},newWatched=false,anyEmergency=false;";
+        html += "(aircraft||[]).forEach(function(a){";
+        html += "if(a.watched){curWatched[a.hex]=true;if(!prevWatchedHex[a.hex])newWatched=true;}";
+        html += "if(a.emergency)anyEmergency=true;});";
+        html += "prevWatchedHex=curWatched;";
+        html += "var allowed=webAudioAlertOn&&!audioMuted;";
+        html += "if(allowed&&anyEmergency)startSiren();else stopSiren();";
+        html += "if(allowed&&newWatched)playWatchedAlert();}";
+
         // Echte Fernsteuerung der Geraete-Reichweite (siehe Design-Absprache
         // im Chat) - die Dropdown-Auswahl schickt jetzt ZUSAETZLICH zum
         // bisherigen reinen Anzeige-Zoom einen POST an /control/range, der
@@ -1404,6 +1611,7 @@ namespace {
         html += "if(pendingRangeKm===null&&deviceVal!==rangeSel.value){rangeSel.value=deviceVal;}";
         html += "}";
         html += "draw(data);refreshSelectedInfo();updateWatchBadge(data.aircraft);updateMapMarkers(data);";
+        html += "checkAudioAlerts(data.aircraft,!!data.web_audio_alert);";
         html += "lastUpdateMs=Date.now();updateFreshness();updateConnStatus(true);";
         html += "}).catch(function(){status.textContent=" + jsLit(I18n::t(StringId::WEB_CONNECTION_LOST)) +
                 ";updateConnStatus(false);});";
@@ -1538,7 +1746,19 @@ namespace {
         FlightLogbook::DayEntry days[MAX_DAYS_QUERIED];
         uint8_t dayCount = FlightLogbook::listDays(days, MAX_DAYS_QUERIED);
 
-        String html = htmlHeader("Eiswolfs Flightradar");
+        // Gestreamte Antwort statt eines einzigen grossen Strings (siehe
+        // ChunkedResponse-Klassenkommentar oben fuer die ausfuehrliche
+        // Begruendung) - CONTENT_LENGTH_UNKNOWN + ein leerer send() starten
+        // die chunked Transfer-Encoding-Antwort, jeder weitere Aufruf
+        // erfolgt ab hier ueber html (ChunkedResponse) bzw. dessen
+        // server.sendContent()-Aufrufe. Gleiches Grundprinzip wie
+        // handleExportCsv() weiter unten (dort seit dem 100km-Bug schon so
+        // gemacht).
+        server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+        server.send(200, "text/html", "");
+
+        ChunkedResponse html;
+        htmlHeader(html, "Eiswolfs Flightradar");
 
         // Dezenter, fest positionierter GitHub-Link unten rechts (Alex'
         // Avatar-Logo, siehe web_avatar_logo.h/handleAvatar() oben und
@@ -1547,11 +1767,6 @@ namespace {
         html += "<a id=\"avatarLink\" href=\"https://github.com/Eiswolf-BG/eiswolfs-flightradar-CYD\" target=\"_blank\" rel=\"noopener\" title=\"Eiswolfs Flightradar on GitHub\"><img src=\"/avatar.png\" alt=\"GitHub\"></a>";
 
         appendRadarSection(html);
-        // Logbuch-Tabelle danach ist variabel lang (bis MAX_DAYS_QUERIED
-        // Tage) - hier nochmal in einem Rutsch nachreservieren statt vieler
-        // weiterer kleiner Reallozierungen weiter unten (siehe Kommentar in
-        // htmlHeader() zum selben Hintergrund).
-        html.reserve(html.length() + 4096);
 
         html += "<nav><a href=\"/lists\">" + String(I18n::t(StringId::WEB_MANAGE_LISTS_LINK)) + " &rarr;</a></nav>";
 
@@ -1692,15 +1907,7 @@ namespace {
         html += "</footer>";
 
         html += "</div></body></html>";
-        // TESTWEISE: Diagnose fuer den Map-Tab-Bug (fehlgeschlagener
-        // Leaflet-<script>-Tag) - falls das Problem trotz der Vorab-
-        // Reservierung oben nochmal auftritt, zeigt dieser Log-Eintrag, ob
-        // html.length() plausibel ist und wie knapp der freie Heap zum
-        // Sendezeitpunkt tatsaechlich war. Wieder entfernen, sobald der Fix
-        // bestaetigt ist.
-        Serial.printf("[WebUI] handleRoot: html.length()=%u freeHeap=%u\n",
-                      (unsigned)html.length(), (unsigned)ESP.getFreeHeap());
-        server.send(200, "text/html", html);
+        html.flushAll();
     }
 
     void handleExportCsv() {
@@ -1787,7 +1994,13 @@ namespace {
     // die sich per Handy-Tastatur deutlich bequemer eintippen lassen als
     // ueber die kleine Bildschirmtastatur des Geraets.
     void handleLists() {
-        String html = htmlHeader("Eiswolfs Flightradar - Lists");
+        // Gestreamt wie handleRoot() (siehe ChunkedResponse-Klassenkommentar)
+        // - diese Seite ist zwar selbst klein, muss aber trotzdem denselben
+        // Signaturen wie htmlHeader()/appendStarBackground() folgen.
+        server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+        server.send(200, "text/html", "");
+        ChunkedResponse html;
+        htmlHeader(html, "Eiswolfs Flightradar - Lists");
 
         html += "<nav><a href=\"/\">&larr; " + String(I18n::t(StringId::WEB_BACK_TO_LOGBOOK)) + "</a></nav>";
 
@@ -1841,7 +2054,7 @@ namespace {
         html += "<button class=\"addbtn\" type=\"submit\">" + String(I18n::t(StringId::WATCHLIST_ADD)) + "</button></form>";
 
         html += "</div></body></html>";
-        server.send(200, "text/html", html);
+        html.flushAll();
     }
 
     void handleAirlineAdd() {
@@ -2067,6 +2280,13 @@ namespace {
         // ob es gerade tatsaechlich regnet).
         doc["military_squawk"] = militaryOn;
         doc["rain_effect"] = SettingsStore::rainEffectEnabled();
+        // Web-Alarmton (Alex' Wunsch) - einseitig Geraet->Web wie die
+        // beiden Felder oben, kein Ruecksync noetig (es gibt keine Web-
+        // seitige Gegenstelle dafuer, nur den globalen Ein/Aus-Schalter am
+        // Geraet). Client-JS prueft dieses Feld UND den eigenen, rein
+        // lokalen Mute-Zustand (localStorage), bevor ein Ton abgespielt
+        // wird - siehe appendRadarSection().
+        doc["web_audio_alert"] = SettingsStore::webAudioAlertEnabled();
         // Nachtdimmung auch fuer die Live-Radar-Webseite (Alex' Wunsch) -
         // exakt dieselbe Bedingung wie radar_screen.cpp::
         // nightDimActiveNow() (Schalter an UND aktuell Nachtstunden am
@@ -2131,6 +2351,27 @@ namespace {
                 bool useIata = SettingsStore::useIataAirportCodes() && nearestAirport.iata[0];
                 doc["metar_airport_code"] = useIata ? nearestAirport.iata : metar.icao;
                 doc["metar_raw"] = metar.raw;
+
+                // Windzeile im Wetter-Popup (Alex' Wunsch) - aus demselben
+                // METAR-Rohtext geparst wie am Geraet (main.cpp::
+                // showWeatherInfo(), Weather::parseMetarWind()), KEINE
+                // eigene Netzwerkabfrage. Bewusst "metar_wind_*" praefigiert
+                // statt "wind_dir_deg" (das gibt es oben schon - Open-Meteo-
+                // Wind fuer den Regen-Effekt-Neigungswinkel, andere Quelle,
+                // nicht verwechseln). Grad/Knoten-Rohwerte gehen unformatiert
+                // raus, das Client-JS baut daraus Kompass-Kuerzel + Pfeil-
+                // Rotation + Einheiten-Umschaltung (fmtSpeed(), bereits
+                // vorhanden) - gleiches Prinzip wie beim Flugzeug-Popup.
+                Weather::ParsedWind wind = Weather::parseMetarWind(metar.raw);
+                doc["metar_wind_available"] = wind.available;
+                if (wind.available) {
+                    doc["metar_wind_calm"] = wind.calm;
+                    doc["metar_wind_variable"] = wind.variableDirection;
+                    if (!wind.calm && !wind.variableDirection) {
+                        doc["metar_wind_dir_deg"] = wind.directionDeg;
+                    }
+                    doc["metar_wind_speed_kt"] = wind.speedKt;
+                }
             }
 
             // Sonnenauf-/-untergang fuer den aktuell aktiven Standort -

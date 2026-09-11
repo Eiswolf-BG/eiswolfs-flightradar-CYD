@@ -509,6 +509,13 @@ static const char* const I18N_EN[] = {
     "Reg: ",
     "Live Radar",
     "Home",
+    "Web Alert Sound",
+    "About Web Alert Sound",
+    "This sound does not come from the device itself by default - it plays in the browser of any phone, Mac, or PC that currently has the Live Radar web page open, whenever a watched aircraft or an emergency squawk appears. If you connect a speaker to the device's SPK port, an emergency squawk (not a plain watchlist hit) also sounds a siren directly on the device. This switch turns both on or off completely.",
+    "Plays an alert sound in this browser for emergency squawks and watchlist hits while this page is open - click to mute",
+    "Alert sound is muted in this browser - click to turn back on",
+    "Calm",
+    "Variable",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

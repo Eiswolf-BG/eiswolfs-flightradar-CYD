@@ -196,6 +196,21 @@ bool performUpdate(const char* url, void (*onProgress)(uint8_t percent)) {
     Serial.printf("[OTA] Start: url=%s freeHeap=%u RSSI=%ddBm\n", url,
                   (unsigned)ESP.getFreeHeap(), WiFi.RSSI());
 
+    // Diagnose-Fund (Alex' Meldung): wiederkehrende 600-1600ms-Aussetzer
+    // alle ~16KB waehrend des firmware.bin-Downloads, dazwischen laeuft er
+    // fluessig - ein direkter curl-Download derselben Datei vom PC aus war
+    // dagegen durchgehend schnell, also kein Netzwerk-/Server-Problem. Das
+    // Muster passt zum ESP32-WLAN-Modem-Sleep (Arduino/PlatformIO-Default
+    // an): das WLAN-Modul schlaeft zwischen Beacon-Intervallen periodisch
+    // kurz ein, um Strom zu sparen - bei einem am Stueck laufenden Download
+    // genau die beobachteten wiederkehrenden Pausen. Fuer die Dauer des
+    // eigentlichen Downloads/Flashens deshalb abgeschaltet, der zuvor
+    // aktive Zustand wird unten (nach httpUpdate.update(), unabhaengig vom
+    // Ergebnis) wiederhergestellt - ein fehlgeschlagenes Update soll nicht
+    // dauerhaft mit abgeschaltetem Stromsparmodus weiterlaufen.
+    bool prevWifiSleep = WiFi.getSleep();
+    WiFi.setSleep(false);
+
     WiFiClientSecure client;
     client.setInsecure();
     client.setTimeout(15000);
@@ -214,24 +229,20 @@ bool performUpdate(const char* url, void (*onProgress)(uint8_t percent)) {
     // Erfolgsmeldung an, bevor das Geraet neu startet - siehe
     // menu_screen.cpp::runOtaUpdateScreen().
     httpUpdate.rebootOnUpdate(false);
-    httpUpdate.onProgress([onProgress](int cur, int total) {
-        if (onProgress && total > 0) {
-            onProgress((uint8_t)((cur * 100) / total));
-        }
-        // Nur gelegentlich loggen (alle ~10%), sonst quillt der Seriell-
-        // Monitor bei grossen Dateien mit hunderten Zeilen ueber.
-        static int8_t lastLoggedPercent = -1;
-        if (total > 0) {
-            int8_t pct = (int8_t)((cur * 100) / total);
-            if (pct != lastLoggedPercent && pct % 10 == 0) {
-                lastLoggedPercent = pct;
-                Serial.printf("[OTA] Fortschritt: %d%% (%d/%d Bytes) freeHeap=%u\n", pct, cur, total,
-                              (unsigned)ESP.getFreeHeap());
-            }
-        }
-    });
+
+    if (onProgress) {
+        httpUpdate.onProgress([onProgress](int cur, int total) {
+            if (total > 0) onProgress((uint8_t)((cur * 100) / total));
+        });
+    }
 
     t_httpUpdate_return result = httpUpdate.update(client, url);
+
+    // Modem-Sleep wieder auf den Zustand von vor dem Download zuruecksetzen
+    // (siehe Kommentar bei WiFi.setSleep(false) oben) - unabhaengig vom
+    // Ergebnis, damit ein fehlgeschlagenes Update nicht dauerhaft mit
+    // abgeschaltetem Stromsparmodus weiterlaeuft.
+    WiFi.setSleep(prevWifiSleep);
 
     if (result != HTTP_UPDATE_OK) {
         Serial.printf("[OTA] Fehlgeschlagen: result=%d error=%d (%s) freeHeap=%u\n", (int)result,

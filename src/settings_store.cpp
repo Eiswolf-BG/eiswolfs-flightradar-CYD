@@ -33,6 +33,14 @@ namespace {
     char peakTrafficDateVal[11] = {0};
     uint32_t peakTrafficEpochVal = 0;
     bool ledHeartbeatOn = true;
+    // AN per Default (gleiches Verhalten wie die anderen Alarm-Toggles auf
+    // dem LED-Alerts-Screen) - steuert den Web-Alarmton auf der Live-Radar-
+    // Webseite bei Watchlist-/Notfall-Treffern (siehe web_export_server.cpp,
+    // handleRadarJson()). Kein Geraete-eigener Ton (CYD hat keinen
+    // brauchbaren Lautsprecher, bereits getestet/verworfen) - der Ton laeuft
+    // stattdessen per Web Audio API im Browser jedes Betrachters, der die
+    // Webseite gerade offen hat.
+    bool webAudioAlertOn = true;
     uint8_t screenTimeoutMin = 0;
     bool nightDimmingOn = true;
     bool screensaverOn = false;
@@ -127,6 +135,8 @@ namespace {
             peakTrafficDateVal[sizeof(peakTrafficDateVal) - 1] = 0;
         } else if (key == "peak_traffic_epoch") {
             peakTrafficEpochVal = (uint32_t)value.toInt();
+        } else if (key == "web_audio_alert") {
+            webAudioAlertOn = (value.toInt() != 0);
         } else if (key == "led_heartbeat") {
             ledHeartbeatOn = (value.toInt() != 0);
         } else if (key == "screen_timeout_min") {
@@ -249,6 +259,7 @@ void save() {
     f.printf("peak_traffic_date=%s\n", peakTrafficDateVal);
     f.printf("peak_traffic_epoch=%lu\n", (unsigned long)peakTrafficEpochVal);
     f.printf("led_heartbeat=%d\n", ledHeartbeatOn ? 1 : 0);
+    f.printf("web_audio_alert=%d\n", webAudioAlertOn ? 1 : 0);
     f.printf("screen_timeout_min=%d\n", screenTimeoutMin);
     f.printf("menu_idle_timeout_sec=%u\n", menuIdleTimeoutSec);
     f.printf("night_dimming=%d\n", nightDimmingOn ? 1 : 0);
@@ -392,6 +403,13 @@ bool ledHeartbeatEnabled() { return ledHeartbeatOn; }
 
 void setLedHeartbeatEnabled(bool on) {
     ledHeartbeatOn = on;
+    save();
+}
+
+bool webAudioAlertEnabled() { return webAudioAlertOn; }
+
+void setWebAudioAlertEnabled(bool on) {
+    webAudioAlertOn = on;
     save();
 }
 

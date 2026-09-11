@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "5.9.5";
+    constexpr const char* APP_VERSION = "6.0.0";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -23,6 +23,20 @@ namespace Config {
     // only, unabhaengig von WiFi nutzbar - ADC2 waere das nicht). Kein
     // eigener Hardware-Zugriff meinerseits zur Verifikation moeglich.
     constexpr uint8_t LDR_PIN = 34;
+
+    // Speaker-Steckverbinder ("SPK") des CYD-Boards (ESP32-2432S028) - laut
+    // oeffentlicher Pinout-Dokumentation und Community-Berichten (u.a. der
+    // von Alex zitierte GitHub-Kommentar) an GPIO26. Rein optional: ohne
+    // angeschlossenen Lautsprecher passiert schlicht nichts, siehe
+    // speaker_alert.h/.cpp. Kein eigener Hardware-Zugriff meinerseits zur
+    // Verifikation moeglich (gleiche Einschraenkung wie bei LDR_PIN oben) -
+    // GPIO26 ist allerdings die auf allen bekannten CYD-Klonvarianten
+    // konsistent dokumentierte Zuordnung (der Pin ist fest mit der
+    // Bestueckung des optionalen Verstaerker-/Speaker-Footprints
+    // verdrahtet, unterscheidet sich also anders als z.B. die GPS-Pins
+    // nicht zwischen Board-Revisionen) - bitte trotzdem einmal gegen das
+    // tatsaechliche Board pruefen, falls sich kein Ton meldet.
+    constexpr uint8_t SPK_PIN = 26;
 
     // ADC-Rohwertbereich (12-Bit, 0-4095), der auf BRIGHTNESS_MIN_PERCENT..
     // BRIGHTNESS_MAX_PERCENT abgebildet wird - AUSDRUECKLICH Schaetzwerte

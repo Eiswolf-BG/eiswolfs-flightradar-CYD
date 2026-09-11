@@ -508,6 +508,13 @@ static const char* const I18N_FR[] = {
     "Immat. : ",
     "Radar en direct",
     "Domicile",
+    "Alerte sonore web",
+    "À propos de l'alerte sonore web",
+    "Par défaut, ce son ne provient pas de l'appareil lui-même - il est joué dans le navigateur de tout téléphone, Mac ou PC ayant actuellement la page web du radar en direct ouverte, dès qu'un avion surveillé ou un code squawk d'urgence apparaît. Si vous branchez un haut-parleur sur le connecteur SPK de l'appareil, un code squawk d'urgence (pas une simple correspondance de liste de surveillance) déclenche aussi une sirène directement sur l'appareil. Cet interrupteur active ou désactive complètement les deux.",
+    "Joue un son d'alerte dans ce navigateur pour les codes squawk d'urgence et les correspondances de la liste de surveillance tant que cette page est ouverte - cliquez pour couper le son",
+    "Le son d'alerte est coupé dans ce navigateur - cliquez pour le réactiver",
+    "Calme",
+    "Variable",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

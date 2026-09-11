@@ -508,6 +508,13 @@ static const char* const I18N_DE[] = {
     "Kennz.: ",
     "Live-Radar",
     "Standort",
+    "Web-Alarmton",
+    "Über Web-Alarmton",
+    "Dieser Ton kommt standardmäßig nicht vom Gerät selbst - er wird im Browser jedes Handys, Macs oder PCs abgespielt, auf dem die Live-Radar-Webseite gerade geöffnet ist, sobald ein beobachtetes Flugzeug oder ein Notfall-Squawk erscheint. Schließt du einen Lautsprecher am SPK-Steckverbinder des Geräts an, ertönt bei einem Notfall-Squawk (nicht bei einem einfachen Watchlist-Treffer) zusätzlich eine Sirene direkt am Gerät. Dieser Schalter schaltet beides komplett ein oder aus.",
+    "Spielt bei einem Notfall-Squawk oder Watchlist-Treffer einen Alarmton in diesem Browser ab, solange diese Seite offen ist - Klick zum Stummschalten",
+    "Alarmton ist in diesem Browser stummgeschaltet - Klick zum Wiedereinschalten",
+    "Windstill",
+    "Wechselnd",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

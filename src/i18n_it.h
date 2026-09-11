@@ -508,6 +508,13 @@ static const char* const I18N_IT[] = {
     "Immatr.: ",
     "Radar live",
     "Casa",
+    "Suono di allerta web",
+    "Info sul suono di allerta web",
+    "Per impostazione predefinita, questo suono non proviene dal dispositivo stesso - viene riprodotto nel browser di qualsiasi telefono, Mac o PC che abbia attualmente aperta la pagina web del radar live, quando appare un aereo controllato o un codice squawk di emergenza. Se colleghi un altoparlante al connettore SPK del dispositivo, un codice squawk di emergenza (non una semplice corrispondenza nella lista di controllo) fa suonare anche una sirena direttamente sul dispositivo. Questo interruttore attiva o disattiva completamente entrambi.",
+    "Riproduce un suono di allerta in questo browser per codici squawk di emergenza e corrispondenze nella lista di controllo finché questa pagina resta aperta - clicca per disattivare",
+    "Il suono di allerta è disattivato in questo browser - clicca per riattivarlo",
+    "Calma",
+    "Variabile",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

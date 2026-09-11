@@ -9,6 +9,7 @@
 #include "units.h"
 #include "settings_store.h"
 #include "led_alert.h"
+#include "speaker_alert.h"
 #include "ota_update.h"
 #include "location_manager.h"
 #include "sun_times.h"
@@ -4932,6 +4933,14 @@ void updateProximityAlert(uint32_t nowMs) {
     // "Nach Update suchen"-Button (siehe main.cpp) bleibt davon unberuehrt.
     bool updateBlinkWanted = SettingsStore::updateLedSignalEnabled() && OtaUpdate::isUpdateAvailable();
     ledBlinkOn = LedAlert::update(mode, nowMs, updateBlinkWanted);
+
+    // Optionaler Notfall-Alarmton ueber den SPK-Steckverbinder (Alex'
+    // Wunsch, siehe speaker_alert.h) - wiederverwendet denselben Schalter
+    // wie der Browser-Alarmton (SettingsStore::webAudioAlertEnabled()),
+    // reagiert NUR auf anyEmergency (nicht auf Watchlist-Treffer), laeuft
+    // unabhaengig vom LedAlert::update()-Aufruf direkt darueber - beide
+    // duerfen gleichzeitig aktiv sein.
+    SpeakerAlert::update(anyEmergency && SettingsStore::webAudioAlertEnabled());
 }
 
 EmergencyInfo checkEmergency() {

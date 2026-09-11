@@ -508,6 +508,13 @@ static const char* const I18N_TR[] = {
     "Tescil: ",
     "Canlı Radar",
     "Ev",
+    "Web Uyarı Sesi",
+    "Web Uyarı Sesi Hakkında",
+    "Bu ses varsayılan olarak cihazın kendisinden gelmez - izlenen bir uçak veya acil durum squawk kodu belirdiğinde, Canlı Radar web sayfasının şu anda açık olduğu herhangi bir telefon, Mac veya PC'nin tarayıcısında çalar. Cihazın SPK konektörüne bir hoparlör bağlarsanız, bir acil durum squawk kodunda (basit bir takip listesi eşleşmesinde değil) cihazda da doğrudan bir siren çalar. Bu anahtar her ikisini de tamamen açar veya kapatır.",
+    "Bu sayfa açıkken acil durum squawk kodları ve takip listesi eşleşmeleri için bu tarayıcıda bir uyarı sesi çalar - kapatmak için tıklayın",
+    "Uyarı sesi bu tarayıcıda kapalı - tekrar açmak için tıklayın",
+    "Sakin",
+    "Değişken",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

@@ -440,4 +440,61 @@ HourlyTimeline currentHourlyTimeline() { return currentHourlyTimelineData; }
 
 NearestAirport currentNearestAirport() { return currentNearestAirportData; }
 
+ParsedWind parseMetarWind(const char* rawMetar) {
+    ParsedWind result;
+    if (!rawMetar || !rawMetar[0]) return result;
+    String raw(rawMetar);
+
+    int start = 0;
+    while (start < (int)raw.length()) {
+        int spacePos = raw.indexOf(' ', start);
+        String token = (spacePos < 0) ? raw.substring(start) : raw.substring(start, spacePos);
+
+        // Windgruppe erkennt man zuverlaessig am "KT"-Suffix (Knoten) -
+        // andere 5-6-stellige Zahlengruppen im METAR (Sichtweite, QNH,
+        // Temperatur/Taupunkt) haben dieses Suffix nie. Mindestlaenge 7
+        // deckt den kuerzesten Fall "VRB03KT"/"00000KT" ab.
+        if (token.length() >= 7 && token.endsWith("KT")) {
+            String body = token.substring(0, token.length() - 2);
+            // Optionaler Boeenzusatz ("G20" o.ae.) wird hier nur
+            // abgeschnitten, nicht separat ausgewertet - nicht gefordert.
+            int gPos = body.indexOf('G');
+            String windPart = (gPos < 0) ? body : body.substring(0, gPos);
+
+            if (windPart.length() >= 5) {
+                String dirStr = windPart.substring(0, 3);
+                String speedStr = windPart.substring(3);
+                bool speedIsDigits = speedStr.length() > 0;
+                for (uint8_t i = 0; i < speedStr.length(); i++) {
+                    if (!isDigit(speedStr[i])) { speedIsDigits = false; break; }
+                }
+                if (speedIsDigits) {
+                    if (dirStr == "VRB") {
+                        result.available = true;
+                        result.variableDirection = true;
+                        result.speedKt = speedStr.toFloat();
+                        result.calm = (result.speedKt <= 0.0f);
+                        break;
+                    }
+                    bool dirIsDigits = true;
+                    for (uint8_t i = 0; i < 3; i++) {
+                        if (!isDigit(dirStr[i])) { dirIsDigits = false; break; }
+                    }
+                    if (dirIsDigits) {
+                        result.available = true;
+                        result.directionDeg = (int16_t)dirStr.toInt();
+                        result.speedKt = speedStr.toFloat();
+                        result.calm = (result.directionDeg == 0 && result.speedKt <= 0.0f);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (spacePos < 0) break;
+        start = spacePos + 1;
+    }
+    return result;
+}
+
 }

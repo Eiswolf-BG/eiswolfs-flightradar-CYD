@@ -107,6 +107,16 @@ namespace SettingsStore {
     bool ledHeartbeatEnabled();
     void setLedHeartbeatEnabled(bool on);
 
+    // AN per Default (gleiches Verhalten wie die anderen Alarm-Toggles auf
+    // dem LED-Alerts-Screen) - schaltet den Web-Alarmton bei Watchlist-/
+    // Notfall-Treffern auf der Live-Radar-Webseite komplett ein/aus (fuer
+    // ALLE Betrachter). Der CYD selbst hat keinen brauchbaren Lautsprecher
+    // (bereits getestet/verworfen) - der Ton laeuft stattdessen per Web
+    // Audio API im Browser jedes Geraets, das die Webseite gerade offen
+    // hat, siehe web_export_server.cpp.
+    bool webAudioAlertEnabled();
+    void setWebAudioAlertEnabled(bool on);
+
     uint8_t screenTimeoutMinutes();
     void setScreenTimeoutMinutes(uint8_t minutes);
 

@@ -510,6 +510,13 @@ static const char* const I18N_NL[] = {
     "Reg.: ",
     "Live radar",
     "Thuis",
+    "Web-alarmgeluid",
+    "Over web-alarmgeluid",
+    "Standaard komt dit geluid niet van het apparaat zelf - het speelt af in de browser van elke telefoon, Mac of pc die de live-radarwebsite op dat moment open heeft, zodra een gevolgd vliegtuig of een noodsquawk verschijnt. Sluit je een luidspreker aan op de SPK-connector van het apparaat, dan klinkt bij een noodsquawk (niet bij een gewone volglijst-treffer) ook een sirene rechtstreeks op het apparaat. Deze schakelaar zet beide volledig aan of uit.",
+    "Speelt in deze browser een alarmgeluid af bij een noodsquawk of een treffer op de volglijst, zolang deze pagina open is - klik om te dempen",
+    "Alarmgeluid is gedempt in deze browser - klik om het weer aan te zetten",
+    "Windstil",
+    "Variabel",
 };
 
 static_assert(sizeof(I18N_NL) / sizeof(I18N_NL[0]) == (size_t)StringId::COUNT,

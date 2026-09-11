@@ -508,6 +508,13 @@ static const char* const I18N_PT[] = {
     "Matrícula: ",
     "Radar ao vivo",
     "Casa",
+    "Som de alerta web",
+    "Sobre o som de alerta web",
+    "Por padrão, esse som não vem do próprio dispositivo - ele toca no navegador de qualquer celular, Mac ou PC que esteja com a página web do radar ao vivo aberta no momento, sempre que um avião monitorado ou um código squawk de emergência aparece. Se você conectar um alto-falante ao conector SPK do dispositivo, um código squawk de emergência (não uma simples correspondência na lista de observação) também faz soar uma sirene diretamente no dispositivo. Esse botão liga ou desliga ambos por completo.",
+    "Toca um som de alerta neste navegador para códigos squawk de emergência e correspondências na lista de observação enquanto esta página estiver aberta - clique para silenciar",
+    "O som de alerta está silenciado neste navegador - clique para reativar",
+    "Calmaria",
+    "Variável",
 };
 
 static_assert(sizeof(I18N_PT) / sizeof(I18N_PT[0]) == (size_t)StringId::COUNT,

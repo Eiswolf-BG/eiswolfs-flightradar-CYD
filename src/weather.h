@@ -94,6 +94,33 @@ namespace Weather {
     // selbst).
     Metar currentMetar();
 
+    // Aus dem rohen METAR-Text geparste Windgruppe (Alex' Wunsch: Wind-
+    // Pfeil/-Zeile im Wetter-Info-Popup, sowohl Geraet als auch WebUI) -
+    // BEWUSST separat von currentWindDirectionDeg()/currentWindSpeedKmh()
+    // oben (die kommen aus Open-Meteo's current_weather und steuern den
+    // Regen-/Schnee-Effekt-Neigungswinkel) - hier stattdessen der "echte",
+    // vom naechstgelegenen Flughafen gemeldete Flugwetter-Wind, direkt aus
+    // demselben METAR-Rohtext wie currentMetar().raw, keine zusaetzliche
+    // Netzwerkabfrage. Deckt die gaengigen METAR-Windgruppen-Formen ab:
+    // "dddffKT" (z.B. "24012KT"), mit Boeenzusatz "dddffGggKT" (Boe wird
+    // erkannt/uebersprungen, aber NICHT separat ausgegeben - nicht
+    // gefordert), "VRB" fuer wechselnde Richtung, "00000KT" fuer
+    // Windstille.
+    struct ParsedWind {
+        bool available = false;        // Windgruppe im METAR gefunden?
+        bool calm = false;              // "00000KT" (Geschwindigkeit 0)
+        bool variableDirection = false; // "VRB..." statt einer Gradzahl
+        int16_t directionDeg = -1;      // 0-359, nur gueltig wenn !calm && !variableDirection
+        float speedKt = 0;              // immer in Knoten (METAR-Standardeinheit), Anzeige rechnet bei Bedarf um
+    };
+
+    // Parst die Windgruppe aus einem METAR-Rohtext (z.B. currentMetar().raw)
+    // - reine String-Verarbeitung, keine eigene Netzwerkabfrage, kann daher
+    // gefahrlos sowohl vom NetTask (Geraet) als auch synchron innerhalb
+    // eines Web-Request-Handlers (WebExportServer, ebenfalls auf NetTask,
+    // siehe dortiger Kommentar) aufgerufen werden.
+    ParsedWind parseMetarWind(const char* rawMetar);
+
     // Kurzfristige Kurzvorhersage (ein einzelner stuendlicher Datenpunkt
     // "jetzt + hoursAhead Stunden", siehe fetchNow() in weather.cpp) fuer
     // den Wetter-Info-Screen (main.cpp::showWeatherInfo()) - bewusst nur

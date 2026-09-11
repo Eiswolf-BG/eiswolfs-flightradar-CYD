@@ -1919,11 +1919,12 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_LED));
 
-            Rect heartbeatBtn = subMenuRowRect(0, 5);
-            Rect emergencyBtn = subMenuRowRect(1, 5);
-            Rect proximityBtn = subMenuRowRect(2, 5);
-            Rect proximityModeBtn = subMenuRowRect(3, 5);
-            Rect backBtn      = subMenuRowRect(4, 5);
+            Rect heartbeatBtn = subMenuRowRect(0, 6);
+            Rect emergencyBtn = subMenuRowRect(1, 6);
+            Rect proximityBtn = subMenuRowRect(2, 6);
+            Rect proximityModeBtn = subMenuRowRect(3, 6);
+            Rect webAudioBtn = subMenuRowRect(4, 6);
+            Rect backBtn      = subMenuRowRect(5, 6);
 
             drawButton(tft, heartbeatBtn, I18n::t(StringId::MENU_LED_HEARTBEAT) + onOff(SettingsStore::ledHeartbeatEnabled()));
             drawButton(tft, emergencyBtn, I18n::t(StringId::MENU_EMERGENCY_ALERT) + onOff(SettingsStore::emergencyAlertEnabled()));
@@ -1936,6 +1937,15 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             drawButton(tft, proximityModeBtn, String(I18n::t(StringId::MENU_PROXIMITY_ALERT_MODE)) +
                        I18n::t(SettingsStore::proximityAlertSmartMode() ? StringId::PROXIMITY_ALERT_MODE_SMART : StringId::PROXIMITY_ALERT_MODE_SIMPLE));
             drawRowInfoButton(tft, proximityModeBtn);
+            // Web-Alarmton (Alex' Wunsch) - CYD hat keinen brauchbaren
+            // Lautsprecher (bereits getestet/verworfen), der Ton laeuft
+            // stattdessen per Web Audio API im Browser jedes Geraets, das
+            // die Live-Radar-Webseite gerade offen hat (siehe
+            // web_export_server.cpp). Dieser Schalter aktiviert/deaktiviert
+            // die Funktion komplett, fuer ALLE Betrachter (SettingsStore::
+            // webAudioAlertEnabled()).
+            drawButton(tft, webAudioBtn, I18n::t(StringId::MENU_WEB_AUDIO_ALERT) + onOff(SettingsStore::webAudioAlertEnabled()));
+            drawRowInfoButton(tft, webAudioBtn);
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -1961,6 +1971,11 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                            UiTheme::accentColor(tft), I18n::t(StringId::OK));
             } else if (proximityModeBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setProximityAlertSmartMode(!SettingsStore::proximityAlertSmartMode());
+            } else if (rowInfoBtnRect(webAudioBtn).contains(tap.x, tap.y)) {
+                infoScreen(tft, I18n::t(StringId::WEB_AUDIO_ALERT_INFO_TITLE), I18n::t(StringId::WEB_AUDIO_ALERT_INFO_BODY),
+                           UiTheme::accentColor(tft), I18n::t(StringId::OK));
+            } else if (webAudioBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setWebAudioAlertEnabled(!SettingsStore::webAudioAlertEnabled());
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::Flight;
             }

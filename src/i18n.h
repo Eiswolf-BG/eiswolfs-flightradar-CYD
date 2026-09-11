@@ -1121,6 +1121,29 @@ enum class StringId : uint16_t {
     // Tooltip des Leaflet-Standort-Markers in der Kartenansicht.
     WEB_HOME_TOOLTIP,
 
+    // Neuer Toggle auf dem LED-Alerts-Screen (Menu > Flight Options > LED
+    // Alerts) - schaltet den Web-Alarmton bei Watchlist-/Notfall-Treffern
+    // auf der Live-Radar-Webseite ein/aus (Alex' Wunsch: der CYD selbst hat
+    // keinen brauchbaren Lautsprecher, der Ton laeuft stattdessen per Web
+    // Audio API im Browser jedes Betrachters, siehe web_export_server.cpp).
+    MENU_WEB_AUDIO_ALERT,
+    WEB_AUDIO_ALERT_INFO_TITLE,
+    WEB_AUDIO_ALERT_INFO_BODY,
+    // Tooltip-Titel des Lautsprecher-Icons auf der Live-Radar-Webseite
+    // (appendRadarSection()) - Mute-Zustand ist rein lokal pro Browser.
+    WEB_AUDIO_ICON_ON_TITLE,
+    WEB_AUDIO_ICON_MUTED_TITLE,
+
+    // Wind-Zeile im Wetter-Info-Popup (Geraet: main.cpp::showWeatherInfo(),
+    // WebUI: web_export_server.cpp) - Praefix "Wind: " wird bewusst NICHT
+    // neu angelegt, sondern die bereits bestehende
+    // WEATHER_FORECAST_INFO_WIND_PREFIX wiederverwendet (identischer Text,
+    // andere Quelle: METAR statt Open-Meteo current_weather). Diese beiden
+    // hier decken die Sonderfaelle ab, die reine Gradzahl+Kompass-Kuerzel
+    // nicht abdecken koennen (siehe Weather::ParsedWind in weather.h).
+    WEATHER_WIND_CALM,
+    WEATHER_WIND_VARIABLE,
+
     COUNT
 };
 
