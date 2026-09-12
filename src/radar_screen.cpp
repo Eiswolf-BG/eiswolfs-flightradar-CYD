@@ -58,8 +58,23 @@ namespace {
     // Radarkreis behaelt seine gewohnte Groesse.
     constexpr int16_t INFO_BAR_GROUND_ROW_H = 18;
 
+    // Zusaetzliche Zeile fuer die rohe GPS-Position (Paul/pronti99's
+    // GitHub-Discussion-Wunsch #6) - nur reserviert, wenn tatsaechlich ein
+    // externes GPS-Modul aktiv ist UND einen Fix hat (dieselbe Bedingung
+    // wie drawGpsPositionRow() unten in drawLegend()), analog zur bereits
+    // bestehenden INFO_BAR_GROUND_ROW_H-Erweiterung fuer die Bodenfahrzeug-
+    // Legende - ohne aktives GPS bleibt die Infoleiste genau so hoch wie
+    // bisher.
+    constexpr int16_t INFO_BAR_GPS_ROW_H = 18;
+
+    bool gpsPositionRowVisible() {
+        return LocationManager::isGpsEnabled() && LocationManager::hasGpsFix();
+    }
+
     int16_t infoBarHeight() {
-        return SettingsStore::hideGroundVehicles() ? INFO_BAR_H : (int16_t)(INFO_BAR_H + INFO_BAR_GROUND_ROW_H);
+        int16_t h = SettingsStore::hideGroundVehicles() ? INFO_BAR_H : (int16_t)(INFO_BAR_H + INFO_BAR_GROUND_ROW_H);
+        if (gpsPositionRowVisible()) h = (int16_t)(h + INFO_BAR_GPS_ROW_H);
+        return h;
     }
 
     Layout computeLayout(int16_t top) {
@@ -1688,11 +1703,44 @@ namespace {
         // "Bodenfahrzeuge ausblenden" == aus). infoBarHeight() reserviert
         // den dafuer noetigen zusaetzlichen Platz nur in diesem Fall, siehe
         // computeLayout().
+        int16_t nextRowY = y;
         if (!SettingsStore::hideGroundVehicles()) {
-            int16_t gy = (int16_t)(y + INFO_BAR_GROUND_ROW_H);
-            gfx.fillRect(3, (int16_t)(gy - 8), 6, 6, colorForGroundVehicle(gfx));
-            gfx.setCursor(13, gy);
+            nextRowY = (int16_t)(y + INFO_BAR_GROUND_ROW_H);
+            gfx.fillRect(3, (int16_t)(nextRowY - 8), 6, 6, colorForGroundVehicle(gfx));
+            gfx.setCursor(13, nextRowY);
             gfx.print(I18n::t(StringId::LEGEND_GROUND_VEHICLE));
+        }
+
+        // Rohe GPS-Position (Paul/pronti99's GitHub-Discussion-Wunsch #6) -
+        // NUR sichtbar, wenn ein externes GPS-Modul aktiv ist UND einen Fix
+        // hat (siehe gpsPositionRowVisible() oben, dieselbe Bedingung, die
+        // infoBarHeight() fuer die Platzreservierung nutzt). Rein
+        // numerisch/Kompassbuchstaben (N/S/E/W) statt uebersetztem Text -
+        // dadurch automatisch in allen 8 Sprachen gleich breit, keine
+        // gesonderte Breitenpruefung pro Sprache noetig. Hoehe fehlt
+        // manchmal kurz nach dem ersten Fix noch (TinyGPSPlus liefert sie
+        // separat validiert) - dann nur Lat/Lon ohne Hoehenteil.
+        if (gpsPositionRowVisible()) {
+            nextRowY = (int16_t)(nextRowY + INFO_BAR_GPS_ROW_H);
+            double lat = 0, lon = 0;
+            if (LocationManager::currentGpsPosition(lat, lon)) {
+                char gpsLine[40];
+                char altPart[12] = "";
+                if (LocationManager::hasGpsAltitude()) {
+                    double altM = LocationManager::gpsAltitudeMeters();
+                    if (LocationManager::useMetricUnits()) {
+                        snprintf(altPart, sizeof(altPart), " %.0fm", altM);
+                    } else {
+                        snprintf(altPart, sizeof(altPart), " %.0fft", altM / Units::FT_TO_M);
+                    }
+                }
+                snprintf(gpsLine, sizeof(gpsLine), "%.5f%c %.5f%c%s",
+                          fabs(lat), lat >= 0 ? 'N' : 'S', fabs(lon), lon >= 0 ? 'E' : 'W', altPart);
+                gfx.setTextDatum(MC_DATUM);
+                gfx.setTextColor(TFT_WHITE, TFT_BLACK);
+                gfx.drawString(gpsLine, Config::SCREEN_WIDTH / 2, nextRowY);
+                gfx.setTextDatum(TL_DATUM);
+            }
         }
     }
 

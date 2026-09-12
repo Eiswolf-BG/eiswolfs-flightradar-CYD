@@ -193,6 +193,16 @@ const char* currentGpsPinLabel() {
 
 bool hasGpsFix() { return gps.location.isValid(); }
 
+bool currentGpsPosition(double& lat, double& lon) {
+    if (!gps.location.isValid()) return false;
+    lat = gps.location.lat();
+    lon = gps.location.lng();
+    return true;
+}
+
+bool hasGpsAltitude() { return gps.altitude.isValid(); }
+double gpsAltitudeMeters() { return gps.altitude.meters(); }
+
 bool hasUtcOffset() { return haveUtcOffset; }
 int32_t utcOffsetSeconds() { return utcOffsetSecs; }
 bool useMetricUnits() {
