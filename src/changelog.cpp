@@ -9,46 +9,59 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 8;
 
     const char* const CHANGELOG_EN =
-        "- New: the info bar now shows the live GPS position (and "
-        "altitude, once available) whenever an external GPS module is "
-        "enabled and has a fix";
+        "- Fix: the GPS position feature introduced in the previous "
+        "release didn't actually receive data on this board - the "
+        "built-in GPS connector is wired to GPIO1 (shared with the "
+        "USB-serial console), not the previously assumed pins. GPS is "
+        "now read correctly";
 
     const char* const CHANGELOG_DE =
-        "- Neu: Die Infoleiste zeigt jetzt die aktuelle GPS-Position "
-        "an (sobald verfuegbar auch die Hoehe), sobald ein externes "
-        "GPS-Modul aktiviert ist und einen Fix hat";
+        "- Fix: Die im letzten Release eingefuehrte GPS-Positions-"
+        "Anzeige empfing auf diesem Board tatsaechlich gar keine Daten "
+        "- der eingebaute GPS-Steckverbinder ist mit GPIO1 verdrahtet "
+        "(geteilt mit der USB-Serial-Konsole), nicht mit den vorher "
+        "angenommenen Pins. GPS wird jetzt korrekt ausgelesen";
 
     const char* const CHANGELOG_FR =
-        "- Nouveau : la barre d'info affiche désormais la position GPS "
-        "en direct (et l'altitude, dès qu'elle est disponible) dès "
-        "qu'un module GPS externe est activé et dispose d'une position "
-        "fixe";
+        "- Correction : la fonction de position GPS introduite dans la "
+        "version précédente ne recevait en réalité aucune donnée sur "
+        "cette carte - le connecteur GPS intégré est câblé sur GPIO1 "
+        "(partagé avec la console USB-série), pas sur les broches "
+        "supposées auparavant. Le GPS est désormais lu correctement";
 
     const char* const CHANGELOG_TR =
-        "- Yeni: Harici bir GPS modülü etkinleştirildiğinde ve konum "
-        "sabitlemesi (fix) olduğunda, bilgi çubuğu artık canlı GPS "
-        "konumunu (ve mevcut olur olmaz irtifayı da) gösteriyor";
+        "- Düzeltme: Önceki sürümde eklenen GPS konum özelliği bu "
+        "kartta aslında hiç veri almıyordu - yerleşik GPS konektörü "
+        "GPIO1'e bağlı (USB-seri konsolla paylaşılıyor), daha önce "
+        "varsayılan pinlere değil. GPS artık doğru şekilde okunuyor";
 
     const char* const CHANGELOG_ES =
-        "- Novedad: la barra de información ahora muestra la posición "
-        "GPS en directo (y la altitud, en cuanto esté disponible) "
-        "siempre que un módulo GPS externo esté activado y tenga una "
-        "posición fija";
+        "- Corrección: la función de posición GPS introducida en la "
+        "versión anterior en realidad no recibía datos en esta placa "
+        "- el conector GPS integrado está conectado al GPIO1 "
+        "(compartido con la consola USB-serie), no a los pines "
+        "asumidos anteriormente. El GPS ahora se lee correctamente";
 
     const char* const CHANGELOG_IT =
-        "- Novità: la barra informativa ora mostra la posizione GPS in "
-        "tempo reale (e l'altitudine, non appena disponibile) quando "
-        "un modulo GPS esterno è attivo e ha un fix";
+        "- Correzione: la funzione di posizione GPS introdotta nella "
+        "versione precedente in realtà non riceveva dati su questa "
+        "scheda - il connettore GPS integrato è collegato al GPIO1 "
+        "(condiviso con la console USB-seriale), non ai pin ipotizzati "
+        "in precedenza. Il GPS ora viene letto correttamente";
 
     const char* const CHANGELOG_PT =
-        "- Novo: a barra de informações agora mostra a posição GPS ao "
-        "vivo (e a altitude, assim que disponível) sempre que um "
-        "módulo GPS externo estiver ativado e tiver um fix";
+        "- Correção: o recurso de posição GPS introduzido na versão "
+        "anterior na verdade não recebia dados nesta placa - o "
+        "conector GPS embutido está ligado ao GPIO1 (compartilhado "
+        "com o console USB-serial), não aos pinos presumidos "
+        "anteriormente. O GPS agora é lido corretamente";
 
     const char* const CHANGELOG_NL =
-        "- Nieuw: de infobalk toont nu de actuele GPS-positie (en "
-        "zodra beschikbaar ook de hoogte) zodra een externe GPS-module "
-        "is ingeschakeld en een fix heeft";
+        "- Fix: de in de vorige release geïntroduceerde GPS-"
+        "positiefunctie ontving op dit board in werkelijkheid helemaal "
+        "geen data - de ingebouwde GPS-connector is bedraad op GPIO1 "
+        "(gedeeld met de USB-seriële console), niet op de eerder "
+        "aangenomen pinnen. GPS wordt nu correct uitgelezen";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT, CHANGELOG_PT, CHANGELOG_NL

@@ -306,7 +306,7 @@ static const char* const I18N_FR[] = {
     "Outils",
     "Statistiques et carnet de vol",
     "Alertes LED",
-    "Nouveau : le bouton \"GPS\" à côté de \"Auto\" active/désactive la lecture d'un module GPS connecté. Activé, ta position suit tes déplacements en direct (par ex. en voiture) au lieu d'être seulement estimée par IP. Câblage : TX du module GPS sur GPIO22, RX du module GPS sur GPIO27 (généralement inutilisé), 3,3V et GND, 9600 bauds (NMEA). Sans module connecté, le bouton n'a simplement aucun effet.",
+    "Nouveau : le bouton \"GPS\" à côté de \"Auto\" active/désactive la lecture d'un module GPS connecté. Activé, ta position suit tes déplacements en direct (par ex. en voiture) au lieu d'être seulement estimée par IP. Branche le module sur le connecteur GPS intégré de la carte (connecteur JST à 4 broches, étiqueté VIN/TX/RX/GND) - câblé sur GPIO1, 9600 bauds (NMEA). Sans module connecté, le bouton n'a simplement aucun effet.",
     "Tourner l'écran (180°) : ",
     "Codes aéroport : ",
     "Basse altitude uniquement : ",

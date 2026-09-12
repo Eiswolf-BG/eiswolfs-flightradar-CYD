@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "6.1.2";
+    constexpr const char* APP_VERSION = "6.1.3";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -87,11 +87,21 @@ namespace Config {
     constexpr const char* NOMINATIM_HOST = "nominatim.openstreetmap.org";
     constexpr const char* NOMINATIM_USER_AGENT = "EiswolfsFlightradarCYD (github.com/Eiswolf-BG/eiswolfs-flightradar-CYD)";
 
-    struct GpsPinPair { uint8_t rx; uint8_t tx; const char* label; };
-    constexpr GpsPinPair GPS_PIN_CANDIDATES[] = {
-        {22, 27, "G22/G27"}
-    };
-    constexpr uint8_t GPS_PIN_CANDIDATE_COUNT = 1;
+    // Der eingebaute GPS-Steckverbinder dieses Boards (4-poliger JST-
+    // Header, beschriftet VIN/TX/RX/GND - auf manchen Board-Revisionen
+    // "P1", auf Alex' Board "P5" genannt) ist fest mit GPIO1 verdrahtet
+    // (die Datenleitung vom Modul - aus Sicht des ESP32 also RX) -
+    // denselben Pins wie die USB-Serial-Konsole (UART0). GPIO3 (die
+    // zweite Leitung des Headers) bleibt unbenutzt, das Modul sendet nur,
+    // empfaengt nichts. Per Serial-Diagnose verifiziert (echte
+    // $GNGGA/$GNRMC/$GNVTG-Saetze empfangen) - die urspruengliche Annahme
+    // GPIO22/27 (aus oeffentlicher Pinout-Doku) war fuer dieses Board
+    // falsch, siehe Git-Historie. Da GPIO1 mit der USB-Konsole geteilt
+    // wird, liest LocationManager::update() periodisch in kurzen
+    // Zeitfenstern (siehe dortiger Kommentar), statt einen dauerhaft
+    // eigenen UART zu belegen.
+    constexpr uint8_t GPS_RX_PIN = 1;
+    constexpr uint8_t GPS_TX_PIN = 3;
     constexpr uint32_t GPS_BAUD = 9600;
 
     constexpr float RANGE_STEPS_KM[] = {10.0f, 25.0f, 50.0f, 100.0f};

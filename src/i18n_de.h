@@ -306,7 +306,7 @@ static const char* const I18N_DE[] = {
     "Werkzeuge",
     "Statistik & Flugbuch",
     "LED-Alarme",
-    "Neu: Der \"GPS\"-Knopf neben \"Automatisch\" schaltet die Auswertung eines angeschlossenen GPS-Moduls ein/aus. Eingeschaltet folgt dein Standort live deiner Bewegung (z.B. im Auto), statt nur ungefähr per IP bestimmt zu werden. Verkabelung: GPS-Modul-TX an GPIO22, GPS-Modul-RX an GPIO27 (meist ungenutzt), 3,3V und GND, 9600 Baud (NMEA). Ohne angeschlossenes Modul bleibt der Knopf einfach wirkungslos.",
+    "Neu: Der \"GPS\"-Knopf neben \"Automatisch\" schaltet die Auswertung eines angeschlossenen GPS-Moduls ein/aus. Eingeschaltet folgt dein Standort live deiner Bewegung (z.B. im Auto), statt nur ungefähr per IP bestimmt zu werden. Das Modul in den eingebauten GPS-Steckverbinder der Platine stecken (4-poliger JST-Stecker, beschriftet VIN/TX/RX/GND) - verdrahtet mit GPIO1, 9600 Baud (NMEA). Ohne angeschlossenes Modul bleibt der Knopf einfach wirkungslos.",
     "Bildschirm drehen (180°): ",
     "Flughafencodes: ",
     "Nur Niedrigflieger: ",

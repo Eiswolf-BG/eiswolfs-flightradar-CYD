@@ -306,7 +306,7 @@ static const char* const I18N_PT[] = {
     "Ferramentas",
     "Estatísticas e diário de bordo",
     "Alertas de LED",
-    "Novo: o botão \"GPS\" ao lado de \"Automático\" ativa/desativa a leitura de um módulo GPS conectado. Ativado, sua localização acompanha seu movimento ao vivo (ex. dirigindo) em vez de ser determinada apenas aproximadamente por IP. Fiação: TX do módulo GPS no GPIO22, RX do módulo GPS no GPIO27 (normalmente não usado), 3,3V e GND, 9600 baud (NMEA). Sem um módulo conectado, o botão simplesmente não tem efeito.",
+    "Novo: o botão \"GPS\" ao lado de \"Automático\" ativa/desativa a leitura de um módulo GPS conectado. Ativado, sua localização acompanha seu movimento ao vivo (ex. dirigindo) em vez de ser determinada apenas aproximadamente por IP. Conecte o módulo ao conector GPS embutido da placa (conector JST de 4 pinos, rotulado VIN/TX/RX/GND) - ligado ao GPIO1, 9600 baud (NMEA). Sem um módulo conectado, o botão simplesmente não tem efeito.",
     "Girar tela (180°): ",
     "Códigos de aeroporto: ",
     "Somente baixa altitude: ",

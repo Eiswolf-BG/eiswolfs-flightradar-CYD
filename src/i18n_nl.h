@@ -307,7 +307,7 @@ static const char* const I18N_NL[] = {
     "Hulpmiddelen",
     "Statistieken en logboek",
     "LED-alarmen",
-    "Nieuw: de knop \"GPS\" naast \"Automatisch\" schakelt het uitlezen van een aangesloten GPS-module in/uit. Indien aan volgt je locatie live je beweging (bijv. tijdens het rijden) in plaats van alleen ruwweg via IP te worden bepaald. Bekabeling: GPS-module TX naar GPIO22, GPS-module RX naar GPIO27 (meestal ongebruikt), 3,3V en GND, 9600 baud (NMEA). Zonder aangesloten module heeft de knop simpelweg geen effect.",
+    "Nieuw: de knop \"GPS\" naast \"Automatisch\" schakelt het uitlezen van een aangesloten GPS-module in/uit. Indien aan volgt je locatie live je beweging (bijv. tijdens het rijden) in plaats van alleen ruwweg via IP te worden bepaald. Sluit de module aan op de ingebouwde GPS-connector van de printplaat (4-pins JST-connector, met VIN/TX/RX/GND gelabeld) - verbonden met GPIO1, 9600 baud (NMEA). Zonder aangesloten module heeft de knop simpelweg geen effect.",
     "Scherm draaien (180°): ",
     "Luchthavencodes: ",
     "Alleen lage hoogte: ",

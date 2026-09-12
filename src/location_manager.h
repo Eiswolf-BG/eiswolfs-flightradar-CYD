@@ -15,9 +15,6 @@ namespace LocationManager {
     void setGpsEnabled(bool enabled);
     bool isGpsEnabled();
 
-    void cycleGpsPinPair();
-    const char* currentGpsPinLabel();
-
     bool hasGpsFix();
 
     // Rohe GPS-Position/-Hoehe fuer die optionale Radar-Eckanzeige

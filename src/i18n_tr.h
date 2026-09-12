@@ -306,7 +306,7 @@ static const char* const I18N_TR[] = {
     "Araçlar",
     "İstatistik ve Uçuş Defteri",
     "LED Uyarıları",
-    "Yeni: \"Otomatik\" yanındaki \"GPS\" düğmesi, bağlı bir GPS modülünün okunmasını açar/kapatır. Açıkken konumun (ör. araba kullanırken) hareketini canlı olarak takip eder, sadece IP üzerinden tahmini olarak belirlenmez. Bağlantı: GPS modülü TX'i GPIO22'ye, GPS modülü RX'i GPIO27'ye (genellikle kullanılmaz), 3,3V ve GND, 9600 baud (NMEA). Bağlı modül yoksa düğmenin bir etkisi olmaz.",
+    "Yeni: \"Otomatik\" yanındaki \"GPS\" düğmesi, bağlı bir GPS modülünün okunmasını açar/kapatır. Açıkken konumun (ör. araba kullanırken) hareketini canlı olarak takip eder, sadece IP üzerinden tahmini olarak belirlenmez. Modülü kartın yerleşik GPS konektörüne takın (VIN/TX/RX/GND etiketli 4 pimli JST konektör) - GPIO1'e bağlıdır, 9600 baud (NMEA). Bağlı modül yoksa düğmenin bir etkisi olmaz.",
     "Ekranı 180° döndür: ",
     "Havalimanı kodları: ",
     "Sadece alçak irtifa: ",

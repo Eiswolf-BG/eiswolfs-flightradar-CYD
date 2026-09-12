@@ -306,7 +306,7 @@ static const char* const I18N_IT[] = {
     "Strumenti",
     "Statistiche e diario di volo",
     "Avvisi LED",
-    "Novità: il pulsante \"GPS\" accanto ad \"Automatico\" attiva/disattiva la lettura di un modulo GPS collegato. Se attivo, la tua posizione segue il tuo movimento in tempo reale (es. in auto) invece di essere determinata solo approssimativamente via IP. Collegamento: TX del modulo GPS su GPIO22, RX del modulo GPS su GPIO27 (di solito inutilizzato), 3,3V e GND, 9600 baud (NMEA). Senza modulo collegato, il pulsante semplicemente non ha alcun effetto.",
+    "Novità: il pulsante \"GPS\" accanto ad \"Automatico\" attiva/disattiva la lettura di un modulo GPS collegato. Se attivo, la tua posizione segue il tuo movimento in tempo reale (es. in auto) invece di essere determinata solo approssimativamente via IP. Collega il modulo al connettore GPS integrato della scheda (connettore JST a 4 pin, etichettato VIN/TX/RX/GND) - collegato al GPIO1, 9600 baud (NMEA). Senza modulo collegato, il pulsante semplicemente non ha alcun effetto.",
     "Ruota schermo (180°): ",
     "Codici aeroportuali: ",
     "Solo bassa quota: ",

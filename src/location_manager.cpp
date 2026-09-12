@@ -3,7 +3,6 @@
 #include "location_presets.h"
 #include "settings_store.h"
 #include <TinyGPSPlus.h>
-#include <HardwareSerial.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <HTTPClient.h>
@@ -18,11 +17,8 @@ namespace {
     Preferences prefs;
 
     TinyGPSPlus gps;
-    HardwareSerial gpsSerial(1);
 
     bool gpsEnabled = false;
-    uint8_t gpsPinIndex = 0;
-    bool gpsSerialStarted = false;
 
     double lastLat = 0, lastLon = 0;
     bool havePersisted = false;
@@ -38,13 +34,6 @@ namespace {
     bool metricUnits = true;
 
     SemaphoreHandle_t mutex = nullptr;
-
-    void startGpsSerialIfNeeded() {
-        if (!gpsEnabled || gpsSerialStarted) return;
-        const auto& pins = Config::GPS_PIN_CANDIDATES[gpsPinIndex];
-        gpsSerial.begin(Config::GPS_BAUD, SERIAL_8N1, pins.rx, pins.tx);
-        gpsSerialStarted = true;
-    }
 
     void persistLocationAndSource(double lat, double lon, Source newSource) {
         prefs.putDouble("homeLat", lat);
@@ -62,8 +51,6 @@ void init() {
     if (mutex == nullptr) mutex = xSemaphoreCreateMutex();
     prefs.begin("adsb_radar", false);
     gpsEnabled = prefs.getBool("gpsEn", false);
-    gpsPinIndex = prefs.getUChar("gpsPinIdx", 0);
-    if (gpsPinIndex >= Config::GPS_PIN_CANDIDATE_COUNT) gpsPinIndex = 0;
 
     double lat = prefs.getDouble("homeLat", 0.0);
     double lon = prefs.getDouble("homeLon", 0.0);
@@ -73,17 +60,46 @@ void init() {
         havePersisted = true;
         source = Source::Persisted;
     }
-
-    startGpsSerialIfNeeded();
 }
+
+// GPIO1 (Config::GPS_RX_PIN) ist derselbe Pin wie die USB-Serial-Konsole
+// (UART0, "Serial") - es gibt auf diesem Board keinen zweiten, unabhaengigen
+// UART auf den tatsaechlich verkabelten Pins (siehe Config::GPS_RX_PIN-
+// Kommentar in config.h). Deshalb wird "Serial" hier periodisch, fuer ein
+// kurzes festes Zeitfenster, auf GPS-Baudrate umgeschaltet: Konsole aus,
+// GPS-Bytes einsammeln, Konsole wieder auf 115200 herstellen. Waehrend
+// dieses kurzen Fensters gehen ggf. einzelne Serial.print()-Aufrufe aus
+// anderen Teilen der App ins Leere (HardwareSerial gibt in diesem Zustand
+// einfach folgenlos zurueck, kein Absturzrisiko) - ein bewusst akzeptierter
+// Kompromiss, da es keine Alternative auf den tatsaechlich verkabelten Pins
+// gibt. Alle paar Sekunden statt bei jedem update()-Aufruf (~alle 50ms aus
+// net_task.cpp), damit die Konsole ganz ueberwiegend normal nutzbar bleibt.
+constexpr uint32_t GPS_READ_INTERVAL_MS = 3000;
+constexpr uint32_t GPS_READ_WINDOW_MS = 500;
 
 void update() {
     if (!gpsEnabled) return;
-    startGpsSerialIfNeeded();
 
-    while (gpsSerial.available() > 0) {
-        gps.encode(gpsSerial.read());
+    static uint32_t lastReadMs = 0;
+    uint32_t nowMs = millis();
+    if (nowMs - lastReadMs < GPS_READ_INTERVAL_MS) return;
+    lastReadMs = nowMs;
+
+    Serial.flush();
+    Serial.end();
+    delay(20);
+    Serial.begin(Config::GPS_BAUD, SERIAL_8N1, Config::GPS_RX_PIN, Config::GPS_TX_PIN);
+
+    uint32_t windowStartMs = millis();
+    while (millis() - windowStartMs < GPS_READ_WINDOW_MS) {
+        while (Serial.available() > 0) {
+            gps.encode((char)Serial.read());
+        }
     }
+
+    Serial.end();
+    delay(20);
+    Serial.begin(115200);
 
     if (gps.location.isValid() && gps.location.isUpdated()) {
         persistLocationAndSource(gps.location.lat(), gps.location.lng(), Source::GpsFix);
@@ -172,24 +188,9 @@ void setManualLocation(double lat, double lon) {
 void setGpsEnabled(bool enabled) {
     gpsEnabled = enabled;
     prefs.putBool("gpsEn", enabled);
-    if (enabled) {
-        gpsSerialStarted = false;
-        startGpsSerialIfNeeded();
-    }
 }
 
 bool isGpsEnabled() { return gpsEnabled; }
-
-void cycleGpsPinPair() {
-    gpsPinIndex = (gpsPinIndex + 1) % Config::GPS_PIN_CANDIDATE_COUNT;
-    prefs.putUChar("gpsPinIdx", gpsPinIndex);
-    gpsSerialStarted = false;
-    if (gpsEnabled) startGpsSerialIfNeeded();
-}
-
-const char* currentGpsPinLabel() {
-    return Config::GPS_PIN_CANDIDATES[gpsPinIndex].label;
-}
 
 bool hasGpsFix() { return gps.location.isValid(); }
 

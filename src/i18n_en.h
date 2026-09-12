@@ -307,7 +307,7 @@ static const char* const I18N_EN[] = {
     "Tools",
     "Stats & Logbook",
     "LED Alerts",
-    "New: the \"GPS\" button next to \"Auto\" turns reading from a connected GPS module on/off. When on, your location follows your movement live (e.g. while driving) instead of only being roughly determined via IP. Wiring: GPS module TX to GPIO22, GPS module RX to GPIO27 (usually unused), 3.3V and GND, 9600 baud (NMEA). Without a connected module, the button simply has no effect.",
+    "New: the \"GPS\" button next to \"Auto\" turns reading from a connected GPS module on/off. When on, your location follows your movement live (e.g. while driving) instead of only being roughly determined via IP. Plug the module into the board's built-in GPS connector (4-pin JST header labeled VIN/TX/RX/GND) - wired to GPIO1, 9600 baud (NMEA). Without a connected module, the button simply has no effect.",
     "Rotate screen (180°): ",
     "Airport codes: ",
     "Low altitude only: ",
