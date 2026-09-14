@@ -82,7 +82,7 @@ static const char* const I18N_NL[] = {
     "Vliegtuigen van deze maatschappijen worden",
     "verborgen op de radar.",
     "Maatschappij toevoegen",
-    "Maatschappij toevoegen (ICAO-code)",
+    "Maatschappij toevoegen (IATA/ICAO)",
 
     "Gevolgde vliegtuigen",
     "Ontvang een melding (blauwe LED) wanneer een",
@@ -517,6 +517,16 @@ static const char* const I18N_NL[] = {
     "Alarmgeluid is gedempt in deze browser - klik om het weer aan te zetten",
     "Windstil",
     "Variabel",
+
+    "Wereldkaart",
+    "Over wereldkaart",
+    "Toont een subtiele, gestippelde wereldkaart onder de radarcirkel voor geografische oriëntatie. Zet hem uit als de achtergrond afleidt - de radar zelf werkt in beide gevallen precies hetzelfde.",
+
+    "Verbergen",
+    "Alleen tonen",
+    "Over de filtermodus",
+    "\"Verbergen\" verbergt de opgegeven maatschappijen, alle andere blijven zichtbaar. \"Alleen tonen\" draait dit om: alleen de opgegeven maatschappijen worden getoond, al het andere (ook vliegtuigen zonder herkenbare maatschappij) wordt verborgen. Beide modi gebruiken dezelfde lijst hieronder.",
+    "Alleen vliegtuigen van deze maatschappijen worden op de radar getoond - al het andere, ook niet-herkende maatschappijen, wordt verborgen.",
 };
 
 static_assert(sizeof(I18N_NL) / sizeof(I18N_NL[0]) == (size_t)StringId::COUNT,

@@ -2020,9 +2020,20 @@ namespace {
         // auf dem Geraete-Airline-Filter-Screen (Teil 1 des Auftrags),
         // WEB_AIRLINE_FILTER_EMPTY/WEB_ICAO_PREFIX_HEADER/WEB_REMOVE/
         // WEB_ICAO_PLACEHOLDER sind neu (kein Geraete-Aequivalent).
+        // Bidirektionaler Filter (Alex' Wunsch): derselbe Modus-Schalter
+        // wie auf dem Geraet, ein simples POST-Formular statt JS/Toggle-
+        // Button - passt zum bestehenden Stil dieser Seite (Add/Delete
+        // sind ebenfalls einfache Formulare).
         html += "<h2>" + String(I18n::t(StringId::AIRLINE_FILTER_TITLE)) + "</h2>";
-        html += "<p>" + String(I18n::t(StringId::AIRLINE_FILTER_DESC1)) + " " +
-                I18n::t(StringId::AIRLINE_FILTER_DESC2) + "</p>";
+        bool airlineShowOnly = SettingsStore::airlineFilterShowOnlyMode();
+        html += "<p>" + String(airlineShowOnly ? I18n::t(StringId::AIRLINE_FILTER_DESC_SHOWONLY)
+                                                : (String(I18n::t(StringId::AIRLINE_FILTER_DESC1)) + " " +
+                                                   I18n::t(StringId::AIRLINE_FILTER_DESC2))) + "</p>";
+        html += "<form method=\"POST\" action=\"/lists/airlines/mode\" style=\"margin-bottom:10px;\">";
+        html += "<button type=\"submit\">" +
+                String(airlineShowOnly ? I18n::t(StringId::AIRLINE_FILTER_MODE_HIDE)
+                                        : I18n::t(StringId::AIRLINE_FILTER_MODE_SHOW_ONLY)) +
+                "</button></form>";
         uint8_t airlineCount = AirlineFilter::count();
         String removeLabel = I18n::t(StringId::WEB_REMOVE);
         if (airlineCount == 0) {
@@ -2088,6 +2099,12 @@ namespace {
                 AirlineFilter::removeHidden((uint8_t)idx);
             }
         }
+        server.sendHeader("Location", "/lists");
+        server.send(303);
+    }
+
+    void handleAirlineModeToggle() {
+        SettingsStore::setAirlineFilterShowOnlyMode(!SettingsStore::airlineFilterShowOnlyMode());
         server.sendHeader("Location", "/lists");
         server.send(303);
     }
@@ -2706,6 +2723,7 @@ void begin() {
     server.on("/lists", handleLists);
     server.on("/lists/airlines/add", HTTP_POST, handleAirlineAdd);
     server.on("/lists/airlines/delete", HTTP_POST, handleAirlineDelete);
+    server.on("/lists/airlines/mode", HTTP_POST, handleAirlineModeToggle);
     server.on("/lists/watchlist/add", HTTP_POST, handleWatchlistAdd);
     server.on("/lists/watchlist/delete", HTTP_POST, handleWatchlistDelete);
     server.on("/control/range", HTTP_POST, handleControlRange);

@@ -82,7 +82,7 @@ static const char* const I18N_TR[] = {
     "Bu havayollarına ait uçaklar",
     "radarda gizlenir.",
     "Havayolu ekle",
-    "Havayolu ekle (ICAO kodu)",
+    "Havayolu ekle (IATA/ICAO)",
 
     "İzlenen uçaklar",
     "Bu uçaklardan biri gorundugunde",
@@ -515,6 +515,16 @@ static const char* const I18N_TR[] = {
     "Uyarı sesi bu tarayıcıda kapalı - tekrar açmak için tıklayın",
     "Sakin",
     "Değişken",
+
+    "Dünya Haritası",
+    "Dünya Haritası Hakkında",
+    "Coğrafi yönelim için radar dairesinin altında soluk, noktalı bir dünya haritası gösterir. Arka plan dikkatini dağıtıyorsa kapatabilirsin - radarın kendisi her iki durumda da tıpatıp aynı şekilde çalışır.",
+
+    "Gizle",
+    "Sadece göster",
+    "Filtre modu hakkında",
+    "\"Gizle\" listedeki havayollarını gizler, diğer tüm havayolları görünür kalır. \"Sadece göster\" bunu tersine çevirir: yalnızca listedeki havayolları gösterilir, geri kalan her şey (tanınamayan havayolu uçakları dahil) gizlenir. Her iki mod da aşağıdaki aynı listeyi kullanır.",
+    "Radarda yalnızca bu havayollarına ait uçaklar gösterilir - tanınamayanlar dahil diğer her şey gizlenir.",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

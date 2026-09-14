@@ -82,7 +82,7 @@ static const char* const I18N_IT[] = {
     "Gli aerei di queste compagnie",
     "sono nascosti dal radar.",
     "Aggiungi compagnia",
-    "Aggiungi compagnia (codice ICAO)",
+    "Aggiungi compagnia (IATA/ICAO)",
 
     "Aerei monitorati",
     "Il LED blu lampeggia quando",
@@ -515,6 +515,16 @@ static const char* const I18N_IT[] = {
     "Il suono di allerta è disattivato in questo browser - clicca per riattivarlo",
     "Calma",
     "Variabile",
+
+    "Mappa del mondo",
+    "Info sulla mappa del mondo",
+    "Mostra una tenue mappa del mondo puntinata sotto il cerchio del radar per l'orientamento geografico. Disattivala se lo sfondo ti distrae - il radar stesso funziona esattamente allo stesso modo in entrambi i casi.",
+
+    "Nascondi",
+    "Mostra solo",
+    "Info sulla modalità filtro",
+    "\"Nascondi\" nasconde le compagnie in elenco, tutte le altre restano visibili. \"Mostra solo\" inverte la cosa: vengono mostrate solo le compagnie in elenco, tutto il resto (inclusi gli aerei senza compagnia riconoscibile) viene nascosto. Entrambe le modalità usano lo stesso elenco qui sotto.",
+    "Sul radar vengono mostrati solo gli aerei di queste compagnie - tutto il resto, comprese le compagnie non riconosciute, viene nascosto.",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

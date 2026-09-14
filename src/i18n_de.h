@@ -82,7 +82,7 @@ static const char* const I18N_DE[] = {
     "Flugzeuge dieser Airlines werden",
     "im Radar ausgeblendet.",
     "Airline hinzufügen",
-    "Airline hinzufügen (ICAO-Code)",
+    "Airline hinzufügen (IATA/ICAO)",
 
     "Beobachtete Flugzeuge",
     "Blaue LED blinkt, sobald eines",
@@ -515,6 +515,16 @@ static const char* const I18N_DE[] = {
     "Alarmton ist in diesem Browser stummgeschaltet - Klick zum Wiedereinschalten",
     "Windstill",
     "Wechselnd",
+
+    "Weltkarte",
+    "Über Weltkarte",
+    "Zeigt eine dezente, gepunktete Weltkarte unter dem Radarkreis zur geografischen Orientierung. Schalte sie aus, wenn dich der Hintergrund ablenkt - der Radar selbst funktioniert in beiden Fällen genau gleich.",
+
+    "Ausblenden",
+    "Nur anzeigen",
+    "Über den Filter-Modus",
+    "„Ausblenden“ versteckt die eingetragenen Airlines, alle anderen bleiben sichtbar. „Nur anzeigen“ dreht das um: Nur die eingetragenen Airlines werden angezeigt, alles andere (auch Flugzeuge ohne erkennbare Airline) wird ausgeblendet. Beide Modi nutzen dieselbe Liste unten.",
+    "Nur Flugzeuge dieser Airlines werden im Radar angezeigt - alles andere, auch nicht erkennbare Airlines, wird ausgeblendet.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

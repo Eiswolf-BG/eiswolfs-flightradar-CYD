@@ -1144,6 +1144,26 @@ enum class StringId : uint16_t {
     WEATHER_WIND_CALM,
     WEATHER_WIND_VARIABLE,
 
+    // Neuer 7. Kaestchen-Eintrag im Radar-Darstellung-Screen (Menue >
+    // System > Anzeige > Radar-Darstellung, radar_theme_screen.cpp) -
+    // schaltet den Weltkarten-Punktraster-Hintergrund unter dem Radarkreis
+    // (radar_screen.cpp::drawWorldMap()) an/aus, gleiches Namensmuster wie
+    // RADAR_THEME_CRT/_INFO_TITLE/_INFO_BODY.
+    RADAR_THEME_WORLD_MAP,
+    RADAR_THEME_WORLD_MAP_INFO_TITLE,
+    RADAR_THEME_WORLD_MAP_INFO_BODY,
+
+    // Bidirektionaler Airline-Filter (airline_filter_screen.cpp,
+    // web_export_server.cpp /lists-Seite) - Modus-Umschalter-Labels,
+    // Info-Text dazu, sowie die Beschreibung fuer den neuen "Nur
+    // anzeigen"-Modus (der bestehende "Ausblenden"-Modus behaelt seine
+    // bisherige AIRLINE_FILTER_DESC1/DESC2-Beschreibung unveraendert).
+    AIRLINE_FILTER_MODE_HIDE,
+    AIRLINE_FILTER_MODE_SHOW_ONLY,
+    AIRLINE_FILTER_MODE_INFO_TITLE,
+    AIRLINE_FILTER_MODE_INFO_BODY,
+    AIRLINE_FILTER_DESC_SHOWONLY,
+
     COUNT
 };
 

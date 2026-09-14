@@ -1,5 +1,6 @@
 #include "airline_filter.h"
 #include "config.h"
+#include "settings_store.h"
 #include "sd_mutex.h"
 #include "sd_storage.h"
 #include <SD.h>
@@ -136,11 +137,20 @@ void removeHidden(uint8_t index) {
     if (changed) saveToSd();
 }
 
+// Bidirektionaler Filter (Alex' Wunsch): dieselbe Liste bedient zwei
+// Modi (SettingsStore::airlineFilterShowOnlyMode()) - "Ausblenden"
+// (Standard, false): eingetragene Airlines werden versteckt, alle
+// anderen bleiben sichtbar - unveraendertes bisheriges Verhalten.
+// "Nur anzeigen" (true): NUR eingetragene Airlines bleiben sichtbar,
+// alle anderen werden ausgeblendet - inklusive Flugzeugen ohne
+// erkennbares Airline-Praefix (kein Callsign-Alpha-Praefix extrahierbar),
+// die gelten in diesem Modus explizit NICHT als Treffer.
 bool isHidden(const char* callsign) {
     ensureMutex();
     char prefix[4];
     extractPrefix(callsign, prefix);
-    if (!prefix[0]) return false;
+    bool showOnlyMode = SettingsStore::airlineFilterShowOnlyMode();
+    if (!prefix[0]) return showOnlyMode;
 
     xSemaphoreTake(mutex, portMAX_DELAY);
     bool found = false;
@@ -148,7 +158,7 @@ bool isHidden(const char* callsign) {
         if (strcmp(hidden[i], prefix) == 0) { found = true; break; }
     }
     xSemaphoreGive(mutex);
-    return found;
+    return showOnlyMode ? !found : found;
 }
 
 }

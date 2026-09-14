@@ -2,6 +2,7 @@
 #include "airline_filter.h"
 #include "touch_input.h"
 #include "menu_stars.h"
+#include "menu_screen.h"
 #include "config.h"
 #include "settings_store.h"
 #include "i18n.h"
@@ -10,6 +11,60 @@
 namespace AirlineFilterScreen {
 
 namespace {
+    // Kleine ICAO<->IATA-Tabelle (haeufige internationale/europaeische
+    // Carrier, bewusst nicht vollstaendig) - dieselbe Datenquelle wie die
+    // JS-Tabelle fuers Airline-Logo-Feature der Webseite
+    // (web_export_server.cpp::"ICAO_TO_IATA"), hier fuer den Geraete-
+    // Eingabe-Screen dupliziert statt geteilt (CLAUDE.md "jeder Screen
+    // unabhaengig lauffaehig") und in Eingaberichtung gedreht (IATA->ICAO,
+    // da der Filter intern immer mit ICAO arbeitet - das Callsign in den
+    // ADS-B-Rohdaten beginnt immer mit dem 3-stelligen ICAO-Praefix).
+    // Alex' Wunsch: statt sich nach der Geraete-IATA/ICAO-Einstellung zu
+    // richten (die eigentlich fuer Flugnummern/Flughafencodes gedacht ist,
+    // nicht fuer diese Eingabe), werden hier IMMER beide Formate anhand
+    // der Laenge automatisch erkannt (IATA=2, ICAO=3 Zeichen) - robuster
+    // und unabhaengig von einer Einstellung, die inhaltlich nichts mit
+    // diesem Screen zu tun hat.
+    struct IataIcaoPair { const char* icao; const char* iata; };
+    constexpr IataIcaoPair IATA_ICAO_TABLE[] = {
+        {"DLH","LH"}, {"BAW","BA"}, {"AFR","AF"}, {"KLM","KL"}, {"SWR","LX"}, {"AUA","OS"},
+        {"IBE","IB"}, {"TAP","TP"}, {"SAS","SK"}, {"FIN","AY"}, {"THY","TK"}, {"AEE","A3"},
+        {"RYR","FR"}, {"EZY","U2"}, {"WZZ","W6"}, {"VLG","VY"}, {"EWG","EW"}, {"NAX","DY"},
+        {"IBS","I2"}, {"TRA","HV"}, {"PGT","PC"}, {"BEL","SN"}, {"CFG","DE"}, {"EXS","LS"},
+        {"TOM","BY"}, {"LGL","LG"}, {"BTI","BT"}, {"LOT","LO"}, {"CSA","OK"}, {"ROT","RO"},
+        {"AFL","SU"}, {"UAE","EK"}, {"QTR","QR"}, {"ETD","EY"}, {"SVA","SV"}, {"MSR","MS"},
+        {"RJA","RJ"}, {"ELY","LY"}, {"GFA","GF"}, {"KAC","KU"}, {"OMA","WY"}, {"MEA","ME"},
+        {"RAM","AT"}, {"TUN","TU"}, {"ETH","ET"}, {"SAA","SA"}, {"KQA","KQ"}, {"DAH","AH"},
+        {"ICE","FI"}, {"UAL","UA"}, {"AAL","AA"}, {"DAL","DL"}, {"SWA","WN"}, {"JBU","B6"},
+        {"ASA","AS"}, {"FFT","F9"}, {"NKS","NK"}, {"ACA","AC"}, {"WJA","WS"}, {"CPA","CX"},
+        {"SIA","SQ"}, {"ANA","NH"}, {"JAL","JL"}, {"KAL","KE"}, {"AAR","OZ"}, {"CCA","CA"},
+        {"CES","MU"}, {"CSN","CZ"}, {"THA","TG"}, {"MAS","MH"}, {"GIA","GA"}, {"PAL","PR"},
+        {"CAL","CI"}, {"EVA","BR"}, {"AIC","AI"}, {"IGO","6E"}, {"QFA","QF"}, {"ANZ","NZ"},
+        {"VOZ","VA"}, {"PIA","PK"}, {"LAN","LA"}, {"TAM","JJ"}, {"ARG","AR"}, {"AVA","AV"},
+        {"CMP","CM"}, {"AMX","AM"}, {"GLO","G3"}, {"AZU","AD"}, {"FDX","FX"}, {"UPS","5X"},
+        {"GTI","5Y"}, {"CLX","CV"}, {"ITY","AZ"}, {"EIN","EI"}, {"CRL","SS"}, {"TSC","TS"},
+    };
+    constexpr uint8_t IATA_ICAO_TABLE_COUNT = sizeof(IATA_ICAO_TABLE) / sizeof(IATA_ICAO_TABLE[0]);
+
+    // Wandelt eine Nutzereingabe in den fuers Filtern noetigen ICAO-Code
+    // um - 3 Zeichen gelten als bereits-ICAO (unveraendert durchgereicht,
+    // deckt auch unbekannte/nicht in der Tabelle gelistete Airlines ab),
+    // 2 Zeichen werden als IATA interpretiert und per Tabelle aufgeloest.
+    // Leerer String = kein Treffer (unbekannter IATA-Code), Aufrufer soll
+    // dann nichts hinzufuegen statt einen falschen/nutzlosen Eintrag zu
+    // speichern.
+    String resolveToIcao(const String& input) {
+        if (input.length() == 2) {
+            for (uint8_t i = 0; i < IATA_ICAO_TABLE_COUNT; i++) {
+                if (input.equalsIgnoreCase(IATA_ICAO_TABLE[i].iata)) {
+                    return String(IATA_ICAO_TABLE[i].icao);
+                }
+            }
+            return String();
+        }
+        return input;
+    }
+
     struct Rect {
         int16_t x, y, w, h;
         bool contains(int16_t px, int16_t py) const {
@@ -121,12 +176,56 @@ namespace {
 
         return confirmed ? String(buf) : String();
     }
+
+    // Wortweiser Zeilenumbruch anhand echter Pixelbreite (CLAUDE.md-Pflicht
+    // fuer Text variabler Laenge) - dupliziert statt geteilt, gleiches
+    // Muster wie in aircraft_watchlist_screen.cpp/location_presets_screen.cpp
+    // etc. Hier ohne Scroll-Bedarf genutzt (viewTop/viewBottom grosszuegig
+    // bemessen), nur fuer den wortweisen Umbruch selbst.
+    int16_t layoutWrapped(TFT_eSPI& tft, int16_t x, int16_t startY, int16_t maxWidth,
+                          int16_t lineHeight, const String& text, int16_t scrollY,
+                          int16_t viewTop, int16_t viewBottom, bool draw) {
+        int16_t y = startY;
+        int32_t start = 0;
+        int32_t len = text.length();
+        while (start < len) {
+            while (start < len && text[start] == ' ') start++;
+            if (start >= len) break;
+
+            String line = text.substring(start, len);
+            while (tft.textWidth(line) > maxWidth) {
+                int32_t lastSpace = line.lastIndexOf(' ');
+                if (lastSpace <= 0) break;
+                line = line.substring(0, lastSpace);
+            }
+
+            if (draw) {
+                int16_t screenY = y - scrollY;
+                if (screenY >= viewTop && screenY <= viewBottom) {
+                    tft.setCursor(x, screenY);
+                    tft.print(line);
+                }
+            }
+            y += lineHeight;
+            start += line.length();
+        }
+        return y;
+    }
 }
 
 void run(TFT_eSPI& tft) {
     constexpr int16_t ROW_H = 32;
     constexpr int16_t ROW_GAP = 6;
     constexpr int16_t REMOVE_BTN_W = 60;
+
+    // Modus-Umschalter-Zeile (Alex' Wunsch: bidirektionaler Filter,
+    // "Ausblenden"/"Nur anzeigen") - kompakte 22px-Buttonzeile, gleiches
+    // "?"-Info-Button-Muster wie die Kaestchen-Zeilen in
+    // radar_theme_screen.cpp (dort dupliziert, hier ebenfalls, siehe
+    // CLAUDE.md "jeder Screen unabhaengig lauffaehig").
+    constexpr int16_t MODE_ROW_Y = 20;
+    constexpr int16_t MODE_ROW_H = 22;
+    constexpr int16_t MODE_INFO_BTN_SIZE = 20;
 
     bool done = false;
     MenuStars::reset();
@@ -135,14 +234,32 @@ void run(TFT_eSPI& tft) {
         tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::AIRLINE_FILTER_TITLE));
+
+        bool showOnly = SettingsStore::airlineFilterShowOnlyMode();
+
+        Rect modeRow = {10, MODE_ROW_Y, (int16_t)(Config::SCREEN_WIDTH - 20), MODE_ROW_H};
+        drawButton(tft, modeRow, showOnly ? I18n::t(StringId::AIRLINE_FILTER_MODE_SHOW_ONLY)
+                                           : I18n::t(StringId::AIRLINE_FILTER_MODE_HIDE));
+        Rect modeInfoBtn = {(int16_t)(modeRow.x + modeRow.w - MODE_INFO_BTN_SIZE - 4),
+                             (int16_t)(modeRow.y + (modeRow.h - MODE_INFO_BTN_SIZE) / 2),
+                             MODE_INFO_BTN_SIZE, MODE_INFO_BTN_SIZE};
+        drawButton(tft, modeInfoBtn, "?");
+
+        // Beschreibung passend zum aktuellen Modus - ueber layoutWrapped()
+        // statt der frueheren fest verdrahteten zwei Zeilen, da der neue
+        // "Nur anzeigen"-Text in manchen Sprachen laenger ausfaellt als in
+        // die bisherigen zwei Zeilen passt.
+        constexpr int16_t DESC_LINE_H = 12;
         tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
-        tft.setCursor(10, 26);
-        tft.println(I18n::t(StringId::AIRLINE_FILTER_DESC1));
-        tft.setCursor(10, 38);
-        tft.println(I18n::t(StringId::AIRLINE_FILTER_DESC2));
+        int16_t descStartY = MODE_ROW_Y + MODE_ROW_H + 14;
+        String desc = showOnly
+            ? String(I18n::t(StringId::AIRLINE_FILTER_DESC_SHOWONLY))
+            : String(I18n::t(StringId::AIRLINE_FILTER_DESC1)) + " " + I18n::t(StringId::AIRLINE_FILTER_DESC2);
+        int16_t descEndY = layoutWrapped(tft, 10, descStartY, Config::SCREEN_WIDTH - 20, DESC_LINE_H,
+                                          desc, 0, 0, Config::SCREEN_HEIGHT, true);
 
         uint8_t count = AirlineFilter::count();
-        int16_t y = 56;
+        int16_t y = descEndY + 8;
 
         Rect rowRects[AirlineFilter::MAX_HIDDEN];
         Rect removeRects[AirlineFilter::MAX_HIDDEN];
@@ -184,6 +301,19 @@ void run(TFT_eSPI& tft) {
         }
 
         bool handled = false;
+        // "?"-Info-Button zuerst pruefen (kleine Flaeche innerhalb der
+        // Modus-Zeile) - sonst wuerde ein Tap darauf faelschlich als Tap
+        // auf die ganze Zeile (Modus umschalten) gewertet.
+        if (!handled && modeInfoBtn.contains(tap.x, tap.y)) {
+            MenuScreen::showInfoScreen(tft, I18n::t(StringId::AIRLINE_FILTER_MODE_INFO_TITLE),
+                                        I18n::t(StringId::AIRLINE_FILTER_MODE_INFO_BODY), UiTheme::accentColor(tft),
+                                        I18n::t(StringId::OK));
+            handled = true;
+        }
+        if (!handled && modeRow.contains(tap.x, tap.y)) {
+            SettingsStore::setAirlineFilterShowOnlyMode(!showOnly);
+            handled = true;
+        }
         for (uint8_t i = 0; i < count && !handled; i++) {
             if (removeRects[i].contains(tap.x, tap.y)) {
                 AirlineFilter::removeHidden(i);
@@ -193,7 +323,15 @@ void run(TFT_eSPI& tft) {
         if (!handled && canAdd && addBtn.contains(tap.x, tap.y)) {
             String code = runLetterKeypad(tft);
             if (code.length() > 0) {
-                AirlineFilter::addHidden(code.c_str());
+                // 2 Zeichen = IATA, per Tabelle auf ICAO aufgeloest (siehe
+                // resolveToIcao() oben) - 3 Zeichen gelten als bereits-ICAO
+                // und werden unveraendert durchgereicht. Kein Treffer (z.B.
+                // unbekannter IATA-Code) fuegt bewusst nichts hinzu, statt
+                // einen falschen ICAO-Eintrag zu speichern.
+                String icao = resolveToIcao(code);
+                if (icao.length() > 0) {
+                    AirlineFilter::addHidden(icao.c_str());
+                }
             }
             handled = true;
         }

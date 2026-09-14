@@ -154,6 +154,15 @@ namespace SettingsStore {
     bool onlyLowAltitude();
     void setOnlyLowAltitude(bool on);
 
+    // Modus des Airline-Filters (airline_filter.h/.cpp) - false (Default)
+    // = "Ausblenden" (bisheriges Verhalten: eingetragene Airlines werden
+    // versteckt, alle anderen bleiben sichtbar), true = "Nur anzeigen"
+    // (nur eingetragene Airlines sichtbar, alle anderen inkl. nicht
+    // erkennbarer Airline ausgeblendet). Nutzt dieselbe Airline-Liste in
+    // beiden Modi, keine zweite Liste.
+    bool airlineFilterShowOnlyMode();
+    void setAirlineFilterShowOnlyMode(bool showOnly);
+
     // Sprache der Benutzeroberflaeche: 0=EN,1=DE,2=FR,3=TR,4=ES,5=IT.
     uint8_t language();
     void setLanguage(uint8_t lang);
@@ -244,6 +253,13 @@ namespace SettingsStore {
     // haengt NICHT an diesem Schalter.
     bool eventCornerOverlayEnabled();
     void setEventCornerOverlayEnabled(bool on);
+
+    // Steuert den Weltkarten-Punktraster-Hintergrund unter dem Radarkreis
+    // (radar_screen.cpp::drawWorldMap()), AN per Default (bisher
+    // unbedingt gezeichnet - fuer bestehende Nutzer aendert sich optisch
+    // nichts, bis jemand aktiv abschaltet).
+    bool worldMapBackgroundEnabled();
+    void setWorldMapBackgroundEnabled(bool on);
 
     // Optionale MQTT-Schnittstelle (siehe mqtt_client.h/mqtt_screen.cpp) -
     // AUS per Default. mqttBroker() liefert "host:port" als ein Feld (so

@@ -9,59 +9,107 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 8;
 
     const char* const CHANGELOG_EN =
-        "- Fix: the GPS position feature introduced in the previous "
-        "release didn't actually receive data on this board - the "
-        "built-in GPS connector is wired to GPIO1 (shared with the "
-        "USB-serial console), not the previously assumed pins. GPS is "
-        "now read correctly";
+        "- New: the radar display's world map background can now be "
+        "switched on/off (Radar Display menu), on by default as "
+        "before\n"
+        "- New: the airline filter can now also work as a whitelist "
+        "(\"Show only\") in addition to the existing \"Hide\" mode, both "
+        "sharing the same airline list - the mode switch (with "
+        "explanation) is available on the device and on the web Lists "
+        "page, kept in sync both ways\n"
+        "- New: adding an airline to the filter now accepts both IATA "
+        "and ICAO codes, converted to ICAO internally";
 
     const char* const CHANGELOG_DE =
-        "- Fix: Die im letzten Release eingefuehrte GPS-Positions-"
-        "Anzeige empfing auf diesem Board tatsaechlich gar keine Daten "
-        "- der eingebaute GPS-Steckverbinder ist mit GPIO1 verdrahtet "
-        "(geteilt mit der USB-Serial-Konsole), nicht mit den vorher "
-        "angenommenen Pins. GPS wird jetzt korrekt ausgelesen";
+        "- Neu: Der Weltkarten-Hintergrund im Radar-Darstellung-Screen "
+        "laesst sich jetzt ein-/ausschalten (Default: an wie bisher)\n"
+        "- Neu: Der Airline-Filter kann jetzt zusaetzlich als \"Nur "
+        "anzeigen\" (Whitelist) genutzt werden, beide Modi teilen sich "
+        "dieselbe Liste - der Umschalter samt Erklaerung ist am Geraet "
+        "UND auf der Web-Listenseite verfuegbar, beidseitig synchron\n"
+        "- Neu: Beim Hinzufuegen einer Airline zum Filter koennen jetzt "
+        "sowohl IATA- als auch ICAO-Codes eingegeben werden (intern "
+        "automatisch auf ICAO umgewandelt)";
 
     const char* const CHANGELOG_FR =
-        "- Correction : la fonction de position GPS introduite dans la "
-        "version précédente ne recevait en réalité aucune donnée sur "
-        "cette carte - le connecteur GPS intégré est câblé sur GPIO1 "
-        "(partagé avec la console USB-série), pas sur les broches "
-        "supposées auparavant. Le GPS est désormais lu correctement";
+        "- Nouveau : le fond de carte du monde sur l'écran radar peut "
+        "désormais être activé/désactivé (activé par défaut, comme "
+        "avant)\n"
+        "- Nouveau : le filtre compagnies peut désormais aussi "
+        "fonctionner comme liste blanche (« Afficher seulement ») en "
+        "plus du mode « Masquer » existant, les deux modes partageant "
+        "la même liste - le sélecteur (avec explication) est "
+        "disponible sur l'appareil ET sur la page web Listes, "
+        "synchronisé dans les deux sens\n"
+        "- Nouveau : l'ajout d'une compagnie au filtre accepte "
+        "désormais les codes IATA et OACI, convertis en OACI en "
+        "interne";
 
     const char* const CHANGELOG_TR =
-        "- Düzeltme: Önceki sürümde eklenen GPS konum özelliği bu "
-        "kartta aslında hiç veri almıyordu - yerleşik GPS konektörü "
-        "GPIO1'e bağlı (USB-seri konsolla paylaşılıyor), daha önce "
-        "varsayılan pinlere değil. GPS artık doğru şekilde okunuyor";
+        "- Yeni: Radar ekranındaki dünya haritası arka planı artık "
+        "açılıp kapatılabiliyor (varsayılan: önceki gibi açık)\n"
+        "- Yeni: Havayolu filtresi artık mevcut \"Gizle\" moduna ek "
+        "olarak beyaz liste olarak da (\"Sadece göster\") "
+        "kullanılabiliyor, her iki mod aynı listeyi paylaşıyor - mod "
+        "anahtarı (açıklamasıyla birlikte) hem cihazda hem de web "
+        "Listeler sayfasında mevcut ve her iki yönde senkronize\n"
+        "- Yeni: Filtreye havayolu eklerken artık hem IATA hem de ICAO "
+        "kodları girilebiliyor, dahili olarak otomatik ICAO'ya "
+        "dönüştürülüyor";
 
     const char* const CHANGELOG_ES =
-        "- Corrección: la función de posición GPS introducida en la "
-        "versión anterior en realidad no recibía datos en esta placa "
-        "- el conector GPS integrado está conectado al GPIO1 "
-        "(compartido con la consola USB-serie), no a los pines "
-        "asumidos anteriormente. El GPS ahora se lee correctamente";
+        "- Novedad: el fondo de mapa mundial de la pantalla del radar "
+        "ahora se puede activar/desactivar (activado por defecto, "
+        "como antes)\n"
+        "- Novedad: el filtro de aerolíneas ahora también puede "
+        "funcionar como lista blanca (\"Mostrar solo\") además del "
+        "modo \"Ocultar\" existente, ambos modos comparten la misma "
+        "lista - el selector de modo (con explicación) está "
+        "disponible en el dispositivo Y en la página web de listas, "
+        "sincronizado en ambos sentidos\n"
+        "- Novedad: al añadir una aerolínea al filtro ahora se aceptan "
+        "tanto códigos IATA como OACI, convertidos internamente a "
+        "OACI";
 
     const char* const CHANGELOG_IT =
-        "- Correzione: la funzione di posizione GPS introdotta nella "
-        "versione precedente in realtà non riceveva dati su questa "
-        "scheda - il connettore GPS integrato è collegato al GPIO1 "
-        "(condiviso con la console USB-seriale), non ai pin ipotizzati "
-        "in precedenza. Il GPS ora viene letto correttamente";
+        "- Novità: lo sfondo a mappa del mondo nella schermata radar "
+        "ora può essere attivato/disattivato (attivo per impostazione "
+        "predefinita, come prima)\n"
+        "- Novità: il filtro compagnie ora può funzionare anche come "
+        "lista bianca (\"Mostra solo\") oltre alla modalità \"Nascondi\" "
+        "esistente, entrambe le modalità condividono lo stesso elenco "
+        "- il selettore di modalità (con spiegazione) è disponibile "
+        "sul dispositivo E sulla pagina web Elenchi, sincronizzato in "
+        "entrambe le direzioni\n"
+        "- Novità: aggiungendo una compagnia al filtro ora si "
+        "accettano sia codici IATA che ICAO, convertiti internamente "
+        "in ICAO";
 
     const char* const CHANGELOG_PT =
-        "- Correção: o recurso de posição GPS introduzido na versão "
-        "anterior na verdade não recebia dados nesta placa - o "
-        "conector GPS embutido está ligado ao GPIO1 (compartilhado "
-        "com o console USB-serial), não aos pinos presumidos "
-        "anteriormente. O GPS agora é lido corretamente";
+        "- Novo: o fundo de mapa-múndi na tela do radar agora pode "
+        "ser ativado/desativado (ativado por padrão, como antes)\n"
+        "- Novo: o filtro de companhias aéreas agora também pode "
+        "funcionar como lista branca (\"Mostrar apenas\") além do modo "
+        "\"Ocultar\" existente, ambos os modos compartilham a mesma "
+        "lista - o alternador de modo (com explicação) está "
+        "disponível no dispositivo E na página web de Listas, "
+        "sincronizado nos dois sentidos\n"
+        "- Novo: ao adicionar uma companhia aérea ao filtro agora são "
+        "aceitos códigos IATA e ICAO, convertidos internamente para "
+        "ICAO";
 
     const char* const CHANGELOG_NL =
-        "- Fix: de in de vorige release geïntroduceerde GPS-"
-        "positiefunctie ontving op dit board in werkelijkheid helemaal "
-        "geen data - de ingebouwde GPS-connector is bedraad op GPIO1 "
-        "(gedeeld met de USB-seriële console), niet op de eerder "
-        "aangenomen pinnen. GPS wordt nu correct uitgelezen";
+        "- Nieuw: de wereldkaartachtergrond op het radarscherm kan nu "
+        "in-/uitgeschakeld worden (standaard aan, zoals voorheen)\n"
+        "- Nieuw: de luchtvaartmaatschappijenfilter kan nu ook als "
+        "whitelist (\"Alleen tonen\") werken naast de bestaande "
+        "\"Verbergen\"-modus, beide modi delen dezelfde lijst - de "
+        "modusschakelaar (met uitleg) is beschikbaar op het apparaat "
+        "EN op de webpagina Lijsten, in beide richtingen "
+        "gesynchroniseerd\n"
+        "- Nieuw: bij het toevoegen van een maatschappij aan de "
+        "filter worden nu zowel IATA- als ICAO-codes geaccepteerd, "
+        "intern automatisch omgezet naar ICAO";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT, CHANGELOG_PT, CHANGELOG_NL

@@ -94,10 +94,10 @@ namespace {
     }
 
     // Zeilenhoehe aus dem verfuegbaren Platz errechnet (gleiches Muster wie
-    // SYSTEM_ROW_H in menu_screen.cpp) statt fest verdrahtet - 8 Zeilen
-    // ("Farben"-Button + 6 Kaestchen + Zurueck) muessen mit ca. 10px Reserve
+    // SYSTEM_ROW_H in menu_screen.cpp) statt fest verdrahtet - 9 Zeilen
+    // ("Farben"-Button + 7 Kaestchen + Zurueck) muessen mit ca. 10px Reserve
     // zum unteren Rand aufs Display passen.
-    constexpr uint8_t ROW_COUNT = 8;
+    constexpr uint8_t ROW_COUNT = 9;
     constexpr int16_t ROW_GAP = 6;
     constexpr int16_t START_Y = 40;
     constexpr int16_t END_Y = Config::SCREEN_HEIGHT - 10;
@@ -209,7 +209,11 @@ void run(TFT_eSPI& tft) {
         drawCheckboxRow(tft, eventCornerRow, I18n::t(StringId::MENU_EVENT_CORNER_OVERLAY), SettingsStore::eventCornerOverlayEnabled());
         drawRowInfoButton(tft, eventCornerRow);
 
-        Rect backBtn = rowRect(7);
+        Rect worldMapRow = rowRect(7);
+        drawCheckboxRow(tft, worldMapRow, I18n::t(StringId::RADAR_THEME_WORLD_MAP), SettingsStore::worldMapBackgroundEnabled());
+        drawRowInfoButton(tft, worldMapRow);
+
+        Rect backBtn = rowRect(8);
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
         TouchInput::Point tap;
@@ -266,6 +270,12 @@ void run(TFT_eSPI& tft) {
                                         I18n::t(StringId::OK));
             handled = true;
         }
+        if (!handled && rowInfoBtnRect(worldMapRow).contains(tap.x, tap.y)) {
+            MenuScreen::showInfoScreen(tft, I18n::t(StringId::RADAR_THEME_WORLD_MAP_INFO_TITLE),
+                                        I18n::t(StringId::RADAR_THEME_WORLD_MAP_INFO_BODY), UiTheme::accentColor(tft),
+                                        I18n::t(StringId::OK));
+            handled = true;
+        }
         if (!handled && crtRow.contains(tap.x, tap.y)) {
             SettingsStore::setCrtPhosphorEnabled(!SettingsStore::crtPhosphorEnabled());
             handled = true;
@@ -288,6 +298,10 @@ void run(TFT_eSPI& tft) {
         }
         if (!handled && eventCornerRow.contains(tap.x, tap.y)) {
             SettingsStore::setEventCornerOverlayEnabled(!SettingsStore::eventCornerOverlayEnabled());
+            handled = true;
+        }
+        if (!handled && worldMapRow.contains(tap.x, tap.y)) {
+            SettingsStore::setWorldMapBackgroundEnabled(!SettingsStore::worldMapBackgroundEnabled());
             handled = true;
         }
         if (!handled && backBtn.contains(tap.x, tap.y)) {

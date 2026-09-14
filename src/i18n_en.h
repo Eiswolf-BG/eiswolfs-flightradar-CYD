@@ -82,7 +82,7 @@ static const char* const I18N_EN[] = {
     "Aircraft from these airlines are",
     "hidden from the radar.",
     "Add airline",
-    "Add airline (ICAO code)",
+    "Add airline (IATA/ICAO)",
 
     "Watched aircraft",
     "Get notified (blue LED) when any",
@@ -516,6 +516,16 @@ static const char* const I18N_EN[] = {
     "Alert sound is muted in this browser - click to turn back on",
     "Calm",
     "Variable",
+
+    "World Map",
+    "About World Map",
+    "Shows a faint, dotted world map underneath the radar circle for geographic orientation. Turn it off if you find the background distracting - the radar itself works exactly the same either way.",
+
+    "Hide",
+    "Show only",
+    "About the filter mode",
+    "\"Hide\" keeps the listed airlines off the radar, showing everyone else. \"Show only\" flips it around: only the listed airlines are shown, everything else (including aircraft with no recognizable airline) is hidden. Both modes share the same list below.",
+    "Only aircraft from these airlines are shown on the radar - everything else, including unrecognized airlines, is hidden.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

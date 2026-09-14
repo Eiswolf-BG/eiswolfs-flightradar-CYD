@@ -82,7 +82,7 @@ static const char* const I18N_ES[] = {
     "Los aviones de estas aerolíneas",
     "se ocultan del radar.",
     "Añadir aerolínea",
-    "Añadir aerolínea (código OACI)",
+    "Añadir aerolínea (IATA/OACI)",
 
     "Aviones vigilados",
     "El LED azul parpadea cuando",
@@ -515,6 +515,16 @@ static const char* const I18N_ES[] = {
     "El sonido de alerta está silenciado en este navegador - haz clic para reactivarlo",
     "Calma",
     "Variable",
+
+    "Mapa mundial",
+    "Acerca del mapa mundial",
+    "Muestra un mapa mundial tenue y punteado debajo del círculo del radar para orientación geográfica. Desactívalo si el fondo te resulta distractor - el radar en sí funciona exactamente igual en ambos casos.",
+
+    "Ocultar",
+    "Mostrar solo",
+    "Acerca del modo de filtro",
+    "\"Ocultar\" esconde las aerolíneas de la lista, todas las demás permanecen visibles. \"Mostrar solo\" invierte esto: solo se muestran las aerolíneas de la lista, todo lo demás (incluidos los aviones sin aerolínea reconocible) se oculta. Ambos modos usan la misma lista de abajo.",
+    "Solo se muestran en el radar los aviones de estas aerolíneas - todo lo demás, incluidas las aerolíneas no reconocidas, se oculta.",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

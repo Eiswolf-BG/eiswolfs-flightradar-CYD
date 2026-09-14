@@ -47,6 +47,7 @@ namespace {
     bool hideGroundVehiclesOn = true;
     bool onlyHelicoptersOn = false;
     bool onlyLowAltitudeOn = false;
+    bool airlineFilterShowOnlyOn = false;
     uint8_t languageIdx = 0;
     uint8_t unitsModeVal = 0;
     // AN per Default (IATA, z.B. "FRA") - bei Aviation-Enthusiasten
@@ -77,6 +78,12 @@ namespace {
     // soll wie die uebrigen Radar-Darstellung-Extras direkt nutzbar sein,
     // ohne dass man sie erst suchen/aktivieren muss.
     bool eventCornerOverlayOn = true;
+    // AN per Default - der Weltkarten-Punktraster-Hintergrund unter dem
+    // Radarkreis (radar_screen.cpp::drawWorldMap()) war bisher unbedingt
+    // gezeichnet, bleibt fuer bestehende Nutzer also optisch unveraendert,
+    // bis jemand aktiv abschaltet (Alex' Meldung: manche Nutzer finden den
+    // Hintergrund ablenkend).
+    bool worldMapBackgroundOn = true;
     bool mqttOn = false;
     // "host:port" als ein Feld, siehe Kommentar in settings_store.h.
     char mqttBrokerBuf[64] = {0};
@@ -157,6 +164,8 @@ namespace {
             onlyHelicoptersOn = (value.toInt() != 0);
         } else if (key == "only_low_altitude") {
             onlyLowAltitudeOn = (value.toInt() != 0);
+        } else if (key == "airline_filter_show_only") {
+            airlineFilterShowOnlyOn = (value.toInt() != 0);
         } else if (key == "language") {
             int v = value.toInt();
             if (v >= 0 && v <= 7) languageIdx = (uint8_t)v;
@@ -184,6 +193,8 @@ namespace {
             updateLedSignalOn = (value.toInt() != 0);
         } else if (key == "event_corner_overlay") {
             eventCornerOverlayOn = (value.toInt() != 0);
+        } else if (key == "world_map_background") {
+            worldMapBackgroundOn = (value.toInt() != 0);
         } else if (key == "mqtt_enabled") {
             mqttOn = (value.toInt() != 0);
         } else if (key == "mqtt_broker") {
@@ -267,6 +278,7 @@ void save() {
     f.printf("hide_ground_vehicles=%d\n", hideGroundVehiclesOn ? 1 : 0);
     f.printf("only_helicopters=%d\n", onlyHelicoptersOn ? 1 : 0);
     f.printf("only_low_altitude=%d\n", onlyLowAltitudeOn ? 1 : 0);
+    f.printf("airline_filter_show_only=%d\n", airlineFilterShowOnlyOn ? 1 : 0);
     f.printf("language=%d\n", languageIdx);
     f.printf("units_mode=%d\n", unitsModeVal);
     f.printf("airport_code_iata=%d\n", iataAirportCodesOn ? 1 : 0);
@@ -279,6 +291,7 @@ void save() {
     f.printf("rain_effect=%d\n", rainEffectOn ? 1 : 0);
     f.printf("update_led_signal=%d\n", updateLedSignalOn ? 1 : 0);
     f.printf("event_corner_overlay=%d\n", eventCornerOverlayOn ? 1 : 0);
+    f.printf("world_map_background=%d\n", worldMapBackgroundOn ? 1 : 0);
     f.printf("mqtt_enabled=%d\n", mqttOn ? 1 : 0);
     f.printf("mqtt_broker=%s\n", mqttBrokerBuf);
     f.printf("mqtt_user=%s\n", mqttUserBuf);
@@ -480,6 +493,13 @@ void setOnlyLowAltitude(bool on) {
     save();
 }
 
+bool airlineFilterShowOnlyMode() { return airlineFilterShowOnlyOn; }
+
+void setAirlineFilterShowOnlyMode(bool showOnly) {
+    airlineFilterShowOnlyOn = showOnly;
+    save();
+}
+
 uint8_t language() { return languageIdx; }
 
 void setLanguage(uint8_t lang) {
@@ -567,6 +587,13 @@ bool eventCornerOverlayEnabled() { return eventCornerOverlayOn; }
 
 void setEventCornerOverlayEnabled(bool on) {
     eventCornerOverlayOn = on;
+    save();
+}
+
+bool worldMapBackgroundEnabled() { return worldMapBackgroundOn; }
+
+void setWorldMapBackgroundEnabled(bool on) {
+    worldMapBackgroundOn = on;
     save();
 }
 

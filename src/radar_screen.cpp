@@ -3735,7 +3735,7 @@ void render(TFT_eSPI& tft, int16_t top) {
     drawNearestAirportCorner(tft, top);
     drawNearestAircraftCorner(tft, top);
 
-    drawWorldMap(tft, L);
+    if (SettingsStore::worldMapBackgroundEnabled()) drawWorldMap(tft, L);
     drawStaticBackground(tft, L, rangeKm);
 
     if (SettingsStore::classicRadarEnabled()) {
