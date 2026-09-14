@@ -650,3 +650,13 @@ allein durch Codelektüre beweisen lassen). Bei reinen Layout-/Text-/Farb-/
 Struktur-Änderungen genügt Codelektüre + einmaliger Build+Flash - kein
 Serial-Logging, kein zweiter Flash-Durchgang, sofern nicht der Nutzer
 ausdrücklich eine Live-Verifikation verlangt.
+
+## Eigenständige Seriell-Diagnose
+
+Wenn zur Fehlerdiagnose ein Mitschnitt des seriellen Monitors nötig ist,
+führt Karl das eigenständig mit eigenen Testinstrumenten durch: den
+seriellen Monitor selbst starten (inkl. Zeitstempel-Filter, falls nötig),
+eine sinnvolle Zeit lang mitlesen, die Ausgabe selbst auswerten, die
+Ursache diagnostizieren und - falls sich ein Fix ergibt - diesen auch
+gleich umsetzen. Alex soll dafür nicht selbst den Monitor beobachten oder
+Log-Zeilen von Hand kopieren müssen.
