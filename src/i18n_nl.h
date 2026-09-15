@@ -559,6 +559,21 @@ static const char* const I18N_NL[] = {
     "Hoogste: ",
     "Meest voorkomend type: ",
     "nog geen gegevens",
+
+    "Vliegfase: ",
+    "Data: ",
+    "Kijk: ",
+
+    "Type-bewaking",
+    "Type-bewaking",
+    "De blauwe LED knippert wanneer een",
+    "vliegtuig overeenkomt met een van deze types.",
+    "Vliegtuigtype toevoegen",
+    "Vliegtuigtype toevoegen",
+    "Nog geen vliegtuigtypes gevolgd.",
+    "Hoe type-bewaking werkt",
+    "Voer een vliegtuigtypecode in (bijv. A380, B747, C17) - dezelfde code die als \"Type:\" in het detailvenster staat, geen maatschappijcode. Er kunnen tot 5 types tegelijk worden gevolgd.",
+    "Zodra een vliegtuig van een gevolgd type ergens op de radar verschijnt, krijgt het een cyaan ring en knippert de LED blauw, precies zoals bij de roepnaam-/squawk-bewaking - handig om bijv. een zeldzaam groot toestel of militair transportvliegtuig te spotten.",
 };
 
 static_assert(sizeof(I18N_NL) / sizeof(I18N_NL[0]) == (size_t)StringId::COUNT,

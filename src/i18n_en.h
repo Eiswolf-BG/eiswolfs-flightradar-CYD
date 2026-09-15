@@ -558,6 +558,21 @@ static const char* const I18N_EN[] = {
     "Highest: ",
     "Most common type: ",
     "no data yet",
+
+    "Phase: ",
+    "Data: ",
+    "Look: ",
+
+    "Type Watch",
+    "Type Watch",
+    "The blue LED blinks when any",
+    "aircraft matches one of these types.",
+    "Add aircraft type",
+    "Add aircraft type",
+    "No aircraft types watched yet.",
+    "How type watch works",
+    "Enter an aircraft type code (e.g. A380, B747, C17) - the same code shown as \"Type:\" in the detail panel, not an airline code. Up to 5 types can be tracked at once.",
+    "As soon as an aircraft of a watched type appears anywhere on the radar, it gets a cyan ring and the LED blinks blue, exactly like the callsign/squawk watchlist - handy for spotting any aircraft of a specific type, e.g. a rare heavy or a military transport.",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

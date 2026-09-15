@@ -5,6 +5,8 @@
 #include "airline_filter.h"
 #include "aircraft_watchlist.h"
 #include "squawk_watchlist.h"
+#include "type_watchlist.h"
+#include "watchlist_alert.h"
 #include "aircraft_table.h"
 #include "settings_store.h"
 #include "location_manager.h"
@@ -2473,12 +2475,13 @@ namespace {
 
             bool isHeavy = isHeavyCategoryWeb(a.category);
             bool isEmergency = emergencyOn && isEmergencySquawkWeb(a.squawk);
-            // Deckt jetzt beide Watchlist-Mechanismen ab, genau wie am
-            // Geraete-Display (radar_screen.cpp) - vorher fehlte hier die
-            // Squawk-Wachliste komplett, ein Flugzeug, das nur ueber seinen
-            // Squawk-Code (nicht das Rufzeichen) beobachtet wird, waere im
-            // WebUI faelschlich als "nicht beobachtet" erschienen.
-            bool isWatched = AircraftWatchlist::isWatched(a.callsign) || SquawkWatchlist::isWatched(a.squawk);
+            // Deckt jetzt alle drei Watchlist-Mechanismen ab (Rufzeichen/
+            // Squawk/Flugzeugtyp, siehe WatchlistAlert::isHit()), genau wie
+            // am Geraete-Display (radar_screen.cpp) - vorher fehlte hier
+            // die Squawk-Wachliste komplett, ein Flugzeug, das nur ueber
+            // seinen Squawk-Code (nicht das Rufzeichen) beobachtet wird,
+            // waere im WebUI faelschlich als "nicht beobachtet" erschienen.
+            bool isWatched = WatchlistAlert::isHit(a);
             // "notable" (oranger Ring) ist fuer Militaer-/Behoerdenfluege
             // reserviert - Heavy-Flugzeuge bekommen stattdessen die eigene
             // Markerform (siehe "heavy" oben). Erkennung ueber Squawk-Code-

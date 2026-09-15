@@ -557,6 +557,21 @@ static const char* const I18N_DE[] = {
     "Höchstes: ",
     "Häufigster Typ: ",
     "noch keine Daten",
+
+    "Flugphase: ",
+    "Daten: ",
+    "Blick: ",
+
+    "Typ-Wachliste",
+    "Typ-Wachliste",
+    "Die blaue LED blinkt, sobald ein",
+    "Flugzeug einem dieser Typen entspricht.",
+    "Flugzeugtyp hinzufügen",
+    "Flugzeugtyp hinzufügen",
+    "Noch keine Flugzeugtypen beobachtet.",
+    "Wie die Typ-Wachliste funktioniert",
+    "Trage einen Flugzeugtyp-Code ein (z.B. A380, B747, C17) - denselben Code, der im Steckbrief als \"Typ:\" angezeigt wird, keinen Airline-Code. Bis zu 5 Typen lassen sich gleichzeitig beobachten.",
+    "Sobald ein Flugzeug eines beobachteten Typs irgendwo im Radar auftaucht, bekommt es einen cyanfarbenen Ring und die LED blinkt blau - genau wie bei der Rufzeichen-/Squawk-Wachliste, praktisch um z.B. seltene Großraumflugzeuge oder Militärtransporter zu erkennen.",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

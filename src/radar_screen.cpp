@@ -18,6 +18,8 @@
 #include "airline_filter.h"
 #include "aircraft_watchlist.h"
 #include "squawk_watchlist.h"
+#include "type_watchlist.h"
+#include "watchlist_alert.h"
 #include "aircraft_watchlist_screen.h"
 #include "squawk_watchlist_screen.h"
 #include "airline_filter_screen.h"
@@ -1327,6 +1329,111 @@ namespace {
         }
     }
 
+    // Flugphasen-Erkennung fuers Detail-Panel (Alex' Wunsch) - ausschliesslich
+    // aus bereits vorhandenen Werten abgeleitet, KEINE neue Datenquelle:
+    // computeVertTrend() (s.o., dieselbe +/-300ft/min-Schwelle wie die
+    // Radar-Trendpfeile), a.altBaroFt, a.firstSeenMs (Session-Erstsichtung,
+    // siehe aircraft.h) und a.approachLikely (bereits bestehende Best-
+    // Effort-Anflug-Erkennung, siehe aircraft_table.cpp::postFetchUpdate()).
+    // Kein Bezug zur tatsaechlichen Flughafenhoehe verfuegbar (nur
+    // barometrische Hoehe uber Meeresspiegel) - PHASE_LOW_ALT_FT ist daher
+    // bewusst grosszuegig gewaehlt (deutlich ueber typischen Flugplatz-
+    // hoehen in Mitteleuropa), keine Praezisionsangabe, nur ein grober
+    // Anhaltspunkt fuer "in Bodennaehe".
+    enum class FlightPhase : uint8_t {
+        None = 0, Takeoff, Climb, Cruise, Descent, Approach, LowPass, Landing
+    };
+
+    FlightPhase computeFlightPhase(const Aircraft& a) {
+        // Keine verwertbaren Daten (z.B. ganz frisch in die Tabelle
+        // aufgenommen, noch kein einziger vollstaendiger ADS-B-Datensatz) -
+        // lieber gar keine Phase zeigen als eine geratene.
+        if (a.altBaroFt <= 0 && a.groundSpeedKt <= 0) return FlightPhase::None;
+
+        int8_t trend = computeVertTrend(a.vertRateFtMin);
+        bool lowAlt = a.altBaroFt < Config::PHASE_LOW_ALT_FT;
+        bool recentlyAppeared = a.firstSeenMs > 0 &&
+                                 (millis() - a.firstSeenMs) < Config::PHASE_TAKEOFF_RECENT_MS;
+
+        // Anflug-Faelle zuerst (a.approachLikely deckt bereits Sinkflug,
+        // plausible Geschwindigkeit/Hoehe und sinkende Flughafendistanz ab,
+        // siehe aircraft_table.cpp) - LANDING nur die verfeinerte,
+        // bodennahe Untermenge davon.
+        if (a.approachLikely) {
+            return lowAlt ? FlightPhase::Landing : FlightPhase::Approach;
+        }
+        if (lowAlt && trend > 0 && recentlyAppeared) return FlightPhase::Takeoff;
+        if (trend > 0) return FlightPhase::Climb;
+        if (trend < 0) return FlightPhase::Descent;
+        // Nahezu horizontal (trend == 0): bodennah ohne erkannten Anflug
+        // ist am ehesten ein Tiefflug/Ueberflug (Militaer, Sichtflug-
+        // Platzrunde etc.), alles andere regulaerer Reiseflug.
+        return lowAlt ? FlightPhase::LowPass : FlightPhase::Cruise;
+    }
+
+    // Die Phasennamen selbst bleiben bewusst in ALLEN Sprachen identisch
+    // englisches Luftfahrt-Fachvokabular (Alex' Vorgabe) - gleiches Prinzip
+    // wie "min"/"s" bei der Ueberflug-ETA weiter unten in dieser Datei:
+    // feste literale ASCII-Woerter statt eigener StringIds pro Sprache.
+    // Nur das Label davor (StringId::DETAIL_PHASE_PREFIX) wird uebersetzt.
+    const char* flightPhaseLabel(FlightPhase phase) {
+        switch (phase) {
+            case FlightPhase::Takeoff:  return "TAKEOFF";
+            case FlightPhase::Climb:    return "CLIMB";
+            case FlightPhase::Cruise:   return "CRUISE";
+            case FlightPhase::Descent:  return "DESCENT";
+            case FlightPhase::Approach: return "APPROACH";
+            case FlightPhase::LowPass:  return "LOW PASS";
+            case FlightPhase::Landing:  return "LANDING";
+            case FlightPhase::None:
+            default:                    return "";
+        }
+    }
+
+    // ADS-B-Datenqualitaet fuers Detail-Panel (Alex' Wunsch) - prueft, wie
+    // viele der fuenf fachlich wichtigsten Felder fuer das aktuell
+    // ausgewaehlte Flugzeug im JUENGSTEN Abrufzyklus tatsaechlich befuellt
+    // waren: Position (lat/lon), Geschwindigkeit, Kurs, Flughoehe,
+    // Rufzeichen. Da adsb_client.cpp jeden Zyklus mit "a = Aircraft{}"
+    // zurueck-/neu befuellt (siehe dortiger Kommentar zu prevDistanceKm
+    // etc.), spiegeln Default-Werte (0 bzw. leerer String) zuverlaessig
+    // "dieses Feld war in der aktuellsten ADS-B-Nachricht nicht enthalten"
+    // wider - dasselbe "a.feld[0]"/"a.feld > 0"-Praesenzmuster, das im
+    // restlichen Panel bereits ueberall genutzt wird (Squawk, Sitzplaetze,
+    // Rufzeichen usw.), keine neue Heuristik.
+    enum class DataQuality : uint8_t { None = 0, Partial, Good };
+
+    DataQuality computeDataQuality(const Aircraft& a) {
+        uint8_t present = 0;
+        if (a.lat != 0.0f || a.lon != 0.0f) present++;
+        if (a.groundSpeedKt > 0.0f) present++;
+        if (a.headingDeg != 0.0f) present++;
+        if (a.altBaroFt != 0) present++;
+        if (a.callsign[0]) present++;
+
+        // Schwellen (Alex' Vorgabe, Feinjustierung Karl ueberlassen): GOOD
+        // ab 4/5 Feldern ("alle oder fast alle"), PARTIAL ab 2/5 - bei
+        // hoechstens 1 von 5 Feldern liefert das Flugzeug ohnehin kaum
+        // nutzbare Daten, dann lieber gar keine Einordnung zeigen statt
+        // eine wenig aussagekraeftige "PARTIAL"-Anzeige.
+        if (present >= 4) return DataQuality::Good;
+        if (present >= 2) return DataQuality::Partial;
+        return DataQuality::None;
+    }
+
+    // Gleiches Prinzip wie flightPhaseLabel() oben - "GOOD"/"PARTIAL"
+    // bleiben als kurzes, feststehendes Fachvokabular in allen Sprachen
+    // unuebersetzt, nur das Label davor (DETAIL_DATA_QUALITY_PREFIX) wird
+    // uebersetzt.
+    const char* dataQualityLabel(DataQuality q) {
+        switch (q) {
+            case DataQuality::Good:    return "GOOD";
+            case DataQuality::Partial: return "PARTIAL";
+            case DataQuality::None:
+            default:                   return "";
+        }
+    }
+
     // Position/Verankerung des Rufzeichen-Labels neben einem Marker -
     // frueher IMMER 8px senkrecht ueber dem Marker-Zentrum (BC_DATUM,
     // feste Position unabhaengig von der Flugrichtung). Bei Flugzeugen,
@@ -2348,7 +2455,24 @@ namespace {
         } else {
             snprintf(buf, sizeof(buf), "%s%.0fft", I18n::t(StringId::DETAIL_ALT), (float)a.altBaroFt);
         }
-        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.alt, String(buf), forceFull);
+        String altLine = buf;
+        // ADS-B-Datenqualitaet (Alex' Wunsch, computeDataQuality() oben)
+        // haengt aus demselben Platzgrund wie die Flugphase an eine
+        // bestehende Zeile an - hier an die Hoehen-Zeile statt an die
+        // Distanz-/Peilungs-Mega-Zeile weiter unten: die Hoehe ist selbst
+        // eines der fuenf geprueften Felder, UND die Hoehen-Zeile ist die
+        // kuerzeste bestehende Zeile im Panel, haelt also am ehesten die
+        // Chance offen, ohne Scrollen auszukommen (die Distanz-Zeile ist
+        // dagegen ohnehin schon die laengste Zeile im Panel). Nur
+        // angehaengt, wenn ueberhaupt eine Einordnung sinnvoll ist
+        // (DataQuality::None sonst, siehe dortiger Kommentar).
+        DataQuality quality = computeDataQuality(a);
+        if (quality != DataQuality::None) {
+            altLine += "  ";
+            altLine += I18n::t(StringId::DETAIL_DATA_QUALITY_PREFIX);
+            altLine += dataQualityLabel(quality);
+        }
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.alt, altLine, forceFull);
         y += LINE_H;
 
         if (metricPanel) {
@@ -2360,6 +2484,22 @@ namespace {
         updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.speed, String(buf), forceFull);
         y += LINE_H;
 
+        String squawkLine = String(I18n::t(StringId::DETAIL_SQUAWK)) + (a.squawk[0] ? a.squawk : I18n::t(StringId::DETAIL_UNKNOWN));
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.squawk, squawkLine, forceFull);
+        y += LINE_H;
+
+        String seatsLine = a.estSeats > 0
+            ? String(I18n::t(StringId::DETAIL_SEATS_EST)) + a.estSeats
+            : String(I18n::t(StringId::DETAIL_SEATS_UNKNOWN));
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.seats, seatsLine, forceFull);
+        y += LINE_H;
+
+        // Ab hier die beiden Zeilen, die regelmaessig per Marquee scrollen
+        // (Alex' Wunsch: statische Zeilen oben zusammen, scrollende Zeilen
+        // unten zusammen, direkt vor der letzten Panel-Zeile) - bisher
+        // standen sie mitten im Panel zwischen den kurzen, meist
+        // unveraenderten Zeilen. Reine Reihenfolge-Aenderung, keine neuen
+        // Inhalte.
         String climbLine;
         if (a.vertRateFtMin > 100) {
             snprintf(buf, sizeof(buf), "%s+%dft/min", I18n::t(StringId::DETAIL_CLIMB), a.vertRateFtMin);
@@ -2369,6 +2509,20 @@ namespace {
             climbLine = buf;
         } else {
             climbLine = I18n::t(StringId::DETAIL_LEVEL);
+        }
+        // Flugphase (Alex' Wunsch, computeFlightPhase() oben) haengt aus
+        // demselben Platzgrund wie Peilung/Trend/CPA/First-Seen weiter
+        // unten an eine bestehende Zeile an, statt eine eigene, zwoelfte
+        // Zeile zu bekommen - hier an die Steig-/Sinkflug-Zeile, da
+        // inhaltlich am naechsten verwandt (beide leiten sich aus
+        // derselben Vertikalrate ab). Nur angehaengt, wenn ueberhaupt eine
+        // Phase bestimmbar ist (FlightPhase::None sonst, siehe dortiger
+        // Kommentar) - keine geratene Angabe bei zu duennen Daten.
+        FlightPhase phase = computeFlightPhase(a);
+        if (phase != FlightPhase::None) {
+            climbLine += "  ";
+            climbLine += I18n::t(StringId::DETAIL_PHASE_PREFIX);
+            climbLine += flightPhaseLabel(phase);
         }
         updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.climb, climbLine, forceFull);
         y += LINE_H;
@@ -2570,25 +2724,28 @@ namespace {
                      Units::kmToNm(a.distanceKm), Units::kmToMi(a.distanceKm));
         }
 
+        // Peilung (Himmelsrichtung) und Hoehenwinkel zu einer kompakten
+        // "LOOK: NE 21°"-Angabe zusammengefasst (Alex' Wunsch) - beide
+        // Werte standen vorher bereits in DIESER selben Zeile (nur
+        // umstaendlicher als "Bearing: 45° NE - 21° up" formatiert), es
+        // wird also NICHTS neu berechnet und KEINE zusaetzliche Zeile
+        // verbraucht. Bewusst OHNE Unicode-Pfeil (Font deckt nur
+        // U+0020-U+015F ab, siehe CLAUDE.md) und OHNE das rohe
+        // Peilungs-Gradmass (a.bearingDeg) - die Himmelsrichtung allein
+        // reicht zum Hinschauen, die genaue Gradzahl war ohnehin nur eine
+        // Verfeinerung derselben Info wie compassLabel().
+        char lookBuf[24];
+        snprintf(lookBuf, sizeof(lookBuf), "%s%s %.0f°",
+                 I18n::t(StringId::DETAIL_LOOK_PREFIX), compassLabel(a.bearingDeg), elevDeg);
+
         char distBuf[560]; // vergroessert (vorher 400) fuer den neuen Hoehenwinkel- und Steckbrief-Zusatz
-        snprintf(distBuf, sizeof(distBuf), "%s%s  %s%.0f  %s%.0f° %s · %.0f°%s  %s %s  %s  %s  %s",
+        snprintf(distBuf, sizeof(distBuf), "%s%s  %s%.0f  %s  %s %s  %s  %s  %s",
                  I18n::t(StringId::DETAIL_DIST), distValBuf,
                  I18n::t(StringId::DETAIL_HDG), a.headingDeg,
-                 I18n::t(StringId::DETAIL_BEARING_PREFIX), a.bearingDeg, compassLabel(a.bearingDeg),
-                 elevDeg, I18n::t(StringId::DETAIL_ELEVATION_SUFFIX),
+                 lookBuf,
                  trendSymbol, trendText, cpaBuf, firstSeenBuf, previouslySeenBuf);
         updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.distHeading, String(distBuf), forceFull);
         y += LINE_H;
-
-        String squawkLine = String(I18n::t(StringId::DETAIL_SQUAWK)) + (a.squawk[0] ? a.squawk : I18n::t(StringId::DETAIL_UNKNOWN));
-        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.squawk, squawkLine, forceFull);
-        y += LINE_H;
-
-        String seatsLine = a.estSeats > 0
-            ? String(I18n::t(StringId::DETAIL_SEATS_EST)) + a.estSeats
-            : String(I18n::t(StringId::DETAIL_SEATS_UNKNOWN));
-        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.seats, seatsLine, forceFull);
-        y += 22;
 
         // Letzte Panel-Zeile: DREI moegliche Inhalte, strikt gegenseitig
         // ausschliessend (Prioritaet Militaer-/Behoerden-Legende > Best-
@@ -3908,12 +4065,13 @@ void render(TFT_eSPI& tft, int16_t top) {
 
         bool isSelected = selectedHex[0] && strcmp(a.hex, selectedHex) == 0;
         bool isEmergency = SettingsStore::emergencyAlertEnabled() && isEmergencySquawk(a.squawk);
-        // Squawk-Wachliste (siehe squawk_watchlist.h) zaehlt als derselbe
-        // "isWatched"-Zustand wie die Rufzeichen-Beobachtungsliste - beide
-        // bedeuten inhaltlich dasselbe ("ein Flugzeug, das mich
-        // interessiert, ist da"), daher ein gemeinsames Flag statt eines
-        // eigenen Alarm-Modus.
-        bool isWatched = AircraftWatchlist::isWatched(a.callsign) || SquawkWatchlist::isWatched(a.squawk);
+        // Squawk- UND Typ-Wachliste (siehe squawk_watchlist.h/
+        // type_watchlist.h) zaehlen als derselbe "isWatched"-Zustand wie
+        // die Rufzeichen-Beobachtungsliste - alle drei bedeuten inhaltlich
+        // dasselbe ("ein Flugzeug, das mich interessiert, ist da"), daher
+        // ein gemeinsames Flag statt eines eigenen Alarm-Modus pro Liste
+        // (siehe WatchlistAlert::isHit()).
+        bool isWatched = WatchlistAlert::isHit(a);
         // Niedrigste Prioritaet der drei Ring-Markierungen (siehe unten) -
         // rein informativ, kein Alarm wie Notfall/Beobachtungsliste. Deckt
         // jetzt zwei unabhaengige Kriterien ab: Militaer-/Regierungs-
@@ -5013,13 +5171,13 @@ void updateProximityAlert(uint32_t nowMs) {
             }
             table[i].wasEmergency = isEmergencyNow;
 
-            // Squawk-Wachliste loest denselben WatchlistBlue-Alarm aus wie
-            // die Rufzeichen-Beobachtungsliste (siehe squawk_watchlist.h) -
-            // ein Watchlist-Treffer loest den Alarm immer aus, kein Ein/Aus
-            // dafuer (der fruehere watchlistAlertEnabled()-Schalter wurde
-            // entfernt).
-            bool isWatchedNow = AircraftWatchlist::isWatched(table[i].callsign) ||
-                                SquawkWatchlist::isWatched(table[i].squawk);
+            // Squawk- UND Typ-Wachliste loesen denselben WatchlistBlue-Alarm
+            // aus wie die Rufzeichen-Beobachtungsliste (siehe
+            // squawk_watchlist.h/type_watchlist.h, gebuendelt in
+            // WatchlistAlert::isHit()) - ein Treffer auf irgendeiner der
+            // drei loest den Alarm immer aus, kein Ein/Aus dafuer (der
+            // fruehere watchlistAlertEnabled()-Schalter wurde entfernt).
+            bool isWatchedNow = WatchlistAlert::isHit(table[i]);
             if (isWatchedNow) {
                 anyWatched = true;
                 if (!table[i].wasWatched) newWatchHit = true;

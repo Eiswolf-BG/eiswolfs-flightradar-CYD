@@ -13,6 +13,7 @@
 #include "airline_filter_screen.h"
 #include "aircraft_watchlist_screen.h"
 #include "squawk_watchlist_screen.h"
+#include "type_watchlist_screen.h"
 #include "aircraft_list_screen.h"
 #include "live_traffic_screen.h"
 #include "connection_status_screen.h"
@@ -1800,16 +1801,18 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_LISTS));
 
-            Rect aircraftListBtn = subMenuRowRect(0, 5);
-            Rect liveTrafficBtn  = subMenuRowRect(1, 5);
-            Rect watchlistBtn    = subMenuRowRect(2, 5);
-            Rect squawkWatchBtn  = subMenuRowRect(3, 5);
-            Rect backBtn         = subMenuRowRect(4, 5);
+            Rect aircraftListBtn = subMenuRowRect(0, 6);
+            Rect liveTrafficBtn  = subMenuRowRect(1, 6);
+            Rect watchlistBtn    = subMenuRowRect(2, 6);
+            Rect squawkWatchBtn  = subMenuRowRect(3, 6);
+            Rect typeWatchBtn    = subMenuRowRect(4, 6);
+            Rect backBtn         = subMenuRowRect(5, 6);
 
             drawButton(tft, aircraftListBtn, I18n::t(StringId::MENU_AIRCRAFT_LIST));
             drawButton(tft, liveTrafficBtn, I18n::t(StringId::MENU_LIVE_TRAFFIC));
             drawButton(tft, watchlistBtn, I18n::t(StringId::MENU_WATCHLIST));
             drawButton(tft, squawkWatchBtn, I18n::t(StringId::MENU_SQUAWK_WATCHLIST));
+            drawButton(tft, typeWatchBtn, I18n::t(StringId::MENU_TYPE_WATCHLIST));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -1833,6 +1836,8 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 AircraftWatchlistScreen::run(tft);
             } else if (squawkWatchBtn.contains(tap.x, tap.y)) {
                 SquawkWatchlistScreen::run(tft);
+            } else if (typeWatchBtn.contains(tap.x, tap.y)) {
+                TypeWatchlistScreen::run(tft);
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::Flight;
             }

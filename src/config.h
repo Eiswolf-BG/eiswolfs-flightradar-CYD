@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "6.3.0";
+    constexpr const char* APP_VERSION = "6.4.0";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -287,6 +287,23 @@ namespace Config {
     // Geschwindigkeit unsinnig niedrig (z.B. 0min).
     constexpr uint16_t APPROACH_ETA_MIN_PLAUSIBLE_MIN = 1;
     constexpr uint16_t APPROACH_ETA_MAX_PLAUSIBLE_MIN = 60;
+
+    // Flugphasen-Erkennung fuers Detail-Panel (radar_screen.cpp::
+    // computeFlightPhase(), Alex' Wunsch) - rein aus bereits vorhandenen
+    // Werten (Hoehe, Vertikalrate, Anflug-Erkennung, Erstsichtungszeit)
+    // abgeleitet. PHASE_LOW_ALT_FT ist deutlich grosszuegiger als
+    // APPROACH_MAX_ALT_FT oben (10000ft, fuer die Anflug-ERKENNUNG selbst
+    // gedacht) - hier geht es um "wirklich bodennah" fuer
+    // Start/Landung/Tiefflug, ohne Bezug zur tatsaechlichen Flugplatzhoehe
+    // (nur barometrische Hoehe ueber Meeresspiegel verfuegbar), daher
+    // bewusst grob gewaehlt statt praezise.
+    constexpr int32_t PHASE_LOW_ALT_FT = 3000;
+    // "Kuerzlich aufgetaucht" fuer die TAKEOFF-Erkennung (a.firstSeenMs,
+    // session-lokal) - ein frisch am Boden gestartetes Flugzeug sendet
+    // praktisch sofort ADS-B-Daten, 2 Minuten seit Erstsichtung sind daher
+    // grosszuegig genug fuer den Start selbst plus die ersten Sekunden im
+    // initialen Steigflug.
+    constexpr uint32_t PHASE_TAKEOFF_RECENT_MS = 120000;
 
     // Offline-/Stale-Data-Modus (radar_screen.cpp) - wenn der ADS-B-Abruf
     // laenger als dieser Schwellenwert nicht mehr erfolgreich war

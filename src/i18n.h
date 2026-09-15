@@ -1220,6 +1220,53 @@ enum class StringId : uint16_t {
     SESSION_STATS_TOP_TYPE_PREFIX,
     SESSION_STATS_NO_DATA,
 
+    // Flugphasen-Erkennung im Detail-Panel (radar_screen.cpp::
+    // computeFlightPhase()/drawDetailPanel(), Alex' Wunsch) - haengt aus
+    // Platzgruenden (Panel randvoll, siehe dortiger Kommentar) an die
+    // bestehende Steig-/Sinkflug-Zeile an, KEINE eigene neue Panel-Zeile.
+    // Nur dieses Label wird uebersetzt ("Phase:"/"Flugphase:" etc.) - die
+    // Phasennamen selbst (TAKEOFF/CLIMB/CRUISE/...) bleiben in allen
+    // Sprachen als englisches Luftfahrt-Fachvokabular stehen, siehe
+    // flightPhaseLabel() in radar_screen.cpp.
+    DETAIL_PHASE_PREFIX,
+
+    // ADS-B-Datenqualitaet im Detail-Panel (radar_screen.cpp::
+    // computeDataQuality()/drawDetailPanel(), Alex' Wunsch) - haengt aus
+    // Platzgruenden an die bestehende Hoehen-Zeile an. Nur dieses Label
+    // wird uebersetzt - "GOOD"/"PARTIAL" bleiben in allen Sprachen als
+    // feststehendes Fachvokabular stehen, siehe dataQualityLabel() in
+    // radar_screen.cpp.
+    DETAIL_DATA_QUALITY_PREFIX,
+
+    // Kombinierte Peilung+Hoehenwinkel-Kurzanzeige im Detail-Panel
+    // (radar_screen.cpp::drawDetailPanel(), Alex' Wunsch), z.B.
+    // "Look: NE 21°" - ersetzt die vorherige, laengere "Bearing: 45° NE -
+    // 21° up"-Formatierung DERSELBEN beiden bereits vorhandenen Werte
+    // (Himmelsrichtung/compassLabel() und Hoehenwinkel/elevDeg), keine
+    // neue Berechnung. Ersetzt DETAIL_BEARING_PREFIX/
+    // DETAIL_ELEVATION_SUFFIX an dieser Stelle (beide StringIds bleiben
+    // aus Kompatibilitaetsgruenden bestehen, um nicht alle nachfolgenden
+    // Indizes in allen 8 Sprachdateien verschieben zu muessen, werden ab
+    // sofort aber nicht mehr verwendet).
+    DETAIL_LOOK_PREFIX,
+
+    // Flugzeugtyp-Wachliste (type_watchlist.h/type_watchlist_screen.cpp,
+    // Alex' Wunsch) - spiegelt 1:1 die bestehende Rufzeichen-Wachliste
+    // (WATCHLIST_*) und die Squawk-Wachliste (SQUAWK_WATCH_*), nur fuer
+    // Flugzeugtyp-Codes (z.B. "A380", "B747", "C17") statt Rufzeichen/
+    // Squawk-Codes. Loest ueber WatchlistAlert::isHit() denselben Alarm
+    // aus wie die beiden anderen Listen.
+    MENU_TYPE_WATCHLIST,
+    TYPE_WATCH_TITLE,
+    TYPE_WATCH_DESC1,
+    TYPE_WATCH_DESC2,
+    TYPE_WATCH_ADD,
+    TYPE_WATCH_ADD_TITLE,
+    TYPE_WATCH_EMPTY,
+    TYPE_WATCH_INFO_TITLE,
+    TYPE_WATCH_INFO_PARA1,
+    TYPE_WATCH_INFO_PARA2,
+
     COUNT
 };
 

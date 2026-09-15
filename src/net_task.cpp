@@ -18,6 +18,8 @@
 #include "mqtt_client.h"
 #include "aircraft_watchlist.h"
 #include "squawk_watchlist.h"
+#include "type_watchlist.h"
+#include "watchlist_alert.h"
 #include "radar_screen.h"
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
@@ -309,8 +311,7 @@ namespace {
                             uint8_t aircraftCount = AircraftTable::validCount();
                             for (uint8_t i = 0; i < AircraftTable::capacity(); i++) {
                                 if (!table[i].valid) continue;
-                                if (AircraftWatchlist::isWatched(table[i].callsign) ||
-                                    SquawkWatchlist::isWatched(table[i].squawk)) {
+                                if (WatchlistAlert::isHit(table[i])) {
                                     anyWatched = true;
                                 }
                                 if (proximityOn && table[i].distanceKm <= Config::LED_ALERT_RADIUS_KM) {

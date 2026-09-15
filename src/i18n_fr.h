@@ -557,6 +557,21 @@ static const char* const I18N_FR[] = {
     "Le plus haut : ",
     "Type le plus fréquent : ",
     "pas encore de données",
+
+    "Phase : ",
+    "Données : ",
+    "Regard : ",
+
+    "Veille Type",
+    "Veille Type",
+    "La LED bleue clignote des qu'un",
+    "avion correspond a l'un de ces types.",
+    "Ajouter un type d'avion",
+    "Ajouter un type d'avion",
+    "Aucun type d'avion surveille pour l'instant.",
+    "Comment fonctionne la veille de type",
+    "Entrez un code de type d'avion (ex. A380, B747, C17) - le meme code affiche comme « Type : » dans le panneau de details, pas un code compagnie. Jusqu'a 5 types peuvent etre suivis a la fois.",
+    "Des qu'un avion d'un type surveille apparait quelque part sur le radar, il recoit un anneau cyan et la LED clignote en bleu, exactement comme la veille indicatif/squawk - pratique pour reperer un type d'avion precis, par exemple un gros porteur rare ou un transport militaire.",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

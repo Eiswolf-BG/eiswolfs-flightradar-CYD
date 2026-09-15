@@ -15,6 +15,7 @@
 #include "airline_filter.h"
 #include "aircraft_watchlist.h"
 #include "squawk_watchlist.h"
+#include "type_watchlist.h"
 #include "sd_storage.h"
 #include "wifi_manager.h"
 #include "location_manager.h"
@@ -1853,6 +1854,7 @@ void setup() {
     AirlineFilter::init();
     AircraftWatchlist::init();
     SquawkWatchlist::init();
+    TypeWatchlist::init();
 
     SplashScreen::begin(tft);
     // Sofort einen ersten Sternen-Frame zeichnen, statt erst auf die naechste

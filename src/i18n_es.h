@@ -557,6 +557,21 @@ static const char* const I18N_ES[] = {
     "Más alto: ",
     "Tipo más frecuente: ",
     "aún sin datos",
+
+    "Fase: ",
+    "Datos: ",
+    "Mirar: ",
+
+    "Vigilancia de Tipo",
+    "Vigilancia de Tipo",
+    "El LED azul parpadea cuando",
+    "un avion coincide con uno de estos tipos.",
+    "Añadir tipo de avión",
+    "Añadir tipo de avión",
+    "Aún no hay tipos de avión vigilados.",
+    "Cómo funciona la vigilancia de tipo",
+    "Introduzca un código de tipo de avión (ej. A380, B747, C17) - el mismo código que aparece como \"Tipo:\" en el panel de detalles, no un código de aerolínea. Se pueden seguir hasta 5 tipos a la vez.",
+    "En cuanto aparece un avión de un tipo vigilado en cualquier parte del radar, recibe un anillo cian y el LED parpadea en azul, igual que la vigilancia de indicativo/squawk - genial para detectar un tipo de avión concreto, por ejemplo un avión de gran tamaño poco frecuente o un transporte militar.",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,
