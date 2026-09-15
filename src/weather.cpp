@@ -275,88 +275,115 @@ namespace {
             return;
         }
 
-        // Body erst komplett als String einsammeln (getString() kuemmert
-        // sich zuverlaessig um Chunked-Transfer-Encoding), statt direkt aus
-        // http.getStream() zu parsen - Letzteres scheiterte bei Open-Meteo
-        // zuverlaessig mit einem ArduinoJson-"InvalidInput"-Fehler.
-        String body = http.getString();
-        http.end();
-
-        JsonDocument doc;
-        DeserializationError err = deserializeJson(doc, body);
-        if (err) return;
-
-        int wmoCode = doc["current_weather"]["weathercode"] | -1;
-        if (wmoCode < 0) return;
-
-        currentCondition = conditionFromWmoCode(wmoCode);
-        currentRainIntensityVal = intensityFromWmoCode(wmoCode);
-        currentSnowIntensityVal = snowIntensityFromWmoCode(wmoCode);
-        // "winddirection" ist Teil derselben current_weather-Antwort - siehe
-        // currentWindDirectionDeg()-Kommentar in weather.h. | -1.0f als
-        // Default, falls das Feld ausnahmsweise fehlen sollte (aendert dann
-        // nichts an einem vorherigen gueltigen Wert).
-        float windDir = doc["current_weather"]["winddirection"] | -1.0f;
-        if (windDir >= 0.0f) currentWindDirDeg = windDir;
-        // "windspeed" ist ebenfalls Teil derselben current_weather-Antwort
-        // (Open-Meteo liefert es standardmaessig mit, in km/h) - bisher
-        // nicht ausgelesen, jetzt fuer den neuen Wettervorschau-Screen
-        // gebraucht (siehe currentWindSpeedKmh()-Kommentar in weather.h).
-        float windSpeed = doc["current_weather"]["windspeed"] | -1.0f;
-        if (windSpeed >= 0.0f) currentWindSpeedKmhVal = windSpeed;
-
-        // Stundenverlauf aus dem "hourly"-Teil derselben Antwort - dank des
-        // jetzt breiteren start_hour/end_hour-Fensters (siehe oben)
-        // enthaelt jedes Array bis zu 10 Eintraege (Index 0 = aktuelle
-        // Stunde, Index 9 = +9h). Fehlt der "hourly"-Teil (z.B. weil oben
-        // mangels NTP-Zeit gar nicht erst danach gefragt wurde), liefert
-        // ArduinoJson fuer .as<JsonArray>() auf einem fehlenden Feld einfach
-        // ein leeres Array zurueck - alle folgenden Werte werden dann
-        // korrekt auf "nicht verfuegbar" gesetzt statt mit einem veralteten
-        // Wert stehen zu bleiben.
-        JsonArray hourlyTemp = doc["hourly"]["temperature_2m"].as<JsonArray>();
-        JsonArray hourlyCode = doc["hourly"]["weathercode"].as<JsonArray>();
-        JsonArray hourlyPrecip = doc["hourly"]["precipitation_probability"].as<JsonArray>();
-
-        // Bestehende Einzelpunkt-Kurzvorhersage (main.cpp::showWeatherInfo())
-        // - unveraendert der Punkt bei FORECAST_HOURS_AHEAD (=3), jetzt aus
-        // demselben breiteren Array statt einer eigenen Anfrage entnommen.
+        // Body/JsonDocument der Open-Meteo-Antwort bewusst in einen
+        // eigenen Block eingeschlossen (siehe Root-Cause-Untersuchung im
+        // Chat, Heap-Fragmentierung/SSL-Speicherfehler bei METAR): body
+        // (mehrere KB roher JSON-Text) und doc (geparstes Stundenverlauf-
+        // Array, ebenfalls mehrere KB, da ohne Feldfilter geparst) blieben
+        // vorher bis zum ENDE von fetchNow() belegt - also waehrend
+        // GLEICHZEITIG noch zwei WEITERE TLS-Handshakes zu zwei anderen
+        // Hosts (aviationweather.gov fuer METAR, hexdb.io fuer die IATA-
+        // Zuordnung) anstanden. mbedTLS braucht fuer einen Handshake einen
+        // einzelnen grossen zusammenhaengenden Speicherblock (RX/TX-Puffer,
+        // typischerweise >10KB) - im Live-Mitschnitt scheiterte exakt der
+        // METAR-Handshake direkt danach zuverlaessig mit "SSL - Memory
+        // allocation failed", weil dieser Block durch body/doc bereits
+        // fragmentiert/belegt war. Der Block hier sorgt dafuer, dass body
+        // und doc (und alle daraus abgeleiteten JsonArray-Views) VOR den
+        // beiden folgenden Handshakes wieder freigegeben werden - die
+        // extrahierten Werte werden dafuer in normale lokale Variablen
+        // ausserhalb des Blocks kopiert.
         Forecast forecast;
-        if (hourlyTemp.size() > FORECAST_HOURS_AHEAD && hourlyCode.size() > FORECAST_HOURS_AHEAD) {
-            forecast.available = true;
-            forecast.temperatureC = hourlyTemp[FORECAST_HOURS_AHEAD].as<float>();
-            forecast.condition = conditionFromWmoCode(hourlyCode[FORECAST_HOURS_AHEAD].as<int>());
-            forecast.hoursAhead = FORECAST_HOURS_AHEAD;
-        }
-        currentForecastData = forecast;
-
-        // Niederschlagswahrscheinlichkeit fuer die aktuelle Stunde (Index 0)
-        // - fuer die "Zusatzdetails"-Zeile im neuen Wettervorschau-Screen.
-        if (hourlyPrecip.size() > 0) {
-            currentPrecipProbVal = (int8_t)hourlyPrecip[0].as<int>();
-        }
-
-        // Vier-Punkte-Stundenverlauf (jetzt/+3h/+6h/+9h) fuer denselben
-        // Screen - "localHour" wird direkt aus nowEpoch+Offset berechnet
-        // (nicht aus dem Array-Index abgeleitet), exakt dieselbe Rechnung,
-        // die vorher schon fuer den einzelnen Forecast-Punkt oben genutzt
-        // wurde, nur fuer vier Offsets statt einem.
         HourlyTimeline timeline;
-        constexpr uint8_t TIMELINE_OFFSETS[HOURLY_TIMELINE_COUNT] = {0, 3, 6, 9};
-        for (uint8_t i = 0; i < HOURLY_TIMELINE_COUNT; i++) {
-            uint8_t off = TIMELINE_OFFSETS[i];
-            if (hourlyTemp.size() <= off || hourlyCode.size() <= off) continue;
-            HourlyPoint& p = timeline.points[i];
-            p.available = true;
-            p.hoursAhead = off;
-            p.temperatureC = hourlyTemp[off].as<float>();
-            p.condition = conditionFromWmoCode(hourlyCode[off].as<int>());
-            time_t pointEpoch = nowEpoch + (time_t)off * 3600;
-            struct tm tmPoint;
-            gmtime_r(&pointEpoch, &tmPoint);
-            p.localHour = (uint8_t)tmPoint.tm_hour;
+        int8_t precipProb = -1;
+        bool havePrecip = false;
+        bool haveWeatherData = false;
+        {
+            // Body erst komplett als String einsammeln (getString() kuemmert
+            // sich zuverlaessig um Chunked-Transfer-Encoding), statt direkt aus
+            // http.getStream() zu parsen - Letzteres scheiterte bei Open-Meteo
+            // zuverlaessig mit einem ArduinoJson-"InvalidInput"-Fehler.
+            String body = http.getString();
+            http.end();
+
+            JsonDocument doc;
+            DeserializationError err = deserializeJson(doc, body);
+            if (err) return;
+
+            int wmoCode = doc["current_weather"]["weathercode"] | -1;
+            if (wmoCode < 0) return;
+
+            currentCondition = conditionFromWmoCode(wmoCode);
+            currentRainIntensityVal = intensityFromWmoCode(wmoCode);
+            currentSnowIntensityVal = snowIntensityFromWmoCode(wmoCode);
+            // "winddirection" ist Teil derselben current_weather-Antwort - siehe
+            // currentWindDirectionDeg()-Kommentar in weather.h. | -1.0f als
+            // Default, falls das Feld ausnahmsweise fehlen sollte (aendert dann
+            // nichts an einem vorherigen gueltigen Wert).
+            float windDir = doc["current_weather"]["winddirection"] | -1.0f;
+            if (windDir >= 0.0f) currentWindDirDeg = windDir;
+            // "windspeed" ist ebenfalls Teil derselben current_weather-Antwort
+            // (Open-Meteo liefert es standardmaessig mit, in km/h) - bisher
+            // nicht ausgelesen, jetzt fuer den neuen Wettervorschau-Screen
+            // gebraucht (siehe currentWindSpeedKmh()-Kommentar in weather.h).
+            float windSpeed = doc["current_weather"]["windspeed"] | -1.0f;
+            if (windSpeed >= 0.0f) currentWindSpeedKmhVal = windSpeed;
+
+            // Stundenverlauf aus dem "hourly"-Teil derselben Antwort - dank des
+            // jetzt breiteren start_hour/end_hour-Fensters (siehe oben)
+            // enthaelt jedes Array bis zu 10 Eintraege (Index 0 = aktuelle
+            // Stunde, Index 9 = +9h). Fehlt der "hourly"-Teil (z.B. weil oben
+            // mangels NTP-Zeit gar nicht erst danach gefragt wurde), liefert
+            // ArduinoJson fuer .as<JsonArray>() auf einem fehlenden Feld einfach
+            // ein leeres Array zurueck - alle folgenden Werte werden dann
+            // korrekt auf "nicht verfuegbar" gesetzt statt mit einem veralteten
+            // Wert stehen zu bleiben.
+            JsonArray hourlyTemp = doc["hourly"]["temperature_2m"].as<JsonArray>();
+            JsonArray hourlyCode = doc["hourly"]["weathercode"].as<JsonArray>();
+            JsonArray hourlyPrecip = doc["hourly"]["precipitation_probability"].as<JsonArray>();
+
+            // Bestehende Einzelpunkt-Kurzvorhersage (main.cpp::showWeatherInfo())
+            // - unveraendert der Punkt bei FORECAST_HOURS_AHEAD (=3), jetzt aus
+            // demselben breiteren Array statt einer eigenen Anfrage entnommen.
+            if (hourlyTemp.size() > FORECAST_HOURS_AHEAD && hourlyCode.size() > FORECAST_HOURS_AHEAD) {
+                forecast.available = true;
+                forecast.temperatureC = hourlyTemp[FORECAST_HOURS_AHEAD].as<float>();
+                forecast.condition = conditionFromWmoCode(hourlyCode[FORECAST_HOURS_AHEAD].as<int>());
+                forecast.hoursAhead = FORECAST_HOURS_AHEAD;
+            }
+
+            // Niederschlagswahrscheinlichkeit fuer die aktuelle Stunde (Index 0)
+            // - fuer die "Zusatzdetails"-Zeile im neuen Wettervorschau-Screen.
+            if (hourlyPrecip.size() > 0) {
+                precipProb = (int8_t)hourlyPrecip[0].as<int>();
+                havePrecip = true;
+            }
+
+            // Vier-Punkte-Stundenverlauf (jetzt/+3h/+6h/+9h) fuer denselben
+            // Screen - "localHour" wird direkt aus nowEpoch+Offset berechnet
+            // (nicht aus dem Array-Index abgeleitet), exakt dieselbe Rechnung,
+            // die vorher schon fuer den einzelnen Forecast-Punkt oben genutzt
+            // wurde, nur fuer vier Offsets statt einem.
+            constexpr uint8_t TIMELINE_OFFSETS[HOURLY_TIMELINE_COUNT] = {0, 3, 6, 9};
+            for (uint8_t i = 0; i < HOURLY_TIMELINE_COUNT; i++) {
+                uint8_t off = TIMELINE_OFFSETS[i];
+                if (hourlyTemp.size() <= off || hourlyCode.size() <= off) continue;
+                HourlyPoint& p = timeline.points[i];
+                p.available = true;
+                p.hoursAhead = off;
+                p.temperatureC = hourlyTemp[off].as<float>();
+                p.condition = conditionFromWmoCode(hourlyCode[off].as<int>());
+                time_t pointEpoch = nowEpoch + (time_t)off * 3600;
+                struct tm tmPoint;
+                gmtime_r(&pointEpoch, &tmPoint);
+                p.localHour = (uint8_t)tmPoint.tm_hour;
+            }
+            haveWeatherData = true;
         }
+        if (!haveWeatherData) return;
+        currentForecastData = forecast;
         currentHourlyTimelineData = timeline;
+        if (havePrecip) currentPrecipProbVal = precipProb;
 
         // METAR-Flugwetterbericht fuer den naechstgelegenen Flughafen - im
         // selben Aufruf/Intervall wie das Icon-Wetter oben, damit dafuer

@@ -10,6 +10,7 @@
 #include "settings_store.h"
 #include "led_alert.h"
 #include "speaker_alert.h"
+#include "ntfy_push.h"
 #include "ota_update.h"
 #include "location_manager.h"
 #include "sun_times.h"
@@ -152,6 +153,12 @@ namespace {
         // Nur relevant, wenn keiner der drei Faelle oben zutrifft (siehe
         // drawTypedMarker()) - Flugzeugtyp-Silhouette aus dem ICAO-Typcode.
         TypeSilhouette typeSilhouette;
+        // Steig-/Sinkflug-Trend (Alex' Wunsch) - +1 Steigflug (>+300ft/min),
+        // -1 Sinkflug (<-300ft/min), 0 dazwischen/keine Vertikalrate
+        // gemeldet (Aircraft::vertRateFtMin defaultet ohnehin auf 0, faellt
+        // damit automatisch in den "kein Pfeil"-Fall). Siehe
+        // computeVertTrend()/drawVertTrendArrow() unten.
+        int8_t vertTrend;
         // Fuer den CRT-Phosphor-Effekt (siehe crtPhosphorColor() unten) -
         // bearingDeg wird fuer die Sweep-Treffer-Erkennung in tick()
         // gebraucht, crtFadeEligible ist jetzt fuer JEDE Kategorie true
@@ -1277,6 +1284,47 @@ namespace {
 
         gfx.drawLine(tipX, tipY, leftX, leftY, color);
         gfx.drawLine(tipX, tipY, rightX, rightY, color);
+    }
+
+    // Steig-/Sinkflug-Trend-Pfeilchen (Alex' Wunsch) - dieselbe bereits
+    // vorhandene Vertikalrate wie die Climb/Descent-Anzeige im Detail-Panel
+    // (drawDetailPanel() unten) und im Web-Popup (web_export_server.cpp),
+    // hier nur zusaetzlich als kleines Symbol direkt am Marker ausgewertet -
+    // kein neuer Datenwert, keine erneute API-Auswertung. +300/-300 ft/min
+    // Schwelle wie vom Auftrag vorgegeben; dazwischen (inkl. fehlender
+    // Vertikalrate, die als 0 ankommt) bewusst KEIN Pfeil, um das Radar bei
+    // vielen Flugzeugen nicht zu ueberladen (aehnliche Ueberlegung wie beim
+    // bewussten Verzicht auf Flugspuren/Tracer).
+    int8_t computeVertTrend(int16_t vertRateFtMin) {
+        if (vertRateFtMin > 300) return 1;
+        if (vertRateFtMin < -300) return -1;
+        return 0;
+    }
+
+    // Winziges ausgefuelltes Dreieck statt eines Text-Glyphs (der eigene
+    // Font deckt keine Pfeil-Unicode-Zeichen ab, siehe ui_font.h) - bewusst
+    // klein und leicht versetzt zur unteren rechten Marker-Ecke platziert:
+    // dort ueberschneidet es sich weder mit dem Richtungs-Chevron (liegt
+    // IMMER in Flugrichtung, kann aber theoretisch auch nach unten-rechts
+    // zeigen - seltener Fall, minimale optische Ueberschneidung dort
+    // akzeptiert, gleiche Kompromiss-Klasse wie die bereits dichte
+    // Marker-Darstellung mit Ringen/Silhouette) noch mit dem Rufzeichen-
+    // Label (computeLabelAnchor() waehlt nie eine untere Position, siehe
+    // dortiger Kommentar).
+    void drawVertTrendArrow(TFT_eSPI& gfx, int16_t x, int16_t y, int8_t trend, uint16_t color) {
+        if (trend == 0) return;
+        constexpr int16_t OFFSET = 7;
+        constexpr int16_t HALF_W = 3;
+        constexpr int16_t H = 4;
+        int16_t cx = (int16_t)(x + OFFSET);
+        int16_t cy = (int16_t)(y + OFFSET);
+        if (trend > 0) {
+            gfx.fillTriangle(cx, (int16_t)(cy - H / 2), (int16_t)(cx - HALF_W), (int16_t)(cy + H / 2),
+                              (int16_t)(cx + HALF_W), (int16_t)(cy + H / 2), color);
+        } else {
+            gfx.fillTriangle(cx, (int16_t)(cy + H / 2), (int16_t)(cx - HALF_W), (int16_t)(cy - H / 2),
+                              (int16_t)(cx + HALF_W), (int16_t)(cy - H / 2), color);
+        }
     }
 
     // Position/Verankerung des Rufzeichen-Labels neben einem Marker -
@@ -3903,6 +3951,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         } else {
             drawTypedMarker(tft, pt.x, pt.y, a.headingDeg, color, typeSilhouette, isHeavy);
         }
+        drawVertTrendArrow(tft, pt.x, pt.y, computeVertTrend(a.vertRateFtMin), color);
 
         if (isEmergency) {
             tft.drawCircle(pt.x, pt.y, 12, TFT_RED);
@@ -3950,6 +3999,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         hitPoints[i].isRotorcraft = isRotorcraft;
         hitPoints[i].isHeavy = isHeavy;
         hitPoints[i].typeSilhouette = typeSilhouette;
+        hitPoints[i].vertTrend = computeVertTrend(a.vertRateFtMin);
         hitPoints[i].bearingDeg = a.bearingDeg;
         hitPoints[i].crtFadeEligible = crtFadeEligible;
         hitPoints[i].baseColor = ownColor;
@@ -4390,6 +4440,7 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             } else {
                 drawTypedMarker(tft, hp.x, hp.y, hp.headingDeg, TFT_BLACK, hp.typeSilhouette, hp.isHeavy);
             }
+            drawVertTrendArrow(tft, hp.x, hp.y, hp.vertTrend, TFT_BLACK);
             if (hp.isEmergency || hp.isWatched || hp.isNotable) {
                 tft.drawCircle(hp.x, hp.y, 12, TFT_BLACK);
             }
@@ -4463,6 +4514,7 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             } else {
                 drawTypedMarker(tft, hp.x, hp.y, hp.headingDeg, TFT_BLACK, hp.typeSilhouette, hp.isHeavy);
             }
+            drawVertTrendArrow(tft, hp.x, hp.y, hp.vertTrend, TFT_BLACK);
             if (hp.isEmergency || hp.isWatched || hp.isNotable) {
                 tft.drawCircle(hp.x, hp.y, 12, TFT_BLACK);
             }
@@ -4487,6 +4539,7 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
         } else {
             drawTypedMarker(tft, hp.x, hp.y, hp.headingDeg, effectiveColor, hp.typeSilhouette, hp.isHeavy);
         }
+        drawVertTrendArrow(tft, hp.x, hp.y, hp.vertTrend, effectiveColor);
 
         if (hp.isEmergency) {
             tft.drawCircle(hp.x, hp.y, 12, TFT_RED);
@@ -4531,6 +4584,17 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     // ueberhaupt (so beabsichtigt, nicht kuenstlich verlaengert).
     if (SettingsStore::issMarkerEnabled()) {
         IssTracker::Position iss = IssTracker::current();
+        // Zusaetzliche Alterspruefung (Alex' Meldung: bei wiederholt
+        // fehlschlagenden Hintergrund-Abrufen - siehe iss_tracker.cpp -
+        // blieb der Marker unbegrenzt lange an der letzten erfolgreich
+        // abgerufenen Stelle eingefroren stehen, statt zu verschwinden).
+        // Ueberlaufsicherer millis()-Vergleich (unsigned-Subtraktion statt
+        // direktem Groesser/Kleiner), gleiches Muster wie z.B. STALE_TIMEOUT_MS
+        // in aircraft_table.cpp - bleibt auch nach einem millis()-Ueberlauf
+        // (~49 Tage Laufzeit) korrekt.
+        if (iss.available && (millis() - iss.fetchedAtMs) > Config::ISS_POSITION_STALE_MS) {
+            iss.available = false;
+        }
         if (iss.available) {
             double homeLat = 0, homeLon = 0;
             LocationManager::getHomeLocation(homeLat, homeLon);
@@ -4892,6 +4956,18 @@ void updateProximityAlert(uint32_t nowMs) {
     // SPK-Lautsprecher-Alarms aus (speaker_alert.h), analog zu
     // playWatchedAlert() im Web-Pendant.
     bool newWatchHit = false;
+    // Gleiches Uebergangs-Prinzip fuer Notfall-Squawks (Aircraft::
+    // wasEmergency, siehe aircraft.h) - loest die optionale ntfy.sh-Push-
+    // Benachrichtigung aus (ntfy_push.h). pushCallsign/pushSquawk/
+    // pushIsEmergency merken sich das ZUERST in diesem Zyklus neu
+    // aufgetretene Ereignis (Notfall hat Vorrang vor Watchlist, gleiche
+    // Prioritaet wie beim LED-Alarm oben) - bei mehreren gleichzeitigen
+    // neuen Treffern wird bewusst nur einer gepusht, nicht mehrere
+    // Nachrichten in einem Zyklus.
+    bool newEmergencyHit = false;
+    char pushCallsign[9] = {0};
+    char pushSquawk[5] = {0};
+    bool pushIsEmergency = false;
 
     bool proximityOn = SettingsStore::proximityAlertEnabled();
     bool smartOn = SettingsStore::proximityAlertSmartMode();
@@ -4925,7 +5001,18 @@ void updateProximityAlert(uint32_t nowMs) {
             // isAircraftVisibleOnRadar() oben) - sollen weiterhin IMMER
             // erkannt werden, auch ausserhalb der eingestellten Reichweite
             // oder hinter einem aktiven Anzeigefilter.
-            if (emergencyOn && isEmergencySquawk(table[i].squawk)) anyEmergency = true;
+            bool isEmergencyNow = emergencyOn && isEmergencySquawk(table[i].squawk);
+            if (isEmergencyNow) {
+                anyEmergency = true;
+                if (!table[i].wasEmergency && !pushIsEmergency && pushCallsign[0] == 0) {
+                    newEmergencyHit = true;
+                    pushIsEmergency = true;
+                    strncpy(pushCallsign, table[i].callsign, sizeof(pushCallsign) - 1);
+                    strncpy(pushSquawk, table[i].squawk, sizeof(pushSquawk) - 1);
+                }
+            }
+            table[i].wasEmergency = isEmergencyNow;
+
             // Squawk-Wachliste loest denselben WatchlistBlue-Alarm aus wie
             // die Rufzeichen-Beobachtungsliste (siehe squawk_watchlist.h) -
             // ein Watchlist-Treffer loest den Alarm immer aus, kein Ein/Aus
@@ -4936,6 +5023,9 @@ void updateProximityAlert(uint32_t nowMs) {
             if (isWatchedNow) {
                 anyWatched = true;
                 if (!table[i].wasWatched) newWatchHit = true;
+                if (!table[i].wasWatched && !pushIsEmergency && pushCallsign[0] == 0) {
+                    strncpy(pushCallsign, table[i].callsign, sizeof(pushCallsign) - 1);
+                }
             }
             table[i].wasWatched = isWatchedNow;
 
@@ -4978,6 +5068,26 @@ void updateProximityAlert(uint32_t nowMs) {
             }
         }
         AircraftTable::unlock();
+    }
+
+    // Optionale ntfy.sh-Push-Benachrichtigung (SettingsStore::
+    // ntfyPushEnabled(), AUS per Default, siehe ntfy_push.h/
+    // ntfy_push_screen.cpp) - wiederverwendet dieselbe Notfall-/Watchlist-
+    // Erkennung wie der LED-Alarm oben, kein zweiter Erkennungsweg. Nur
+    // beim UEBERGANG (newEmergencyHit/newWatchHit, siehe Kommentar bei
+    // deren Deklaration oben) ausgeloest, nicht bei jedem Zyklus, solange
+    // dasselbe Flugzeug weiter sichtbar bleibt - request() selbst merkt nur
+    // vor, die eigentliche HTTPS-Anfrage laeuft asynchron auf Core 0
+    // (net_task.cpp::NtfyPush::update()).
+    if ((newEmergencyHit || newWatchHit) && SettingsStore::ntfyPushEnabled()) {
+        char msg[160];
+        if (pushIsEmergency) {
+            snprintf(msg, sizeof(msg), "%s%s: %s", I18n::t(StringId::NTFY_PUSH_MSG_EMERGENCY_PREFIX),
+                      pushSquawk, pushCallsign);
+        } else {
+            snprintf(msg, sizeof(msg), "%s%s", I18n::t(StringId::NTFY_PUSH_MSG_WATCHLIST_PREFIX), pushCallsign);
+        }
+        NtfyPush::request(msg);
     }
 
     // Aktiver Zonen-Alarm-Burst nur fuer Config::SMART_PROXIMITY_BURST_MS

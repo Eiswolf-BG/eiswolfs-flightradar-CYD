@@ -44,6 +44,15 @@ struct Aircraft {
     // dafuer bietet.
     bool     wasWatched     = false;
 
+    // Gleiches Uebergangs-Prinzip wie wasWatched oben, hier fuer Notfall-
+    // Squawks (isEmergencySquawk()) - erkennt "war kein Notfall -> ist
+    // jetzt Notfall" fuer die ntfy.sh-Push-Benachrichtigung (siehe
+    // ntfy_push.h), damit pro Flugzeug/Ereignis nur einmal gepusht wird,
+    // bis es entweder wieder aus der Tabelle verschwindet (Slot wird auf
+    // Aircraft{} zurueckgesetzt, siehe aircraft_table.cpp) oder den
+    // Notfall-Squawk wieder verlaesst.
+    bool     wasEmergency   = false;
+
     // Best-Effort-Anflug-Erkennung auf den naechstgelegenen Flughafen
     // (Weather::currentNearestAirport(), dieselbe Referenz wie die
     // "Naechster Flughafen"-Eckanzeige) - rein geometrisch aus bereits

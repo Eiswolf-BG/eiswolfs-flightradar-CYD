@@ -20,8 +20,21 @@ namespace {
         // Speicher-/Verbindungslast, die bei den ADS-B-Abfragen
         // problematisch war (siehe CLAUDE.md "Bekannte Probleme").
         WiFiClient client;
+
+        // Eigener, groesserer Timeout statt HTTP_TIMEOUT_MS (siehe
+        // Config::ISS_HTTP_TIMEOUT_MS-Kommentar in config.h) - per
+        // separatem DNS-/TCP-Connect-Mitschnitt eindeutig als
+        // gelegentlich langsamer/ueberlasteter Server identifiziert
+        // (Open-Notify), nicht als DNS- oder Netzwerkproblem. WICHTIG:
+        // setTimeout() setzt nur den Lese-Timeout (_tcpTimeout) - den
+        // eigentlichen TCP-Connect-Timeout (_connectTimeout, separates
+        // HTTPClient-Feld, Default 5000ms) setzt NUR
+        // setConnectTimeout() - genau der beim Diagnose-Mitschnitt
+        // gemessene Wert, an dem alle Fehlschlaege haengen, deshalb hier
+        // beide Timeouts explizit setzen.
         HTTPClient http;
-        http.setTimeout(Config::HTTP_TIMEOUT_MS);
+        http.setConnectTimeout(Config::ISS_HTTP_TIMEOUT_MS);
+        http.setTimeout(Config::ISS_HTTP_TIMEOUT_MS);
         if (!http.begin(client, "http://api.open-notify.org/iss-now.json")) {
             return;
         }

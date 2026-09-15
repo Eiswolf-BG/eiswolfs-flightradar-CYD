@@ -3,6 +3,7 @@
 #include "weather.h"
 #include "units.h"
 #include "settings_store.h"
+#include "session_stats.h"
 #include <algorithm>
 #include <atomic>
 #include <math.h>
@@ -42,6 +43,7 @@ namespace {
     std::atomic<bool> hasFetchOutcome{false};
     std::atomic<bool> lastFetchOk{false};
     std::atomic<int>  lastFetchHttpCode{0};
+    std::atomic<uint32_t> lastFetchDurationMs{0};
 }
 
 void lock() { xSemaphoreTake(mutex, portMAX_DELAY); }
@@ -66,9 +68,10 @@ uint32_t msSinceLastSuccessfulFetch(uint32_t nowMs) {
     return nowMs - lastSuccessfulFetchMs.load(std::memory_order_relaxed);
 }
 
-void recordFetchOutcome(bool ok, int httpCode) {
+void recordFetchOutcome(bool ok, int httpCode, uint32_t durationMs) {
     lastFetchOk.store(ok, std::memory_order_relaxed);
     lastFetchHttpCode.store(httpCode, std::memory_order_relaxed);
+    lastFetchDurationMs.store(durationMs, std::memory_order_relaxed);
     hasFetchOutcome.store(true, std::memory_order_relaxed);
 }
 
@@ -77,6 +80,7 @@ FetchOutcome lastFetchOutcome() {
     out.hasResult = hasFetchOutcome.load(std::memory_order_relaxed);
     out.ok = lastFetchOk.load(std::memory_order_relaxed);
     out.httpCode = lastFetchHttpCode.load(std::memory_order_relaxed);
+    out.durationMs = lastFetchDurationMs.load(std::memory_order_relaxed);
     return out;
 }
 
@@ -207,6 +211,14 @@ void postFetchUpdate(double homeLat, double homeLon) {
         if (a.groundSpeedKt > a.sessionMaxSpeedKt) {
             a.sessionMaxSpeedKt = a.groundSpeedKt;
         }
+
+        // Reine In-RAM-Sitzungsstatistik (Alex' Wunsch, siehe
+        // session_stats.h) - GLOBAL ueber ALLE Flugzeuge dieser Sitzung
+        // hinweg, im Unterschied zu sessionMinDistanceKm/sessionMaxSpeedKt
+        // oben (die nur PRO Flugzeug gelten). Bewusst unabhaengig vom
+        // Flugbuch-Schalter (SettingsStore::flightLogbookEnabled()), laeuft
+        // also immer mit.
+        SessionStats::record(a);
 
         // "Ueberflug"-CPA (Closest Point of Approach, siehe aircraft.h::
         // cpaRelevant/cpaEtaMin und Config::CPA_*) - reine Momentaufnahme

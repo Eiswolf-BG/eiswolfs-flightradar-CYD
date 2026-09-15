@@ -277,6 +277,17 @@ namespace SettingsStore {
     String mqttPassword();
     void setMqttPassword(const String& pass);
 
+    // Optionale Push-Benachrichtigung ueber den kostenlosen, anmeldefreien
+    // Dienst ntfy.sh (siehe ntfy_push.h/ntfy_push_screen.cpp) bei Notfall-
+    // Squawk oder Watchlist-Treffer - AUS per Default. ntfyPushTopic() ist
+    // der frei gewaehlte, eindeutige Topic-Name (kein Passwort - siehe
+    // Info-Text im Screen, der oeffentliche ntfy.sh-Server ist nur so
+    // "geheim" wie der Topic-Name selbst).
+    bool ntfyPushEnabled();
+    void setNtfyPushEnabled(bool on);
+    String ntfyPushTopic();
+    void setNtfyPushTopic(const String& topic);
+
     // Zuletzt vom Geraet GEBOOTETE Firmware-Version (Config::APP_VERSION zum
     // Zeitpunkt des letzten Speicherns) - main.cpp::setup() vergleicht dies
     // beim Start gegen die AKTUELLE Config::APP_VERSION, um genau EINMAL

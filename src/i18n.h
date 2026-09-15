@@ -1164,6 +1164,62 @@ enum class StringId : uint16_t {
     AIRLINE_FILTER_MODE_INFO_BODY,
     AIRLINE_FILTER_DESC_SHOWONLY,
 
+    // System-Status/Diagnose-Screen (Menue > System > Werkzeuge, neben
+    // "Ueber" einsortiert) - system_status_screen.cpp. Reine Anzeige
+    // (WLAN-Signal, freier Heap, groesster freier Speicherblock, Dauer des
+    // letzten ADS-B-Abrufs), live aktualisiert waehrend der Screen offen
+    // ist. Info-Button erklaert kurz, was "groesster freier
+    // Speicherblock" bedeutet (Alex' Wunsch: dieser Wert war in der
+    // Vergangenheit mehrfach die eigentliche Ursache fuer Bugs, waehrend
+    // der einfache "freier Heap"-Wert dabei unauffaellig blieb).
+    MENU_SYSTEM_STATUS,
+    SYSTEM_STATUS_TITLE,
+    SYSTEM_STATUS_WIFI_PREFIX,
+    SYSTEM_STATUS_FREE_HEAP_PREFIX,
+    SYSTEM_STATUS_MAX_ALLOC_PREFIX,
+    SYSTEM_STATUS_FETCH_DURATION_PREFIX,
+    SYSTEM_STATUS_INFO_TITLE,
+    SYSTEM_STATUS_INFO_BODY,
+
+    // Optionale ntfy.sh-Push-Benachrichtigung (Menue > System > Werkzeuge >
+    // "ntfy.sh Push", ntfy_push_screen.cpp/ntfy_push.h) bei Notfall-Squawk
+    // oder Watchlist-Treffer - wiederverwendet dieselbe Erkennung wie die
+    // bestehenden LED-Alerts (radar_screen.cpp::updateProximityAlert()).
+    // MSG_EMERGENCY_PREFIX/MSG_WATCHLIST_PREFIX/TEST_MESSAGE sind der
+    // eigentliche, an ntfy.sh gesendete Benachrichtigungstext (nicht nur
+    // UI-Beschriftung).
+    MENU_NTFY_PUSH,
+    NTFY_PUSH_TITLE,
+    NTFY_PUSH_ENABLE,
+    NTFY_PUSH_TOPIC_LABEL,
+    NTFY_PUSH_TOPIC_PROMPT,
+    NTFY_PUSH_TEST_BUTTON,
+    NTFY_PUSH_TEST_SENT,
+    NTFY_PUSH_INFO_TITLE,
+    NTFY_PUSH_INFO_BODY,
+    NTFY_PUSH_MSG_EMERGENCY_PREFIX,
+    NTFY_PUSH_MSG_WATCHLIST_PREFIX,
+    NTFY_PUSH_TEST_MESSAGE,
+
+    // Sitzungsstatistik-Screen (Menue > Flugoptionen > Statistik & Logbuch,
+    // neben "Flugbuch" einsortiert, session_stats_screen.cpp/
+    // session_stats.h) - reine In-RAM-Werte seit dem letzten Neustart,
+    // NICHT persistiert (anders als das bestehende, SD-gestuetzte
+    // "Statistiken"). SINCE_BOOT_NOTE macht das auf dem Screen selbst klar,
+    // damit niemand nach einem Reboot verwirrt ist, warum die Zahlen wieder
+    // bei null anfangen. NO_DATA ist der gemeinsame Platzhalter fuer alle
+    // vier optionalen Werte, solange noch kein einziges Flugzeug erfasst
+    // wurde.
+    MENU_SESSION_STATS,
+    SESSION_STATS_TITLE,
+    SESSION_STATS_SINCE_BOOT_NOTE,
+    SESSION_STATS_UNIQUE_AIRCRAFT_PREFIX,
+    SESSION_STATS_CLOSEST_PREFIX,
+    SESSION_STATS_MAX_SPEED_PREFIX,
+    SESSION_STATS_MAX_ALT_PREFIX,
+    SESSION_STATS_TOP_TYPE_PREFIX,
+    SESSION_STATS_NO_DATA,
+
     COUNT
 };
 

@@ -3,6 +3,7 @@
 #include "calibration_screen.h"
 #include "wifi_manage_screen.h"
 #include "stats_screen.h"
+#include "session_stats_screen.h"
 #include "stats_history_screen.h"
 #include "logbook_files_screen.h"
 #include "flight_logbook.h"
@@ -15,6 +16,8 @@
 #include "aircraft_list_screen.h"
 #include "live_traffic_screen.h"
 #include "connection_status_screen.h"
+#include "system_status_screen.h"
+#include "ntfy_push_screen.h"
 #include "brightness_screen.h"
 #include "timeout_screen.h"
 #include "menu_timeout_screen.h"
@@ -1598,18 +1601,22 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             // Sicherung & Reset (das bestehende Page::BackupReset-Untermenue
             // bleibt unveraendert, wird jetzt nur eine Ebene tiefer erreicht:
             // System > Werkzeuge > Sicherung & Reset).
-            Rect calibBtn       = subMenuRowRect(0, 7);
-            Rect webuiBtn       = subMenuRowRect(1, 7);
-            Rect mqttBtn        = subMenuRowRect(2, 7);
-            Rect connectionBtn  = subMenuRowRect(3, 7);
-            Rect backupResetBtn = subMenuRowRect(4, 7);
-            Rect aboutBtn       = subMenuRowRect(5, 7);
-            Rect backBtn        = subMenuRowRect(6, 7);
+            Rect calibBtn       = subMenuRowRect(0, 9);
+            Rect webuiBtn       = subMenuRowRect(1, 9);
+            Rect mqttBtn        = subMenuRowRect(2, 9);
+            Rect ntfyPushBtn    = subMenuRowRect(3, 9);
+            Rect connectionBtn  = subMenuRowRect(4, 9);
+            Rect systemStatusBtn = subMenuRowRect(5, 9);
+            Rect backupResetBtn = subMenuRowRect(6, 9);
+            Rect aboutBtn       = subMenuRowRect(7, 9);
+            Rect backBtn        = subMenuRowRect(8, 9);
 
             drawButton(tft, calibBtn, I18n::t(StringId::MENU_CALIBRATE));
             drawButton(tft, webuiBtn, I18n::t(StringId::MENU_LOGBOOK_WEBUI));
             drawButton(tft, mqttBtn, I18n::t(StringId::MENU_MQTT));
+            drawButton(tft, ntfyPushBtn, I18n::t(StringId::MENU_NTFY_PUSH));
             drawButton(tft, connectionBtn, I18n::t(StringId::MENU_CONNECTION_STATUS));
+            drawButton(tft, systemStatusBtn, I18n::t(StringId::MENU_SYSTEM_STATUS));
             drawButton(tft, backupResetBtn, I18n::t(StringId::MENU_BACKUP_RESET));
             drawButton(tft, aboutBtn, I18n::t(StringId::MENU_ABOUT));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
@@ -1628,8 +1635,12 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 WebUiScreen::run(tft);
             } else if (mqttBtn.contains(tap.x, tap.y)) {
                 MqttScreen::run(tft);
+            } else if (ntfyPushBtn.contains(tap.x, tap.y)) {
+                NtfyPushScreen::run(tft);
             } else if (connectionBtn.contains(tap.x, tap.y)) {
                 ConnectionStatusScreen::run(tft);
+            } else if (systemStatusBtn.contains(tap.x, tap.y)) {
+                SystemStatusScreen::run(tft);
             } else if (backupResetBtn.contains(tap.x, tap.y)) {
                 page = Page::BackupReset;
             } else if (aboutBtn.contains(tap.x, tap.y)) {
@@ -1831,17 +1842,19 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_STATS_LOGBOOK));
 
-            Rect statsBtn        = subMenuRowRect(0, 5);
-            Rect statsHistoryBtn = subMenuRowRect(1, 5);
-            Rect logFilesBtn     = subMenuRowRect(2, 5);
-            Rect logbookBtn      = subMenuRowRect(3, 5);
-            Rect backBtn         = subMenuRowRect(4, 5);
+            Rect statsBtn        = subMenuRowRect(0, 6);
+            Rect statsHistoryBtn = subMenuRowRect(1, 6);
+            Rect logFilesBtn     = subMenuRowRect(2, 6);
+            Rect logbookBtn      = subMenuRowRect(3, 6);
+            Rect sessionStatsBtn = subMenuRowRect(4, 6);
+            Rect backBtn         = subMenuRowRect(5, 6);
 
             drawButton(tft, statsBtn, I18n::t(StringId::MENU_STATISTICS));
             drawButton(tft, statsHistoryBtn, I18n::t(StringId::MENU_STATS_HISTORY));
             drawButton(tft, logFilesBtn, I18n::t(StringId::MENU_LOGBOOK_FILES));
             drawButtonWithSubline(tft, logbookBtn, I18n::t(StringId::MENU_FLIGHT_LOGBOOK) + onOff(SettingsStore::flightLogbookEnabled()),
                                   SettingsStore::flightLogbookEnabled() ? logbookCountdownText() : "");
+            drawButton(tft, sessionStatsBtn, I18n::t(StringId::MENU_SESSION_STATS));
             // Punkt oben LINKS: reiner Status-/"Aufzeichnung laeuft"-Punkt,
             // zeigt an dass das Flugbuch aktiv ist (24h-Countdown laeuft
             // implizit mit, siehe FlightLogbook::secondsUntilAutoOff()) -
@@ -1881,6 +1894,8 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 StatsHistoryScreen::run(tft);
             } else if (logFilesBtn.contains(tap.x, tap.y)) {
                 LogbookFilesScreen::run(tft);
+            } else if (sessionStatsBtn.contains(tap.x, tap.y)) {
+                SessionStatsScreen::run(tft);
             } else if (logbookAutoOffHint && rowInfoBtnRect(logbookBtn).contains(tap.x, tap.y)) {
                 // "?"-Info-Button zuerst pruefen (kleine Flaeche innerhalb
                 // der Flugbuch-Zeile) - sonst wuerde ein Tap darauf

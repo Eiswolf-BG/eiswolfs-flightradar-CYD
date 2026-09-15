@@ -89,6 +89,8 @@ namespace {
     char mqttBrokerBuf[64] = {0};
     char mqttUserBuf[33] = {0};
     char mqttPassBuf[33] = {0};
+    bool ntfyPushOn = false;
+    char ntfyPushTopicBuf[48] = {0};
     char lastSeenVersionBuf[16] = {0};
     // Default 120s = Config::MENU_IDLE_TIMEOUT_MS (bisheriger fester Wert) -
     // damit aendert sich fuer niemanden ungefragt etwas, bis der neue
@@ -206,6 +208,11 @@ namespace {
         } else if (key == "mqtt_pass") {
             strncpy(mqttPassBuf, value.c_str(), sizeof(mqttPassBuf) - 1);
             mqttPassBuf[sizeof(mqttPassBuf) - 1] = 0;
+        } else if (key == "ntfy_push_enabled") {
+            ntfyPushOn = (value.toInt() != 0);
+        } else if (key == "ntfy_push_topic") {
+            strncpy(ntfyPushTopicBuf, value.c_str(), sizeof(ntfyPushTopicBuf) - 1);
+            ntfyPushTopicBuf[sizeof(ntfyPushTopicBuf) - 1] = 0;
         } else if (key == "last_seen_version") {
             strncpy(lastSeenVersionBuf, value.c_str(), sizeof(lastSeenVersionBuf) - 1);
             lastSeenVersionBuf[sizeof(lastSeenVersionBuf) - 1] = 0;
@@ -296,6 +303,8 @@ void save() {
     f.printf("mqtt_broker=%s\n", mqttBrokerBuf);
     f.printf("mqtt_user=%s\n", mqttUserBuf);
     f.printf("mqtt_pass=%s\n", mqttPassBuf);
+    f.printf("ntfy_push_enabled=%d\n", ntfyPushOn ? 1 : 0);
+    f.printf("ntfy_push_topic=%s\n", ntfyPushTopicBuf);
     f.printf("last_seen_version=%s\n", lastSeenVersionBuf);
     f.printf("ota_just_installed=%d\n", otaJustInstalledFlag ? 1 : 0);
     f.close();
@@ -625,6 +634,21 @@ String mqttPassword() { return String(mqttPassBuf); }
 void setMqttPassword(const String& pass) {
     strncpy(mqttPassBuf, pass.c_str(), sizeof(mqttPassBuf) - 1);
     mqttPassBuf[sizeof(mqttPassBuf) - 1] = 0;
+    save();
+}
+
+bool ntfyPushEnabled() { return ntfyPushOn; }
+
+void setNtfyPushEnabled(bool on) {
+    ntfyPushOn = on;
+    save();
+}
+
+String ntfyPushTopic() { return String(ntfyPushTopicBuf); }
+
+void setNtfyPushTopic(const String& topic) {
+    strncpy(ntfyPushTopicBuf, topic.c_str(), sizeof(ntfyPushTopicBuf) - 1);
+    ntfyPushTopicBuf[sizeof(ntfyPushTopicBuf) - 1] = 0;
     save();
 }
 

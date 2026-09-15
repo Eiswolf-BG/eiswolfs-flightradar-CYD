@@ -14,6 +14,7 @@
 #include "weather.h"
 #include "ota_update.h"
 #include "iss_tracker.h"
+#include "ntfy_push.h"
 #include "mqtt_client.h"
 #include "aircraft_watchlist.h"
 #include "squawk_watchlist.h"
@@ -133,6 +134,13 @@ namespace {
             // Versuchen, hier einfach jede Schleife mit aufrufen, gleiches
             // Muster wie Weather::update()/OtaUpdate::pollBackground() oben.
             MqttClient::loop();
+            // Optionale ntfy.sh-Push-Benachrichtigung (SettingsStore::
+            // ntfyPushEnabled(), AUS per Default, siehe ntfy_push.h) - sendet
+            // nur, wenn radar_screen.cpp::updateProximityAlert() (Core 1)
+            // gerade eine Nachricht vorgemerkt hat, sonst kehrt update()
+            // sofort zurueck. Gleiches "jede Schleife mit aufrufen"-Muster
+            // wie MqttClient::loop() oben.
+            NtfyPush::update();
             // Unabhaengig vom Erfolg der ADS-B-Abfrage weiter unten pruefen,
             // damit die 24h-Sicherheitsabschaltung des Flugbuchs auch waehrend
             // laengerer WLAN-/ADS-B-Ausfaelle zuverlaessig greift (siehe
@@ -205,14 +213,17 @@ namespace {
                     // netTaskIdle ist bereits seit Schleifenbeginn false
                     // (siehe dortiger Kommentar) - kein erneutes Setzen hier
                     // noetig.
+                    uint32_t fetchStartMs = millis();
                     auto result = AdsbClient::fetch(lat, lon, rangeKm,
                                                      tempTable, Config::MAX_TRACKED_AIRCRAFT);
+                    uint32_t fetchDurationMs = millis() - fetchStartMs;
 
                     // Feature 5 "Verbindungsqualitaet" - bei JEDEM
                     // Abrufversuch aktualisiert, unabhaengig vom Ergebnis
                     // (anders als AircraftTable::markFetchSuccess() unten,
-                    // das nur bei Erfolg laeuft).
-                    AircraftTable::recordFetchOutcome(result.ok, result.httpCode);
+                    // das nur bei Erfolg laeuft). fetchDurationMs zusaetzlich
+                    // fuer den System-Status-Screen (system_status_screen.cpp).
+                    AircraftTable::recordFetchOutcome(result.ok, result.httpCode, fetchDurationMs);
 
                     if (result.ok) {
                         // Offline-/Stale-Data-Modus (radar_screen.cpp) - haelt

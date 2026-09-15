@@ -48,8 +48,14 @@ namespace AircraftTable {
         bool hasResult = false; // false = noch kein Abrufversuch seit dem Boot
         bool ok = false;
         int  httpCode = 0;
+        // Wie lange der letzte Abrufversuch gedauert hat (millis()-Differenz
+        // rund um AdsbClient::fetch() in net_task.cpp) - unabhaengig vom
+        // Ergebnis erfasst, damit z.B. eine lang haengende, am Ende doch
+        // erfolgreiche Anfrage sichtbar wird (System-Status-Screen, siehe
+        // system_status_screen.cpp).
+        uint32_t durationMs = 0;
     };
-    void recordFetchOutcome(bool ok, int httpCode);
+    void recordFetchOutcome(bool ok, int httpCode, uint32_t durationMs);
     FetchOutcome lastFetchOutcome();
 
     // Wird bei jedem postFetchUpdate() erhoeht. Damit koennen andere Teile des

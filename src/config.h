@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "6.2.0";
+    constexpr const char* APP_VERSION = "6.3.0";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -150,6 +150,34 @@ namespace Config {
     // Intervall als hier haette keinen praktischen Mehrwert (die ISS
     // bewegt sich vorhersagbar, ~7,66 km/s).
     constexpr uint32_t ISS_FETCH_INTERVAL_MS = 20000; // 20 Sekunden
+
+    // Eigener, grosszuegigerer Timeout nur fuer die ISS-Abfrage, getrennt
+    // von HTTP_TIMEOUT_MS (siehe Root-Cause-Diagnose im Chat, eigener
+    // serieller Mitschnitt mit DNS-/TCP-Connect-Trennung): DNS loeste bei
+    // JEDEM gemessenen Versuch sofort auf (~0ms), der TCP-Connect zum
+    // Open-Notify-Server (kleines Hobby-Projekt auf einer einzelnen VM,
+    // keine CDN-Absicherung) schwankte dagegen stark zwischen ~200ms und
+    // ueber 5,9s - ALLE gemessenen Fehlschlaege trafen exakt die alte
+    // 6000ms-Grenze (HTTP_TIMEOUT_MS), waren also echte Server-Timeouts
+    // bei einem gelegentlich ueberlasteten Server, keine sofortigen
+    // Verbindungsablehnungen und kein Netzwerk-/DNS-Problem auf Alex'
+    // Seite. 12s gibt dem Server ausreichend Spielraum, ohne den NetTask-
+    // Loop bei einem echten Totalausfall unnoetig lange zu blockieren -
+    // das ISS-Feature ist rein dekorativ, ein paar Sekunden mehr Wartezeit
+    // bei einem einzelnen langsamen Zyklus faellt nicht negativ auf.
+    constexpr uint32_t ISS_HTTP_TIMEOUT_MS = 12000;
+
+    // Aeltere Position ausblenden statt eingefroren weiter anzuzeigen
+    // (Alex' Meldung: bei wiederholt fehlschlagenden Abrufen - siehe
+    // iss_tracker.cpp - blieb der Marker unbegrenzt lange an der letzten
+    // erfolgreich abgerufenen Stelle stehen). 2 Minuten = 6x das normale
+    // 20s-Abrufintervall, toleriert also ein paar aufeinanderfolgende
+    // Fehlschlaege ohne staendiges Ein-/Ausblenden, faellt bei laenger
+    // anhaltenden Problemen aber zuverlaessig weg - bei ~7,66 km/s legt die
+    // ISS in dieser Zeit ohnehin schon ueber 900km zurueck, die Position
+    // waere laengst nicht mehr aussagekraeftig.
+    constexpr uint32_t ISS_POSITION_STALE_MS = 120000; // 2 Minuten
+
 
     // Intervall fuer die automatische Hintergrund-Pruefung auf neue
     // Firmware-Updates (siehe OtaUpdate::pollBackground(), aufgerufen aus
