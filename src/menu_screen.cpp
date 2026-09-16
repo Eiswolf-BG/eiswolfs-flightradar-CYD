@@ -2061,18 +2061,12 @@ void runPendingOtaInstall(TFT_eSPI& tft) {
     SettingsStore::clearOtaPendingInstall();
     if (url.length() == 0) return; // sollte nie vorkommen, rein defensiv
 
-    // Gleicher vollwertiger Status-Bildschirm-Aufbau wie im interaktiven
-    // Screen oben (runOtaUpdateScreen()), aber bewusst ANDERER Text
-    // (OTA_INSTALLING_TITLE + WIFI_CONNECTING statt OTA_RESTART_TITLE/
-    // OTA_RESTARTING) - Alex' Meldung: der bereits erfolgte Neustart liegt
-    // an DIESER Stelle schon hinter uns (siehe SW_CPU_RESET im Seriell-
-    // Mitschnitt, bestaetigt GENAU EIN Neustart vor dem Download), zeigte
-    // aber denselben "Neustart"-Text wie der Bildschirm davor - das sah
-    // wie ein zweiter Neustart aus, obwohl keiner stattfand. Jetzt eindeutig
-    // als "WLAN verbinden, bevor der Download beginnt" erkennbar.
-    drawOtaSuccessMessage(tft, I18n::t(StringId::OTA_INSTALLING_TITLE), I18n::t(StringId::WIFI_CONNECTING),
-                          UiTheme::accentColor(tft));
-
+    // Bewusst KEIN eigener Zwischen-Bildschirm mehr an dieser Stelle
+    // (fruehere Version zeigte hier "Installing Update"/"Connecting...") -
+    // Alex' Meldung: das wirkte trotz unterschiedlichem Text immer noch wie
+    // ein zweiter Neustart-Schritt. Der Bildschirm bleibt bis zum
+    // Fortschrittsbalken schlicht schwarz (Restbild des vorherigen
+    // Neustart-Screens durch den harten ESP.restart() ohnehin geloescht).
     // Minimaler, rein blockierender WLAN-Verbindungsaufbau OHNE die
     // normale NetTask-Maschinerie (die an dieser Stelle im Boot bewusst
     // noch gar nicht existiert - genau das ist der Punkt: der Heap soll

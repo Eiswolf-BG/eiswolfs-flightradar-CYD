@@ -575,7 +575,6 @@ static const char* const I18N_FR[] = {
 
     "Pays : ",
     "Redémarrage pour la mise à jour",
-    "Installation de la mise à jour",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,
