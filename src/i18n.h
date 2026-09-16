@@ -1282,6 +1282,16 @@ enum class StringId : uint16_t {
     // drawOtaSuccessMessage() angezeigt.
     OTA_RESTART_TITLE,
 
+    // Titel fuer den Status-Bildschirm NACH dem gezielten Neustart, waehrend
+    // MenuScreen::runPendingOtaInstall() (menu_screen.cpp) mit WLAN
+    // verbindet, bevor der eigentliche Download beginnt - bewusst ANDERER
+    // Text als OTA_RESTART_TITLE/OTA_RESTARTING oben (Alex' Meldung: gleicher
+    // Text vor UND nach dem einzigen tatsaechlichen Neustart sah wie ein
+    // zweiter Neustart aus, obwohl per Seriell-Mitschnitt bestaetigt nur
+    // EIN einziger Neustart vor dem Download stattfindet). Nutzt als Text
+    // darunter das bereits bestehende WIFI_CONNECTING ("Connecting...").
+    OTA_INSTALLING_TITLE,
+
     COUNT
 };
 
