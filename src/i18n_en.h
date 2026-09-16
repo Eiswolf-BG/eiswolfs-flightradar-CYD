@@ -575,6 +575,7 @@ static const char* const I18N_EN[] = {
     "As soon as an aircraft of a watched type appears anywhere on the radar, it gets a cyan ring and the LED blinks blue, exactly like the callsign/squawk watchlist - handy for spotting any aircraft of a specific type, e.g. a rare heavy or a military transport.",
 
     "Country: ",
+    "Restarting for Update",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

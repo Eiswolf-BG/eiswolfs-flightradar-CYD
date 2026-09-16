@@ -1824,6 +1824,20 @@ void setup() {
     // Nachziehen wie bei invertDisplay() direkt drueber.
     ledcWrite(BACKLIGHT_PWM_CHANNEL, normalBacklightPwm());
 
+    // Ausstehende OTA-Installation (Alex' Wunsch, siehe settings_store.h/
+    // menu_screen.cpp::runPendingOtaInstall() fuer die ausfuehrliche
+    // Begruendung) - bewusst SO FRueH wie moeglich, noch VOR der
+    // kosmetischen Boot-Sequenz, dem Splash-Screen, WLAN-Manager,
+    // Standort-/Filter-Initialisierung und vor allem NetTask::begin()
+    // weiter unten: der Heap soll fuer den Download so unfragmentiert wie
+    // nur irgend moeglich sein. Bei einem Fehlschlag (kein WLAN, Download-
+    // Fehler) kehrt die Funktion einfach zurueck und der Boot laeuft ab
+    // hier ganz normal weiter, als waere nichts gewesen - bei Erfolg endet
+    // sie nie normal (ESP.restart()).
+    if (SettingsStore::otaPendingInstall()) {
+        MenuScreen::runPendingOtaInstall(tft);
+    }
+
     // Rein kosmetische Terminal-Boot-Sequenz (kein eigener Schalter) - erst
     // HIER moeglich, da sie die richtige Sprache braucht (SettingsStore::
     // load() ist gerade eben gelaufen). Laeuft blockierend vor dem

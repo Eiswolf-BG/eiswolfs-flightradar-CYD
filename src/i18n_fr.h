@@ -574,6 +574,7 @@ static const char* const I18N_FR[] = {
     "Des qu'un avion d'un type surveille apparait quelque part sur le radar, il recoit un anneau cyan et la LED clignote en bleu, exactement comme la veille indicatif/squawk - pratique pour reperer un type d'avion precis, par exemple un gros porteur rare ou un transport militaire.",
 
     "Pays : ",
+    "Redémarrage pour la mise à jour",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

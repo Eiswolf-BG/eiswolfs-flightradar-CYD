@@ -233,6 +233,8 @@ Any saved network can be removed again at any time via the red "X", freeing up a
 #### 🔄 OTA firmware updates over WiFi
 **Menu → System → "Check for update"** checks the latest GitHub release and, if newer, downloads and installs it directly on the device - no cable or web flasher needed. Update results are shown as a clear on-screen message, and a short, scrollable changelog of what changed in that version. On success, the device restarts automatically after a short pause. While installing, a filling progress bar shows how far along the download/flash is, alongside a reminder not to unplug or turn off the device until it's done.
 
+Confirming an update triggers a brief, expected restart *before* the actual download starts (shown on its own status screen, "Restarting for Update") - this gives the download a completely fresh, unfragmented memory state to work with, which noticeably speeds up the download and avoids rare failures that could otherwise happen after the device had been running for a long time. This extra restart is normal, not an error - the real download and installation, with its own progress bar, follows right after.
+
 The device also quietly checks for new firmware every few minutes in the background; a small red dot (like an app badge) appears on the Menu button, the System tile, the "Check for update" button, and the sleep screen when a new version is available. Installing always requires explicit confirmation - nothing happens automatically.
 
 #### ☀️ Weather Icon

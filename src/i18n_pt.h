@@ -574,6 +574,7 @@ static const char* const I18N_PT[] = {
     "Assim que um avião de um tipo monitorado aparece em qualquer lugar no radar, ele recebe um anel ciano e o LED pisca em azul, exatamente como o monitoramento de indicativo/squawk - ótimo para detectar um tipo de avião específico, por exemplo um avião de grande porte raro ou um transporte militar.",
 
     "País: ",
+    "Reiniciando para a Atualização",
 };
 
 static_assert(sizeof(I18N_PT) / sizeof(I18N_PT[0]) == (size_t)StringId::COUNT,

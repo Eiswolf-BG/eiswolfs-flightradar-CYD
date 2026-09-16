@@ -574,6 +574,7 @@ static const char* const I18N_IT[] = {
     "Non appena un aereo di un tipo monitorato appare ovunque sul radar, riceve un anello ciano e il LED lampeggia in blu, esattamente come il controllo nominativo/squawk - utile per individuare un tipo di aereo specifico, ad esempio un grande aereo raro o un trasporto militare.",
 
     "Paese: ",
+    "Riavvio per l'Aggiornamento",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

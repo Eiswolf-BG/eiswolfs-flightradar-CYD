@@ -1274,6 +1274,14 @@ enum class StringId : uint16_t {
     // aus der Tabelle in hex_country.cpp, nur dieses Label wird uebersetzt.
     DETAIL_COUNTRY_PREFIX,
 
+    // Titel fuer den vollwertigen "Geraet startet fuers Update neu"-
+    // Statusbildschirm (menu_screen.cpp::runOtaUpdateScreen()/
+    // runPendingOtaInstall(), Alex' Meldung: der vorherige kleine
+    // Einzeiler wirkte gequetscht) - wird zusammen mit dem bereits
+    // bestehenden OTA_RESTARTING als Titel+Text ueber
+    // drawOtaSuccessMessage() angezeigt.
+    OTA_RESTART_TITLE,
+
     COUNT
 };
 

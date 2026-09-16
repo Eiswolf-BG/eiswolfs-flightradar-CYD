@@ -28,6 +28,7 @@
 #include "settings_backup.h"
 #include "settings_store.h"
 #include "ota_update.h"
+#include "wifi_manager.h"
 #include "net_task.h"
 #include "menu_stars.h"
 #include "i18n.h"
@@ -1154,65 +1155,34 @@ namespace {
         bool confirmed = confirmWarningScreen(tft, title, I18n::t(StringId::OTA_CONFIRM_BODY), UiTheme::accentColor(tft));
         if (!confirmed) return;
 
-        otaProgressTft = &tft;
-        resetOtaProgressLayout(); // siehe dortiger Kommentar - Pflicht vor jedem neuen Versuch
-        tft.fillScreen(TFT_BLACK);
-        drawOtaProgress(0);
-        // Gleicher Grund wie oben bei checkForUpdate() - waehrend des
-        // eigentlichen Downloads/Flashens darf NetTask nicht gleichzeitig
-        // um die WLAN-Funk-/TLS-Ressourcen konkurrieren.
-        if (!NetTask::pause()) {
-            otaProgressTft = nullptr;
-            infoScreen(tft, I18n::t(StringId::OTA_NETWORK_BUSY), "", TFT_RED, I18n::t(StringId::OK));
-            return;
-        }
-        bool ok = OtaUpdate::performUpdate(info.downloadUrl, drawOtaProgress);
-        NetTask::resume();
-        otaProgressTft = nullptr;
-
-        if (ok) {
-            // Automatischer Neustart nach kurzer Lesepause, KEIN Button/
-            // KEINE Touch-Warteschleife mehr (Alex' Entscheidung, nachdem
-            // der vorherige "Jetzt neu starten"-Button-Screen ein Dauer-
-            // Flackern verursachte - siehe drawOtaSuccessMessage()-Kommentar
-            // oben fuer die ausfuehrliche Vorgeschichte/Begruendung).
-            //
-            // BEWUSST OHNE Changelog an dieser Stelle (war testweise kurz
-            // drin, siehe Git-Historie): hier laeuft noch die ALTE, gerade
-            // zu ersetzende Firmware - die kennt den Changelog-Text der NEU
-            // heruntergeladenen Version gar nicht, der neue Code wird ja
-            // erst nach ESP.restart() tatsaechlich ausgefuehrt. Stattdessen
-            // zeigt main.cpp::showWhatsNewIfNeeded() den Changelog beim
-            // naechsten Boot an, wenn wirklich schon die neue Firmware
-            // laeuft (siehe dort).
-            // GitHub-Stern-Hinweis und Auto-Neustart-Hinweis als
-            // zusaetzliche Absaetze angehaengt (gleiches "\n\n"-Absatz-
-            // Muster wie main.cpp::showWeatherInfo()).
-            String successBody = String(I18n::t(StringId::OTA_SUCCESS_BODY)) + "\n\n" +
-                                  I18n::t(StringId::OTA_AUTO_RESTART_HINT) + "\n\n" +
-                                  I18n::t(StringId::OTA_GITHUB_STAR_HINT);
-            drawOtaSuccessMessage(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), successBody,
-                                  UiTheme::accentColor(tft));
-            // Feste Lesepause statt einer Touch-Warteschleife - lang genug,
-            // um den kurzen Text zu erfassen, kurz genug, um nicht
-            // unnoetig zu nerven. Kein delay()/Watchdog-Risiko wie bei der
-            // frueheren Touch-Schleife, da hier keine Bedingung wiederholt
-            // geprueft wird.
-            delay(4000);
-            // Setzt das Flag, das main.cpp::showWhatsNewIfNeeded() beim
-            // naechsten Boot ausliest - siehe settings_store.h fuer die
-            // Begruendung (Changelog-Screen soll NUR nach einem echten
-            // OTA-Update erscheinen, nicht nach jedem simplen Neuflashen).
-            SettingsStore::setOtaJustInstalled(true);
-            ESP.restart();
-        } else {
-            // Bewusst ein stehenbleibender Info-Screen statt der alten
-            // showBriefMessage() (1,2s, dann automatisch zurueck ins Menue)
-            // - ein fehlgeschlagenes Firmware-Update ist keine
-            // Nebensaechlichkeit, die man verpassen darf.
-            infoScreen(tft, I18n::t(StringId::OTA_UPDATE_FAILED), I18n::t(StringId::OTA_FAILED_BODY),
-                       TFT_RED, I18n::t(StringId::OK));
-        }
+        // Statt hier direkt herunterzuladen: Download-URL persistieren
+        // (SettingsStore, ueberlebt einen Neustart) und gezielt neu
+        // starten - der eigentliche Download/Update.begin() laeuft dann
+        // ALLERERSTES im naechsten Boot (main.cpp::setup() ->
+        // MenuScreen::runPendingOtaInstall()), BEVOR irgendein anderer
+        // Code (WLAN-Manager, NetTask, Radarscreen, Menues) auch nur
+        // einen einzigen Heap-Block belegt hat. Grund (Alex' Diagnose im
+        // Chat, maxAlloc-Messung per Live-Mitschnitt): ein Download aus
+        // der laufenden Sitzung heraus traf regelmaessig auf einen durch
+        // Stunden normalen Betriebs (ADS-B/Wetter/ISS/MQTT/ntfy) bereits
+        // fragmentierten Heap - "Updater.cpp: malloc failed" trotz
+        // gesund aussehendem freeHeap, obwohl Update.begin() selbst nur
+        // 4096 zusammenhaengende Bytes braucht. Ein frischer Boot hat
+        // dieses Problem nicht. NetTask::pause() wird dafuer hier nicht
+        // mehr gebraucht (das war der bisherige Schutz waehrend des
+        // Downloads) - stattdessen existiert NetTask im neuen Boot-Pfad
+        // zum fraglichen Zeitpunkt schlicht noch gar nicht.
+        // Vollwertiger Status-Bildschirm statt einer kleinen einzeiligen
+        // Meldung (Alex' Meldung: wirkte zu klein/gequetscht) - selber
+        // Kasten-/Titel-/Text-Aufbau wie drawOtaSuccessMessage() unten
+        // (grosse, ggf. automatisch umgebrochene Titelschrift plus
+        // mehrzeiliger Text darunter), hier bewusst wiederverwendet statt
+        // eine eigene Variante zu bauen.
+        drawOtaSuccessMessage(tft, I18n::t(StringId::OTA_RESTART_TITLE), I18n::t(StringId::OTA_RESTARTING),
+                              UiTheme::accentColor(tft));
+        delay(1200);
+        SettingsStore::setOtaPendingInstall(info.downloadUrl);
+        ESP.restart();
     }
 
     // Neue Untermenues (SystemDisplay/SystemTools/FlightStatsLogbook/
@@ -2079,6 +2049,75 @@ bool showInfoScreen(TFT_eSPI& tft, const String& title, const String& body,
 int layoutTitleLines(TFT_eSPI& tft, const String& text, int16_t maxWidth,
                       String* outLines, int maxLines) {
     return wrapTitleLines(tft, text, maxWidth, outLines, maxLines);
+}
+
+void runPendingOtaInstall(TFT_eSPI& tft) {
+    // SOFORT konsumieren, bevor ueberhaupt irgendetwas versucht wird -
+    // siehe settings_store.h-Kommentar: garantiert, dass ein Fehlschlag
+    // (kein WLAN, Download-Fehler, sogar ein harter Absturz mitten im
+    // Versuch) NIE zu einer Neustart-Schleife fuehren kann. Die URL wird
+    // vorher in eine lokale Kopie geholt, unabhaengig vom Flag selbst.
+    String url = SettingsStore::otaPendingInstallUrl();
+    SettingsStore::clearOtaPendingInstall();
+    if (url.length() == 0) return; // sollte nie vorkommen, rein defensiv
+
+    // Gleicher vollwertiger Status-Bildschirm wie im interaktiven
+    // Screen oben (runOtaUpdateScreen()) - Alex' Meldung: der vorherige
+    // kleine Einzeiler wirkte gequetscht/schlecht lesbar.
+    drawOtaSuccessMessage(tft, I18n::t(StringId::OTA_RESTART_TITLE), I18n::t(StringId::OTA_RESTARTING),
+                          UiTheme::accentColor(tft));
+
+    // Minimaler, rein blockierender WLAN-Verbindungsaufbau OHNE die
+    // normale NetTask-Maschinerie (die an dieser Stelle im Boot bewusst
+    // noch gar nicht existiert - genau das ist der Punkt: der Heap soll
+    // hier noch so frisch/unfragmentiert wie moeglich sein). WifiMgr::
+    // update() bringt seinen eigenen 15s-Verbindungstimeout mit (siehe
+    // CONNECT_TIMEOUT_MS in wifi_manager.cpp) und wechselt danach selbst
+    // auf State::Failed - der zusaetzliche aeussere Timeout hier ist nur
+    // ein defensives Sicherheitsnetz, damit dieser fruehe Boot-Pfad unter
+    // GAR keinen Umstaenden haengen bleiben kann.
+    WifiMgr::init();
+    WifiMgr::beginConnect();
+    uint32_t waitStartMs = millis();
+    constexpr uint32_t WIFI_WAIT_SAFETY_TIMEOUT_MS = 25000;
+    while (true) {
+        WifiMgr::State s = WifiMgr::getState();
+        if (s == WifiMgr::State::Connected) break;
+        if (s == WifiMgr::State::Failed || s == WifiMgr::State::NoCredentials) return;
+        if (millis() - waitStartMs > WIFI_WAIT_SAFETY_TIMEOUT_MS) return;
+        WifiMgr::update();
+        delay(50);
+    }
+
+    otaProgressTft = &tft;
+    resetOtaProgressLayout();
+    tft.fillScreen(TFT_BLACK);
+    drawOtaProgress(0);
+    // Kein NetTask::pause() noetig - NetTask::begin() ist an dieser Stelle
+    // im Boot noch nie aufgerufen worden, es gibt also nichts, das um
+    // WLAN-Funk-/TLS-Ressourcen konkurrieren koennte (der eigentliche
+    // Zweck dieser ganzen Umstrukturierung).
+    bool ok = OtaUpdate::performUpdate(url.c_str(), drawOtaProgress);
+    otaProgressTft = nullptr;
+
+    if (ok) {
+        // Gleicher Ablauf wie der bisherige Erfolgsfall in
+        // runOtaUpdateScreen() (siehe dort fuer die ausfuehrliche
+        // Begruendung: Changelog erst im naechsten Boot, kein Neustart-
+        // Button-Screen mehr).
+        String successBody = String(I18n::t(StringId::OTA_SUCCESS_BODY)) + "\n\n" +
+                              I18n::t(StringId::OTA_AUTO_RESTART_HINT) + "\n\n" +
+                              I18n::t(StringId::OTA_GITHUB_STAR_HINT);
+        drawOtaSuccessMessage(tft, I18n::t(StringId::OTA_UPDATE_SUCCESS), successBody,
+                              UiTheme::accentColor(tft));
+        delay(4000);
+        SettingsStore::setOtaJustInstalled(true);
+        ESP.restart();
+    }
+    // Fehlschlag: bewusst KEIN eigener Fehler-Screen hier (anders als im
+    // interaktiven runOtaUpdateScreen()-Pfad) - main.cpp::setup() faehrt
+    // direkt im Anschluss ganz normal weiter hoch, der Nutzer kann es
+    // spaeter jederzeit erneut ueber das Menue versuchen.
 }
 
 }

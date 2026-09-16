@@ -311,4 +311,18 @@ namespace SettingsStore {
     // Versionsnummer (Alex' ausdruecklicher Wunsch).
     bool otaJustInstalled();
     void setOtaJustInstalled(bool value);
+
+    // Persistenter "Update-Installation aussteht"-Zustand (Alex' Wunsch,
+    // siehe main.cpp::setup()/menu_screen.cpp::runPendingOtaInstall()) -
+    // wird vom "Update installieren"-Screen gesetzt, BEVOR der eigentliche
+    // Download beginnt, gefolgt von einem gezielten Neustart. Der naechste
+    // Boot liest das Flag ganz frueh aus (vor WLAN-Manager/NetTask/
+    // Radarscreen) und konsumiert es sofort (setzt es zurueck), damit ein
+    // fehlgeschlagener Versuch NIE in eine Neustart-Schleife fuehren kann -
+    // unabhaengig davon, ob der eigentliche Download/das Update danach
+    // gelingt oder fehlschlaegt.
+    bool otaPendingInstall();
+    const char* otaPendingInstallUrl();
+    void setOtaPendingInstall(const char* url);
+    void clearOtaPendingInstall();
 }

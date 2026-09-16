@@ -574,6 +574,7 @@ static const char* const I18N_ES[] = {
     "En cuanto aparece un avión de un tipo vigilado en cualquier parte del radar, recibe un anillo cian y el LED parpadea en azul, igual que la vigilancia de indicativo/squawk - genial para detectar un tipo de avión concreto, por ejemplo un avión de gran tamaño poco frecuente o un transporte militar.",
 
     "País: ",
+    "Reiniciando para la Actualización",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

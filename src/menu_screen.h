@@ -51,4 +51,20 @@ namespace MenuScreen {
     // Zeilenzahl zurueck (mindestens 1).
     int layoutTitleLines(TFT_eSPI& tft, const String& text, int16_t maxWidth,
                           String* outLines, int maxLines);
+
+    // Fuer main.cpp::setup() gedacht: wird ganz frueh im Boot aufgerufen
+    // (noch VOR WLAN-Manager/NetTask/Radarscreen), wenn SettingsStore::
+    // otaPendingInstall() true liefert - also ein "Update installieren"-Tap
+    // in einer FRUEHEREN Sitzung bereits die Download-URL gemerkt und
+    // gezielt neu gestartet hat (siehe settings_store.h fuer die
+    // ausfuehrliche Begruendung: ein frischer Boot hat einen praktisch
+    // unfragmentierten Heap, im Unterschied zu einer bereits stundenlang
+    // laufenden Sitzung). Konsumiert das Flag SOFORT (egal wie es danach
+    // ausgeht), verbindet minimal mit WLAN (blockierend, mit Timeout,
+    // OHNE die normale NetTask-Maschinerie) und fuehrt bei Erfolg den
+    // eigentlichen Download/Flash-Vorgang durch - bei Erfolg endet die
+    // Funktion NIE normal (ESP.restart()), bei jedem Fehlschlag (kein
+    // WLAN, Download-Fehler) kehrt sie einfach zurueck, main.cpp::setup()
+    // faehrt danach ganz normal weiter hoch, als waere nichts gewesen.
+    void runPendingOtaInstall(TFT_eSPI& tft);
 }

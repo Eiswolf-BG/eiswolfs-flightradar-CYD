@@ -192,9 +192,18 @@ bool performUpdate(const char* url, void (*onProgress)(uint8_t percent)) {
     // false" nach aussen gegeben, ohne den eigentlichen Grund (Timeout,
     // TLS-Fehler, HTTP-Statuscode...) festzuhalten. Damit laesst sich ein
     // fehlgeschlagener OTA-Versuch am Seriell-Monitor nachvollziehen, statt
-    // erneut raten zu muessen.
-    Serial.printf("[OTA] Start: url=%s freeHeap=%u RSSI=%ddBm\n", url,
-                  (unsigned)ESP.getFreeHeap(), WiFi.RSSI());
+    // erneut raten zu muessen. maxAlloc (groesster zusammenhaengender freier
+    // Speicherblock) bewusst dauerhaft mitgeloggt, nicht nur testweise
+    // (Alex' Meldung zu haengenden/fehlschlagenden Updates, siehe Diagnose
+    // im Chat): Update.begin() braucht selbst nur SPI_FLASH_SEC_SIZE
+    // (4096 Byte, siehe Updater.cpp) - ein "malloc failed" dort trotz
+    // gesund aussehendem freeHeap waere ein Fragmentierungs-Indiz (gleiche
+    // Bugklasse wie die bereits behobenen SSL-Speicherfehler bei Weather/
+    // ADS-B). Kostet nichts, spart aber bei einem kuenftigen Wiederauftreten
+    // dieses SELTENEN Fehlerbilds einen erneuten Diagnose-Umweg (extra
+    // Serial-Mitschnitt), da der Wert dann schon im ganz normalen Log steht.
+    Serial.printf("[OTA] Start: url=%s freeHeap=%u maxAlloc=%u RSSI=%ddBm\n", url,
+                  (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap(), WiFi.RSSI());
 
     // Diagnose-Fund (Alex' Meldung): wiederkehrende 600-1600ms-Aussetzer
     // alle ~16KB waehrend des firmware.bin-Downloads, dazwischen laeuft er
@@ -230,11 +239,28 @@ bool performUpdate(const char* url, void (*onProgress)(uint8_t percent)) {
     // menu_screen.cpp::runOtaUpdateScreen().
     httpUpdate.rebootOnUpdate(false);
 
-    if (onProgress) {
-        httpUpdate.onProgress([onProgress](int cur, int total) {
-            if (total > 0) onProgress((uint8_t)((cur * 100) / total));
-        });
-    }
+    // Feingranulare Fortschritts-Zeitmessung (Alex' Wunsch, Diagnose der
+    // extrem langsamen Downloads/Aussetzer im Chat) - loggt Zeitstempel
+    // relativ zum Download-Start alle ~100KB, unabhaengig vom UI-Callback
+    // (der nur die grobe Prozentzahl fuers Display braucht). Damit laesst
+    // sich am Seriell-Monitor objektiv sehen, ob ein Download gleichmaessig
+    // durchlaeuft oder irgendwo stockt/aussetzt, ohne dafuer extra einen
+    // neuen Diagnose-Durchgang aufsetzen zu muessen. Lambda faengt
+    // progressStartMs/lastLoggedStep per Referenz - unkritisch, da
+    // httpUpdate.update() unten blockierend im selben Stack-Frame laeuft,
+    // die Lambda also nie ueber das Ende dieser Funktion hinaus existiert.
+    constexpr int PROGRESS_LOG_STEP_BYTES = 100 * 1024;
+    uint32_t progressStartMs = millis();
+    int lastLoggedStep = -1;
+    httpUpdate.onProgress([onProgress, progressStartMs, &lastLoggedStep](int cur, int total) {
+        int step = cur / PROGRESS_LOG_STEP_BYTES;
+        if (step != lastLoggedStep) {
+            lastLoggedStep = step;
+            Serial.printf("[OTA] Fortschritt: %d/%d Bytes bei %ums seit Start\n", cur, total,
+                          (unsigned)(millis() - progressStartMs));
+        }
+        if (onProgress && total > 0) onProgress((uint8_t)((cur * 100) / total));
+    });
 
     t_httpUpdate_return result = httpUpdate.update(client, url);
 
@@ -245,9 +271,9 @@ bool performUpdate(const char* url, void (*onProgress)(uint8_t percent)) {
     WiFi.setSleep(prevWifiSleep);
 
     if (result != HTTP_UPDATE_OK) {
-        Serial.printf("[OTA] Fehlgeschlagen: result=%d error=%d (%s) freeHeap=%u\n", (int)result,
+        Serial.printf("[OTA] Fehlgeschlagen: result=%d error=%d (%s) freeHeap=%u maxAlloc=%u\n", (int)result,
                       httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str(),
-                      (unsigned)ESP.getFreeHeap());
+                      (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
     } else {
         Serial.println("[OTA] Erfolgreich heruntergeladen und geflasht.");
     }

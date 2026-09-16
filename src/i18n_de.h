@@ -574,6 +574,7 @@ static const char* const I18N_DE[] = {
     "Sobald ein Flugzeug eines beobachteten Typs irgendwo im Radar auftaucht, bekommt es einen cyanfarbenen Ring und die LED blinkt blau - genau wie bei der Rufzeichen-/Squawk-Wachliste, praktisch um z.B. seltene Großraumflugzeuge oder Militärtransporter zu erkennen.",
 
     "Land: ",
+    "Neustart fürs Update",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

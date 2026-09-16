@@ -576,6 +576,7 @@ static const char* const I18N_NL[] = {
     "Zodra een vliegtuig van een gevolgd type ergens op de radar verschijnt, krijgt het een cyaan ring en knippert de LED blauw, precies zoals bij de roepnaam-/squawk-bewaking - handig om bijv. een zeldzaam groot toestel of militair transportvliegtuig te spotten.",
 
     "Land: ",
+    "Herstart voor Update",
 };
 
 static_assert(sizeof(I18N_NL) / sizeof(I18N_NL[0]) == (size_t)StringId::COUNT,

@@ -104,6 +104,27 @@ namespace {
     // showWhatsNewIfNeeded().
     bool otaJustInstalledFlag = false;
 
+    // Vom "Update installieren"-Screen gesetzt (menu_screen.cpp::
+    // runOtaUpdateScreen()), direkt vor einem gezielten Neustart, BEVOR der
+    // eigentliche Download ueberhaupt beginnt - siehe main.cpp::setup(),
+    // das dieses Flag ganz frueh (vor WLAN-Manager/NetTask/Radarscreen)
+    // ausliest und bei true sofort in MenuScreen::runPendingOtaInstall()
+    // springt, statt normal weiterzubooten. Grund (Alex' Diagnose im Chat,
+    // maxAlloc-Messung): der Download+Update.begin() lief bisher immer aus
+    // der laufenden Sitzung heraus, deren Heap durch Stunden normalen
+    // Betriebs (ADS-B/Wetter/ISS/MQTT/ntfy) bereits fragmentiert war -
+    // "Updater.cpp: malloc failed" trotz gesund aussehendem freeHeap. Ein
+    // frischer Neustart unmittelbar vor dem Download hat einen praktisch
+    // unfragmentierten Heap. MUSS auf SD persistiert werden (nicht nur im
+    // RAM halten), gleiches Prinzip wie otaJustInstalledFlag oben.
+    bool otaPendingInstallFlag = false;
+    // Direkter Download-Link (GitHub "browser_download_url" fuer
+    // firmware.bin) - bereits bekannt aus der vorherigen checkForUpdate()-
+    // Abfrage in der laufenden Sitzung, spart nach dem Neustart eine
+    // zweite API-Abfrage. OtaUpdate::CheckInfo::downloadUrl ist char[192]
+    // (siehe ota_update.h) - hier ebenso dimensioniert.
+    char otaPendingInstallUrlBuf[192] = {0};
+
     void applyKeyValue(const String& key, const String& value) {
         if (key == "range_index") {
             int v = value.toInt();
@@ -218,6 +239,11 @@ namespace {
             lastSeenVersionBuf[sizeof(lastSeenVersionBuf) - 1] = 0;
         } else if (key == "ota_just_installed") {
             otaJustInstalledFlag = (value.toInt() != 0);
+        } else if (key == "ota_pending_install") {
+            otaPendingInstallFlag = (value.toInt() != 0);
+        } else if (key == "ota_pending_install_url") {
+            strncpy(otaPendingInstallUrlBuf, value.c_str(), sizeof(otaPendingInstallUrlBuf) - 1);
+            otaPendingInstallUrlBuf[sizeof(otaPendingInstallUrlBuf) - 1] = 0;
         }
     }
 }
@@ -307,6 +333,8 @@ void save() {
     f.printf("ntfy_push_topic=%s\n", ntfyPushTopicBuf);
     f.printf("last_seen_version=%s\n", lastSeenVersionBuf);
     f.printf("ota_just_installed=%d\n", otaJustInstalledFlag ? 1 : 0);
+    f.printf("ota_pending_install=%d\n", otaPendingInstallFlag ? 1 : 0);
+    f.printf("ota_pending_install_url=%s\n", otaPendingInstallUrlBuf);
     f.close();
 }
 
@@ -664,6 +692,22 @@ bool otaJustInstalled() { return otaJustInstalledFlag; }
 
 void setOtaJustInstalled(bool value) {
     otaJustInstalledFlag = value;
+    save();
+}
+
+bool otaPendingInstall() { return otaPendingInstallFlag; }
+
+const char* otaPendingInstallUrl() { return otaPendingInstallUrlBuf; }
+
+void setOtaPendingInstall(const char* url) {
+    otaPendingInstallFlag = true;
+    strncpy(otaPendingInstallUrlBuf, url, sizeof(otaPendingInstallUrlBuf) - 1);
+    otaPendingInstallUrlBuf[sizeof(otaPendingInstallUrlBuf) - 1] = 0;
+    save();
+}
+
+void clearOtaPendingInstall() {
+    otaPendingInstallFlag = false;
     save();
 }
 
