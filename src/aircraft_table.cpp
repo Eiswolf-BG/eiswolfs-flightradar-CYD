@@ -4,6 +4,7 @@
 #include "units.h"
 #include "settings_store.h"
 #include "session_stats.h"
+#include "daily_sightings.h"
 #include <algorithm>
 #include <atomic>
 #include <math.h>
@@ -219,6 +220,12 @@ void postFetchUpdate(double homeLat, double homeLon) {
         // Flugbuch-Schalter (SettingsStore::flightLogbookEnabled()), laeuft
         // also immer mit.
         SessionStats::record(a);
+
+        // Taeglicher (lokale Kalenderzeit) Sichtungszaehler fuers Detail-
+        // Panel (Alex' Wunsch, siehe daily_sightings.h) - eigenstaendig
+        // von SessionStats oben, da dort ausschliesslich seit dem letzten
+        // Neustart gezaehlt wird, hier dagegen taeglich zurueckgesetzt.
+        DailySightings::record(a);
 
         // "Ueberflug"-CPA (Closest Point of Approach, siehe aircraft.h::
         // cpaRelevant/cpaEtaMin und Config::CPA_*) - reine Momentaufnahme

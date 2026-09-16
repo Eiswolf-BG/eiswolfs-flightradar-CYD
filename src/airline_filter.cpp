@@ -150,14 +150,40 @@ bool isHidden(const char* callsign) {
     char prefix[4];
     extractPrefix(callsign, prefix);
     bool showOnlyMode = SettingsStore::airlineFilterShowOnlyMode();
-    if (!prefix[0]) return showOnlyMode;
 
     xSemaphoreTake(mutex, portMAX_DELAY);
+    // BUGFIX (Alex' Meldung: komplett leeres Radar trotz "noch nie eine
+    // Airline eingetragen", nur der Ereignis-Ecke-Hinweis zeigte
+    // faelschlich EIN Flugzeug als "durch Airline-Filter ausgeblendet"):
+    // im "Nur anzeigen"-Modus (Whitelist) mit LEERER Liste kann "found"
+    // unten nie true werden - "showOnlyMode ? !found : found" ergab damit
+    // fuer JEDES Flugzeug true, das Radar zeigte de facto nie irgendein
+    // Flugzeug an ("Leerer Himmel"), obwohl real welche in Reichweite
+    // waren. Eine leere Whitelist ist inhaltlich ein unkonfigurierter,
+    // bedeutungsloser Zustand ("noch keine Airline ausgewaehlt") - in
+    // diesem Fall wird jetzt NICHTS gefiltert (fail-open), statt
+    // versehentlich ALLES zu verstecken (fail-closed). Greift sowohl,
+    // wenn "Nur anzeigen" mit bereits leerer Liste aktiviert wurde, als
+    // auch wenn nachtraeglich die letzte verbliebene Airline waehrend
+    // aktivem "Nur anzeigen" entfernt wird.
+    if (showOnlyMode && hiddenCount == 0) {
+        xSemaphoreGive(mutex);
+        return false;
+    }
+
     bool found = false;
-    for (uint8_t i = 0; i < hiddenCount; i++) {
-        if (strcmp(hidden[i], prefix) == 0) { found = true; break; }
+    if (prefix[0]) {
+        for (uint8_t i = 0; i < hiddenCount; i++) {
+            if (strcmp(hidden[i], prefix) == 0) { found = true; break; }
+        }
     }
     xSemaphoreGive(mutex);
+
+    // Flugzeug ohne erkennbares Airline-Praefix (kein Callsign-Alpha-
+    // Praefix extrahierbar) - im "Nur anzeigen"-Modus gilt es als NICHT
+    // gelistet und wird deshalb ausgeblendet (siehe Kommentar oben der
+    // Funktion), im "Ausblenden"-Modus wird es nie gefiltert.
+    if (!prefix[0]) return showOnlyMode;
     return showOnlyMode ? !found : found;
 }
 

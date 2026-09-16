@@ -102,6 +102,16 @@ namespace FlightLogbook {
         bool found = false;
         uint16_t count = 0;
         char lastDate[11] = {0}; // "YYYY-MM-DD", nur gueltig wenn found true
+        // Uhrzeit der letzten frueheren Sichtung (aus derselben
+        // Logbuch-Zeile wie lastDate, kein zweiter Scan) - fuers "LAST:
+        // HH:MM" im Detail-Panel (Alex' Wunsch). Nur gueltig wenn found
+        // true. Bei mehreren Logbuch-Dateien mit demselben (juengsten)
+        // Datum (z.B. zwei Sitzungen am selben Tag) bewusst die Uhrzeit
+        // aus der zuerst gescannten dieser Dateien - SD.openNextFile()
+        // liefert keine garantierte Reihenfolge, exakt dieselbe bereits
+        // bestehende Ungenauigkeit wie bei lastDate selbst.
+        uint8_t lastHour = 0;
+        uint8_t lastMinute = 0;
 
         // "Smart Aircraft Recognition" - einfache Zeitmuster ueber alle
         // fruehreren Sichtungen hinweg, IM SELBEN Scan-Durchlauf wie

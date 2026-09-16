@@ -572,6 +572,8 @@ static const char* const I18N_TR[] = {
     "Tip izleme nasıl çalışır",
     "Bir uçak tipi kodu girin (örn. A380, B747, C17) - ayrıntı panelinde \"Tip:\" olarak gösterilen aynı kod, havayolu kodu değil. Aynı anda 5 adete kadar tip izlenebilir.",
     "İzlenen bir tipteki uçak radarda herhangi bir yerde göründüğünde, çevresinde camgöbeği bir halka belirir ve LED mavi yanıp söner - tıpkı çağrı işareti/squawk izleme gibi, örneğin nadir bir geniş gövdeli uçağı veya askeri nakliye uçağını fark etmek için harika.",
+
+    "Ülke: ",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

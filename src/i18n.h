@@ -1267,6 +1267,13 @@ enum class StringId : uint16_t {
     TYPE_WATCH_INFO_PARA1,
     TYPE_WATCH_INFO_PARA2,
 
+    // Herkunftsland aus dem ICAO-24-Bit-Hex-Code (hex_country.h,
+    // radar_screen.cpp::drawDetailPanel(), Alex' Wunsch) - haengt aus
+    // Platzgruenden an die bestehende Typ-Zeile an, KEINE eigene neue
+    // Panel-Zeile. Der Laendername selbst (z.B. "Germany") kommt direkt
+    // aus der Tabelle in hex_country.cpp, nur dieses Label wird uebersetzt.
+    DETAIL_COUNTRY_PREFIX,
+
     COUNT
 };
 

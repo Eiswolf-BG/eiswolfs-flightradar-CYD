@@ -572,6 +572,8 @@ static const char* const I18N_DE[] = {
     "Wie die Typ-Wachliste funktioniert",
     "Trage einen Flugzeugtyp-Code ein (z.B. A380, B747, C17) - denselben Code, der im Steckbrief als \"Typ:\" angezeigt wird, keinen Airline-Code. Bis zu 5 Typen lassen sich gleichzeitig beobachten.",
     "Sobald ein Flugzeug eines beobachteten Typs irgendwo im Radar auftaucht, bekommt es einen cyanfarbenen Ring und die LED blinkt blau - genau wie bei der Rufzeichen-/Squawk-Wachliste, praktisch um z.B. seltene Großraumflugzeuge oder Militärtransporter zu erkennen.",
+
+    "Land: ",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

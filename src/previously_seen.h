@@ -18,6 +18,11 @@ namespace PreviouslySeen {
         bool found = false;
         uint16_t count = 0;
         char lastDate[11] = {0}; // "YYYY-MM-DD", nur gueltig wenn found true
+        // Uhrzeit derselben letzten Sichtung (siehe FlightLogbook::
+        // PreviousSighting::lastHour/lastMinute) - nur gueltig wenn found
+        // true.
+        uint8_t lastHour = 0;
+        uint8_t lastMinute = 0;
 
         // "Smart Aircraft Recognition" - siehe FlightLogbook::
         // PreviousSighting im selben Scan-Durchlauf mit ermittelt, nur

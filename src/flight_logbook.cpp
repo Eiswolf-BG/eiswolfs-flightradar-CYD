@@ -962,7 +962,7 @@ namespace {
     // endet nach altitude_ft) liefern outHasProfile=false, statt einen
     // falschen/geratenen Wert zu erfinden - "fehlende Spalte" bedeutet
     // "kein Wert bekannt", nicht 0.
-    bool fileFindHexRow(File& f, const char* hex, uint8_t& outHour, int32_t& outAltitudeFt,
+    bool fileFindHexRow(File& f, const char* hex, uint8_t& outHour, uint8_t& outMinute, int32_t& outAltitudeFt,
                          bool& outHasProfile, float& outMinDistanceKm, float& outMaxSpeedKt) {
         constexpr size_t BUF_SIZE = 512;
         static uint8_t buf[BUF_SIZE];
@@ -984,11 +984,19 @@ namespace {
             if (hexLen == hexQueryLen && strncmp(p1 + 1, hex, hexLen) == 0) {
                 found = true;
                 // Spalte 0 (Zeitstempel) ist "YYYY-MM-DD HH:MM:SS" - Stunde
-                // steht immer an Zeichen 11-12, unabhaengig vom Rest.
-                if ((size_t)(p1 - lineBuf) >= 13 && isdigit((unsigned char)lineBuf[11]) && isdigit((unsigned char)lineBuf[12])) {
+                // steht immer an Zeichen 11-12, Minute an 14-15,
+                // unabhaengig vom Rest (fuer "LOCAL OVERFLIGHTS"/"LAST"-
+                // Anzeige im Steckbrief, Alex' Wunsch - selbe Zeile wie
+                // outHour, kein zweiter Scan noetig).
+                if ((size_t)(p1 - lineBuf) >= 16 && isdigit((unsigned char)lineBuf[11]) && isdigit((unsigned char)lineBuf[12])) {
                     outHour = (uint8_t)((lineBuf[11] - '0') * 10 + (lineBuf[12] - '0'));
                 } else {
                     outHour = 0;
+                }
+                if ((size_t)(p1 - lineBuf) >= 16 && isdigit((unsigned char)lineBuf[14]) && isdigit((unsigned char)lineBuf[15])) {
+                    outMinute = (uint8_t)((lineBuf[14] - '0') * 10 + (lineBuf[15] - '0'));
+                } else {
+                    outMinute = 0;
                 }
                 outAltitudeFt = 0;
                 outHasProfile = false;
@@ -1053,6 +1061,7 @@ PreviousSighting countPreviousSightings(const char* hex) {
     // ermittelt (funktioniert dank "YYYY-MM-DD"-Format lexikographisch
     // korrekt wie ein Datumsvergleich).
     char latestDate[11] = {0};
+    uint8_t latestHour = 0, latestMinute = 0;
 
     // "Smart Aircraft Recognition" - Zeit-/Hoehen-Spanne ueber alle
     // Treffer, im selben Durchlauf wie count/lastDate gesammelt (siehe
@@ -1085,16 +1094,18 @@ PreviousSighting countPreviousSightings(const char* hex) {
                 String dayKey = dateOnly.length() >= 10 ? dateOnly.substring(0, 10) : dateOnly;
                 bool isToday = timeKnown && dayKey == String(todayStr);
 
-                uint8_t rowHour = 0;
+                uint8_t rowHour = 0, rowMinute = 0;
                 int32_t rowAltitudeFt = 0;
                 bool rowHasProfile = false;
                 float rowMinDist = 0, rowMaxSpeed = 0;
-                if (!isToday && fileFindHexRow(entry, hex, rowHour, rowAltitudeFt,
+                if (!isToday && fileFindHexRow(entry, hex, rowHour, rowMinute, rowAltitudeFt,
                                                 rowHasProfile, rowMinDist, rowMaxSpeed)) {
                     result.count++;
                     if (strcmp(dayKey.c_str(), latestDate) > 0) {
                         strncpy(latestDate, dayKey.c_str(), sizeof(latestDate) - 1);
                         latestDate[sizeof(latestDate) - 1] = 0;
+                        latestHour = rowHour;
+                        latestMinute = rowMinute;
                     }
                     if (rowHour < minHour) minHour = rowHour;
                     if (rowHour > maxHour) maxHour = rowHour;
@@ -1117,6 +1128,8 @@ PreviousSighting countPreviousSightings(const char* hex) {
     if (result.found) {
         strncpy(result.lastDate, latestDate, sizeof(result.lastDate) - 1);
         result.lastDate[sizeof(result.lastDate) - 1] = 0;
+        result.lastHour = latestHour;
+        result.lastMinute = latestMinute;
     }
     if (result.count >= MIN_SIGHTINGS_FOR_PATTERN) {
         result.hasPattern = true;

@@ -572,6 +572,8 @@ static const char* const I18N_PT[] = {
     "Como funciona o monitoramento de tipo",
     "Digite um código de tipo de aeronave (ex. A380, B747, C17) - o mesmo código exibido como \"Tipo:\" no painel de detalhes, não um código de companhia aérea. É possível monitorar até 5 tipos ao mesmo tempo.",
     "Assim que um avião de um tipo monitorado aparece em qualquer lugar no radar, ele recebe um anel ciano e o LED pisca em azul, exatamente como o monitoramento de indicativo/squawk - ótimo para detectar um tipo de avião específico, por exemplo um avião de grande porte raro ou um transporte militar.",
+
+    "País: ",
 };
 
 static_assert(sizeof(I18N_PT) / sizeof(I18N_PT[0]) == (size_t)StringId::COUNT,

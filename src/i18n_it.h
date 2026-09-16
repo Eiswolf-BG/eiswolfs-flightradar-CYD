@@ -572,6 +572,8 @@ static const char* const I18N_IT[] = {
     "Come funziona il controllo tipo",
     "Inserisci un codice tipo aereo (es. A380, B747, C17) - lo stesso codice mostrato come \"Tipo:\" nel pannello dettagli, non un codice compagnia. Puoi monitorare fino a 5 tipi contemporaneamente.",
     "Non appena un aereo di un tipo monitorato appare ovunque sul radar, riceve un anello ciano e il LED lampeggia in blu, esattamente come il controllo nominativo/squawk - utile per individuare un tipo di aereo specifico, ad esempio un grande aereo raro o un trasporto militare.",
+
+    "Paese: ",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

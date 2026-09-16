@@ -68,6 +68,8 @@ void update() {
     result.found = sighting.found;
     result.count = sighting.count;
     strncpy(result.lastDate, sighting.lastDate, sizeof(result.lastDate) - 1);
+    result.lastHour = sighting.lastHour;
+    result.lastMinute = sighting.lastMinute;
     result.hasPattern = sighting.hasPattern;
     result.minHour = sighting.minHour;
     result.maxHour = sighting.maxHour;

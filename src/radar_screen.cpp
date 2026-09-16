@@ -20,6 +20,8 @@
 #include "squawk_watchlist.h"
 #include "type_watchlist.h"
 #include "watchlist_alert.h"
+#include "hex_country.h"
+#include "daily_sightings.h"
 #include "aircraft_watchlist_screen.h"
 #include "squawk_watchlist_screen.h"
 #include "airline_filter_screen.h"
@@ -2398,6 +2400,20 @@ namespace {
         y += LINE_H;
 
         String typeLine = String(I18n::t(StringId::DETAIL_TYPE)) + (a.typeCode[0] ? a.typeCode : I18n::t(StringId::DETAIL_UNKNOWN));
+        // Herkunftsland aus dem ICAO-24-Bit-Hex-Bereich (hex_country.h,
+        // Alex' Wunsch) haengt aus demselben Platzgrund wie Phase/
+        // Datenqualitaet an eine bestehende Zeile an - hier an die Typ-
+        // Zeile (beides kurze, statische Identitaets-Angaben). Registrierung
+        // (a.reg) wird bislang nirgends im Panel angezeigt, deshalb NUR das
+        // Land angehaengt, kein "REG:"-Zusatz. Nichts angehaengt, wenn der
+        // Hex-Code keinem der hinterlegten Bereiche zugeordnet werden kann
+        // (siehe HexCountry::lookup()) - keine geratene Angabe.
+        const char* country = HexCountry::lookup(a.hex);
+        if (country) {
+            typeLine += "  ";
+            typeLine += I18n::t(StringId::DETAIL_COUNTRY_PREFIX);
+            typeLine += country;
+        }
         updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.type, typeLine, forceFull);
         y += LINE_H;
 
@@ -2640,6 +2656,43 @@ namespace {
                      I18n::t(StringId::DETAIL_SEEN_FOR_PREFIX), seenForBuf);
         }
 
+        // Taeglicher Sichtungsstatus (Alex' Wunsch, daily_sightings.h)
+        // haengt aus demselben Platzgrund wie First-Seen/Previously-Seen
+        // ebenfalls an dieser Zeile an, direkt nach "Sichtbar seit" - beides
+        // "wann/wie oft heute gesehen"-Angaben. Feste englische Status-
+        // texte (kein StringId, gleiches Prinzip wie PHASE/DATA weiter
+        // oben) - NEW TODAY (erste Sichtung heute), SEEN Nx TODAY (schon
+        // mehrfach heute, aktuell durchgehend sichtbar) oder RETURNED
+        // AFTER Xh Ym (nach einer Pause von mehr als RETURN_GAP_MS wieder
+        // aufgetaucht, siehe daily_sightings.cpp). Nichts angehaengt, wenn
+        // noch kein Tages-Eintrag existiert (z.B. Systemzeit noch nicht
+        // NTP-synchronisiert) - keine geratene Angabe.
+        char dailyBuf[32] = {0};
+        DailySightings::Info daily = DailySightings::get(a.hex);
+        if (daily.available) {
+            switch (daily.state) {
+                case DailySightings::State::NewToday:
+                    strncpy(dailyBuf, "NEW TODAY", sizeof(dailyBuf) - 1);
+                    break;
+                case DailySightings::State::SeenToday:
+                    snprintf(dailyBuf, sizeof(dailyBuf), "SEEN %ux TODAY", (unsigned)daily.count);
+                    break;
+                case DailySightings::State::Returning: {
+                    uint32_t totalMin = daily.gapMs / 60000;
+                    uint32_t hh = totalMin / 60;
+                    uint32_t mm = totalMin % 60;
+                    if (hh > 0) {
+                        snprintf(dailyBuf, sizeof(dailyBuf), "RETURNED AFTER %uh %02um", (unsigned)hh, (unsigned)mm);
+                    } else {
+                        snprintf(dailyBuf, sizeof(dailyBuf), "RETURNED AFTER %um", (unsigned)mm);
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+
         // "Previously Seen" (echter Logbuch-Abgleich, siehe previously_seen.h/
         // flight_logbook.h::countPreviousSightings()) - haengt aus demselben
         // Platzgrund wie Trend/CPA/First-Seen oben ebenfalls an dieser Zeile
@@ -2662,9 +2715,22 @@ namespace {
             // gesehen" nicht relevant).
             int yy = 0, mm = 0, dd = 0;
             sscanf(previouslySeen.lastDate, "%d-%d-%d", &yy, &mm, &dd);
-            snprintf(previouslySeenBuf, sizeof(previouslySeenBuf), "%s%u%s%02d.%02d.",
+            // Uhrzeit der letzten fruehreren Sichtung (Alex' Wunsch: "wie
+            // oft insgesamt gesehen, plus Zeitpunkt der letzten Sichtung")
+            // direkt an DIESE bestehende Zeile angehaengt statt eine neue
+            // "LOCAL OVERFLIGHTS"-Zeile zu erzwingen - sie zeigt inhaltlich
+            // bereits GENAU dieselbe Kern-Information (Gesamtzahl fruehrer
+            // Sichtungen + Zeitpunkt der letzten), nur bisher ohne Uhrzeit.
+            // Eine zweite, separate Zeile mit im Kern denselben Zahlen
+            // waere reine Redundanz in einem ohnehin randvollen Panel.
+            // FlightLogbook::countPreviousSightings() liefert Stunde/Minute
+            // bereits aus demselben Scan-Durchlauf/derselben CSV-Zeile wie
+            // das Datum (siehe flight_logbook.cpp::fileFindHexRow()) - kein
+            // zusaetzlicher SD-Zugriff.
+            snprintf(previouslySeenBuf, sizeof(previouslySeenBuf), "%s%u%s%02d.%02d. %02u:%02u",
                      I18n::t(StringId::DETAIL_PREVIOUSLY_SEEN_PREFIX), previouslySeen.count,
-                     I18n::t(StringId::DETAIL_PREVIOUSLY_SEEN_MIDDLE), dd, mm);
+                     I18n::t(StringId::DETAIL_PREVIOUSLY_SEEN_MIDDLE), dd, mm,
+                     (unsigned)previouslySeen.lastHour, (unsigned)previouslySeen.lastMinute);
 
             // "Smart Aircraft Recognition" - einfaches Zeitmuster (Uhrzeit-
             // und Hoehen-Spanne der bisherigen Sichtungen), direkt an die
@@ -2739,11 +2805,11 @@ namespace {
                  I18n::t(StringId::DETAIL_LOOK_PREFIX), compassLabel(a.bearingDeg), elevDeg);
 
         char distBuf[560]; // vergroessert (vorher 400) fuer den neuen Hoehenwinkel- und Steckbrief-Zusatz
-        snprintf(distBuf, sizeof(distBuf), "%s%s  %s%.0f  %s  %s %s  %s  %s  %s",
+        snprintf(distBuf, sizeof(distBuf), "%s%s  %s%.0f  %s  %s %s  %s  %s  %s  %s",
                  I18n::t(StringId::DETAIL_DIST), distValBuf,
                  I18n::t(StringId::DETAIL_HDG), a.headingDeg,
                  lookBuf,
-                 trendSymbol, trendText, cpaBuf, firstSeenBuf, previouslySeenBuf);
+                 trendSymbol, trendText, cpaBuf, firstSeenBuf, dailyBuf, previouslySeenBuf);
         updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.distHeading, String(distBuf), forceFull);
         y += LINE_H;
 
