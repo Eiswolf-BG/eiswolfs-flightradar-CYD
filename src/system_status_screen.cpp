@@ -4,6 +4,7 @@
 #include "touch_input.h"
 #include "menu_stars.h"
 #include "settings_store.h"
+#include "perf_tuner.h"
 #include "config.h"
 #include "i18n.h"
 #include "ui_theme.h"
@@ -121,6 +122,21 @@ void run(TFT_eSPI& tft) {
             : String(I18n::t(StringId::CONNECTION_STATUS_RESULT_NONE));
         y = layoutWrapped(tft, LINE_X, y, LINE_MAX_W, LINE_H,
                            String(I18n::t(StringId::SYSTEM_STATUS_FETCH_DURATION_PREFIX)) + durationValue);
+
+        // Aktuelle PerfTuner-Stufe (perf_tuner.h, Alex' Wunsch: unauffaelliger
+        // Hinweis hier statt eines eigenen Panels) - nur bei Stufe > 0 die
+        // Stufenzahl einblenden, sonst schlicht "Normal".
+        uint8_t perfLevel = PerfTuner::currentLevel();
+        String perfValue;
+        if (perfLevel == 0) {
+            perfValue = I18n::t(StringId::SYSTEM_STATUS_PERF_NORMAL);
+        } else {
+            char perfBuf[24];
+            snprintf(perfBuf, sizeof(perfBuf), I18n::t(StringId::SYSTEM_STATUS_PERF_REDUCED), perfLevel);
+            perfValue = perfBuf;
+        }
+        y = layoutWrapped(tft, LINE_X, y, LINE_MAX_W, LINE_H,
+                           String(I18n::t(StringId::SYSTEM_STATUS_PERF_PREFIX)) + perfValue);
 
         Rect backBtn = {LINE_X, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
         drawButton(tft, backBtn, I18n::t(StringId::BACK));

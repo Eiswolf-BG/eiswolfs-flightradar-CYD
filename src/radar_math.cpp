@@ -31,12 +31,16 @@ PolarCoord toPolar(double lat0, double lon0, double lat1, double lon1) {
 }
 
 ScreenPoint toScreen(const PolarCoord& polar, int16_t centerX, int16_t centerY,
-                     int16_t radiusPx, float rangeKm) {
+                     int16_t radiusPx, float rangeKm, float rotationOffsetDeg) {
     float clampedKm = polar.distanceKm > rangeKm ? rangeKm : polar.distanceKm;
     float r = (clampedKm / rangeKm) * radiusPx;
 
     // bearing 0 = North = "up" on screen = negative Y direction.
-    double rad = polar.bearingDeg * DEG2RAD;
+    // rotationOffsetDeg wird VOR der Umrechnung abgezogen - bei "Follow-Me
+    // Modus" ist das die aktuelle Fahrtrichtung, dadurch landet ein
+    // Flugzeug genau in Fahrtrichtung wieder "oben" auf dem Bildschirm statt
+    // bei seiner tatsaechlichen Kompass-Peilung.
+    double rad = (polar.bearingDeg - rotationOffsetDeg) * DEG2RAD;
     float dx = r * sin(rad);
     float dy = -r * cos(rad);
 

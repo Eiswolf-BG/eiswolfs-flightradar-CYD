@@ -575,6 +575,15 @@ static const char* const I18N_FR[] = {
 
     "Pays : ",
     "Redémarrage pour la mise à jour",
+    "Mode Suivi",
+    "Mode Suivi",
+    "Pour une utilisation mobile avec un module GPS connecté : le radar oriente toujours le \"haut\" vers la direction de déplacement actuelle au lieu du nord, et effectue un zoom arrière automatique à vitesse plus élevée. Nécessite une position GPS valide et une vitesse supérieure à quelques km/h - sinon l'affichage revient à l'orientation nord habituelle.",
+    "Réglage Auto Performance",
+    "Réglage Auto Performance",
+    "Réduit automatiquement la charge de rendu (effets météo, animation du balayage, détail des silhouettes d'avions) lorsque la mémoire se raréfie ou que le temps d'image augmente, et rétablit le détail complet dès que la situation s'améliore. Purement visuel, sans effet sur les données de vol elles-mêmes.",
+    "Performance : ",
+    "Normal",
+    "Réduit (niveau %d/3)",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

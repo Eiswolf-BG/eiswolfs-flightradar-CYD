@@ -575,6 +575,15 @@ static const char* const I18N_TR[] = {
 
     "Ülke: ",
     "Güncelleme İçin Yeniden Başlatılıyor",
+    "Takip Modu",
+    "Takip Modu",
+    "GPS modülü bağlı mobil kullanım için: Radar, kuzey yerine her zaman mevcut hareket yönünü \"yukarı\" gösterecek şekilde döner ve daha yüksek hızlarda otomatik olarak uzaklaşır. Geçerli bir GPS konumu ve birkaç km/s üzerinde hız gerektirir - aksi halde ekran normal kuzey yönlü görünüme geri döner.",
+    "Performans Otomatik Ayarı",
+    "Performans Otomatik Ayarı",
+    "Bellek daraldığında veya kare süreleri arttığında render yükünü (hava efektleri, tarama animasyonu, uçak silüeti detayı) otomatik olarak azaltır ve değerler iyileştiğinde tam detayı geri yükler. Tamamen görsel, gerçek uçuş verilerini etkilemez.",
+    "Performans: ",
+    "Normal",
+    "Azaltıldı (seviye %d/3)",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

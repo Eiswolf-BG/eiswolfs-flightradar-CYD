@@ -22,6 +22,7 @@
 #include "watchlist_alert.h"
 #include "hex_country.h"
 #include "daily_sightings.h"
+#include "perf_tuner.h"
 #include "aircraft_watchlist_screen.h"
 #include "squawk_watchlist_screen.h"
 #include "airline_filter_screen.h"
@@ -671,6 +672,101 @@ namespace {
     float prevSweepAngleDeg = -1.0f;
     constexpr float SWEEP_DEGREES_PER_SEC = 45.0f;
 
+    // "Follow-Me Modus" (SettingsStore::followMeModeEnabled(), Alex' Wunsch
+    // fuer mobile Nutzung mit GPS-Modul) - die eigentliche Live-Zentrierung
+    // auf die GPS-Position passiert bereits von selbst ueber
+    // LocationManager::getHomeLocation() (nutzt bei aktivem GPS-Fix und
+    // "Automatisch"-Standort schon immer die aktuelle Position, siehe dort)
+    // - hier kommt nur noch die Drehung ("oben" = Fahrtrichtung statt
+    // Norden) und die geschwindigkeitsabhaengige automatische Zoomstufe
+    // dazu, beides rein in der Darstellung, ohne SettingsStore::rangeIndex()
+    // selbst zu veraendern.
+    //
+    // Geglaetteter Kurs statt des rohen GPS-Heading direkt: TinyGPSPlus'
+    // course-Wert schwankt besonders bei langsamer Fahrt/schlechtem Fix
+    // spuerbar von einem Fix zum naechsten - ein einfacher exponentieller
+    // Glaettungsfilter (IIR-Tiefpass) ueber mehrere Fixes hinweg verhindert
+    // ruckartige Sprung-Drehungen des ganzen Radarbilds. Kreisförmige
+    // Mittelung (kuerzester Winkel-Weg ueber die 0/360-Grad-Naht) noetig,
+    // da ein normaler linearer Mittelwert bei z.B. 350 Grad und 10 Grad
+    // faelschlich auf 180 Grad statt auf 0 Grad glaetten wuerde.
+    float smoothedHeadingDeg = 0.0f;
+    bool haveSmoothedHeading = false;
+    constexpr float HEADING_SMOOTHING_ALPHA = 0.35f;
+
+    // Unterhalb dieser Geschwindigkeit ist der GPS-Kurs praktisch nur noch
+    // Rauschen (kein echter Bewegungsvektor mehr messbar, v.a. bei
+    // Fussgaenger-Tempo/Stillstand) - Follow-Me faellt dann bewusst auf die
+    // normale Nordausrichtung zurueck, statt sich staendig zufaellig zu
+    // drehen. Deckt gleichzeitig Anforderung 5 (kein/verlorener GPS-Fix)
+    // mit ab, da hasGpsCourse()/hasGpsSpeed() dann ohnehin false liefern.
+    constexpr float FOLLOW_ME_MIN_HEADING_SPEED_KMH = 5.0f;
+
+    // Geschwindigkeitsschwellen fuer die automatische Zoomstufe (Anforderung
+    // 3) - bewusst grobe, plausible Groessenordnungen (Alex' Vorgabe: "muss
+    // nicht exakt sein"), keine feste Geschwindigkeits-Messung/Referenz.
+    // Erweitert die Reichweite nur nach OBEN gegenueber der manuell
+    // eingestellten Reichweite (siehe followMeEffectiveRangeIndex() unten) -
+    // ein bewusst enger gewaehlter manueller Zoom wird also nie automatisch
+    // WEITER hineingezoomt, nur ggf. weiter herausgezoomt.
+    struct FollowMeZoomStep { float minSpeedKmh; uint8_t minRangeIndex; };
+    constexpr FollowMeZoomStep FOLLOW_ME_ZOOM_STEPS[] = {
+        {30.0f, 1},  // Stadt-/Landstrassentempo -> mindestens 25km
+        {80.0f, 2},  // zuegige Landstrasse/Autobahn-Beginn -> mindestens 50km
+        {150.0f, 3}, // hohes Autobahntempo -> mindestens 100km
+    };
+    constexpr uint8_t FOLLOW_ME_ZOOM_STEP_COUNT =
+        sizeof(FOLLOW_ME_ZOOM_STEPS) / sizeof(FOLLOW_ME_ZOOM_STEPS[0]);
+
+    // Liefert 0.0f (= keine Drehung, normales Nord-oben-Verhalten), wenn der
+    // Modus aus ist oder aktuell kein brauchbarer GPS-Kurs vorliegt (deckt
+    // Anforderung 5 ab - sauberer Fallback statt Fehler/Absturz). Aktualisiert
+    // bei jedem Aufruf den geglaetteten Kurs weiter - wird nur aus render()
+    // aufgerufen (nicht aus dem haeufigeren tick()), die Drehung aktualisiert
+    // sich also im selben ~8s-Rhythmus wie neue ADS-B-Daten/GPS-Fixes.
+    float followMeRotationOffsetDeg() {
+        if (!SettingsStore::followMeModeEnabled()) { haveSmoothedHeading = false; return 0.0f; }
+        if (!LocationManager::hasGpsCourse() || !LocationManager::hasGpsSpeed()) {
+            haveSmoothedHeading = false;
+            return 0.0f;
+        }
+        float speedKmh = LocationManager::gpsSpeedKmh();
+        if (speedKmh < FOLLOW_ME_MIN_HEADING_SPEED_KMH) {
+            // Zu langsam fuer einen verlaesslichen Kurs - letzten
+            // geglaetteten Wert einfach beibehalten (kein Zurueckspringen
+            // auf Norden bei kurzem Ampelstopp), aber erst nach dem ersten
+            // brauchbaren Fix ueberhaupt.
+            return haveSmoothedHeading ? smoothedHeadingDeg : 0.0f;
+        }
+        float rawHeading = LocationManager::gpsCourseDeg();
+        if (!haveSmoothedHeading) {
+            smoothedHeadingDeg = rawHeading;
+            haveSmoothedHeading = true;
+        } else {
+            float diff = fmodf(rawHeading - smoothedHeadingDeg + 540.0f, 360.0f) - 180.0f;
+            smoothedHeadingDeg = fmodf(smoothedHeadingDeg + diff * HEADING_SMOOTHING_ALPHA + 360.0f, 360.0f);
+        }
+        return smoothedHeadingDeg;
+    }
+
+    // Liefert den tatsaechlich zu verwendenden Range-Wert in km - identisch
+    // zur manuell eingestellten Reichweite, ausser Follow-Me ist aktiv UND
+    // liefert eine brauchbare Geschwindigkeit oberhalb der niedrigsten
+    // Zoom-Schwelle (siehe FOLLOW_ME_ZOOM_STEPS oben).
+    float followMeEffectiveRangeKm(uint8_t manualRangeIndex) {
+        float manualKm = Config::RANGE_STEPS_KM[manualRangeIndex];
+        if (!SettingsStore::followMeModeEnabled() || !LocationManager::hasGpsSpeed()) return manualKm;
+
+        float speedKmh = LocationManager::gpsSpeedKmh();
+        uint8_t boostedIndex = manualRangeIndex;
+        for (uint8_t i = 0; i < FOLLOW_ME_ZOOM_STEP_COUNT; i++) {
+            if (speedKmh >= FOLLOW_ME_ZOOM_STEPS[i].minSpeedKmh && FOLLOW_ME_ZOOM_STEPS[i].minRangeIndex > boostedIndex) {
+                boostedIndex = FOLLOW_ME_ZOOM_STEPS[i].minRangeIndex;
+            }
+        }
+        return Config::RANGE_STEPS_KM[boostedIndex];
+    }
+
     // Volle Umdrehung in ms - Fade-Dauer des CRT-Phosphor-Effekts (siehe
     // crtPhosphorColor() unten), an SWEEP_DEGREES_PER_SEC gekoppelt statt
     // fest verdrahtet, damit beides zwangslaeufig synchron bleibt.
@@ -1120,8 +1216,13 @@ namespace {
     // Himmel zu finden ("in diese Richtung schauen"). Nur fuer den Moment
     // des Zeichnens relevant - beim naechsten Sweep-Tick/Redraw wird sie vom
     // normalen Hintergrund-Redraw automatisch mit geloescht und neu gesetzt.
-    void drawBearingIndicator(TFT_eSPI& gfx, const Layout& L, float bearingDeg) {
-        double rad = bearingDeg * PI / 180.0;
+    // rotationOffsetDeg (Default 0) verschiebt nur die GEZEICHNETE Linie um
+    // denselben Winkel wie die Marker/den Kompass-Hintergrund (Follow-Me
+    // Modus) - die gedruckte Gradzahl bleibt bewusst die echte, unrotierte
+    // Kompasspeilung (bearingDeg), sonst wuerde dort ein fuer den Nutzer
+    // irrefuehrender, relativer Wert statt der tatsaechlichen Peilung stehen.
+    void drawBearingIndicator(TFT_eSPI& gfx, const Layout& L, float bearingDeg, float rotationOffsetDeg = 0.0f) {
+        double rad = (bearingDeg - rotationOffsetDeg) * PI / 180.0;
         double s = sin(rad), c = cos(rad);
 
         // Gepunktete Linie: kurze Segmente statt einer durchgezogenen Linie,
@@ -1737,6 +1838,15 @@ namespace {
     // bleiben eigenstaendige, bereits silhouettenartige Formen).
     void drawTypedMarker(TFT_eSPI& gfx, int16_t x, int16_t y, float headingDeg, uint16_t color,
                           TypeSilhouette sil, bool heavy) {
+        // PerfTuner::silhouetteDetailReduced() (Stufe >= 3, teuerste/am
+        // spaetesten gezogene Massnahme) erzwingt bei vielen sichtbaren
+        // Flugzeugen die guenstigste Marker-Form (einfacher Pfeil statt der
+        // mehrteiligen Typ-Silhouetten) - normalisiert sich automatisch
+        // wieder, sobald PerfTuner zurueckstuft.
+        if (PerfTuner::silhouetteDetailReduced()) {
+            drawAircraftMarker(gfx, x, y, headingDeg, color, heavy);
+            return;
+        }
         switch (sil) {
             case TypeSilhouette::Airliner:   drawAirlinerMarker(gfx, x, y, headingDeg, color, heavy); break;
             case TypeSilhouette::PrivateJet: drawPrivateJetMarker(gfx, x, y, headingDeg, color, heavy); break;
@@ -1988,12 +2098,37 @@ namespace {
         }
     }
 
-    void drawStaticBackground(TFT_eSPI& gfx, const Layout& L, float rangeKm) {
+    // rotationOffsetDeg (Default 0 = bisheriges Verhalten) dreht Kreuzlinien/
+    // Speichen/N-S-E-W-Beschriftung/Ring-Distanzbeschriftung gemeinsam um
+    // denselben Winkel wie die Flugzeug-Marker (siehe RadarMath::toScreen())
+    // - fuer den "Follow-Me Modus", der das ganze Radarbild auf die aktuelle
+    // Fahrtrichtung ausrichtet statt fest auf Norden. Bei 0 Grad IDENTISCH
+    // zum vorherigen, rein achsenparallelen Kreuz (dort weiterhin
+    // drawFastHLine/VLine statt der rotierten drawLine()-Variante, minimal
+    // schneller/schaerfer - kein Grund, den unrotierten Standardfall
+    // unnoetig zu verlangsamen). Die vier Himmelsrichtungs-Labels sitzen bei
+    // Rotation absichtlich ALLE auf demselben Innenradius wie bisher nur E/W
+    // (radius-10, statt N aussen/S+E+W innen wie im urspruenglichen
+    // unrotierten Layout) - bei beliebigem Drehwinkel koennte sonst jedes
+    // der vier Labels je nach aktueller Fahrtrichtung mal aussen, mal innen
+    // landen und mit Kopf-/Infozeile kollidieren.
+    void drawStaticBackground(TFT_eSPI& gfx, const Layout& L, float rangeKm, float rotationOffsetDeg = 0.0f) {
         gfx.drawCircle(L.cx, L.cy, L.radius, TFT_DARKGREY);
         gfx.drawCircle(L.cx, L.cy, L.radius * 2 / 3, TFT_DARKGREY);
         gfx.drawCircle(L.cx, L.cy, L.radius / 3, TFT_DARKGREY);
-        gfx.drawFastHLine(L.cx - L.radius, L.cy, L.radius * 2, TFT_DARKGREY);
-        gfx.drawFastVLine(L.cx, L.cy - L.radius, L.radius * 2, TFT_DARKGREY);
+
+        if (rotationOffsetDeg == 0.0f) {
+            gfx.drawFastHLine(L.cx - L.radius, L.cy, L.radius * 2, TFT_DARKGREY);
+            gfx.drawFastVLine(L.cx, L.cy - L.radius, L.radius * 2, TFT_DARKGREY);
+        } else {
+            constexpr int16_t CROSS_ANGLES_DEG[4] = {0, 90, 180, 270};
+            for (uint8_t i = 0; i < 4; i++) {
+                double rad = (double)(CROSS_ANGLES_DEG[i] - rotationOffsetDeg) * DEG_TO_RAD;
+                int16_t x2 = L.cx + (int16_t)(L.radius * sin(rad));
+                int16_t y2 = L.cy - (int16_t)(L.radius * cos(rad));
+                gfx.drawLine(L.cx, L.cy, x2, y2, TFT_DARKGREY);
+            }
+        }
 
         // "Klassik-Radar", Teil 2: zusaetzliche Rasterspeichen alle 30 Grad
         // (SettingsStore::classicRadarEnabled()) - die 4 Hauptrichtungen
@@ -2012,7 +2147,7 @@ namespace {
             uint16_t spokeColor = scaleColorBrightness(TFT_DARKGREY, 0.45f);
             constexpr int16_t SPOKE_ANGLES_DEG[8] = {30, 60, 120, 150, 210, 240, 300, 330};
             for (uint8_t i = 0; i < 8; i++) {
-                double rad = (double)SPOKE_ANGLES_DEG[i] * DEG_TO_RAD;
+                double rad = (double)(SPOKE_ANGLES_DEG[i] - rotationOffsetDeg) * DEG_TO_RAD;
                 int16_t x2 = L.cx + (int16_t)(L.radius * sin(rad));
                 int16_t y2 = L.cy - (int16_t)(L.radius * cos(rad));
                 gfx.drawLine(L.cx, L.cy, x2, y2, spokeColor);
@@ -2021,22 +2156,39 @@ namespace {
 
         gfx.setTextColor(TFT_DARKGREY, TFT_BLACK);
         gfx.setTextDatum(MC_DATUM);
-        gfx.drawString("N", L.cx, L.cy - L.radius - 8);
-        gfx.drawString("S", L.cx, L.cy + L.radius - 10);
-        gfx.drawString("E", L.cx + L.radius - 10, L.cy);
-        gfx.drawString("W", L.cx - L.radius + 10, L.cy);
+        if (rotationOffsetDeg == 0.0f) {
+            gfx.drawString("N", L.cx, L.cy - L.radius - 8);
+            gfx.drawString("S", L.cx, L.cy + L.radius - 10);
+            gfx.drawString("E", L.cx + L.radius - 10, L.cy);
+            gfx.drawString("W", L.cx - L.radius + 10, L.cy);
+        } else {
+            constexpr const char* COMPASS_LABELS[4] = {"N", "E", "S", "W"};
+            for (uint8_t i = 0; i < 4; i++) {
+                double rad = (double)(i * 90 - rotationOffsetDeg) * DEG_TO_RAD;
+                int16_t lx = L.cx + (int16_t)((L.radius - 10) * sin(rad));
+                int16_t ly = L.cy - (int16_t)((L.radius - 10) * cos(rad));
+                gfx.drawString(COMPASS_LABELS[i], lx, ly);
+            }
+        }
 
         // Ring-Beschriftungen (Zwischenabstaende) respektieren jetzt die
         // Einheiten-Einstellung (Menue > Einheiten) - vorher immer in km,
         // auch wenn Imperial (nm) eingestellt war. Gleiches Umrechnungs-
-        // Muster wie beim Range-Button unten und der Legende oben.
+        // Muster wie beim Range-Button unten und der Legende oben. Sitzen
+        // bei Rotation weiterhin auf der (jetzt ggf. gedrehten) Nord-
+        // Speiche statt fest an der Bildschirm-Oberkante.
         bool metric = LocationManager::useMetricUnits();
         float displayRange = metric ? rangeKm : Units::kmToNm(rangeKm);
         char ringLabel[8];
+        double northRad = (double)(0 - rotationOffsetDeg) * DEG_TO_RAD;
+        int16_t ringDx1 = (int16_t)((L.radius / 3) * sin(northRad));
+        int16_t ringDy1 = -(int16_t)((L.radius / 3) * cos(northRad));
+        int16_t ringDx2 = (int16_t)((L.radius * 2 / 3) * sin(northRad));
+        int16_t ringDy2 = -(int16_t)((L.radius * 2 / 3) * cos(northRad));
         snprintf(ringLabel, sizeof(ringLabel), "%.0f", displayRange / 3);
-        gfx.drawString(ringLabel, L.cx, L.cy - L.radius / 3);
+        gfx.drawString(ringLabel, (int16_t)(L.cx + ringDx1), (int16_t)(L.cy + ringDy1));
         snprintf(ringLabel, sizeof(ringLabel), "%.0f", displayRange * 2 / 3);
-        gfx.drawString(ringLabel, L.cx, L.cy - L.radius * 2 / 3);
+        gfx.drawString(ringLabel, (int16_t)(L.cx + ringDx2), (int16_t)(L.cy + ringDy2));
         gfx.setTextDatum(TL_DATUM);
     }
 
@@ -3940,7 +4092,8 @@ bool consumeHeaderRedrawFlag() {
 
 void render(TFT_eSPI& tft, int16_t top) {
     Layout L = computeLayout(top);
-    float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
+    float rangeKm = followMeEffectiveRangeKm(SettingsStore::rangeIndex());
+    float followMeRotDeg = followMeRotationOffsetDeg();
 
     // Radar-Puls-Trigger: NUR bei echter Datenaenderung (Versionsvergleich),
     // nicht bei jedem render()-Aufruf - siehe Kommentar bei lastPulseVersion
@@ -4007,12 +4160,16 @@ void render(TFT_eSPI& tft, int16_t top) {
     drawNearestAircraftCorner(tft, top);
 
     if (SettingsStore::worldMapBackgroundEnabled()) drawWorldMap(tft, L);
-    drawStaticBackground(tft, L, rangeKm);
+    drawStaticBackground(tft, L, rangeKm, followMeRotDeg);
 
-    if (SettingsStore::classicRadarEnabled()) {
-        drawSweepTail(tft, L, sweepAngleDeg, sweepLineColor(tft));
+    float drawnSweepAngleDeg = sweepAngleDeg - followMeRotDeg;
+    // PerfTuner::sweepSimplified() (Stufe >= 2) erzwingt die einfache
+    // Sweep-Linie statt des Kometenschweifs (8 statt 1 Liniensegment pro
+    // Tick), unabhaengig von SettingsStore::classicRadarEnabled() selbst.
+    if (SettingsStore::classicRadarEnabled() && !PerfTuner::sweepSimplified()) {
+        drawSweepTail(tft, L, drawnSweepAngleDeg, sweepLineColor(tft));
     } else {
-        drawSweepLine(tft, L, sweepAngleDeg, sweepLineColor(tft));
+        drawSweepLine(tft, L, drawnSweepAngleDeg, sweepLineColor(tft));
     }
     prevSweepAngleDeg = sweepAngleDeg;
 
@@ -4065,7 +4222,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         visibleCount++;
 
         RadarMath::PolarCoord polar{a.distanceKm, a.bearingDeg};
-        RadarMath::ScreenPoint pt = RadarMath::toScreen(polar, L.cx, L.cy, L.radius, rangeKm);
+        RadarMath::ScreenPoint pt = RadarMath::toScreen(polar, L.cx, L.cy, L.radius, rangeKm, followMeRotDeg);
 
         // ADS-B-Emitter-Kategorie "C*" = Bodenfahrzeug (nur ueberhaupt
         // sichtbar, wenn "Bodenfahrzeuge ausblenden" aus ist, siehe Filter
@@ -4163,17 +4320,23 @@ void render(TFT_eSPI& tft, int16_t top) {
             strncpy(eventCorner.watchlistCallsign, a.callsign, sizeof(eventCorner.watchlistCallsign) - 1);
         }
 
+        // Rotierte Fassung des Flugzeug-eigenen Kurses fuer die Marker-Form
+        // selbst (Nase/Chevron zeigen sonst in eine falsche Richtung relativ
+        // zum jetzt evtl. gedrehten Kompass-Hintergrund) - a.headingDeg
+        // bleibt an allen anderen Stellen (Detail-Panel-Textanzeige) unangetastet.
+        float markerHeadingDeg = a.headingDeg - followMeRotDeg;
+
         if (isSelected) {
             tft.drawCircle(pt.x, pt.y, 9, TFT_WHITE);
             lastKnownAircraft = a;
-            drawBearingIndicator(tft, L, a.bearingDeg);
+            drawBearingIndicator(tft, L, a.bearingDeg, followMeRotDeg);
         }
         if (isGroundVehicle) {
             drawGroundVehicleMarker(tft, pt.x, pt.y, color);
         } else if (isRotorcraft) {
             drawHelicopterMarker(tft, pt.x, pt.y, color);
         } else {
-            drawTypedMarker(tft, pt.x, pt.y, a.headingDeg, color, typeSilhouette, isHeavy);
+            drawTypedMarker(tft, pt.x, pt.y, markerHeadingDeg, color, typeSilhouette, isHeavy);
         }
         drawVertTrendArrow(tft, pt.x, pt.y, computeVertTrend(a.vertRateFtMin), color);
 
@@ -4204,7 +4367,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         const char* label = a.callsign[0] ? a.callsign : a.hex;
         LabelAnchor labelAnchor = (isGroundVehicle || isRotorcraft)
             ? LabelAnchor{pt.x, (int16_t)(pt.y - 8), BC_DATUM}
-            : computeLabelAnchor(tft, pt.x, pt.y, a.headingDeg, label);
+            : computeLabelAnchor(tft, pt.x, pt.y, markerHeadingDeg, label);
         tft.setTextColor(color);
         tft.setTextDatum(labelAnchor.datum);
         tft.drawString(label, labelAnchor.x, labelAnchor.y);
@@ -4214,7 +4377,7 @@ void render(TFT_eSPI& tft, int16_t top) {
         hitPoints[i].y = pt.y;
         hitPoints[i].valid = true;
         hitPoints[i].color = color;
-        hitPoints[i].headingDeg = a.headingDeg;
+        hitPoints[i].headingDeg = markerHeadingDeg;
         hitPoints[i].distanceKm = a.distanceKm;
         hitPoints[i].isEmergency = isEmergency;
         hitPoints[i].isWatched = isWatched;
@@ -4328,7 +4491,8 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     }
 
     Layout L = computeLayout(top);
-    float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
+    float rangeKm = followMeEffectiveRangeKm(SettingsStore::rangeIndex());
+    float followMeRotDeg = followMeRotationOffsetDeg();
 
     tft.startWrite();
 
@@ -4347,10 +4511,11 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     drawNearestAircraftCorner(tft, top);
 
     if (prevSweepAngleDeg >= 0.0f) {
-        if (SettingsStore::classicRadarEnabled()) {
-            eraseSweepTail(tft, L, prevSweepAngleDeg);
+        float drawnPrevSweepAngleDeg = prevSweepAngleDeg - followMeRotDeg;
+        if (SettingsStore::classicRadarEnabled() && !PerfTuner::sweepSimplified()) {
+            eraseSweepTail(tft, L, drawnPrevSweepAngleDeg);
         } else {
-            drawSweepLine(tft, L, prevSweepAngleDeg, TFT_BLACK);
+            drawSweepLine(tft, L, drawnPrevSweepAngleDeg, TFT_BLACK);
         }
         // Alten Radar-Puls-Ring (falls im letzten Tick gezeichnet) ebenfalls
         // erst schwarz uebermalen, BEVOR der statische Hintergrund
@@ -4408,7 +4573,7 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             tft.drawLine(rainDrops[i].prevX1, rainDrops[i].prevY1,
                          rainDrops[i].prevX2, rainDrops[i].prevY2, TFT_BLACK);
         }
-        drawStaticBackground(tft, L, rangeKm);
+        drawStaticBackground(tft, L, rangeKm, followMeRotDeg);
         tft.fillCircle(L.cx, L.cy, 3, TFT_WHITE);
     }
 
@@ -4416,10 +4581,14 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     sweepAngleDeg += SWEEP_DEGREES_PER_SEC * (deltaMs / 1000.0f);
     if (sweepAngleDeg >= 360.0f) sweepAngleDeg -= 360.0f;
 
-    if (SettingsStore::classicRadarEnabled()) {
-        drawSweepTail(tft, L, sweepAngleDeg, sweepLineColor(tft));
+    float drawnSweepAngleDeg = sweepAngleDeg - followMeRotDeg;
+    // PerfTuner::sweepSimplified() (Stufe >= 2) erzwingt die einfache
+    // Sweep-Linie statt des Kometenschweifs (8 statt 1 Liniensegment pro
+    // Tick), unabhaengig von SettingsStore::classicRadarEnabled() selbst.
+    if (SettingsStore::classicRadarEnabled() && !PerfTuner::sweepSimplified()) {
+        drawSweepTail(tft, L, drawnSweepAngleDeg, sweepLineColor(tft));
     } else {
-        drawSweepLine(tft, L, sweepAngleDeg, sweepLineColor(tft));
+        drawSweepLine(tft, L, drawnSweepAngleDeg, sweepLineColor(tft));
     }
     prevSweepAngleDeg = sweepAngleDeg;
 
@@ -4545,7 +4714,12 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     {
         Weather::Condition cond = Weather::current();
         float windDir = Weather::currentWindDirectionDeg();
-        bool rainy = SettingsStore::rainEffectEnabled() &&
+        // PerfTuner::weatherEffectsSuppressed() (Stufe >= 1, guenstigste
+        // Massnahme zuerst) unterdrueckt den Effekt zusaetzlich zur eigenen
+        // SettingsStore::rainEffectEnabled()-Einstellung, OHNE diese
+        // Einstellung selbst zu veraendern - normalisiert sich also von
+        // selbst wieder, sobald PerfTuner zurueckstuft.
+        bool rainy = SettingsStore::rainEffectEnabled() && !PerfTuner::weatherEffectsSuppressed() &&
                      (cond == Weather::Condition::Rain || cond == Weather::Condition::Thunderstorm) && windDir >= 0.0f;
         RainParams params = rainParamsForIntensity(Weather::currentRainIntensity());
         float step = params.speedPxPerSec * (deltaMs / 1000.0f);
@@ -4824,7 +4998,7 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
             LocationManager::getHomeLocation(homeLat, homeLon);
             RadarMath::PolarCoord issPolar = RadarMath::toPolar(homeLat, homeLon, iss.lat, iss.lon);
             if (issPolar.distanceKm <= rangeKm * 1.05f) {
-                RadarMath::ScreenPoint issPt = RadarMath::toScreen(issPolar, L.cx, L.cy, L.radius, rangeKm);
+                RadarMath::ScreenPoint issPt = RadarMath::toScreen(issPolar, L.cx, L.cy, L.radius, rangeKm, followMeRotDeg);
                 drawIssMarker(tft, issPt.x, issPt.y);
                 tft.setTextColor(ISS_MARKER_COLOR);
                 tft.setTextDatum(BC_DATUM);

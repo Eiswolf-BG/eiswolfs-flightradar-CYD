@@ -153,6 +153,20 @@ void requestIpLookupIfNeeded() {
 }
 
 void getHomeLocation(double& lat, double& lon) {
+    // "Follow-Me Modus" (SettingsStore::followMeModeEnabled(), radar_screen.cpp)
+    // ist ein bewusst expliziter "ignoriere meinen festen Standort, ich bin
+    // gerade unterwegs"-Modus - deshalb hier VOR der sonst vorrangigen
+    // Preset-Pruefung, damit ein zufaellig noch aktives Standort-Preset
+    // (z.B. vom letzten Zuhause-Test) die Live-GPS-Zentrierung nicht
+    // versehentlich blockiert. Ohne gueltigen GPS-Fix faellt der Code
+    // unveraendert durch zur bisherigen Preset-/Persistenz-Kette (Anforderung
+    // 5: sauberer Fallback statt Fehler/Absturz).
+    if (SettingsStore::followMeModeEnabled() && gps.location.isValid()) {
+        lat = gps.location.lat();
+        lon = gps.location.lng();
+        return;
+    }
+
     int8_t presetIdx = LocationPresets::activeIndex();
     if (presetIdx >= 0) {
         LocationPresets::getLatLon((uint8_t)presetIdx, lat, lon);
@@ -203,6 +217,11 @@ bool currentGpsPosition(double& lat, double& lon) {
 
 bool hasGpsAltitude() { return gps.altitude.isValid(); }
 double gpsAltitudeMeters() { return gps.altitude.meters(); }
+
+bool hasGpsCourse() { return gps.location.isValid() && gps.course.isValid(); }
+float gpsCourseDeg() { return (float)gps.course.deg(); }
+bool hasGpsSpeed() { return gps.location.isValid() && gps.speed.isValid(); }
+float gpsSpeedKmh() { return (float)gps.speed.kmph(); }
 
 bool hasUtcOffset() { return haveUtcOffset; }
 int32_t utcOffsetSeconds() { return utcOffsetSecs; }

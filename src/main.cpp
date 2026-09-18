@@ -33,6 +33,7 @@
 #include "settings_store.h"
 #include "net_task.h"
 #include "radar_screen.h"
+#include "perf_tuner.h"
 #include "splash_screen.h"
 #include "led_alert.h"
 #include "speaker_alert.h"
@@ -2181,6 +2182,15 @@ void loop() {
         if (nowMs - lastSweepMs >= SWEEP_TICK_MS) {
             uint32_t deltaMs = nowMs - lastSweepMs;
             lastSweepMs = nowMs;
+            // Performance-Auto-Tuning (perf_tuner.h) - deltaMs ist hier
+            // bereits vorhanden (Ziel: SWEEP_TICK_MS=80ms), ein deutlich
+            // groesserer Wert zeigt einen haengenden Hauptloop (z.B. durch
+            // einen schweren render()-Durchlauf) an, dient als einfacher
+            // "Framerate"-Proxy ohne eigene Mess-Infrastruktur. update()
+            // ist intern selbst gedrosselt (~alle 2s), kann also bedenkenlos
+            // bei jedem Tick aufgerufen werden.
+            PerfTuner::recordFrameMs(deltaMs);
+            PerfTuner::update();
             RadarScreen::tick(tft, CONTENT_TOP, deltaMs);
             updateEmergencyBanner(nowMs);
         }

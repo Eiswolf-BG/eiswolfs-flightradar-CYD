@@ -1282,6 +1282,36 @@ enum class StringId : uint16_t {
     // drawOtaSuccessMessage() angezeigt.
     OTA_RESTART_TITLE,
 
+    // "Follow-Me Modus" (Menue > System > Anzeige > Radar-Darstellung,
+    // radar_theme_screen.cpp, AUS per Default) - fuer mobile Nutzung mit
+    // GPS-Modul: dreht das Radarbild auf die aktuelle Fahrtrichtung statt
+    // fest auf Norden und zoomt bei hoeherer Geschwindigkeit automatisch
+    // weiter heraus. Die eigentliche Live-Zentrierung auf die GPS-Position
+    // passiert unabhaengig davon bereits ueber "Automatisch"-Standort + GPS
+    // (LocationManager::getHomeLocation()). Gleiches Namensmuster wie
+    // MENU_MILITARY_SQUAWK/MILITARY_SQUAWK_INFO_TITLE/_INFO_BODY oben.
+    MENU_FOLLOW_ME_MODE,
+    FOLLOW_ME_MODE_INFO_TITLE,
+    FOLLOW_ME_MODE_INFO_BODY,
+
+    // "Performance-Auto-Tuning" (Menue > System > Anzeige > Radar-
+    // Darstellung, radar_theme_screen.cpp, AN per Default) - siehe
+    // PerfTuner (perf_tuner.h/.cpp) und SettingsStore::
+    // perfAutoTuningEnabled(). Gleiches Namensmuster wie
+    // MENU_FOLLOW_ME_MODE/FOLLOW_ME_MODE_INFO_TITLE/_INFO_BODY oben.
+    MENU_PERF_AUTO_TUNING,
+    PERF_AUTO_TUNING_INFO_TITLE,
+    PERF_AUTO_TUNING_INFO_BODY,
+
+    // Zusaetzliche Zeile im System-Status-Screen (system_status_screen.cpp) -
+    // zeigt die aktuelle PerfTuner-Stufe an (SYSTEM_STATUS_PERF_NORMAL bei
+    // Stufe 0, sonst SYSTEM_STATUS_PERF_REDUCED mit eingesetzter Stufenzahl
+    // ueber snprintf, "%d" Platzhalter MUSS in jeder Uebersetzung enthalten
+    // bleiben).
+    SYSTEM_STATUS_PERF_PREFIX,
+    SYSTEM_STATUS_PERF_NORMAL,
+    SYSTEM_STATUS_PERF_REDUCED,
+
     COUNT
 };
 

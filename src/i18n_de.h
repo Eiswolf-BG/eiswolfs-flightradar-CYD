@@ -575,6 +575,15 @@ static const char* const I18N_DE[] = {
 
     "Land: ",
     "Neustart fürs Update",
+    "Follow-Me Modus",
+    "Follow-Me Modus",
+    "Für mobile Nutzung mit angeschlossenem GPS-Modul: Das Radar richtet \"oben\" immer nach der aktuellen Fahrtrichtung statt nach Norden aus und zoomt bei höherer Geschwindigkeit automatisch weiter heraus. Setzt einen gültigen GPS-Fix und eine Geschwindigkeit von mehr als wenigen km/h voraus - sonst fällt die Anzeige auf die normale Nordausrichtung zurück.",
+    "Performance-Auto-Tuning",
+    "Performance-Auto-Tuning",
+    "Reduziert automatisch die Render-Last (Wetter-Effekte, Sweep-Animation, Detailgrad der Flugzeug-Silhouetten), wenn Speicher knapp wird oder die Bildrate sinkt, und stellt die volle Detailstufe wieder her, sobald sich die Werte erholen. Rein visuell, hat keinen Einfluss auf die eigentlichen Flugdaten.",
+    "Performance: ",
+    "Normal",
+    "Reduziert (Stufe %d/3)",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

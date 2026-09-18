@@ -221,6 +221,31 @@ namespace SettingsStore {
     bool militarySquawkDetectionEnabled();
     void setMilitarySquawkDetectionEnabled(bool on);
 
+    // "Follow-Me Modus" (System > Radar-Darstellung) - AUS per Default,
+    // gedacht fuer mobile Nutzung mit angeschlossenem GPS-Modul. Bei AN
+    // dreht sich der Radarkreis zusaetzlich zur ohnehin schon GPS-
+    // gestuetzten Zentrierung (siehe LocationManager::getHomeLocation(),
+    // nutzt bei aktivem GPS-Fix und "Automatisch"-Standort bereits von
+    // sich aus die Live-Position) an der aktuellen Fahrtrichtung aus
+    // ("Heading-up" statt Norden oben) und zoomt bei hoeherer
+    // Geschwindigkeit automatisch weiter heraus - siehe
+    // RadarScreen::followMeRotationOffsetDeg()/followMeEffectiveRangeKm()
+    // in radar_screen.cpp. Ohne gueltigen GPS-Kurs/-Fix faellt die Anzeige
+    // sauber auf die normale, unrotierte Nordausrichtung zurueck.
+    bool followMeModeEnabled();
+    void setFollowMeModeEnabled(bool on);
+
+    // "Performance-Auto-Tuning" (System > Radar-Darstellung) - AN per
+    // Default. Bei AN reduziert PerfTuner (perf_tuner.h/.cpp) automatisch
+    // und stufenweise die Render-Last (Wetter-Effekte -> Sweep-Animation ->
+    // Flugzeug-Silhouetten-Detailgrad), sobald die ohnehin schon erfasste
+    // Frame-Zeit/freeHeap/maxAlloc auf eine Ueberlastung hindeuten, und
+    // normalisiert sich mit etwas Hysterese automatisch wieder. Bei AUS
+    // bleibt PerfTuner dauerhaft auf Stufe 0 (kein Eingriff), unabhaengig
+    // von den gemessenen Werten.
+    bool perfAutoTuningEnabled();
+    void setPerfAutoTuningEnabled(bool on);
+
     // Animierter Regen-Effekt (System > Radar-Darstellung) - AN per Default
     // (wird ohnehin nur sichtbar, wenn die Wetterdaten tatsaechlich Regen/
     // Gewitter zeigen, siehe radar_screen.cpp). Kurze, schraege Linien

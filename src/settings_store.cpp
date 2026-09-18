@@ -68,6 +68,8 @@ namespace {
     bool issMarkerOn = true;
     bool classicRadarOn = false;
     bool militarySquawkDetectionOn = false;
+    bool followMeModeOn = false;
+    bool perfAutoTuningOn = true;
     bool rainEffectOn = true;
     // AN per Default - bisheriges Verhalten (dreimal Magenta bei
     // verfuegbarem Update, siehe radar_screen.cpp) bleibt unveraendert,
@@ -210,6 +212,10 @@ namespace {
             classicRadarOn = (value.toInt() != 0);
         } else if (key == "military_squawk_detection") {
             militarySquawkDetectionOn = (value.toInt() != 0);
+        } else if (key == "follow_me_mode") {
+            followMeModeOn = (value.toInt() != 0);
+        } else if (key == "perf_auto_tuning") {
+            perfAutoTuningOn = (value.toInt() != 0);
         } else if (key == "rain_effect") {
             rainEffectOn = (value.toInt() != 0);
         } else if (key == "update_led_signal") {
@@ -321,6 +327,8 @@ void save() {
     f.printf("iss_marker=%d\n", issMarkerOn ? 1 : 0);
     f.printf("classic_radar=%d\n", classicRadarOn ? 1 : 0);
     f.printf("military_squawk_detection=%d\n", militarySquawkDetectionOn ? 1 : 0);
+    f.printf("follow_me_mode=%d\n", followMeModeOn ? 1 : 0);
+    f.printf("perf_auto_tuning=%d\n", perfAutoTuningOn ? 1 : 0);
     f.printf("rain_effect=%d\n", rainEffectOn ? 1 : 0);
     f.printf("update_led_signal=%d\n", updateLedSignalOn ? 1 : 0);
     f.printf("event_corner_overlay=%d\n", eventCornerOverlayOn ? 1 : 0);
@@ -596,6 +604,20 @@ bool militarySquawkDetectionEnabled() { return militarySquawkDetectionOn; }
 
 void setMilitarySquawkDetectionEnabled(bool on) {
     militarySquawkDetectionOn = on;
+    save();
+}
+
+bool followMeModeEnabled() { return followMeModeOn; }
+
+void setFollowMeModeEnabled(bool on) {
+    followMeModeOn = on;
+    save();
+}
+
+bool perfAutoTuningEnabled() { return perfAutoTuningOn; }
+
+void setPerfAutoTuningEnabled(bool on) {
+    perfAutoTuningOn = on;
     save();
 }
 

@@ -577,6 +577,15 @@ static const char* const I18N_NL[] = {
 
     "Land: ",
     "Herstart voor Update",
+    "Follow-Me Modus",
+    "Follow-Me Modus",
+    "Voor mobiel gebruik met aangesloten GPS-module: de radar richt \"boven\" altijd op de huidige rijrichting in plaats van het noorden, en zoomt bij hogere snelheid automatisch verder uit. Vereist een geldige GPS-fix en een snelheid van meer dan een paar km/u - anders valt de weergave terug op de normale noordoriëntatie.",
+    "Prestatie Auto-Tuning",
+    "Prestatie Auto-Tuning",
+    "Vermindert automatisch de renderbelasting (weer-effecten, sweep-animatie, detailniveau van vliegtuigsilhouetten) wanneer het geheugen krap wordt of de framesnelheid daalt, en herstelt het volledige detail zodra de waarden zich herstellen. Puur visueel, heeft geen invloed op de daadwerkelijke vluchtgegevens.",
+    "Prestaties: ",
+    "Normaal",
+    "Verminderd (niveau %d/3)",
 };
 
 static_assert(sizeof(I18N_NL) / sizeof(I18N_NL[0]) == (size_t)StringId::COUNT,

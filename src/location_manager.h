@@ -30,6 +30,20 @@ namespace LocationManager {
     bool hasGpsAltitude();
     double gpsAltitudeMeters();
 
+    // Kurs ueber Grund (GPS-Heading) und Geschwindigkeit, fuer den
+    // "Follow-Me Modus" (radar_screen.cpp) - TinyGPSPlus liefert beide nur
+    // zusammen mit einem gueltigen Positions-Fix sinnvoll, deshalb hier
+    // dieselbe hasGpsFix()-Bedingung wie bei currentGpsPosition() oben.
+    // Bei niedriger Geschwindigkeit ist der GPS-Kurs elektronisch bedingt
+    // sehr verrauscht (keine echte Bewegungsrichtung mehr messbar) - das
+    // wird bewusst NICHT hier schon herausgefiltert, sondern liegt in der
+    // Verantwortung des Aufrufers (siehe MIN-Geschwindigkeits-Schwelle in
+    // radar_screen.cpp).
+    bool hasGpsCourse();
+    float gpsCourseDeg();
+    bool hasGpsSpeed();
+    float gpsSpeedKmh();
+
     // UTC-Offset in Sekunden (inkl. evtl. Sommerzeit), ermittelt bei der
     // IP-Geolocation-Abfrage. 0/false, falls noch nicht bekannt.
     bool hasUtcOffset();

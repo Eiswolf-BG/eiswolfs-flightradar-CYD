@@ -576,6 +576,15 @@ static const char* const I18N_EN[] = {
 
     "Country: ",
     "Restarting for Update",
+    "Follow-Me Mode",
+    "Follow-Me Mode",
+    "For mobile use with a connected GPS module: rotates the radar so \"up\" always points in your current direction of travel instead of north, and automatically zooms out further at higher speed. Needs an active GPS fix and a speed above a few km/h - otherwise the display falls back to the normal north-up view.",
+    "Performance Auto-Tuning",
+    "Performance Auto-Tuning",
+    "Automatically reduces render load (weather effects, sweep animation, aircraft silhouette detail) when memory gets tight or frame times increase, and restores full detail again once things recover. Purely visual, has no effect on the actual flight data.",
+    "Performance: ",
+    "Normal",
+    "Reduced (level %d/3)",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

@@ -6,6 +6,7 @@
 #include "ui_theme.h"
 #include "i18n.h"
 #include "config.h"
+#include "location_manager.h"
 
 // Einstell-Screen fuer die Radar-Darstellung (Menue > System > Radar-
 // Darstellung). Oben ein einzelner "Farben"-Button, der den Unterscreen
@@ -94,10 +95,10 @@ namespace {
     }
 
     // Zeilenhoehe aus dem verfuegbaren Platz errechnet (gleiches Muster wie
-    // SYSTEM_ROW_H in menu_screen.cpp) statt fest verdrahtet - 9 Zeilen
-    // ("Farben"-Button + 7 Kaestchen + Zurueck) muessen mit ca. 10px Reserve
+    // SYSTEM_ROW_H in menu_screen.cpp) statt fest verdrahtet - 11 Zeilen
+    // ("Farben"-Button + 9 Kaestchen + Zurueck) muessen mit ca. 10px Reserve
     // zum unteren Rand aufs Display passen.
-    constexpr uint8_t ROW_COUNT = 9;
+    constexpr uint8_t ROW_COUNT = 11;
     constexpr int16_t ROW_GAP = 6;
     constexpr int16_t START_Y = 40;
     constexpr int16_t END_Y = Config::SCREEN_HEIGHT - 10;
@@ -213,7 +214,15 @@ void run(TFT_eSPI& tft) {
         drawCheckboxRow(tft, worldMapRow, I18n::t(StringId::RADAR_THEME_WORLD_MAP), SettingsStore::worldMapBackgroundEnabled());
         drawRowInfoButton(tft, worldMapRow);
 
-        Rect backBtn = rowRect(8);
+        Rect followMeRow = rowRect(8);
+        drawCheckboxRow(tft, followMeRow, I18n::t(StringId::MENU_FOLLOW_ME_MODE), SettingsStore::followMeModeEnabled());
+        drawRowInfoButton(tft, followMeRow);
+
+        Rect perfTuningRow = rowRect(9);
+        drawCheckboxRow(tft, perfTuningRow, I18n::t(StringId::MENU_PERF_AUTO_TUNING), SettingsStore::perfAutoTuningEnabled());
+        drawRowInfoButton(tft, perfTuningRow);
+
+        Rect backBtn = rowRect(10);
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
         TouchInput::Point tap;
@@ -276,6 +285,18 @@ void run(TFT_eSPI& tft) {
                                         I18n::t(StringId::OK));
             handled = true;
         }
+        if (!handled && rowInfoBtnRect(followMeRow).contains(tap.x, tap.y)) {
+            MenuScreen::showInfoScreen(tft, I18n::t(StringId::FOLLOW_ME_MODE_INFO_TITLE),
+                                        I18n::t(StringId::FOLLOW_ME_MODE_INFO_BODY), UiTheme::accentColor(tft),
+                                        I18n::t(StringId::OK));
+            handled = true;
+        }
+        if (!handled && rowInfoBtnRect(perfTuningRow).contains(tap.x, tap.y)) {
+            MenuScreen::showInfoScreen(tft, I18n::t(StringId::PERF_AUTO_TUNING_INFO_TITLE),
+                                        I18n::t(StringId::PERF_AUTO_TUNING_INFO_BODY), UiTheme::accentColor(tft),
+                                        I18n::t(StringId::OK));
+            handled = true;
+        }
         if (!handled && crtRow.contains(tap.x, tap.y)) {
             SettingsStore::setCrtPhosphorEnabled(!SettingsStore::crtPhosphorEnabled());
             handled = true;
@@ -302,6 +323,22 @@ void run(TFT_eSPI& tft) {
         }
         if (!handled && worldMapRow.contains(tap.x, tap.y)) {
             SettingsStore::setWorldMapBackgroundEnabled(!SettingsStore::worldMapBackgroundEnabled());
+            handled = true;
+        }
+        if (!handled && followMeRow.contains(tap.x, tap.y)) {
+            bool newState = !SettingsStore::followMeModeEnabled();
+            SettingsStore::setFollowMeModeEnabled(newState);
+            // Follow-Me ist ohne GPS wirkungslos - beim Einschalten hier
+            // gleich mit aktivieren, statt den Nutzer zusaetzlich noch im
+            // Standort-Presets-Screen (location_presets_screen.cpp) danach
+            // suchen zu lassen. Beim Ausschalten bewusst NICHT automatisch
+            // wieder deaktivieren (GPS koennte dort unabhaengig gewuenscht
+            // sein, z.B. fuer die optionale Radar-Eckanzeige).
+            if (newState) LocationManager::setGpsEnabled(true);
+            handled = true;
+        }
+        if (!handled && perfTuningRow.contains(tap.x, tap.y)) {
+            SettingsStore::setPerfAutoTuningEnabled(!SettingsStore::perfAutoTuningEnabled());
             handled = true;
         }
         if (!handled && backBtn.contains(tap.x, tap.y)) {
