@@ -294,6 +294,36 @@ explizit erwähnt.
   beachten, auch wenn `.claude/settings.json` aus irgendeinem Grund mal
   fehlen sollte.
 
+## Flash-Speicher: Große statische Daten bevorzugt auf SD-Karte
+
+Die SD-Karte ist für dieses Projekt zwingend erforderliche Hardware (das
+Gerät startet ohne erkannte SD-Karte gar nicht erst, siehe
+`main.cpp::haltWithSdRequiredScreen()`), UND der Flash-Speicher ist
+konstant knapp (Stand v6.5.5: >93% belegt, siehe Flash-Analyse-Bericht im
+Chat-Verlauf zu i18n-Sprachtabellen/Flughafendatenbank/GitHub-Logo als
+größten Verbrauchern). Deshalb gilt ab sofort:
+
+Bei JEDEM neuen Feature, das eine größere statische Datentabelle braucht
+(z.B. Lookup-Tabellen, Bilder/Icons, längere Textblöcke, Sprachdaten o.ä.),
+zuerst prüfen, ob diese Daten stattdessen zur Laufzeit von der SD-Karte
+geladen werden können, statt sie fest ins Flash-Image (PROGMEM/`const`-
+Array) einzubetten. Nur echter Programmcode/Logik, der zwingend ausführbar
+im Flash liegen muss, bleibt davon ausgenommen — reine Daten sind der
+Regelfall für eine Auslagerung, keine Ausnahme.
+
+Bei SD-basierten Daten gilt zwingend:
+- **Automatisches, sauberes Anlegen/Herunterladen** der benötigten Datei
+  beim ersten Bedarf (z.B. per HTTPS-Download bei erstem Zugriff, siehe
+  `github_logo_cache.cpp` als Vorbild, oder per Einmal-Seed von einer noch
+  im Flash verbleibenden Quelle, siehe `sd_storage.cpp::seedAirportsFile()`)
+  - KEIN manueller Nutzer-Schritt, KEIN Reinstall nötig, ein normales
+    OTA-Update muss genügen.
+- **Sauberer Fallback ohne Absturz**, falls das Lesen/Laden fehlschlägt
+  (z.B. defekte Karte, kein WLAN für einen nötigen Erst-Download, korrupte
+  Datei) - die Funktion/Anzeige fällt dann einfach weg oder auf einen
+  einfacheren Zustand zurück, nie ein Crash oder eine verunsichernde
+  Fehlermeldung.
+
 ## Sprache: Projekt-Außendarstellung immer Englisch
 
 Alle nach außen sichtbaren Texte sind IMMER auf Englisch zu verfassen —
