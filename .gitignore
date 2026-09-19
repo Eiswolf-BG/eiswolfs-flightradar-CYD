@@ -4,4 +4,5 @@
 *.elf
 *.bin
 !/versions/**/*.bin
+!/assets/**/*.bin
 .DS_Store
