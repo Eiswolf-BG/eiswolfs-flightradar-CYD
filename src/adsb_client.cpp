@@ -255,6 +255,14 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
     struct PrevProfile { char hex[7]; float minDist; float maxSpeed; };
     PrevProfile prevProfileByHex[Config::MAX_TRACKED_AIRCRAFT];
     uint8_t prevProfileCount = 0;
+    // Gleicher Schnappschuss-Bedarf wie oben, fuer die Wiederholungssperre
+    // des "Flight Stories"-Features (aircraft.h::lastFlightStoryMs, siehe
+    // dortiger Kommentar) - ohne diesen Schnappschuss wuerde die Sperre
+    // durch "a = Aircraft{}" unten bei JEDEM Fetch-Zyklus (alle ~10s)
+    // wirkungslos auf 0 zurueckgesetzt.
+    struct PrevFlightStory { char hex[7]; uint32_t lastMs; };
+    PrevFlightStory prevFlightStoryByHex[Config::MAX_TRACKED_AIRCRAFT];
+    uint8_t prevFlightStoryCount = 0;
     for (uint8_t j = 0; j < tableCapacity && j < Config::MAX_TRACKED_AIRCRAFT; j++) {
         if (table[j].hex[0] != '\0') {
             strncpy(prevAirportDistByHex[prevAirportDistCount].hex, table[j].hex,
@@ -282,6 +290,12 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
             prevProfileByHex[prevProfileCount].minDist = table[j].sessionMinDistanceKm;
             prevProfileByHex[prevProfileCount].maxSpeed = table[j].sessionMaxSpeedKt;
             prevProfileCount++;
+
+            strncpy(prevFlightStoryByHex[prevFlightStoryCount].hex, table[j].hex,
+                    sizeof(prevFlightStoryByHex[0].hex) - 1);
+            prevFlightStoryByHex[prevFlightStoryCount].hex[sizeof(prevFlightStoryByHex[0].hex) - 1] = 0;
+            prevFlightStoryByHex[prevFlightStoryCount].lastMs = table[j].lastFlightStoryMs;
+            prevFlightStoryCount++;
         }
     }
 
@@ -407,6 +421,16 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
                 if (strcmp(prevProfileByHex[j].hex, hex) == 0) {
                     a.sessionMinDistanceKm = prevProfileByHex[j].minDist;
                     a.sessionMaxSpeedKt = prevProfileByHex[j].maxSpeed;
+                    break;
+                }
+            }
+            // lastFlightStoryMs ebenso wiederherstellen (siehe Kommentar
+            // beim Schnappschuss oben) - fuer die "Flight Stories"-
+            // Wiederholungssperre. Nicht gefunden = neues Flugzeug, bleibt
+            // beim Aircraft{}-Default 0 (noch nie eine Meldung verschickt).
+            for (uint8_t j = 0; j < prevFlightStoryCount; j++) {
+                if (strcmp(prevFlightStoryByHex[j].hex, hex) == 0) {
+                    a.lastFlightStoryMs = prevFlightStoryByHex[j].lastMs;
                     break;
                 }
             }

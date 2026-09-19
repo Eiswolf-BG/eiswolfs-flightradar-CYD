@@ -13,6 +13,7 @@
 #include "web_export_server.h"
 #include "weather.h"
 #include "ota_update.h"
+#include "sd_storage.h"
 #include "iss_tracker.h"
 #include "ntfy_push.h"
 #include "mqtt_client.h"
@@ -130,6 +131,14 @@ namespace {
             // ota_update.cpp) - hier einfach jede Schleife mit aufrufen,
             // genau wie Weather::update() oben.
             OtaUpdate::pollBackground();
+            // Holt einen beim Boot mangels WLAN fehlgeschlagenen (oder noch
+            // nie versuchten) Download der Flughafendatenbank nach (siehe
+            // sd_storage.cpp) - kuemmert sich intern selbst um ihr eigenes,
+            // deutlich selteneres Intervall, gleiches "jede Schleife mit
+            // aufrufen"-Muster wie OtaUpdate::pollBackground() oben. Kehrt
+            // nach dem EINEN erfolgreichen Download im Geraeteleben dauerhaft
+            // sofort zurueck.
+            SdStorage::retryAirportsDownloadIfNeeded();
             // Optionale MQTT-Anbindung (SettingsStore::mqttEnabled(), AUS
             // per Default, siehe mqtt_client.h) - kuemmert sich selbst um
             // (Wieder-)Verbinden mit eigenem Mindestabstand zwischen

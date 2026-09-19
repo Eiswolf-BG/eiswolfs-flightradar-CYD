@@ -400,39 +400,6 @@ namespace {
         return true;
     }
 
-    // Erster Schritt beim Antippen von "+": manuelle Koordinaten oder
-    // Adresssuche (AddressSearchScreen, kuemmert sich dort bereits selbst
-    // um Namensvergabe + Speichern als Preset).
-    bool addPresetFlow(TFT_eSPI& tft) {
-        MenuStars::reset();
-        tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
-        tft.setCursor(10, 14);
-        tft.println(I18n::t(StringId::LOCATION_ADD_CHOICE_TITLE));
-
-        Rect addressBtn = {10, 90, (int16_t)(Config::SCREEN_WIDTH - 20), 44};
-        Rect coordsBtn  = {10, 144, (int16_t)(Config::SCREEN_WIDTH - 20), 44};
-        Rect cancelBtn  = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
-        drawButton(tft, addressBtn, I18n::t(StringId::LOCATION_ADD_BY_ADDRESS));
-        drawButton(tft, coordsBtn, I18n::t(StringId::LOCATION_ADD_BY_COORDS));
-        drawButton(tft, cancelBtn, I18n::t(StringId::CANCEL), false, true);
-
-        while (true) {
-            TouchInput::Point tap;
-            if (!TouchInput::wasTapped(tap)) {
-                // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
-                if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) return false;
-                MenuStars::update(tft);
-                delay(20);
-                continue;
-            }
-
-            if (addressBtn.contains(tap.x, tap.y)) return AddressSearchScreen::run(tft);
-            if (coordsBtn.contains(tap.x, tap.y)) return addPresetByCoordsFlow(tft);
-            if (cancelBtn.contains(tap.x, tap.y)) return false;
-        }
-    }
-
     // Kurze Meldung unten am Bildschirmrand, z.B. wenn beim Antippen des
     // Naechster-Flughafen-Textes bereits alle 3 Preset-Slots belegt sind.
     void showBriefMessage(TFT_eSPI& tft, const String& msg, uint16_t color) {
@@ -620,6 +587,42 @@ namespace {
 
         MenuScreen::showInfoScreen(tft, I18n::t(StringId::LOCATION_INFO_TITLE), body,
                                     UiTheme::accentColor(tft), I18n::t(StringId::BACK));
+    }
+}
+
+// Erster Schritt beim Antippen von "+": manuelle Koordinaten oder
+// Adresssuche (AddressSearchScreen, kuemmert sich dort bereits selbst um
+// Namensvergabe + Speichern als Preset). Jetzt oeffentlich (vorher in der
+// anonymen Namespace oben) - first_run_location_screen.cpp ruft denselben
+// Code-Pfad auf, statt einer eigenen Kopie (Alex' ausdruecklicher Wunsch:
+// haelt Ersteinrichtung und regulaeres Menue automatisch konsistent).
+bool addPresetFlow(TFT_eSPI& tft) {
+    MenuStars::reset();
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+    tft.setCursor(10, 14);
+    tft.println(I18n::t(StringId::LOCATION_ADD_CHOICE_TITLE));
+
+    Rect addressBtn = {10, 90, (int16_t)(Config::SCREEN_WIDTH - 20), 44};
+    Rect coordsBtn  = {10, 144, (int16_t)(Config::SCREEN_WIDTH - 20), 44};
+    Rect cancelBtn  = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+    drawButton(tft, addressBtn, I18n::t(StringId::LOCATION_ADD_BY_ADDRESS));
+    drawButton(tft, coordsBtn, I18n::t(StringId::LOCATION_ADD_BY_COORDS));
+    drawButton(tft, cancelBtn, I18n::t(StringId::CANCEL), false, true);
+
+    while (true) {
+        TouchInput::Point tap;
+        if (!TouchInput::wasTapped(tap)) {
+            // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
+            if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) return false;
+            MenuStars::update(tft);
+            delay(20);
+            continue;
+        }
+
+        if (addressBtn.contains(tap.x, tap.y)) return AddressSearchScreen::run(tft);
+        if (coordsBtn.contains(tap.x, tap.y)) return addPresetByCoordsFlow(tft);
+        if (cancelBtn.contains(tap.x, tap.y)) return false;
     }
 }
 

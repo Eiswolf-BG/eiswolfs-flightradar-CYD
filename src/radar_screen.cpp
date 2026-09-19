@@ -5367,9 +5367,19 @@ void updateProximityAlert(uint32_t nowMs) {
     char pushSquawk[5] = {0};
     bool pushIsEmergency = false;
 
+    // "Flight Stories" (Alex' Wunsch) - automatische Ereignis-Meldungen
+    // (Militaer-/Hubschrauber-Sichtung, Tiefflug) per ntfy-Push und/oder
+    // MQTT. flightStoryMsg merkt sich das ZUERST in diesem Zyklus
+    // gefundene Ereignis (gleiches "nur eins pro Zyklus"-Prinzip wie
+    // pushCallsign oben) - bei mehreren gleichzeitigen Kandidaten im selben
+    // Zyklus wird bewusst nur einer verschickt.
+    bool flightStoriesOn = SettingsStore::ntfyFlightStoriesEnabled();
+    char flightStoryMsg[160] = {0};
+
     bool proximityOn = SettingsStore::proximityAlertEnabled();
     bool smartOn = SettingsStore::proximityAlertSmartMode();
     bool emergencyOn = SettingsStore::emergencyAlertEnabled();
+    bool militaryOn = SettingsStore::militarySquawkDetectionEnabled();
     // Fuer isAircraftVisibleOnRadar() unten - dieselbe Reichweite, die
     // render() gerade tatsaechlich zum Zeichnen benutzt.
     float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
@@ -5435,6 +5445,39 @@ void updateProximityAlert(uint32_t nowMs) {
             // Kommentar dort).
             if (!isAircraftVisibleOnRadar(table[i], rangeKm) || AirlineFilter::isHidden(table[i].callsign)) continue;
 
+            // "Flight Stories" - Erkennung fuer NUR tatsaechlich sichtbare
+            // (Reichweite/Filter) Flugzeuge, anders als Notfall/Watchlist
+            // oben bewusst NICHT filterunabhaengig (eine Meldung ueber ein
+            // Flugzeug ausserhalb der eingestellten Reichweite waere
+            // verwirrend). Knuepft an bereits vorhandene Erkennungslogik an:
+            // isMilitaryGovSquawk() (derselbe Ring wie auf der Web-Seite,
+            // ebenso hinter militaryOn), isRotorcraftCategoryInternal()
+            // (Hubschrauber-Kategorie "A7") und computeFlightPhase()==LowPass
+            // (bereits bestehende Flugphasen-Erkennung - LowPass bedeutet
+            // bereits "niedrig UND weder An-/Abflug noch Start", genau der
+            // vom Auftrag gemeinte "ungewoehnliche Tiefflug"-Fall). Pro
+            // Flugzeug hoechstens EINE Meldung alle Config::
+            // FLIGHT_STORY_REPEAT_SUPPRESS_MS (10 Minuten), unabhaengig
+            // davon, wie oft/lange es weiter in Reichweite bleibt.
+            if (flightStoriesOn && flightStoryMsg[0] == 0 &&
+                (table[i].lastFlightStoryMs == 0 ||
+                 nowMs - table[i].lastFlightStoryMs > Config::FLIGHT_STORY_REPEAT_SUPPRESS_MS)) {
+                const char* name = table[i].callsign[0] ? table[i].callsign : table[i].hex;
+                if (militaryOn && isMilitaryGovSquawk(table[i].squawk)) {
+                    snprintf(flightStoryMsg, sizeof(flightStoryMsg),
+                             "Military aircraft spotted nearby: %s - %.0fkm away", name, table[i].distanceKm);
+                    table[i].lastFlightStoryMs = nowMs;
+                } else if (isRotorcraftCategoryInternal(table[i].category)) {
+                    snprintf(flightStoryMsg, sizeof(flightStoryMsg),
+                             "Helicopter over the area: %s - %.0fkm away", name, table[i].distanceKm);
+                    table[i].lastFlightStoryMs = nowMs;
+                } else if (computeFlightPhase(table[i]) == FlightPhase::LowPass) {
+                    snprintf(flightStoryMsg, sizeof(flightStoryMsg),
+                             "Low-altitude flight detected: %s at %ldft", name, (long)table[i].altBaroFt);
+                    table[i].lastFlightStoryMs = nowMs;
+                }
+            }
+
             if (proximityOn && !smartOn && table[i].distanceKm <= Config::LED_ALERT_RADIUS_KM) anyClose = true;
 
             if (!proximityOn || !smartOn) continue;
@@ -5486,6 +5529,24 @@ void updateProximityAlert(uint32_t nowMs) {
             snprintf(msg, sizeof(msg), "%s%s", I18n::t(StringId::NTFY_PUSH_MSG_WATCHLIST_PREFIX), pushCallsign);
         }
         NtfyPush::request(msg);
+    }
+
+    // "Flight Stories" - Versand ueber den bereits bestehenden ntfy-
+    // Mechanismus (keine neue Versand-Infrastruktur, Alex' ausdruecklicher
+    // Wunsch). Nutzt DIESELBE Ein-Platz-Warteschlange wie der Notfall-/
+    // Watchlist-Push oben - ein Notfall/Watchlist-Treffer im selben Zyklus
+    // hat deshalb IMMER Vorrang (echte Sicherheitsmeldung vor einer
+    // blossen Sichtung); die Wiederholungssperre (lastFlightStoryMs,
+    // bereits oben in der Schleife gesetzt) greift in diesem Fall trotzdem -
+    // ein knapp verpasster ntfy-Slot fuehrt also NICHT zu einem sofortigen
+    // zweiten Versuch im naechsten Zyklus, sondern erst wieder nach der
+    // vollen Sperrzeit (bewusst einfach gehalten, kein Nachhol-Mechanismus
+    // fuer dieses "nice to have"-Feature). Ein separater MQTT-Versand
+    // (eigenes "flight-story"-Event-Topic) wurde bewusst wieder entfernt -
+    // widerspricht der dokumentierten Feature-14-Regel, dass MQTT nur fuer
+    // Dauerzustaende (Sensoren) genutzt wird, keine Einzelereignisse.
+    if (flightStoryMsg[0] != 0 && !newEmergencyHit && !newWatchHit && SettingsStore::ntfyPushEnabled()) {
+        NtfyPush::request(flightStoryMsg);
     }
 
     // Aktiver Zonen-Alarm-Burst nur fuer Config::SMART_PROXIMITY_BURST_MS

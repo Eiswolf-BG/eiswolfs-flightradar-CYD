@@ -16,6 +16,14 @@ namespace SdStorage {
     void seedDefaultDataFiles();
     void logEvent(const char* csvLine);
 
+    // Holt einen beim Boot mangels WLAN fehlgeschlagenen (oder noch nie
+    // versuchten) Download der Flughafendatenbank nach - von NetTask
+    // (net_task.cpp) bei JEDER Schleifeniteration aufgerufen, intern selbst
+    // gedrosselt. Genau EIN Download im gesamten Geraeteleben (nicht bei
+    // jedem Neustart) - kehrt danach dauerhaft sofort zurueck, ohne
+    // Netzwerkzugriff.
+    void retryAirportsDownloadIfNeeded();
+
     // Loescht rekursiv einen kompletten Ordner (alle Dateien und
     // Unterordner) inklusive des Ordners selbst. Fuer den Menuepunkt
     // "Einstellungen zuruecksetzen" (settings_backup.cpp::factoryReset()) -

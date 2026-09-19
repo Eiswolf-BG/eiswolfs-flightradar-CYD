@@ -1,9 +1,11 @@
 #include "sd_storage.h"
 #include "config.h"
 #include "sd_mutex.h"
-#include "airports_data.h"
 #include <SD.h>
 #include <SPI.h>
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
 #include <time.h>
 #include <cstring>
 
@@ -53,17 +55,32 @@ namespace {
         "DH8D,78\n";
 
     // Kopfzeile des aktuellen Binaerformats fuer die Flughafen-Datei (siehe
-    // airports_data.h/.cpp fuer die eingebetteten Rohdaten und
     // airport_lookup.cpp fuer den Parser): 4 Byte Magic "APR2" + 2 Byte
     // Datensatz-Anzahl (uint16 LE), danach je 12 Byte pro Flughafen (4 Byte
     // ICAO-ASCII + int32 LE Breitengrad + int32 LE Laengengrad, beide in
     // Mikrograd). Frueher lag hier eine reine Text-CSV
     // ("icao,name,lat,lon\n...") mit nur 34 handkuratierten Hubs - eine
     // Datei im alten Format beginnt nie mit diesen 4 Magic-Bytes, weshalb
-    // seedAirportsFile() ein Fehlen/Nicht-Uebereinstimmen dieser Kennung
+    // die Pruefung unten ein Fehlen/Nicht-Uebereinstimmen dieser Kennung
     // zuverlässig als "muss durch die neue, weltweite Datenbank ersetzt
     // werden" erkennt - auch auf bereits eingerichteten Geraeten, ohne
     // Werksreset.
+    //
+    // BUGFIX (Alex' Wunsch, Flash-Sparziel): Die ~5025 Datensaetze (~60KB)
+    // lagen bisher als kAirportsBin fest im Flash (airports_data.cpp/.h,
+    // JETZT ENTFERNT) und dienten nur dazu, diese SD-Datei einmalig beim
+    // allerersten Boot zu befuellen - der eigentliche Lookup (siehe
+    // airport_lookup.cpp::findNearest()) liest ohnehin schon in kleinen
+    // Bloecken direkt von der SD-Karte, NIE die komplette Tabelle ins RAM.
+    // Die Befuellung passiert jetzt per einmaligem HTTPS-Download
+    // (downloadAirportsToSd() unten) statt aus dem Flash - GENAU EIN
+    // Download im gesamten Geraeteleben (nicht bei jedem Neustart wie beim
+    // bewusst weiterhin unangetasteten Sprachsystem), danach bleibt die
+    // Datei bestehen und wird nie erneut heruntergeladen. Gleiches
+    // Download-/Tmp-Datei-Umbenennungs-Muster wie i18n.cpp::
+    // downloadLanguageToSd() (inkl. delay(1)-Watchdog-Fix und exakter
+    // Content-Length-Pruefung, siehe dortige Bugfix-Kommentare fuer die
+    // volle Herleitung).
     constexpr uint8_t AIRPORTS_MAGIC[4] = {'A', 'P', 'R', '2'};
 
     bool ensureDir(const char* path) {
@@ -93,18 +110,108 @@ namespace {
         return n == sizeof(header) && memcmp(header, AIRPORTS_MAGIC, sizeof(AIRPORTS_MAGIC)) == 0;
     }
 
-    void seedAirportsFile() {
-        if (airportsFileUpToDate()) return;
-        // FILE_WRITE oeffnet vorhandene Dateien im Anhaenge-Modus - eine
-        // veraltete (kuerzere) alte CSV-Datei muss daher vorher entfernt
-        // werden, sonst blieben ihre Reste hinter den neuen Binaerdaten
-        // haengen.
-        if (SD.exists(Config::SD_AIRPORTS_CSV)) SD.remove(Config::SD_AIRPORTS_CSV);
-        File f = SD.open(Config::SD_AIRPORTS_CSV, FILE_WRITE);
-        if (!f) return;
-        f.write(kAirportsBin, kAirportsBinLen);
-        f.close();
+    // Laedt die aktuelle Flughafendatenbank von GitHub herunter und
+    // ersetzt die SD-Datei nur bei VOLLSTAENDIGEM Erfolg (Tmp-Datei-dann-
+    // Umbenennen-Muster, identisch zu i18n.cpp::downloadLanguageToSd() -
+    // siehe dortige Bugfix-Kommentare fuer delay(1)-Watchdog-Fix und
+    // exakte Content-Length-Pruefung, hier 1:1 uebernommen).
+    bool downloadAirportsToSd() {
+        if (WiFi.status() != WL_CONNECTED) return false;
+
+        try {
+            constexpr const char* URL =
+                "https://raw.githubusercontent.com/Eiswolf-BG/eiswolfs-flightradar-CYD/main/assets/airports_data.bin";
+            Serial.printf("[SD] Lade Flughafendatenbank herunter: %s\n", URL);
+
+            WiFiClientSecure client;
+            client.setInsecure();
+            HTTPClient http;
+            if (!http.begin(client, URL)) return false;
+
+            constexpr uint32_t TIMEOUT_MS = 20000;
+            http.setTimeout(TIMEOUT_MS);
+            http.setUserAgent("EiswolfsFlightradarCYD-Airports/1.0 (+https://github.com/Eiswolf-BG/eiswolfs-flightradar-CYD)");
+
+            int code = http.GET();
+            if (code != HTTP_CODE_OK) {
+                http.end();
+                return false;
+            }
+
+            constexpr const char* TMP_PATH = "/Flightradar_cyd/airports.tmp";
+            File out;
+            {
+                SdMutex::Guard guard;
+                if (SD.exists(TMP_PATH)) SD.remove(TMP_PATH);
+                out = SD.open(TMP_PATH, FILE_WRITE);
+            }
+            if (!out) {
+                http.end();
+                return false;
+            }
+
+            Stream& stream = http.getStream();
+            int contentLen = http.getSize();
+            uint8_t buf[512];
+            int32_t written = 0;
+            uint32_t startMs = millis();
+            bool timedOut = false;
+            while (http.connected() && (contentLen < 0 || written < contentLen)) {
+                if (millis() - startMs > TIMEOUT_MS) {
+                    timedOut = true;
+                    break;
+                }
+                size_t avail = stream.available();
+                if (!avail) {
+                    delay(5);
+                    continue;
+                }
+                size_t toRead = avail > sizeof(buf) ? sizeof(buf) : avail;
+                int n = stream.readBytes(buf, toRead);
+                if (n <= 0) break;
+                {
+                    SdMutex::Guard guard;
+                    out.write(buf, n);
+                }
+                written += n;
+                if (contentLen >= 0 && written >= contentLen) break;
+                delay(1);
+            }
+            {
+                SdMutex::Guard guard;
+                out.close();
+            }
+            http.end();
+
+            bool complete = (contentLen >= 0) ? (written == contentLen) : (written >= 1000);
+            if (timedOut || !complete) {
+                SdMutex::Guard guard;
+                SD.remove(TMP_PATH);
+                return false;
+            }
+
+            SdMutex::Guard guard;
+            if (SD.exists(Config::SD_AIRPORTS_CSV)) SD.remove(Config::SD_AIRPORTS_CSV);
+            bool renamed = SD.rename(TMP_PATH, Config::SD_AIRPORTS_CSV);
+            Serial.printf("[SD] Flughafendatenbank-Download %s (%d Bytes)\n",
+                          renamed ? "erfolgreich" : "fehlgeschlagen (Umbenennen)", written);
+            return renamed;
+        } catch (...) {
+            Serial.printf("[SD] Flughafendatenbank: Exception abgefangen, freeHeap=%u maxAlloc=%u\n",
+                          (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+            return false;
+        }
     }
+
+    uint32_t lastAirportsRetryMs = 0;
+    // Gleiche Groessenordnung wie LANG_RETRY_INTERVAL_MS in i18n.cpp -
+    // verhindert, dass ein fehlgeschlagener Download (WLAN gerade erst
+    // verbunden, GitHub kurzzeitig nicht erreichbar) bei jeder
+    // NetTask-Schleifeniteration sofort erneut versucht wird. Wird nach
+    // dem EINEN erfolgreichen Download im Geraeteleben nie wieder erreicht
+    // (airportsFileUpToDate() liefert dann sofort true, kein Netzwerk-
+    // zugriff mehr noetig).
+    constexpr uint32_t AIRPORTS_RETRY_INTERVAL_MS = 30000;
 }
 
 bool init() {
@@ -132,7 +239,31 @@ void seedDefaultDataFiles() {
     SdMutex::Guard guard;
     writeIfAbsent(Config::SD_AIRLINES_CSV, kDefaultAirlinesCsv);
     writeIfAbsent(Config::SD_AIRCRAFT_TYPES_CSV, kDefaultAircraftTypesCsv);
-    seedAirportsFile();
+    // Flughafendatenbank NICHT mehr hier synchron aus dem Flash geseedet
+    // (kein WLAN zu diesem fruehen Boot-Zeitpunkt verfuegbar, siehe
+    // downloadAirportsToSd()-Kommentar oben) - retryAirportsDownloadIfNeeded()
+    // unten uebernimmt das jetzt asynchron, sobald WLAN verbunden ist.
+}
+
+// Von NetTask (net_task.cpp) bei JEDER Schleifeniteration aufgerufen,
+// intern selbst gedrosselt (AIRPORTS_RETRY_INTERVAL_MS) - gleiches Prinzip
+// wie I18n::retryActiveLanguageDownloadIfNeeded(). Kehrt sofort zurueck,
+// sobald airportsFileUpToDate() einmal true liefert (der Normalfall nach
+// dem allerersten erfolgreichen Download im Geraeteleben) - kein
+// wiederkehrender Netzwerkzugriff danach.
+void retryAirportsDownloadIfNeeded() {
+    if (!mounted) return;
+    bool upToDate;
+    {
+        SdMutex::Guard guard;
+        upToDate = airportsFileUpToDate();
+    }
+    if (upToDate) return;
+    if (WiFi.status() != WL_CONNECTED) return;
+    uint32_t now = millis();
+    if (lastAirportsRetryMs != 0 && now - lastAirportsRetryMs < AIRPORTS_RETRY_INTERVAL_MS) return;
+    lastAirportsRetryMs = now;
+    downloadAirportsToSd();
 }
 
 void logEvent(const char* csvLine) {

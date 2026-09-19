@@ -313,6 +313,14 @@ namespace SettingsStore {
     String ntfyPushTopic();
     void setNtfyPushTopic(const String& topic);
 
+    // "Flight Stories" - automatische, kurze Ereignis-Meldungen (Militaer-/
+    // Hubschrauber-Sichtung, Tiefflug) per ntfy-Push und/oder MQTT, siehe
+    // radar_screen.cpp::updateProximityAlert(). Eigener Schalter, unabhaengig
+    // von ntfyPushEnabled() oben (der nur Notfall/Watchlist steuert) - AUS
+    // per Default.
+    bool ntfyFlightStoriesEnabled();
+    void setNtfyFlightStoriesEnabled(bool on);
+
     // Zuletzt vom Geraet GEBOOTETE Firmware-Version (Config::APP_VERSION zum
     // Zeitpunkt des letzten Speicherns) - main.cpp::setup() vergleicht dies
     // beim Start gegen die AKTUELLE Config::APP_VERSION, um genau EINMAL

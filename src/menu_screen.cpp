@@ -33,17 +33,17 @@
 #include "menu_stars.h"
 #include "i18n.h"
 #include "config.h"
-#include "github_screen_logo_image.h"
 #include "changelog.h"
 #include <time.h>
+#include <qrcode.h>
 #include "ui_theme.h"
 
 // In main.cpp definiert, ohne eigenen Header (globale Funktion, kein
-// Namespace) - zeigt den GitHub-QR-Code-Screen mit Alex' Avatar-Bild
-// (siehe github_screen_logo_image.h). Frueher ueber den inzwischen
-// entfernten Header-Titel "Eiswolfs FR" erreichbar, seitdem verwaist -
-// wird jetzt ueber den neuen "Über"-Menuepunkt (System > Werkzeuge) wieder
-// erreichbar gemacht, ohne die bestehende Funktion/Logik anzufassen.
+// Namespace) - zeigt den GitHub-QR-Code-Screen im Vollformat. Frueher
+// ueber den inzwischen entfernten Header-Titel "Eiswolfs FR" erreichbar,
+// seitdem verwaist - wird jetzt ueber den neuen "Über"-Menuepunkt
+// (System > Werkzeuge) wieder erreichbar gemacht, ohne die bestehende
+// Funktion/Logik anzufassen.
 void runGithubQrScreen(TFT_eSPI& tftRef);
 
 namespace MenuScreen {
@@ -515,49 +515,36 @@ namespace {
         }
     }
 
-    // Kleine, herunterskalierte Kopie von Alex' Avatar-Bild (siehe
-    // github_screen_logo_image.h, dort normalerweise 240x240px fuer den
-    // GitHub-QR-Screen) fuer die OTA-Screens unten - Alex' Wunsch: "unten
-    // mittig noch mein Logo platzieren". Dekodiert den RLE-Strom wie
-    // main.cpp::drawGithubScreenLogo() zeilenweise (kein 115.200-Byte-
-    // Vollbild-Puffer noetig), tastet dabei aber pro Ausgabezeile/-spalte
-    // nur den naechstgelegenen Quellpixel ab (Nearest-Neighbor) statt
-    // wirklich zu mitteln - fuer ein derart kleines Deko-Icon ausreichend
-    // und ohne zusaetzlichen Rechenaufwand. Bricht die Dekodierung ab,
-    // sobald alle "size" Ausgabezeilen gezeichnet sind, statt immer den
-    // kompletten 240-Zeilen-Strom zu lesen.
-    void drawSmallAvatarLogo(TFT_eSPI& t, int16_t centerX, int16_t topY, int16_t size) {
-        uint16_t lineBuf[GITHUB_SCREEN_LOGO_W];
-        uint16_t outBuf[GITHUB_SCREEN_LOGO_W]; // "size" bleibt <= 240 (Quellbildbreite), siehe Aufrufer
-        int16_t lineFill = 0;
-        int16_t row = 0;
-        int16_t outRow = 0;
-        size_t pos = 0;
-        int16_t x = (int16_t)(centerX - size / 2);
-        while (row < GITHUB_SCREEN_LOGO_H && outRow < size && pos + 2 < GITHUB_SCREEN_LOGO_RLE_LEN) {
-            uint8_t count = GITHUB_SCREEN_LOGO_RLE[pos];
-            uint16_t value = (uint16_t)GITHUB_SCREEN_LOGO_RLE[pos + 1] |
-                              ((uint16_t)GITHUB_SCREEN_LOGO_RLE[pos + 2] << 8);
-            pos += 3;
+    // Kleiner GitHub-QR-Code (ersetzt das vorherige Avatar-Foto, Alex'
+    // Wunsch: Flash-Speicher zurueckgewinnen) fuer die OTA-Screens unten
+    // mittig - identische Ziel-URL wie der grosse QR-Code auf dem
+    // "Ueber"-Screen (main.cpp::runGithubQrScreen(), siehe
+    // Config::GITHUB_REPO_URL), aber zur Laufzeit neu erzeugt statt als
+    // Bild im Flash gespeichert. "size" ist eine Zielgroesse - da sich
+    // ein QR-Code nur in ganzzahligen Modul-Blockgroessen sauber
+    // darstellen laesst, faellt die tatsaechliche Pixelgroesse ggf. etwas
+    // kleiner aus und wird innerhalb des "size"-Bereichs zentriert (siehe
+    // auch die QR_BLOCK-Kommentare bei runGithubQrScreen() in main.cpp).
+    void drawSmallGithubQr(TFT_eSPI& t, int16_t centerX, int16_t topY, int16_t size) {
+        constexpr uint8_t QR_VERSION = 4;
+        constexpr int16_t QR_QUIET = 2;
+        uint8_t qrData[qrcode_getBufferSize(QR_VERSION)];
+        QRCode qrcode;
+        qrcode_initText(&qrcode, qrData, QR_VERSION, ECC_LOW, Config::GITHUB_REPO_URL);
 
-            while (count > 0) {
-                int16_t spaceInLine = GITHUB_SCREEN_LOGO_W - lineFill;
-                int16_t take = count < spaceInLine ? count : spaceInLine;
-                for (int16_t i = 0; i < take; i++) lineBuf[lineFill + i] = value;
-                lineFill += take;
-                count -= take;
-                if (lineFill == GITHUB_SCREEN_LOGO_W) {
-                    int32_t srcForOutRow = (int32_t)outRow * GITHUB_SCREEN_LOGO_H / size;
-                    if (row == srcForOutRow) {
-                        for (int16_t c = 0; c < size; c++) {
-                            int16_t srcCol = (int16_t)((int32_t)c * GITHUB_SCREEN_LOGO_W / size);
-                            outBuf[c] = lineBuf[srcCol];
-                        }
-                        t.pushImage(x, (int16_t)(topY + outRow), size, 1, outBuf);
-                        outRow++;
-                    }
-                    lineFill = 0;
-                    row++;
+        int16_t totalModules = qrcode.size + 2 * QR_QUIET;
+        int16_t block = size / totalModules;
+        if (block < 1) block = 1;
+        int16_t pixelSize = block * totalModules;
+        int16_t x = (int16_t)(centerX - pixelSize / 2);
+
+        t.fillRect(x, topY, pixelSize, pixelSize, TFT_WHITE);
+        for (uint8_t my = 0; my < qrcode.size; my++) {
+            for (uint8_t mx = 0; mx < qrcode.size; mx++) {
+                if (qrcode_getModule(&qrcode, mx, my)) {
+                    int16_t px = (int16_t)(x + (QR_QUIET + mx) * block);
+                    int16_t py = (int16_t)(topY + (QR_QUIET + my) * block);
+                    t.fillRect(px, py, block, block, TFT_BLACK);
                 }
             }
         }
@@ -578,7 +565,8 @@ namespace {
     // nicht mehr haben. Gleicher Kasten-/Titel-/Text-Aufbau wie
     // infoScreen() unten, nur ohne Button/Scroll (der kurze Text passt in
     // allen 8 Sprachen ohne Scrollen).
-    void drawOtaSuccessMessage(TFT_eSPI& tft, const String& title, const String& body, uint16_t accentColor) {
+    void drawOtaSuccessMessage(TFT_eSPI& tft, const String& title, const String& body, uint16_t accentColor,
+                                int16_t logoSize = 84) {
         constexpr int16_t BOX_X = 4;
         constexpr int16_t BOX_Y = 4;
         constexpr int16_t BOX_W = Config::SCREEN_WIDTH - 2 * BOX_X;
@@ -608,23 +596,36 @@ namespace {
         tft.setTextSize(1);
         tft.setTextDatum(TL_DATUM);
 
-        // Logo unten mittig (Alex' Wunsch) - der Text-Bereich bekommt dafuer
-        // ein reduziertes viewBottom, statt den Logo-Platz erst NACH dem
-        // Zeichnen zu reservieren - so kann eine laengere Uebersetzung das
-        // Logo nie ueberlappen (wird stattdessen wie ein normaler
+        // QR-Code unten mittig (ersetzt das frühere Avatar-Logo, Alex'
+        // Wunsch) - der Text-Bereich bekommt dafuer ein reduziertes
+        // viewBottom, statt den Platz erst NACH dem Zeichnen zu
+        // reservieren - so kann eine laengere Uebersetzung den QR-Code
+        // nie ueberlappen (wird stattdessen wie ein normaler
         // Sichtfenster-Rand einfach nicht mehr gezeichnet, siehe
         // layoutWrapped()-Sichtfenster-Parameter oben).
-        // 300% groesser (Alex' Wunsch) - 3x 28px -> 84px.
-        constexpr int16_t LOGO_SIZE = 84;
         constexpr int16_t LOGO_BOTTOM_MARGIN = 8;
-        int16_t logoTopY = (int16_t)(BOX_Y + BOX_H - LOGO_SIZE - LOGO_BOTTOM_MARGIN);
-        int16_t textViewBottom = (int16_t)(logoTopY - 6);
+        int16_t reservedLogoTopY = (int16_t)(BOX_Y + BOX_H - logoSize - LOGO_BOTTOM_MARGIN);
+        int16_t textViewBottom = (int16_t)(reservedLogoTopY - 6);
 
         int16_t viewTop = (int16_t)(TITLE_Y + titleLineCount * LINE_H + 12);
         tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
-        layoutWrapped(tft, BOX_X + 10, viewTop, TEXT_MAX_WIDTH, LINE_H, body, 0, 0, textViewBottom, true);
+        int16_t textEndY = layoutWrapped(tft, BOX_X + 10, viewTop, TEXT_MAX_WIDTH, LINE_H, body, 0, 0, textViewBottom, true);
 
-        drawSmallAvatarLogo(tft, Config::SCREEN_WIDTH / 2, logoTopY, LOGO_SIZE);
+        // Bei einem groesseren QR-Code (Alex' Wunsch: "im ersten Screen
+        // doppelt so gross und zentriert") wird er nicht mehr unten
+        // festgeklebt, sondern in der freien Flaeche zwischen tatsaechlichem
+        // Textende und Box-Unterkante vertikal zentriert - bei der kleinen
+        // Standardgroesse (Update-installiert-Screen) bleibt die bisherige,
+        // an der Unterkante verankerte Position unveraendert (dort bereits
+        // getestet und bestaetigt, "der Rest passt").
+        int16_t logoTopY = reservedLogoTopY;
+        if (logoSize > 84) {
+            int16_t availableTop = (int16_t)(textEndY + 6);
+            int16_t availableBottom = (int16_t)(BOX_Y + BOX_H - LOGO_BOTTOM_MARGIN);
+            logoTopY = (int16_t)(availableTop + (availableBottom - availableTop - logoSize) / 2);
+        }
+
+        drawSmallGithubQr(tft, Config::SCREEN_WIDTH / 2, logoTopY, logoSize);
     }
 
     // Einfacher Info-Screen mit nur EINEM Button (kein Abbrechen) - fuer
@@ -1033,18 +1034,18 @@ namespace {
                                               0, 0, Config::SCREEN_HEIGHT, true);
             t.setTextDatum(TL_DATUM);
 
-            // Logo unten mittig (Alex' Wunsch, jetzt 300% groesser = 3x
-            // 28px -> 84px) - Teil des einmaligen Aufbaus, da es sich
-            // waehrend des Downloads nie aendert und sonst bei jedem
-            // Prozent-Update unnoetig erneut gezeichnet wuerde. Position
-            // dynamisch UNTER dem tatsaechlichen Ende des Hinweistexts
-            // (layoutWrapped()-Rueckgabewert) statt an einer festen
-            // Bildschirmposition - so kann das jetzt deutlich groessere
-            // Logo den Hinweistext in keiner der 8 Sprachen ueberlappen,
-            // selbst wenn dieser dort mal auf 2 Zeilen umbricht.
+            // QR-Code unten mittig (ersetzt das fruehere Avatar-Logo,
+            // Alex' Wunsch, gleiche Groesse 84px) - Teil des einmaligen
+            // Aufbaus, da er sich waehrend des Downloads nie aendert und
+            // sonst bei jedem Prozent-Update unnoetig erneut gezeichnet
+            // wuerde. Position dynamisch UNTER dem tatsaechlichen Ende
+            // des Hinweistexts (layoutWrapped()-Rueckgabewert) statt an
+            // einer festen Bildschirmposition - so kann der QR-Code den
+            // Hinweistext in keiner der 8 Sprachen ueberlappen, selbst
+            // wenn dieser dort mal auf 2 Zeilen umbricht.
             constexpr int16_t LOGO_SIZE = 84;
             int16_t logoTopY = (int16_t)(hintEndY + 10);
-            drawSmallAvatarLogo(t, Config::SCREEN_WIDTH / 2, logoTopY, LOGO_SIZE);
+            drawSmallGithubQr(t, Config::SCREEN_WIDTH / 2, logoTopY, LOGO_SIZE);
         }
 
         // Echte Aenderung? Sonst gibt es nichts zu aktualisieren (deckt den
@@ -1178,8 +1179,14 @@ namespace {
         // (grosse, ggf. automatisch umgebrochene Titelschrift plus
         // mehrzeiliger Text darunter), hier bewusst wiederverwendet statt
         // eine eigene Variante zu bauen.
+        // QR-Code auf diesem Screen doppelt so gross wie sonst und
+        // vertikal zentriert statt unten verankert (Alex' Wunsch,
+        // nachdem er den Screen am echten Geraet gesehen hat: "genug
+        // Platz, der Rest passt") - der "Update installiert"-Screen
+        // (drawOtaSuccessMessage()-Aufruf weiter unten) bleibt bei der
+        // Standardgroesse von 84px.
         drawOtaSuccessMessage(tft, I18n::t(StringId::OTA_RESTART_TITLE), I18n::t(StringId::OTA_RESTARTING),
-                              UiTheme::accentColor(tft));
+                              UiTheme::accentColor(tft), 168);
         delay(1200);
         SettingsStore::setOtaPendingInstall(info.downloadUrl);
         ESP.restart();
@@ -1674,11 +1681,39 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             } else if (resetBtn.contains(tap.x, tap.y)) {
                 if (confirmWarningScreen(tft, I18n::t(StringId::MENU_LOGBOOK_WARNING_TITLE),
                                           I18n::t(StringId::MENU_FACTORY_RESET_WARNING_BODY))) {
+                    // BUGFIX (Alex' Meldung: bei umfangreichen Logbuchdaten
+                    // kann das Loeschen weit ueber 20s dauern, OHNE jeden
+                    // sichtbaren Fortschritt - wirkte auf Nutzer wie ein
+                    // Absturz, Gefahr, dass das USB-Kabel gezogen wird,
+                    // mitten im Loeschvorgang). Bisher nur eine einzelne
+                    // zentrierte Zeile - jetzt ueber layoutWrapped() auf den
+                    // GESAMTEN verfuegbaren Bildschirmbereich verteilt
+                    // (gleiches, bereits bewaehrtes Muster wie drawOtaProgress()
+                    // weiter unten: Ueberschrift Size 2 oben, Hinweistext
+                    // Size 1 darunter, beides zeilenumbruchsicher), statt
+                    // alles mittig zusammenzuquetschen.
+                    constexpr int16_t X_MARGIN = 15;
+                    constexpr int16_t TEXT_MAX_WIDTH = Config::SCREEN_WIDTH - 2 * X_MARGIN;
                     tft.fillScreen(TFT_BLACK);
-                    tft.setTextDatum(MC_DATUM);
                     tft.setTextColor(TFT_RED, TFT_BLACK);
-                    tft.drawString(I18n::t(StringId::MENU_FACTORY_RESET_DELETING),
-                                    Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
+                    tft.setTextSize(2);
+                    int16_t headingEndY = layoutWrapped(tft, X_MARGIN, 60, TEXT_MAX_WIDTH, 20,
+                                                         I18n::t(StringId::MENU_FACTORY_RESET_DELETING),
+                                                         0, 0, Config::SCREEN_HEIGHT, true);
+                    // Noch KEINE eigene StringId fuer den Dauer-/Warnhinweis
+                    // (neue uebersetzte Strings brauchen aktualisierte
+                    // lang_XX.bin-Assets auf GitHub - diese Aufgabe ist
+                    // bewusst "nur bauen und flashen, nicht pushen", daher
+                    // hier absichtlich englisch hart kodiert wie schon beim
+                    // Neustart-Hinweis in language_screen.cpp. Sollte beim
+                    // naechsten echten Asset-Update sauber uebersetzt werden.
+                    tft.setTextSize(1);
+                    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+                    layoutWrapped(tft, X_MARGIN, (int16_t)(headingEndY + 20), TEXT_MAX_WIDTH, 16,
+                                  "This can take up to a minute with a lot of logbook data. "
+                                  "Please do not unplug or turn off the device.",
+                                  0, 0, Config::SCREEN_HEIGHT, true);
+                    tft.setTextSize(1);
                     tft.setTextDatum(TL_DATUM);
                     // Erfolgsfall: factoryReset() startet das Geraet neu und
                     // kehrt nie zurueck - dieser Code danach laeuft nur im

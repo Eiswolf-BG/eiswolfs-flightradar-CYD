@@ -93,6 +93,13 @@ namespace {
     char mqttPassBuf[33] = {0};
     bool ntfyPushOn = false;
     char ntfyPushTopicBuf[48] = {0};
+    // "Flight Stories" - automatische Ereignis-Meldungen (Militaer-/
+    // Hubschrauber-Sichtung, Tiefflug), siehe radar_screen.cpp::
+    // updateProximityAlert(). Eigener Schalter statt an ntfyPushOn
+    // gekoppelt, da nicht jeder, der den normalen Notfall-/Watchlist-Push
+    // nutzt, auch diese haeufigeren, weniger kritischen Meldungen will.
+    // Default AUS (Alex' Wunsch).
+    bool ntfyFlightStoriesOn = false;
     char lastSeenVersionBuf[16] = {0};
     // Default 120s = Config::MENU_IDLE_TIMEOUT_MS (bisheriger fester Wert) -
     // damit aendert sich fuer niemanden ungefragt etwas, bis der neue
@@ -237,6 +244,8 @@ namespace {
             mqttPassBuf[sizeof(mqttPassBuf) - 1] = 0;
         } else if (key == "ntfy_push_enabled") {
             ntfyPushOn = (value.toInt() != 0);
+        } else if (key == "ntfy_flight_stories_enabled") {
+            ntfyFlightStoriesOn = (value.toInt() != 0);
         } else if (key == "ntfy_push_topic") {
             strncpy(ntfyPushTopicBuf, value.c_str(), sizeof(ntfyPushTopicBuf) - 1);
             ntfyPushTopicBuf[sizeof(ntfyPushTopicBuf) - 1] = 0;
@@ -338,6 +347,7 @@ void save() {
     f.printf("mqtt_user=%s\n", mqttUserBuf);
     f.printf("mqtt_pass=%s\n", mqttPassBuf);
     f.printf("ntfy_push_enabled=%d\n", ntfyPushOn ? 1 : 0);
+    f.printf("ntfy_flight_stories_enabled=%d\n", ntfyFlightStoriesOn ? 1 : 0);
     f.printf("ntfy_push_topic=%s\n", ntfyPushTopicBuf);
     f.printf("last_seen_version=%s\n", lastSeenVersionBuf);
     f.printf("ota_just_installed=%d\n", otaJustInstalledFlag ? 1 : 0);
@@ -691,6 +701,13 @@ bool ntfyPushEnabled() { return ntfyPushOn; }
 
 void setNtfyPushEnabled(bool on) {
     ntfyPushOn = on;
+    save();
+}
+
+bool ntfyFlightStoriesEnabled() { return ntfyFlightStoriesOn; }
+
+void setNtfyFlightStoriesEnabled(bool on) {
+    ntfyFlightStoriesOn = on;
     save();
 }
 

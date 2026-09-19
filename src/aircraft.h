@@ -166,4 +166,20 @@ struct Aircraft {
 
     char     airlineName[24] = {0};
     uint16_t estSeats         = 0;
+
+    // Wiederholungssperre fuers "Flight Stories"-Feature (ntfy_push.cpp/
+    // mqtt_client.cpp, siehe radar_screen.cpp::updateProximityAlert()) -
+    // haelt fest, wann fuer DIESES Flugzeug zuletzt eine automatische
+    // Ereignis-Meldung (Militaer/Hubschrauber/Tiefflug) verschickt wurde,
+    // GANZ EGAL welche der drei Arten - verhindert z.B., dass ein
+    // tieffliegender Militaerhubschrauber gleich mehrere Meldungen auf
+    // einmal ausloest. Anders als wasEmergency/wasWatched oben (die
+    // bewusst JEDEN Fetch-Zyklus erneut ausloesen duerfen) MUSS dieser
+    // Wert ueber den Fetch-Zyklus-Schnappschuss in adsb_client.cpp hinweg
+    // erhalten bleiben (siehe dortiges PrevFlightStory), sonst waere die
+    // Sperre alle ~10s wirkungslos - genau das soll hier ausdruecklich
+    // NICHT passieren (Alex' Wunsch: keine Wiederholung "alle paar
+    // Sekunden", solange das Flugzeug in Reichweite bleibt). 0 = noch nie
+    // eine Meldung fuer dieses Flugzeug verschickt.
+    uint32_t lastFlightStoryMs = 0;
 };

@@ -6,7 +6,14 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "6.5.5";
+    constexpr const char* APP_VERSION = "6.7.0";
+
+    // Projekt-Repo-URL fuer den GitHub-QR-Code - zentral hier hinterlegt,
+    // damit main.cpp (Ueber-Screen, grosser QR-Code) und menu_screen.cpp
+    // (kleiner QR-Code unten auf den OTA-Screens) garantiert denselben
+    // Text kodieren, statt die URL an zwei Stellen im Code zu duplizieren
+    // und dadurch auseinanderlaufen zu koennen.
+    constexpr const char* GITHUB_REPO_URL = "https://github.com/Eiswolf-BG/eiswolfs-flightradar-CYD";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -304,6 +311,16 @@ namespace Config {
     // grosszuegig genug fuer den Start selbst plus die ersten Sekunden im
     // initialen Steigflug.
     constexpr uint32_t PHASE_TAKEOFF_RECENT_MS = 120000;
+
+    // "Flight Stories"-Feature (ntfy_push.cpp/mqtt_client.cpp, automatische
+    // Ereignis-Meldungen bei Militaer-/Hubschrauber-Sichtung oder Tiefflug,
+    // siehe radar_screen.cpp::updateProximityAlert()) - Wiederholungssperre
+    // pro Flugzeug (aircraft.h::lastFlightStoryMs): 10 Minuten, deutlich
+    // grosszuegiger als der ~10s-ADS-B-Abrufzyklus (Alex' ausdruecklicher
+    // Wunsch: keine Wiederholung "alle paar Sekunden", solange dasselbe
+    // Flugzeug in Reichweite bleibt), aber kurz genug, dass ein Flugzeug,
+    // das laenger in der Naehe bleibt, nicht komplett stumm bleibt.
+    constexpr uint32_t FLIGHT_STORY_REPEAT_SUPPRESS_MS = 10UL * 60UL * 1000UL;
 
     // Offline-/Stale-Data-Modus (radar_screen.cpp) - wenn der ADS-B-Abruf
     // laenger als dieser Schwellenwert nicht mehr erfolgreich war

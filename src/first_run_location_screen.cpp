@@ -1,6 +1,5 @@
 #include "first_run_location_screen.h"
-#include "address_search_screen.h"
-#include "location_presets.h"
+#include "location_presets_screen.h"
 #include "touch_input.h"
 #include "menu_stars.h"
 #include "config.h"
@@ -74,7 +73,16 @@ void run(TFT_eSPI& tft) {
 
     Rect setBtn  = {10, setY, (int16_t)(Config::SCREEN_WIDTH - 20), BTN_H};
     Rect skipBtn = {10, (int16_t)(setY + BTN_H + BTN_GAP), (int16_t)(Config::SCREEN_WIDTH - 20), BTN_H};
-    drawButton(tft, setBtn, I18n::t(StringId::FIRST_RUN_LOCATION_SET_BTN));
+    // Label jetzt LOCATION_ADD ("Add Location") statt des bisherigen
+    // FIRST_RUN_LOCATION_SET_BTN ("Enter Address") - der Button fuehrt seit
+    // der Wiederverwendung von LocationPresetsScreen::addPresetFlow() (Alex'
+    // Wunsch) zu einer Auswahl zwischen Adresse UND Koordinaten, nicht mehr
+    // direkt in die Adresssuche. FIRST_RUN_LOCATION_SET_BTN bleibt als
+    // ungenutzte StringId im Enum stehen (Verschieben wuerde die Zuordnung
+    // aller nachfolgenden IDs in den bereits veroeffentlichten
+    // lang_XX.bin-Assets verschieben) - LOCATION_ADD ist bereits in allen
+    // 8 Sprachen uebersetzt und passt inhaltlich genau.
+    drawButton(tft, setBtn, I18n::t(StringId::LOCATION_ADD));
     drawButton(tft, skipBtn, I18n::t(StringId::FIRST_RUN_LOCATION_SKIP_BTN));
 
     while (true) {
@@ -82,13 +90,12 @@ void run(TFT_eSPI& tft) {
         if (!TouchInput::wasTapped(tap)) { MenuStars::update(tft); delay(20); continue; }
 
         if (setBtn.contains(tap.x, tap.y)) {
-            if (AddressSearchScreen::run(tft)) {
-                // Direkt aktivieren - das ist der ganze Sinn dieses
-                // Screens (sofort beim ersten Start den praezisen
-                // Standort nutzen, statt weiter auf Auto/IP zu bleiben).
-                uint8_t idx = LocationPresets::count();
-                if (idx > 0) LocationPresets::setActiveIndex((int8_t)(idx - 1));
-            }
+            // LocationPresetsScreen::addPresetFlow() aktiviert das neu
+            // angelegte Preset bei Erfolg bereits selbst (beide Unterwege,
+            // Adresse wie Koordinaten) - keine zusaetzliche Aktivierung
+            // mehr noetig wie frueher bei der direkten AddressSearchScreen-
+            // Nutzung hier.
+            LocationPresetsScreen::addPresetFlow(tft);
             return;
         }
         if (skipBtn.contains(tap.x, tap.y)) {
