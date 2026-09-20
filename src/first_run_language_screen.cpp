@@ -63,6 +63,10 @@ void run(TFT_eSPI& tft) {
         for (uint8_t i = 0; i < I18n::LANG_COUNT; i++) {
             if (langRects[i].contains(tap.x, tap.y)) {
                 SettingsStore::setLanguage(i);
+                // Neu gewaehlte Sprache sofort von der SD nachladen (falls
+                // schon vorhanden) - der naechste Screen zeigt dann direkt
+                // den richtigen Text statt erst nach einem Neustart.
+                I18n::onLanguageChanged();
                 return;
             }
         }

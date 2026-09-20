@@ -1819,6 +1819,13 @@ void setup() {
     }
 
     SettingsStore::load();
+    // Aktuell gewaehlte Sprache von der SD laden (Alex' Wunsch: nur
+    // Englisch bleibt im Flash einkompiliert) - schneller lokaler
+    // Lesevorgang, faellt bei fehlender/veralteter Datei automatisch auf
+    // die kompilierte Englisch-Tabelle zurueck (siehe i18n.cpp). Muss NACH
+    // SettingsStore::load() passieren (braucht die gespeicherte Sprache)
+    // und NACH SdStorage::init() (schon oben passiert).
+    I18n::loadActiveLanguageFromSd();
     tft.invertDisplay(SettingsStore::displayInverted());
     // 180-Grad-Drehung fuer Tischmontage (Menue > System > Anzeige) -
     // Rotation 2 ist bei diesem Panel/Treiber das 180-Grad-Gegenstueck zu
@@ -2009,6 +2016,18 @@ void setup() {
 }
 
 void loop() {
+    // Sprachdatei-Nachlade-Signal (Alex' Wunsch) - billige Abfrage jeden
+    // Tick: wird nur true, wenn NetTask (Core 0) gerade frisch die aktuell
+    // aktive Sprache heruntergeladen hat (z.B. nach einem Update, das den
+    // Text geaendert hat und die zuvor gespeicherte SD-Datei damit
+    // veraltet macht) - laedt sie dann sofort in den RAM, noch in
+    // derselben Sitzung, statt erst nach dem naechsten Neustart.
+    if (I18n::consumeReloadPending()) {
+        I18n::loadActiveLanguageFromSd();
+        RadarScreen::invalidatePanel();
+        forceRedraw = true;
+    }
+
     TouchInput::Point tap;
     bool tapped = TouchInput::wasTapped(tap);
 

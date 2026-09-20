@@ -8,6 +8,7 @@
 #include "settings_store.h"
 #include "aircraft_details.h"
 #include "route_watchlist.h"
+#include "i18n.h"
 #include "previously_seen.h"
 #include "flight_logbook.h"
 #include "led_alert.h"
@@ -147,6 +148,12 @@ namespace {
             // nach dem EINEN erfolgreichen Download im Geraeteleben dauerhaft
             // sofort zurueck.
             SdStorage::retryAirportsDownloadIfNeeded();
+            // Sprachdateien (SD-Auslagerung, Alex' Wunsch) - laedt bei
+            // Bedarf hoechstens EINE fehlende/veraltete lang_XX.bin pro
+            // Aufruf nach, gleiches Drosselungs-Prinzip wie oben. Kehrt
+            // dauerhaft sofort zurueck, sobald alle 8 Sprachdateien aktuell
+            // sind.
+            I18n::retryLanguageDownloadsIfNeeded();
             // Optionale MQTT-Anbindung (SettingsStore::mqttEnabled(), AUS
             // per Default, siehe mqtt_client.h) - kuemmert sich selbst um
             // (Wieder-)Verbinden mit eigenem Mindestabstand zwischen
