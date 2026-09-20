@@ -115,14 +115,38 @@ namespace {
         uint8_t header[LANG_FILE_HEADER_SIZE];
         size_t n = f.read(header, sizeof(header));
         f.close();
-        if (n != sizeof(header)) return false;
-        if (memcmp(header, LANG_FILE_MAGIC, 4) != 0) return false;
-        if (header[4] != LANG_FILE_FORMAT_VERSION) return false;
-        if (header[5] != langIndex) return false;
+        if (n != sizeof(header)) {
+            Serial.printf("[I18n] '%s' veraltet: nur %u/%u Kopfzeilen-Byte gelesen\n",
+                          LANG_FILE_SUFFIX[langIndex], (unsigned)n, (unsigned)sizeof(header));
+            return false;
+        }
+        if (memcmp(header, LANG_FILE_MAGIC, 4) != 0) {
+            Serial.printf("[I18n] '%s' veraltet: falsches Magic %02x%02x%02x%02x\n",
+                          LANG_FILE_SUFFIX[langIndex], header[0], header[1], header[2], header[3]);
+            return false;
+        }
+        if (header[4] != LANG_FILE_FORMAT_VERSION) {
+            Serial.printf("[I18n] '%s' veraltet: Format-Version %u statt %u\n",
+                          LANG_FILE_SUFFIX[langIndex], header[4], LANG_FILE_FORMAT_VERSION);
+            return false;
+        }
+        if (header[5] != langIndex) {
+            Serial.printf("[I18n] '%s' veraltet: Datei-Sprachindex %u statt %u\n",
+                          LANG_FILE_SUFFIX[langIndex], header[5], langIndex);
+            return false;
+        }
         uint16_t contentVersion = (uint16_t)header[6] | ((uint16_t)header[7] << 8);
         uint16_t count = (uint16_t)header[8] | ((uint16_t)header[9] << 8);
-        if (contentVersion != Config::I18N_CONTENT_VERSION) return false;
-        if (count != (uint16_t)StringId::COUNT) return false;
+        if (contentVersion != Config::I18N_CONTENT_VERSION) {
+            Serial.printf("[I18n] '%s' veraltet: Inhalts-Version %u statt %u\n",
+                          LANG_FILE_SUFFIX[langIndex], contentVersion, Config::I18N_CONTENT_VERSION);
+            return false;
+        }
+        if (count != (uint16_t)StringId::COUNT) {
+            Serial.printf("[I18n] '%s' veraltet: %u Strings statt %u\n",
+                          LANG_FILE_SUFFIX[langIndex], count, (unsigned)StringId::COUNT);
+            return false;
+        }
         return true;
     }
 
