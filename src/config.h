@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "6.7.6";
+    constexpr const char* APP_VERSION = "6.7.5";
 
     // Projekt-Repo-URL fuer den GitHub-QR-Code - zentral hier hinterlegt,
     // damit main.cpp (Ueber-Screen, grosser QR-Code) und menu_screen.cpp
@@ -14,22 +14,6 @@ namespace Config {
     // Text kodieren, statt die URL an zwei Stellen im Code zu duplizieren
     // und dadurch auseinanderlaufen zu koennen.
     constexpr const char* GITHUB_REPO_URL = "https://github.com/Eiswolf-BG/eiswolfs-flightradar-CYD";
-
-    // Inhalts-Version der SD-ausgelagerten Sprachtabellen (i18n.cpp, Alex'
-    // Wunsch: Sprachsystem auf SD auslagern, nur Englisch bleibt im Flash).
-    // WICHTIG: bewusst UNABHAENGIG von APP_VERSION oben - wird NUR erhoeht,
-    // wenn sich uebersetzter UI-Text aendert, OHNE dass sich gleichzeitig
-    // StringId::COUNT aendert (z.B. eine reine Tippfehler-Korrektur). Ein
-    // geaendertes StringId::COUNT (neue/entfernte Strings, der weitaus
-    // haeufigere Fall bei neuen Features) macht bereits gespeicherte
-    // lang_XX.bin-Dateien automatisch als veraltet erkennbar, OHNE hier
-    // erhoeht werden zu muessen - deshalb NICHT bei jedem Release
-    // hochzaehlen, sonst wuerden alle 8 Sprachdateien nach JEDEM Update
-    // unnoetig neu heruntergeladen, selbst wenn sich am Text gar nichts
-    // geaendert hat (Alex' ausdruecklicher Wunsch, das zu vermeiden). Der
-    // Python-Generator (siehe Kommentar in i18n.cpp) stempelt neu erzeugte
-    // assets/lang_XX.bin-Dateien mit diesem Wert.
-    constexpr uint16_t I18N_CONTENT_VERSION = 1;
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie

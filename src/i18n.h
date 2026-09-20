@@ -1397,45 +1397,4 @@ namespace I18n {
     constexpr uint8_t LANG_COUNT = 8;
     const char* t(StringId id);
     const char* languageName(uint8_t index);
-
-    // SD-basierte Sprachauslagerung (Alex' Wunsch) - siehe i18n.cpp fuer
-    // Dateiformat/Herleitung. Nur Englisch bleibt fest im Flash
-    // einkompiliert; die anderen 7 Sprachen (Englisch der Vollstaendigkeit
-    // halber ebenso) liegen als lang_XX.bin auf der SD-Karte und werden
-    // bei Bedarf in den RAM geladen. t() faellt bei fehlender/ungueltiger
-    // SD-Datei automatisch auf die kompilierte Englisch-Tabelle zurueck -
-    // nie ein Absturz, nie kaputter Text.
-
-    // Von main.cpp::setup() EINMALIG kurz nach dem SD-Mount aufgerufen -
-    // versucht, die aktuell in den Einstellungen gewaehlte Sprache synchron
-    // von der SD-Karte zu laden (schneller lokaler Lesevorgang, kein
-    // Netzwerk noetig). Bleibt bei fehlender/beschaedigter/veralteter Datei
-    // einfach bei der kompilierten Englisch-Tabelle.
-    void loadActiveLanguageFromSd();
-
-    // Von den beiden Sprachauswahl-Screens (language_screen.cpp/
-    // first_run_language_screen.cpp) direkt NACH SettingsStore::
-    // setLanguage() aufgerufen - laedt die neu gewaehlte Sprache sofort
-    // nach (falls bereits auf der SD vorhanden), damit der naechste
-    // gezeichnete Screen schon den richtigen Text zeigt, statt erst beim
-    // naechsten Boot.
-    void onLanguageChanged();
-
-    // Von NetTask (net_task.cpp, Core 0) bei JEDER Schleifeniteration
-    // aufgerufen, intern selbst gedrosselt - laedt hoechstens EINE fehlende
-    // oder veraltete Sprachdatei pro Aufruf von GitHub herunter (gleiches
-    // Tmp-Datei-dann-Umbenennen-Muster wie SdStorage::
-    // downloadAirportsToSd()). Setzt bei einem Treffer auf die AKTUELL
-    // aktive Sprache ein internes Reload-Signal, das main.cpp::loop() (Core
-    // 1) abfragt - so wird die frisch heruntergeladene Sprache noch in
-    // derselben Sitzung aktiv, ohne auf einen Neustart warten zu muessen.
-    // Sobald alle 8 Dateien aktuell sind, kehrt die Funktion dauerhaft
-    // sofort zurueck, ohne Netzwerkzugriff.
-    void retryLanguageDownloadsIfNeeded();
-
-    // Von main.cpp::loop() (Core 1) bei jedem Tick billig abgefragt - true
-    // (und setzt sich dabei zurueck), wenn retryLanguageDownloadsIfNeeded()
-    // oben gerade frisch die aktive Sprache heruntergeladen hat und sie neu
-    // geladen werden sollte.
-    bool consumeReloadPending();
 }
