@@ -584,6 +584,36 @@ static const char* const I18N_DE[] = {
     "Performance: ",
     "Normal",
     "Reduziert (Stufe %d/3)",
+
+    "Anflug-Alarm",
+    "Anflug-Alarm",
+    "Sendet eine eigene ntfy-Push-Benachrichtigung, sobald ein bereits auf einer deiner Wachlisten (Rufzeichen, Squawk oder Flugzeugtyp) erkanntes Flugzeug neu in die Landeanflugphase wechselt. Löst nur einmal pro Anflug aus, nicht wiederholt während der ganzen Phase.",
+
+    "In der Nähe wurde ein Militärflugzeug gesichtet: %s - %s entfernt",
+    "Hubschrauber über dem Gebiet: %s - %s entfernt",
+    "Tiefflug erkannt: %s auf %s",
+    "Flug %s befindet sich jetzt im Landeanflug",
+
+    "Routen-Wachliste",
+    "Routen-Wachliste",
+    "Die blaue LED blinkt, wenn die Route",
+    "eines Flugs auf einen dieser Einträge passt.",
+    "Route hinzufügen",
+    "Startflughafen (ICAO)",
+    "Zielflughafen (ICAO)",
+    "Leer lassen",
+    "Noch keine Routen beobachtet.",
+    "Routen-Ermittlung",
+    "Routen-Ermittlung",
+    "Ermittelt im Hintergrund online den Start-/Zielflughafen jedes sichtbaren Flugzeugs (einmal pro Flug, danach zwischengespeichert), um ihn mit der Routen-Wachliste unten abzugleichen. Standardmäßig aus, um unnötigen Netzwerkverkehr zu vermeiden.",
+    "Wie die Routen-Wachliste funktioniert",
+    "Gib einen Start- und/oder Zielflughafen als ICAO-Code ein (z.B. EDDS, LWSK) - lasse ein Feld leer (\"Leer lassen\"), um jede Route von/zu nur dem anderen Flughafen zu erfassen. Bis zu 5 Routen lassen sich gleichzeitig beobachten.",
+    "Sobald die ermittelte Route eines sichtbaren Flugzeugs passt, bekommt es einen cyanfarbenen Ring und die LED blinkt blau - genau wie bei den anderen Wachlisten. Die Route ist erst bekannt, sobald die Hintergrund-Ermittlung (siehe Schalter \"Routen-Ermittlung\" oben) für diesen Flug abgeschlossen ist.",
+
+    "Interessant: ",
+    "Nur Interessantes",
+    "Zeigt nur Flugzeuge, auf die mindestens eines zutrifft: Militär-/Behördenflug, Notfall-Squawk, ein Treffer auf einer deiner vier Wachlisten (Rufzeichen, Squawk, Typ, Route) oder ein Heavy-Flugzeug (ADS-B-Emitter-Kategorie). Kombiniert sich mit den anderen Filtern oben.",
+    "Interessant",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

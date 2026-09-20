@@ -47,6 +47,7 @@ namespace {
     bool hideGroundVehiclesOn = true;
     bool onlyHelicoptersOn = false;
     bool onlyLowAltitudeOn = false;
+    bool onlyInterestingOn = false;
     bool airlineFilterShowOnlyOn = false;
     uint8_t languageIdx = 0;
     uint8_t unitsModeVal = 0;
@@ -100,6 +101,17 @@ namespace {
     // nutzt, auch diese haeufigeren, weniger kritischen Meldungen will.
     // Default AUS (Alex' Wunsch).
     bool ntfyFlightStoriesOn = false;
+
+    // "Anflug-Alarm" (SettingsStore::ntfyApproachAlertEnabled(), siehe
+    // radar_screen.cpp::updateProximityAlert()) - eigener Schalter, Default
+    // AUS (Alex' Wunsch: fuer bestehende Nutzer aendert sich nichts
+    // automatisch).
+    bool ntfyApproachAlertOn = false;
+
+    // Route-Watchlist (SettingsStore::routeWatchlistAlertEnabled(), siehe
+    // route_watchlist.h) - Default AUS (Alex' Wunsch: kein automatischer
+    // Hintergrund-HTTPS-Verkehr, bis bewusst eingeschaltet).
+    bool routeWatchlistAlertOn = false;
     char lastSeenVersionBuf[16] = {0};
     // Default 120s = Config::MENU_IDLE_TIMEOUT_MS (bisheriger fester Wert) -
     // damit aendert sich fuer niemanden ungefragt etwas, bis der neue
@@ -196,6 +208,8 @@ namespace {
             onlyHelicoptersOn = (value.toInt() != 0);
         } else if (key == "only_low_altitude") {
             onlyLowAltitudeOn = (value.toInt() != 0);
+        } else if (key == "only_interesting") {
+            onlyInterestingOn = (value.toInt() != 0);
         } else if (key == "airline_filter_show_only") {
             airlineFilterShowOnlyOn = (value.toInt() != 0);
         } else if (key == "language") {
@@ -246,6 +260,10 @@ namespace {
             ntfyPushOn = (value.toInt() != 0);
         } else if (key == "ntfy_flight_stories_enabled") {
             ntfyFlightStoriesOn = (value.toInt() != 0);
+        } else if (key == "ntfy_approach_alert_enabled") {
+            ntfyApproachAlertOn = (value.toInt() != 0);
+        } else if (key == "route_watchlist_alert_enabled") {
+            routeWatchlistAlertOn = (value.toInt() != 0);
         } else if (key == "ntfy_push_topic") {
             strncpy(ntfyPushTopicBuf, value.c_str(), sizeof(ntfyPushTopicBuf) - 1);
             ntfyPushTopicBuf[sizeof(ntfyPushTopicBuf) - 1] = 0;
@@ -326,6 +344,7 @@ void save() {
     f.printf("hide_ground_vehicles=%d\n", hideGroundVehiclesOn ? 1 : 0);
     f.printf("only_helicopters=%d\n", onlyHelicoptersOn ? 1 : 0);
     f.printf("only_low_altitude=%d\n", onlyLowAltitudeOn ? 1 : 0);
+    f.printf("only_interesting=%d\n", onlyInterestingOn ? 1 : 0);
     f.printf("airline_filter_show_only=%d\n", airlineFilterShowOnlyOn ? 1 : 0);
     f.printf("language=%d\n", languageIdx);
     f.printf("units_mode=%d\n", unitsModeVal);
@@ -348,6 +367,8 @@ void save() {
     f.printf("mqtt_pass=%s\n", mqttPassBuf);
     f.printf("ntfy_push_enabled=%d\n", ntfyPushOn ? 1 : 0);
     f.printf("ntfy_flight_stories_enabled=%d\n", ntfyFlightStoriesOn ? 1 : 0);
+    f.printf("ntfy_approach_alert_enabled=%d\n", ntfyApproachAlertOn ? 1 : 0);
+    f.printf("route_watchlist_alert_enabled=%d\n", routeWatchlistAlertOn ? 1 : 0);
     f.printf("ntfy_push_topic=%s\n", ntfyPushTopicBuf);
     f.printf("last_seen_version=%s\n", lastSeenVersionBuf);
     f.printf("ota_just_installed=%d\n", otaJustInstalledFlag ? 1 : 0);
@@ -548,6 +569,13 @@ void setOnlyLowAltitude(bool on) {
     save();
 }
 
+bool onlyInteresting() { return onlyInterestingOn; }
+
+void setOnlyInteresting(bool on) {
+    onlyInterestingOn = on;
+    save();
+}
+
 bool airlineFilterShowOnlyMode() { return airlineFilterShowOnlyOn; }
 
 void setAirlineFilterShowOnlyMode(bool showOnly) {
@@ -708,6 +736,20 @@ bool ntfyFlightStoriesEnabled() { return ntfyFlightStoriesOn; }
 
 void setNtfyFlightStoriesEnabled(bool on) {
     ntfyFlightStoriesOn = on;
+    save();
+}
+
+bool ntfyApproachAlertEnabled() { return ntfyApproachAlertOn; }
+
+void setNtfyApproachAlertEnabled(bool on) {
+    ntfyApproachAlertOn = on;
+    save();
+}
+
+bool routeWatchlistAlertEnabled() { return routeWatchlistAlertOn; }
+
+void setRouteWatchlistAlertEnabled(bool on) {
+    routeWatchlistAlertOn = on;
     save();
 }
 

@@ -69,12 +69,15 @@ namespace {
         uint32_t size;
     };
 
-    // BUGFIX (Linker-Fehler "DRAM segment does not fit" nach Hinzufuegen
-    // des Flight-Stories-Features an anderer Stelle) - von 64 auf 24
-    // reduziert, spart ~2,9KB im knappen .bss-Speicherbereich. 24 reicht
-    // dank der bereits vorhandenen Paginierung (Prev/Next) weiterhin
-    // bequem aus, dieser Screen ist ohnehin ein reines Entwicklerwerkzeug.
-    constexpr uint8_t MAX_ENTRIES = 24;
+    // BUGFIX (Linker-Fehler "DRAM segment does not fit") - urspruenglich
+    // von 64 auf 24 reduziert (Flight-Stories-Feature), jetzt nochmal auf
+    // 12 (Route-Watchlist: aircraft.h waechst um routeOrigin/routeDest/
+    // routeLookupDone, mal ZWEI 40er-Aircraft-Arrays - aircraft_table.cpp
+    // UND net_task.cpp::tempTable). Spart nochmal ~864 Byte im knappen
+    // .bss-Speicherbereich. 12 reicht dank der bereits vorhandenen
+    // Paginierung (Prev/Next) weiterhin bequem aus, dieser Screen ist
+    // ohnehin ein reines Entwicklerwerkzeug.
+    constexpr uint8_t MAX_ENTRIES = 12;
 
     // Liest den Inhalt von `path` komplett in `entries` ein (bis maximal
     // MAX_ENTRIES) - synchron/blockierend, kann bei vielen Dateien (z.B.

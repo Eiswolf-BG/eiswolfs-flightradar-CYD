@@ -584,6 +584,36 @@ static const char* const I18N_PT[] = {
     "Desempenho: ",
     "Normal",
     "Reduzido (nível %d/3)",
+
+    "Alerta de aproximação",
+    "Alerta de aproximação",
+    "Envia uma notificação push ntfy separada quando uma aeronave que já está em uma das suas listas de observação (indicativo, squawk ou tipo de aeronave) entra agora na aproximação de pouso. É acionado apenas uma vez por aproximação, não repetidamente enquanto permanece nessa fase.",
+
+    "Aeronave militar avistada nas proximidades: %s - a %s",
+    "Helicóptero sobre a área: %s - a %s",
+    "Voo em baixa altitude detectado: %s a %s",
+    "O voo %s está agora em aproximação final",
+
+    "Lista de Rotas",
+    "Lista de Rotas",
+    "O LED azul pisca quando a rota",
+    "de um voo corresponde a uma destas entradas.",
+    "Adicionar rota",
+    "Aeroporto de partida (ICAO)",
+    "Aeroporto de destino (ICAO)",
+    "Deixar vazio",
+    "Nenhuma rota observada ainda.",
+    "Busca de Rota",
+    "Busca de Rota",
+    "Busca online, em segundo plano, o aeroporto de partida/destino de cada aeronave visível (uma vez por voo, depois armazenado em cache) para comparar com a lista de rotas abaixo. Desativado por padrão para evitar tráfego de rede desnecessário.",
+    "Como funciona a lista de rotas",
+    "Digite um aeroporto de partida e/ou destino como código ICAO (ex.: EDDS, LWSK) - deixe um campo vazio (\"Deixar vazio\") para corresponder a qualquer rota de/para apenas o outro aeroporto. Até 5 rotas podem ser observadas ao mesmo tempo.",
+    "Assim que a rota obtida de uma aeronave visível corresponder, ela recebe um anel ciano e o LED pisca em azul, exatamente como as outras listas de observação. A rota só é conhecida depois que a busca em segundo plano (veja o interruptor \"Busca de Rota\" acima) for concluída para aquele voo.",
+
+    "Interessante: ",
+    "Somente interessante",
+    "Mostra apenas aeronaves que atendam a pelo menos um destes critérios: voo militar/governamental, squawk de emergência, correspondência em uma das suas quatro listas de observação (indicativo, squawk, tipo, rota), ou uma aeronave Heavy (categoria de emissor ADS-B). Combina-se com os outros filtros acima.",
+    "Interessante",
 };
 
 static_assert(sizeof(I18N_PT) / sizeof(I18N_PT[0]) == (size_t)StringId::COUNT,

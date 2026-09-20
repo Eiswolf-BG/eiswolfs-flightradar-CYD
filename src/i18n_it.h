@@ -584,6 +584,36 @@ static const char* const I18N_IT[] = {
     "Prestazioni: ",
     "Normale",
     "Ridotto (livello %d/3)",
+
+    "Allarme avvicinamento",
+    "Allarme avvicinamento",
+    "Invia una notifica push ntfy separata quando un aereo già presente in una delle tue liste di controllo (nominativo, squawk o tipo di aereo) entra nella fase di avvicinamento all'atterraggio. Si attiva una sola volta per avvicinamento, non ripetutamente per tutta la fase.",
+
+    "Aereo militare avvistato nelle vicinanze: %s - a %s",
+    "Elicottero sulla zona: %s - a %s",
+    "Volo a bassa quota rilevato: %s a %s",
+    "Il volo %s è ora in avvicinamento finale",
+
+    "Rotte Controllate",
+    "Rotte Controllate",
+    "Il LED blu lampeggia quando la rotta",
+    "di un volo corrisponde a una di queste voci.",
+    "Aggiungi rotta",
+    "Aeroporto di partenza (ICAO)",
+    "Aeroporto di destinazione (ICAO)",
+    "Lascia vuoto",
+    "Nessuna rotta controllata per ora.",
+    "Ricerca rotta",
+    "Ricerca rotta",
+    "Cerca online, in background, l'aeroporto di partenza/destinazione di ogni aereo visibile (una volta per volo, poi memorizzato in cache) per confrontarlo con la lista rotte qui sotto. Disattivato per impostazione predefinita per evitare traffico di rete inutile.",
+    "Come funziona il controllo rotte",
+    "Inserisci un aeroporto di partenza e/o destinazione come codice ICAO (es. EDDS, LWSK) - lascia un campo vuoto (\"Lascia vuoto\") per far corrispondere qualsiasi rotta da/verso solo l'altro aeroporto. Puoi controllare fino a 5 rotte contemporaneamente.",
+    "Non appena la rotta rilevata di un aereo visibile corrisponde, riceve un anello ciano e il LED lampeggia blu, esattamente come le altre liste di controllo. La rotta è nota solo dopo che la ricerca in background (vedi l'interruttore \"Ricerca rotta\" sopra) è stata completata per quel volo.",
+
+    "Interessante: ",
+    "Solo interessanti",
+    "Mostra solo aerei che soddisfano almeno uno di questi criteri: volo militare/governativo, squawk di emergenza, corrispondenza in una delle tue quattro liste di controllo (nominativo, squawk, tipo, rotta), oppure un aereo Heavy (categoria emittente ADS-B). Si combina con gli altri filtri sopra.",
+    "Interessante",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

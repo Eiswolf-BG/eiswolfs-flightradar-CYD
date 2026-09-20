@@ -121,7 +121,7 @@ namespace {
         return prefix + shown;
     }
 
-    constexpr uint8_t ROW_COUNT = 5; // Enable, Topic, Flight Stories, Test-Push, Zurueck
+    constexpr uint8_t ROW_COUNT = 6; // Enable, Topic, Flight Stories, Approach Alert, Test-Push, Zurueck
     constexpr int16_t ROW_GAP = 6;
     constexpr int16_t START_Y = 40;
     constexpr int16_t END_Y = Config::SCREEN_HEIGHT - 10;
@@ -326,15 +326,28 @@ void run(TFT_eSPI& tft) {
         drawCheckboxRow(tft, flightStoriesRow, "Flight Stories", SettingsStore::ntfyFlightStoriesEnabled());
         drawRowInfoButton(tft, flightStoriesRow);
 
+        // "Anflug-Alarm" (Alex' Wunsch) - eigene ntfy-Push-Meldung, sobald
+        // ein bereits per Watchlist erkanntes Flugzeug neu in den
+        // Landeanflug wechselt (radar_screen.cpp::updateProximityAlert()).
+        // Eigene, echte StringIds diesmal (anders als "Flight Stories"
+        // oben) - das Sprachsystem ist weiterhin ausschliesslich
+        // hinsichtlich Lade-/Cache-Mechanismus tabu, das reine Hinzufuegen
+        // neuer, in i18n_XX.h fest einkompilierter Eintraege ist normale
+        // Feature-Arbeit wie bei jedem anderen Toggle im Projekt.
+        Rect approachAlertRow = rowRect(3);
+        drawCheckboxRow(tft, approachAlertRow, I18n::t(StringId::NTFY_APPROACH_ALERT_LABEL),
+                         SettingsStore::ntfyApproachAlertEnabled());
+        drawRowInfoButton(tft, approachAlertRow);
+
         // Nur antippbar, wenn ueberhaupt ein Topic gesetzt ist - ohne Topic
         // weiss NtfyPush::update() ohnehin nicht, wohin gesendet werden
         // soll (siehe dortiger stiller Abbruch), ein deaktiviert wirkender
         // Knopf ist hier klarer als ein Tap, der sichtbar nichts bewirkt.
         bool canTest = topic.length() > 0;
-        Rect testBtn = rowRect(3);
+        Rect testBtn = rowRect(4);
         drawButton(tft, testBtn, I18n::t(StringId::NTFY_PUSH_TEST_BUTTON));
 
-        Rect backBtn = rowRect(4);
+        Rect backBtn = rowRect(5);
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
         TouchInput::Point tap;
@@ -356,15 +369,21 @@ void run(TFT_eSPI& tft) {
             // Bounding-Box geschluckt (gleiches Muster wie bei allen
             // anderen "?"-Buttons im Projekt).
             MenuScreen::showInfoScreen(tft, "Flight Stories",
-                                        "Sends a short automatic push/MQTT message when a military "
+                                        "Sends a short automatic push message when a military "
                                         "aircraft, a helicopter, or a low-altitude flight is detected "
                                         "nearby. Each aircraft triggers at most one message every 10 "
                                         "minutes, even if it stays in range longer.",
+                                        UiTheme::accentColor(tft), I18n::t(StringId::OK));
+        } else if (rowInfoBtnRect(approachAlertRow).contains(tap.x, tap.y)) {
+            MenuScreen::showInfoScreen(tft, I18n::t(StringId::NTFY_APPROACH_ALERT_INFO_TITLE),
+                                        I18n::t(StringId::NTFY_APPROACH_ALERT_INFO_BODY),
                                         UiTheme::accentColor(tft), I18n::t(StringId::OK));
         } else if (enableRow.contains(tap.x, tap.y)) {
             SettingsStore::setNtfyPushEnabled(!SettingsStore::ntfyPushEnabled());
         } else if (flightStoriesRow.contains(tap.x, tap.y)) {
             SettingsStore::setNtfyFlightStoriesEnabled(!SettingsStore::ntfyFlightStoriesEnabled());
+        } else if (approachAlertRow.contains(tap.x, tap.y)) {
+            SettingsStore::setNtfyApproachAlertEnabled(!SettingsStore::ntfyApproachAlertEnabled());
         } else if (topicRow.contains(tap.x, tap.y)) {
             String value = runTopicKeypad(tft, I18n::t(StringId::NTFY_PUSH_TOPIC_PROMPT));
             if (value.length() > 0) SettingsStore::setNtfyPushTopic(value);

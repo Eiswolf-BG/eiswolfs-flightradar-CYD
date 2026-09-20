@@ -585,6 +585,36 @@ static const char* const I18N_EN[] = {
     "Performance: ",
     "Normal",
     "Reduced (level %d/3)",
+
+    "Approach Alert",
+    "Approach Alert",
+    "Sends a separate ntfy push notification when an aircraft already on one of your watchlists (callsign, squawk, or aircraft type) newly enters its landing approach. Fires once per approach, not repeatedly while it stays in that phase.",
+
+    "Military aircraft spotted nearby: %s - %s away",
+    "Helicopter over the area: %s - %s away",
+    "Low-altitude flight detected: %s at %s",
+    "Flight %s is now on final approach",
+
+    "Route Watch",
+    "Route Watch",
+    "The blue LED blinks when a flight's",
+    "route matches one of these.",
+    "Add route",
+    "Departure airport (ICAO)",
+    "Destination airport (ICAO)",
+    "Leave empty",
+    "No routes watched yet.",
+    "Route Lookup",
+    "Route Lookup",
+    "Looks up each visible aircraft's departure/destination airport online in the background (once per flight, then cached) to check it against the route watchlist below. Off by default to avoid unnecessary network use.",
+    "How route watch works",
+    "Enter a departure and/or destination airport as an ICAO code (e.g. EDDS, LWSK) - leave one field empty (\"Leave empty\") to match any route from/to just the other airport. Up to 5 routes can be tracked at once.",
+    "As soon as a visible aircraft's looked-up route matches, it gets a cyan ring and the LED blinks blue, exactly like the other watchlists - the route is only known once the background lookup (see the \"Route Lookup\" switch above) has completed for that flight.",
+
+    "Interesting: ",
+    "Interesting Only",
+    "Shows only aircraft matching at least one of: military/government flight, emergency squawk, a hit on any of your four watchlists (callsign, squawk, type, route), or a Heavy aircraft (ADS-B emitter category). Combines with the other filters above.",
+    "Interesting",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

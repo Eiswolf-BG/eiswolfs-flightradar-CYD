@@ -586,6 +586,36 @@ static const char* const I18N_NL[] = {
     "Prestaties: ",
     "Normaal",
     "Verminderd (niveau %d/3)",
+
+    "Nadering-alarm",
+    "Nadering-alarm",
+    "Stuurt een aparte ntfy-pushmelding wanneer een vliegtuig dat al op een van je volglijsten staat (roepnaam, squawk of vliegtuigtype) nieuw de landingsnadering ingaat. Wordt maar één keer per nadering geactiveerd, niet herhaaldelijk zolang het in die fase blijft.",
+
+    "Militair vliegtuig gespot in de buurt: %s - op %s",
+    "Helikopter boven het gebied: %s - op %s",
+    "Laagvliegende vlucht gedetecteerd: %s op %s",
+    "Vlucht %s bevindt zich nu in de landingsnadering",
+
+    "Routelijst",
+    "Routelijst",
+    "De blauwe LED knippert als de route",
+    "van een vlucht overeenkomt met een van deze.",
+    "Route toevoegen",
+    "Vertrekluchthaven (ICAO)",
+    "Bestemmingsluchthaven (ICAO)",
+    "Leeg laten",
+    "Nog geen routes gevolgd.",
+    "Route-opzoeking",
+    "Route-opzoeking",
+    "Zoekt op de achtergrond online de vertrek-/bestemmingsluchthaven van elk zichtbaar vliegtuig op (eenmaal per vlucht, daarna gecachet) om te vergelijken met de routelijst hieronder. Standaard uit om onnodig netwerkverkeer te vermijden.",
+    "Hoe de routelijst werkt",
+    "Voer een vertrek- en/of bestemmingsluchthaven in als ICAO-code (bijv. EDDS, LWSK) - laat een veld leeg (\"Leeg laten\") om elke route van/naar alleen de andere luchthaven te laten overeenkomen. Tot 5 routes tegelijk kunnen worden gevolgd.",
+    "Zodra de opgezochte route van een zichtbaar vliegtuig overeenkomt, krijgt het een cyaan ring en knippert de LED blauw - precies zoals de andere volglijsten. De route is pas bekend zodra de achtergrondopzoeking (zie de schakelaar \"Route-opzoeking\" hierboven) voor die vlucht is voltooid.",
+
+    "Interessant: ",
+    "Alleen interessant",
+    "Toont alleen vliegtuigen die aan minstens een van deze criteria voldoen: militaire/overheidsvlucht, noodsquawk, een treffer op een van je vier volglijsten (roepnaam, squawk, type, route), of een Heavy-vliegtuig (ADS-B-zendercategorie). Combineert met de andere filters hierboven.",
+    "Interessant",
 };
 
 static_assert(sizeof(I18N_NL) / sizeof(I18N_NL[0]) == (size_t)StringId::COUNT,

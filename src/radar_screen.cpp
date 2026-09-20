@@ -445,12 +445,41 @@ namespace {
     // (siehe dort). Notfall-Squawk und Watchlist-Treffer nutzen diese
     // Funktion bewusst NICHT - die sollen wie bisher immer erkannt werden,
     // auch ausserhalb der Reichweite oder hinter einem aktiven Filter.
+    // Vorwaertsdeklarationen - beide Funktionen sind erst weiter unten in
+    // dieser Datei vollstaendig definiert (isMilitaryGovSquawk() bei der
+    // Militaer-/Behoerdenflug-Erkennung, isHeavyCategory() bei der
+    // Marker-Groessen-Logik), werden aber hier schon fuer
+    // isInterestingAircraft() gebraucht.
+    bool isMilitaryGovSquawk(const char* squawk);
+    bool isHeavyCategory(const char* category);
+
+    // Filter "Nur Interessantes" (Alex' Wunsch) - reiner ODER-Verbund
+    // bereits bestehender Erkennungen, KEINE neue Datenerkennung:
+    // Militaer-/Behoerdenflug (isMilitaryGovSquawk(), respektiert denselben
+    // An/Aus-Schalter wie ueberall sonst im Projekt), Notfall-Squawk
+    // (isEmergencySquawk(), ebenso), ein Treffer auf irgendeiner der vier
+    // Watchlists (WatchlistAlert::isHit() - Callsign/Squawk/Typ/Route,
+    // kein eigener Schalter noetig, die Listen sind immer aktiv), oder
+    // "Heavy" (ADS-B-Emitter-Kategorie "A5", isHeavyCategory() - das ist
+    // die einzige im Projekt bereits vorhandene "Heavy"/Wake-Turbulence-
+    // artige Kennzeichnung; ein separates, echtes Wake-Turbulence-Feld
+    // liefert adsb.lol nicht, daher wird ausdruecklich NICHTS Neues dafuer
+    // erfunden).
+    bool isInterestingAircraft(const Aircraft& a) {
+        bool military = SettingsStore::militarySquawkDetectionEnabled() && isMilitaryGovSquawk(a.squawk);
+        bool emergency = SettingsStore::emergencyAlertEnabled() && isEmergencySquawk(a.squawk);
+        bool watched = WatchlistAlert::isHit(a);
+        bool heavy = isHeavyCategory(a.category);
+        return military || emergency || watched || heavy;
+    }
+
     bool isAircraftVisibleOnRadar(const Aircraft& a, float rangeKm) {
         if (a.distanceKm > rangeKm * 1.05f) return false;
         if (SettingsStore::hideGroundVehicles() && a.category[0] == 'C') return false;
         if (SettingsStore::onlyHelicopters() && !(a.category[0] == 'A' && a.category[1] == '7')) return false;
         if (SettingsStore::onlyLowAltitude() &&
             (a.category[0] == 'C' || a.altBaroFt >= Config::COLOR_LOW_ALT_THRESHOLD_FT)) return false;
+        if (SettingsStore::onlyInteresting() && !isInterestingAircraft(a)) return false;
         return true;
     }
 
@@ -5034,6 +5063,10 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
         if (activeFilters.length()) activeFilters += ", ";
         activeFilters += I18n::t(StringId::RADAR_FILTER_NAME_LOW_ALTITUDE);
     }
+    if (SettingsStore::onlyInteresting()) {
+        if (activeFilters.length()) activeFilters += ", ";
+        activeFilters += I18n::t(StringId::RADAR_FILTER_NAME_INTERESTING);
+    }
     if (AirlineFilter::count() > 0) {
         if (activeFilters.length()) activeFilters += ", ";
         activeFilters += I18n::t(StringId::RADAR_FILTER_NAME_AIRLINE);
@@ -5376,6 +5409,17 @@ void updateProximityAlert(uint32_t nowMs) {
     bool flightStoriesOn = SettingsStore::ntfyFlightStoriesEnabled();
     char flightStoryMsg[160] = {0};
 
+    // "Anflug-Alarm" (Alex' Wunsch) - eigene ntfy-Push-Nachricht, sobald ein
+    // bereits per Watchlist (Rufzeichen/Squawk/Typ) erkanntes Flugzeug NEU
+    // in die Landeanflugphase wechselt (FlightPhase::Approach/::Landing).
+    // Anders als flightStoryMsg oben (niedrigere Prioritaet, siehe
+    // Sende-Prioritaet weiter unten) liegt dieses Ereignis auf derselben
+    // Stufe wie ein gewoehnlicher Watchlist-Treffer - beide werden deshalb
+    // OBEN im filterunabhaengigen Teil der Schleife erkannt, nicht erst
+    // nach dem Sichtbarkeits-Filter wie Flight Stories.
+    bool approachAlertOn = SettingsStore::ntfyApproachAlertEnabled();
+    char approachMsg[160] = {0};
+
     bool proximityOn = SettingsStore::proximityAlertEnabled();
     bool smartOn = SettingsStore::proximityAlertSmartMode();
     bool emergencyOn = SettingsStore::emergencyAlertEnabled();
@@ -5437,6 +5481,26 @@ void updateProximityAlert(uint32_t nowMs) {
             }
             table[i].wasWatched = isWatchedNow;
 
+            // "Anflug-Alarm" - nur fuer Flugzeuge, die GERADE JETZT auf
+            // einer der drei Watchlisten stehen (isWatchedNow), unabhaengig
+            // davon, ob der Watchlist-Treffer selbst neu ist oder schon
+            // laenger besteht - ein bereits seit Minuten beobachtetes
+            // Flugzeug soll den Alarm genauso ausloesen, sobald es in den
+            // Anflug geht. computeFlightPhase() ist dieselbe, bereits
+            // bestehende Flugphasen-Erkennung wie bei Flight Stories/dem
+            // Detail-Panel (siehe oben in dieser Datei) - Approach UND
+            // Landing zaehlen beide als "im Anflug" (Landing ist nur die
+            // bodennahe Verfeinerung desselben approachLikely-Falls).
+            if (isWatchedNow && approachAlertOn) {
+                FlightPhase phase = computeFlightPhase(table[i]);
+                bool isApproachingNow = (phase == FlightPhase::Approach || phase == FlightPhase::Landing);
+                if (isApproachingNow && !table[i].wasApproachPhase && approachMsg[0] == 0) {
+                    const char* name = table[i].callsign[0] ? table[i].callsign : table[i].hex;
+                    snprintf(approachMsg, sizeof(approachMsg), I18n::t(StringId::NTFY_APPROACH_ALERT_MSG_FMT), name);
+                }
+                table[i].wasApproachPhase = isApproachingNow;
+            }
+
             // Einfacher UND intelligenter Naeherungsalarm dagegen NUR fuer
             // Flugzeuge, die auch tatsaechlich auf dem Radar sichtbar waeren
             // (Alex' Meldung: der Alarm ignorierte bisher die eingestellte
@@ -5463,17 +5527,39 @@ void updateProximityAlert(uint32_t nowMs) {
                 (table[i].lastFlightStoryMs == 0 ||
                  nowMs - table[i].lastFlightStoryMs > Config::FLIGHT_STORY_REPEAT_SUPPRESS_MS)) {
                 const char* name = table[i].callsign[0] ? table[i].callsign : table[i].hex;
+                // Distanz/Hoehe respektieren die zentrale Metrisch/Imperial-
+                // Einstellung (Alex' Wunsch) statt fest auf km/ft zu stehen -
+                // gleiche Umrechnung/Formatierung wie an anderen Stellen im
+                // Projekt (z.B. "Naechster Flughafen"-Distanz, Detail-Panel-
+                // Hoehe: LocationManager::useMetricUnits() + Units::
+                // kmToNm()/feetToMeters()). Der fertige, einheitenbehaftete
+                // Textbaustein wird per "%s" in den uebersetzten Satz
+                // eingesetzt statt die Einheit im Format-String selbst
+                // fest zu verdrahten.
+                bool metric = LocationManager::useMetricUnits();
+                char distStr[16];
+                if (metric) {
+                    snprintf(distStr, sizeof(distStr), "%.0fkm", table[i].distanceKm);
+                } else {
+                    snprintf(distStr, sizeof(distStr), "%.0fnm", Units::kmToNm(table[i].distanceKm));
+                }
                 if (militaryOn && isMilitaryGovSquawk(table[i].squawk)) {
                     snprintf(flightStoryMsg, sizeof(flightStoryMsg),
-                             "Military aircraft spotted nearby: %s - %.0fkm away", name, table[i].distanceKm);
+                             I18n::t(StringId::NTFY_FLIGHT_STORY_MILITARY_FMT), name, distStr);
                     table[i].lastFlightStoryMs = nowMs;
                 } else if (isRotorcraftCategoryInternal(table[i].category)) {
                     snprintf(flightStoryMsg, sizeof(flightStoryMsg),
-                             "Helicopter over the area: %s - %.0fkm away", name, table[i].distanceKm);
+                             I18n::t(StringId::NTFY_FLIGHT_STORY_HELICOPTER_FMT), name, distStr);
                     table[i].lastFlightStoryMs = nowMs;
                 } else if (computeFlightPhase(table[i]) == FlightPhase::LowPass) {
+                    char altStr[16];
+                    if (metric) {
+                        snprintf(altStr, sizeof(altStr), "%.0fm", Units::feetToMeters((float)table[i].altBaroFt));
+                    } else {
+                        snprintf(altStr, sizeof(altStr), "%.0fft", (float)table[i].altBaroFt);
+                    }
                     snprintf(flightStoryMsg, sizeof(flightStoryMsg),
-                             "Low-altitude flight detected: %s at %ldft", name, (long)table[i].altBaroFt);
+                             I18n::t(StringId::NTFY_FLIGHT_STORY_LOWALT_FMT), name, altStr);
                     table[i].lastFlightStoryMs = nowMs;
                 }
             }
@@ -5519,14 +5605,28 @@ void updateProximityAlert(uint32_t nowMs) {
     // deren Deklaration oben) ausgeloest, nicht bei jedem Zyklus, solange
     // dasselbe Flugzeug weiter sichtbar bleibt - request() selbst merkt nur
     // vor, die eigentliche HTTPS-Anfrage laeuft asynchron auf Core 0
-    // (net_task.cpp::NtfyPush::update()).
-    if ((newEmergencyHit || newWatchHit) && SettingsStore::ntfyPushEnabled()) {
+    // (net_task.cpp::NtfyPush::update()). Der "Anflug-Alarm" (approachMsg,
+    // Alex' Wunsch) liegt auf DERSELBEN Prioritaetsstufe wie ein normaler
+    // Watchlist-Treffer (newWatchHit) - beide konkurrieren hier um denselben
+    // Ein-Platz-Sendeplatz. Grenzfall (Alex' Frage): taucht ein Flugzeug im
+    // selben Zyklus gleichzeitig NEU auf der Watchlist auf UND befindet
+    // sich schon im Anflug, gewinnt bewusst die einfache Watchlist-Meldung
+    // (newWatchHit zuerst geprueft) - das grundlegendere "wird jetzt
+    // beobachtet"-Ereignis wiegt in diesem seltenen Zusammentreffen schwerer
+    // als der Anflug-Hinweis; table[i].wasApproachPhase wurde oben in der
+    // Schleife trotzdem bereits korrekt auf true gesetzt, es gibt also
+    // keinen verwaisten Zustand - nur die Meldung selbst entfaellt fuer
+    // diesen einen Zyklus.
+    if ((newEmergencyHit || newWatchHit || approachMsg[0] != 0) && SettingsStore::ntfyPushEnabled()) {
         char msg[160];
         if (pushIsEmergency) {
             snprintf(msg, sizeof(msg), "%s%s: %s", I18n::t(StringId::NTFY_PUSH_MSG_EMERGENCY_PREFIX),
                       pushSquawk, pushCallsign);
-        } else {
+        } else if (newWatchHit) {
             snprintf(msg, sizeof(msg), "%s%s", I18n::t(StringId::NTFY_PUSH_MSG_WATCHLIST_PREFIX), pushCallsign);
+        } else {
+            strncpy(msg, approachMsg, sizeof(msg) - 1);
+            msg[sizeof(msg) - 1] = 0;
         }
         NtfyPush::request(msg);
     }
@@ -5632,6 +5732,15 @@ bool isEmergencySquawkCode(const char* squawk) {
 
 bool isMilitaryGovSquawkCode(const char* squawk) {
     return isMilitaryGovSquawk(squawk);
+}
+
+bool isAircraftVisibleAtRange(const Aircraft& a, float rangeKm) {
+    return isAircraftVisibleOnRadar(a, rangeKm) && !AirlineFilter::isHidden(a.callsign);
+}
+
+bool isAircraftCurrentlyVisible(const Aircraft& a) {
+    float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
+    return isAircraftVisibleAtRange(a, rangeKm);
 }
 
 }

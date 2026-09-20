@@ -14,6 +14,7 @@
 #include "aircraft_watchlist_screen.h"
 #include "squawk_watchlist_screen.h"
 #include "type_watchlist_screen.h"
+#include "route_watchlist_screen.h"
 #include "aircraft_list_screen.h"
 #include "live_traffic_screen.h"
 #include "connection_status_screen.h"
@@ -1806,18 +1807,20 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             tft.setCursor(10, 14);
             tft.println(I18n::t(StringId::MENU_CATEGORY_LISTS));
 
-            Rect aircraftListBtn = subMenuRowRect(0, 6);
-            Rect liveTrafficBtn  = subMenuRowRect(1, 6);
-            Rect watchlistBtn    = subMenuRowRect(2, 6);
-            Rect squawkWatchBtn  = subMenuRowRect(3, 6);
-            Rect typeWatchBtn    = subMenuRowRect(4, 6);
-            Rect backBtn         = subMenuRowRect(5, 6);
+            Rect aircraftListBtn = subMenuRowRect(0, 7);
+            Rect liveTrafficBtn  = subMenuRowRect(1, 7);
+            Rect watchlistBtn    = subMenuRowRect(2, 7);
+            Rect squawkWatchBtn  = subMenuRowRect(3, 7);
+            Rect typeWatchBtn    = subMenuRowRect(4, 7);
+            Rect routeWatchBtn   = subMenuRowRect(5, 7);
+            Rect backBtn         = subMenuRowRect(6, 7);
 
             drawButton(tft, aircraftListBtn, I18n::t(StringId::MENU_AIRCRAFT_LIST));
             drawButton(tft, liveTrafficBtn, I18n::t(StringId::MENU_LIVE_TRAFFIC));
             drawButton(tft, watchlistBtn, I18n::t(StringId::MENU_WATCHLIST));
             drawButton(tft, squawkWatchBtn, I18n::t(StringId::MENU_SQUAWK_WATCHLIST));
             drawButton(tft, typeWatchBtn, I18n::t(StringId::MENU_TYPE_WATCHLIST));
+            drawButton(tft, routeWatchBtn, I18n::t(StringId::MENU_ROUTE_WATCHLIST));
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -1843,6 +1846,8 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 SquawkWatchlistScreen::run(tft);
             } else if (typeWatchBtn.contains(tap.x, tap.y)) {
                 TypeWatchlistScreen::run(tft);
+            } else if (routeWatchBtn.contains(tap.x, tap.y)) {
+                RouteWatchlistScreen::run(tft);
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::Flight;
             }
@@ -2017,12 +2022,13 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             // starten deshalb wieder beim normalen ROW_START_Y=18 (Default-
             // Parameter von subMenuRowRect()) statt der bisherigen, wegen des
             // Header-Buttons nach unten verschobenen 34.
-            Rect airlineBtn        = subMenuRowRect(0, 6);
-            Rect groundBtn         = subMenuRowRect(1, 6);
-            Rect helicoptersBtn    = subMenuRowRect(2, 6);
-            Rect lowAltitudeBtn    = subMenuRowRect(3, 6);
-            Rect issMarkerBtn      = subMenuRowRect(4, 6);
-            Rect backBtn           = subMenuRowRect(5, 6);
+            Rect airlineBtn        = subMenuRowRect(0, 7);
+            Rect groundBtn         = subMenuRowRect(1, 7);
+            Rect helicoptersBtn    = subMenuRowRect(2, 7);
+            Rect lowAltitudeBtn    = subMenuRowRect(3, 7);
+            Rect interestingBtn    = subMenuRowRect(4, 7);
+            Rect issMarkerBtn      = subMenuRowRect(5, 7);
+            Rect backBtn           = subMenuRowRect(6, 7);
 
             drawButton(tft, airlineBtn, I18n::t(StringId::MENU_AIRLINE_FILTER));
             // Label jetzt "Bodenfahrzeuge anzeigen" statt "...ausblenden" -
@@ -2037,6 +2043,12 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             drawButton(tft, groundBtn, I18n::t(StringId::MENU_HIDE_GROUND) + onOff(!SettingsStore::hideGroundVehicles()));
             drawButton(tft, helicoptersBtn, I18n::t(StringId::MENU_ONLY_HELICOPTERS) + onOff(SettingsStore::onlyHelicopters()));
             drawButton(tft, lowAltitudeBtn, I18n::t(StringId::MENU_ONLY_LOW_ALTITUDE) + onOff(SettingsStore::onlyLowAltitude()));
+            // "Nur Interessantes" (Alex' Wunsch) - anders als die beiden
+            // Geschwister oben MIT eigenem "?"-Info-Button, da mehrere
+            // kombinierte Kriterien kurz erklaert werden sollten (CLAUDE.md-
+            // Pflicht fuer jeden neuen Toggle).
+            drawButton(tft, interestingBtn, I18n::t(StringId::MENU_ONLY_INTERESTING) + onOff(SettingsStore::onlyInteresting()));
+            drawRowInfoButton(tft, interestingBtn);
             // Kein Sichtbarkeitsfilter im engeren Sinne (blendet keine
             // Flugzeuge aus), aber thematisch am ehesten hier passend - "was
             // wird zusaetzlich auf dem Radar angezeigt". Siehe iss_tracker.h.
@@ -2059,6 +2071,13 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             if (rowInfoBtnRect(issMarkerBtn).contains(tap.x, tap.y)) {
                 infoScreen(tft, I18n::t(StringId::ISS_MARKER_INFO_TITLE), I18n::t(StringId::ISS_MARKER_INFO_BODY),
                            UiTheme::accentColor(tft), I18n::t(StringId::OK));
+            } else if (rowInfoBtnRect(interestingBtn).contains(tap.x, tap.y)) {
+                // VOR dem Zeilen-Toggle direkt unten geprueft, sonst wuerde
+                // der kleine "?"-Button von der groesseren Zeilen-Bounding-
+                // Box geschluckt (gleiches Muster wie beim ISS-Marker oben).
+                infoScreen(tft, I18n::t(StringId::MENU_ONLY_INTERESTING_INFO_TITLE),
+                           I18n::t(StringId::MENU_ONLY_INTERESTING_INFO_BODY),
+                           UiTheme::accentColor(tft), I18n::t(StringId::OK));
             } else if (airlineBtn.contains(tap.x, tap.y)) {
                 AirlineFilterScreen::run(tft);
             } else if (groundBtn.contains(tap.x, tap.y)) {
@@ -2067,6 +2086,8 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 SettingsStore::setOnlyHelicopters(!SettingsStore::onlyHelicopters());
             } else if (lowAltitudeBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setOnlyLowAltitude(!SettingsStore::onlyLowAltitude());
+            } else if (interestingBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setOnlyInteresting(!SettingsStore::onlyInteresting());
             } else if (issMarkerBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setIssMarkerEnabled(!SettingsStore::issMarkerEnabled());
             } else if (backBtn.contains(tap.x, tap.y)) {

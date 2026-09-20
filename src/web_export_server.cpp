@@ -8,6 +8,7 @@
 #include "type_watchlist.h"
 #include "watchlist_alert.h"
 #include "aircraft_table.h"
+#include "radar_screen.h"
 #include "settings_store.h"
 #include "location_manager.h"
 #include "units.h"
@@ -2254,8 +2255,6 @@ namespace {
                 }
             }
         }
-        bool hideGround = SettingsStore::hideGroundVehicles();
-        bool onlyHeli = SettingsStore::onlyHelicopters();
         bool emergencyOn = SettingsStore::emergencyAlertEnabled();
         bool militaryOn = SettingsStore::militarySquawkDetectionEnabled();
 
@@ -2463,15 +2462,20 @@ namespace {
         for (uint8_t i = 0; i < AircraftTable::capacity(); i++) {
             Aircraft& a = table[i];
             if (!a.valid) continue;
-            if (a.distanceKm > rangeKm * 1.05f) continue;
+            // EIN gemeinsamer Filter-Check (Reichweite, Bodenfahrzeuge,
+            // Nur-Helikopter, Nur-Niedrigflieger, Nur-Interessantes,
+            // Airline-Filter) statt einer separat gepflegten Kopie hier -
+            // Alex' Wunsch: die Web-Livekarte soll konsistent dieselbe
+            // Sichtbarkeitsmenge zeigen wie Radar/Flugzeugliste/Live-
+            // Traffic. Explizit MIT dem hier lokal aufgeloesten rangeKm
+            // (kann per "range_km"-Query-Parameter vom eigentlichen
+            // Geraete-Wert abweichen, siehe Kommentar weiter oben), NICHT
+            // ueber RadarScreen::isAircraftCurrentlyVisible() (das
+            // haette wieder fest die Geraete-Reichweite angenommen).
+            if (!RadarScreen::isAircraftVisibleAtRange(a, rangeKm)) continue;
 
             bool isGroundVehicle = a.category[0] == 'C';
-            if (hideGround && isGroundVehicle) continue;
-
             bool isRotorcraft = a.category[0] == 'A' && a.category[1] == '7';
-            if (onlyHeli && !isRotorcraft) continue;
-
-            if (AirlineFilter::isHidden(a.callsign)) continue;
 
             bool isHeavy = isHeavyCategoryWeb(a.category);
             bool isEmergency = emergencyOn && isEmergencySquawkWeb(a.squawk);

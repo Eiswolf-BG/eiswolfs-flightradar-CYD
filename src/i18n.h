@@ -1312,6 +1312,84 @@ enum class StringId : uint16_t {
     SYSTEM_STATUS_PERF_NORMAL,
     SYSTEM_STATUS_PERF_REDUCED,
 
+    // "Anflug-Alarm" fuer bereits per Watchlist (Rufzeichen/Squawk/Typ)
+    // erkannte Flugzeuge (Alex' Wunsch) - eigener ntfy.sh-Push, sobald ein
+    // beobachtetes Flugzeug NEU in die Anflugphase wechselt (FlightPhase::
+    // Approach/::Landing, radar_screen.cpp::computeFlightPhase(), bereits
+    // bestehende Erkennung seit v6.4.0), AUS per Default. Eigener Schalter
+    // auf dem ntfy.sh-Push-Screen (ntfy_push_screen.cpp), analog zum
+    // bestehenden Flight-Stories-Schalter dort.
+    NTFY_APPROACH_ALERT_LABEL,
+    NTFY_APPROACH_ALERT_INFO_TITLE,
+    NTFY_APPROACH_ALERT_INFO_BODY,
+
+    // Die eigentlichen ntfy-Push-NACHRICHTENTEXTE fuer Flight Stories und
+    // den Anflug-Alarm (radar_screen.cpp::updateProximityAlert()) - vorher
+    // fest auf Englisch einprogrammiert, jetzt wie Notfall/Watchlist oben
+    // (NTFY_PUSH_MSG_EMERGENCY_PREFIX/_WATCHLIST_PREFIX) sprachabhaengig
+    // ueber I18n::t(). ALLE Platzhalter sind "%s" (Callsign/Hex, sowie bei
+    // Militaer/Hubschrauber/Tiefflug ein bereits fertig formatierter
+    // Distanz-/Hoehen-Textbaustein MIT Einheit, z.B. "42km"/"23nm" bzw.
+    // "9144m"/"30000ft" - je nach Metrisch/Imperial-Einstellung, siehe
+    // LocationManager::useMetricUnits() in radar_screen.cpp) - MUESSEN in
+    // JEDER Uebersetzung in der GLEICHEN Reihenfolge (erst Name, dann
+    // Distanz/Hoehe) enthalten bleiben, da hier bewusst keine positionellen
+    // %1$s/%2$s-Spezifizierer verwendet werden. Der Feature-Name "Flight
+    // Stories" selbst bleibt bewusst Englisch (Alex' Vorgabe) - nur diese
+    // vier Ereignistexte werden uebersetzt.
+    NTFY_FLIGHT_STORY_MILITARY_FMT,
+    NTFY_FLIGHT_STORY_HELICOPTER_FMT,
+    NTFY_FLIGHT_STORY_LOWALT_FMT,
+    NTFY_APPROACH_ALERT_MSG_FMT,
+
+    // Vierte Watchlist-Art (Alex' Wunsch): Route (Start-/Zielflughafen ICAO,
+    // beide optional) - route_watchlist.h/.cpp, route_watchlist_screen.cpp.
+    // Gleiches Namensmuster wie TYPE_WATCH_* oben (Menue > Flugoptionen >
+    // Listen). MENU_ROUTE_WATCHLIST ist der Menue-Button-Text, alle
+    // weiteren fuer den eigenen Screen.
+    MENU_ROUTE_WATCHLIST,
+    ROUTE_WATCH_TITLE,
+    ROUTE_WATCH_DESC1,
+    ROUTE_WATCH_DESC2,
+    ROUTE_WATCH_ADD,
+    ROUTE_WATCH_ADD_ORIGIN_TITLE,
+    ROUTE_WATCH_ADD_DEST_TITLE,
+    ROUTE_WATCH_SKIP,
+    ROUTE_WATCH_EMPTY,
+    // Eigener Ein/Aus-Schalter (anders als die anderen drei Listen, die
+    // keinen haben) - die Route erfordert einen Hintergrund-HTTPS-Lookup
+    // pro Flugzeug statt direkt im ADS-B-Signal zu stecken, siehe
+    // route_watchlist.h. AUS per Default.
+    ROUTE_WATCH_ENABLE_LABEL,
+    ROUTE_WATCH_ENABLE_INFO_TITLE,
+    ROUTE_WATCH_ENABLE_INFO_BODY,
+    ROUTE_WATCH_INFO_TITLE,
+    ROUTE_WATCH_INFO_PARA1,
+    ROUTE_WATCH_INFO_PARA2,
+
+    // Neuer Anzeigefilter "Nur Interessantes" (Alex' Wunsch, Menue >
+    // Flugoptionen > Anzeigefilter, gleiche Stelle wie MENU_ONLY_HELICOPTERS/
+    // MENU_ONLY_LOW_ALTITUDE) - kombiniert AUSSCHLIESSLICH bereits
+    // bestehende Erkennungen per ODER (radar_screen.cpp::
+    // isInterestingAircraft()): Militaer-/Behoerdenflug, Notfall-Squawk,
+    // Treffer auf einer der vier Watchlists, oder "Heavy" (ADS-B-Emitter-
+    // Kategorie "A5", bereits bestehende isHeavyCategory()). Text wird wie
+    // bei den Geschwistern mit onOff() kombiniert, daher ohne AN/AUS im
+    // String selbst. Bekommt (anders als die beiden Geschwister) einen
+    // eigenen "?"-Info-Button, da "interessant" mehrere kombinierte
+    // Kriterien zusammenfasst, die kurz erklaert werden sollten (CLAUDE.md-
+    // Pflicht fuer jeden neuen Toggle).
+    MENU_ONLY_INTERESTING,
+    MENU_ONLY_INTERESTING_INFO_TITLE,
+    MENU_ONLY_INTERESTING_INFO_BODY,
+
+    // Kurzer Name fuer den "aktive Filter"-Hinweis auf dem Radarscreen
+    // selbst (radar_screen.cpp, gleiche Liste wie RADAR_FILTER_NAME_
+    // HELICOPTERS/_LOW_ALTITUDE/_AIRLINE), wenn "Nur Interessantes" aktiv
+    // ist - kurzes Substantiv statt des vollen Menue-Texts, gleiches Muster
+    // wie die drei bestehenden Eintraege dort.
+    RADAR_FILTER_NAME_INTERESTING,
+
     COUNT
 };
 

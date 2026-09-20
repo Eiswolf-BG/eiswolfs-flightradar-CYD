@@ -81,20 +81,20 @@ bool run(TFT_eSPI& tft) {
     while (!done && !selected) {
         static Aircraft snapshot[Config::MAX_TRACKED_AIRCRAFT];
         uint8_t count = 0;
-        float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
-        // Gleiche Filter wie das Radar (Reichweite, Bodenfahrzeuge,
-        // Airline-Filter), damit die Liste genau die Flugzeuge zeigt, die
-        // gerade auch als Punkte auf dem Radar zu sehen sind.
+        // Gleiche Filter wie das Radar (Reichweite, Bodenfahrzeuge, Nur-
+        // Helikopter, Nur-Niedrigflieger, Nur-Interessantes, Airline-Filter)
+        // ueber RadarScreen::isAircraftCurrentlyVisible() - EIN gemeinsamer
+        // Filter-Check statt einer zweiten, separat gepflegten Kopie (Alex'
+        // Wunsch: alle Ansichten sollen konsistent dieselbe Sichtbarkeits-
+        // menge zeigen wie der Radar-Screen selbst; vorher fehlten hier
+        // Nur-Niedrigflieger/Nur-Interessantes schlicht, weil die Liste
+        // ihre eigene, unabhaengige Kopie der Filterlogik pflegte).
         AircraftTable::lock();
         Aircraft* table = AircraftTable::raw();
         for (uint8_t i = 0; i < AircraftTable::capacity(); i++) {
             if (!table[i].valid) continue;
-            if (table[i].distanceKm > rangeKm * 1.05f) continue;
-            if (SettingsStore::hideGroundVehicles() && table[i].category[0] == 'C') continue;
-
-            if (SettingsStore::onlyHelicopters() && !(table[i].category[0] == 'A' && table[i].category[1] == '7')) continue;
-            if (AirlineFilter::isHidden(table[i].callsign)) continue;
+            if (!RadarScreen::isAircraftCurrentlyVisible(table[i])) continue;
             snapshot[count++] = table[i];
         }
         AircraftTable::unlock();

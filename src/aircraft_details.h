@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include <WiFiClientSecure.h>
 
 // Additional aircraft details (model) that are NOT part of the ADS-B signal
 // and get looked up via the free hexdb.io community database by hex code -
@@ -46,4 +47,25 @@ namespace AircraftDetails {
     // (blocking HTTPS call, but that's fine - runs in the background and
     // only briefly delays the next ADS-B poll).
     void update();
+
+    // Die Flugrouten-Suche (Start-/Zielflughafen) - dieselbe Drei-Quellen-
+    // Fallback-Kette (VRS-Standing-Data-Mirror -> adsbdb.com -> hexdb.io,
+    // siehe aircraft_details.cpp fuer die ausfuehrliche Herleitung/
+    // Reihenfolge-Begruendung) wie von update() oben genutzt - hier als
+    // eigenstaendige, wiederverwendbare Funktion herausgezogen, damit sowohl
+    // update() ALS AUCH route_watchlist.cpp dieselbe, bereits bewaehrte
+    // Implementierung (inkl. Fehlerbehandlung/Timeouts) nutzen, statt sie
+    // zweimal zu pflegen ODER doppelte Netzwerkanfragen fuer ICAO- und IATA-
+    // Codes separat auszuloesen (beide stecken bereits in derselben
+    // Quellen-Antwort). Die vier IATA-Parameter sind optional (nullptr/0 =
+    // nicht gebraucht, siehe route_watchlist.cpp, das nur ICAO braucht).
+    // Blockierender HTTPS-Aufruf - NUR aus einem Core-0/Hintergrund-Kontext
+    // aufrufen, niemals vom UI-Thread (Core 1). 'client' wird vom Aufrufer
+    // gestellt (kein eigener Verbindungsaufbau hier), 'callsign' darf
+    // Kleinbuchstaben/Leerzeichen enthalten (wird intern normalisiert).
+    // Gibt true zurueck, wenn ein ICAO-Origin UND -Dest gefunden wurden.
+    bool fetchRoute(WiFiClientSecure& client, const String& callsign,
+                     char* origin, size_t originSize, char* dest, size_t destSize,
+                     char* originIata = nullptr, size_t originIataSize = 0,
+                     char* destIata = nullptr, size_t destIataSize = 0);
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <TFT_eSPI.h>
+#include "aircraft.h"
 
 namespace RadarScreen {
     void render(TFT_eSPI& tft, int16_t top);
@@ -70,4 +71,24 @@ namespace RadarScreen {
     // pflegen.
     bool isEmergencySquawkCode(const char* squawk);
     bool isMilitaryGovSquawkCode(const char* squawk);
+
+    // Oeffentliche Huelle um isAircraftVisibleOnRadar()+AirlineFilter::
+    // isHidden() (beide intern im anonymen Namespace) - fuer
+    // route_watchlist.cpp::pollBackground() (Core 0/NetTask), damit der
+    // Route-Watchlist-Hintergrund-Lookup NUR fuer Flugzeuge ausgeloest wird,
+    // die auch tatsaechlich auf dem Radar sichtbar waeren (aktuelle
+    // Reichweite + Anzeigefilter) - exakt dieselbe Definition wie beim
+    // Flight-Stories-Feature (siehe dortiger Kommentar in radar_screen.cpp),
+    // statt die Sichtbarkeits-Logik ein zweites Mal nachzubauen.
+    bool isAircraftCurrentlyVisible(const Aircraft& a);
+
+    // Wie isAircraftCurrentlyVisible() oben, aber mit EXPLIZIT uebergebener
+    // Reichweite statt der aktuellen Geraete-Einstellung (SettingsStore::
+    // rangeIndex()) - fuer web_export_server.cpp gebraucht: die Web-Live-
+    // karte erlaubt jedem Besucher einen EIGENEN, vom Geraet unabhaengigen
+    // Anzeige-Radius (Query-Parameter "range_km"), waehrend
+    // isAircraftCurrentlyVisible() immer die Geraete-Reichweite annimmt -
+    // fuer Radar-Screen/Flugzeugliste/Live-Traffic (dort IMMER die Geraete-
+    // Reichweite gemeint) bleibt die einfachere Variante oben richtig.
+    bool isAircraftVisibleAtRange(const Aircraft& a, float rangeKm);
 }

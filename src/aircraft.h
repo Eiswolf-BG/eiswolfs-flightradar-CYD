@@ -182,4 +182,32 @@ struct Aircraft {
     // Sekunden", solange das Flugzeug in Reichweite bleibt). 0 = noch nie
     // eine Meldung fuer dieses Flugzeug verschickt.
     uint32_t lastFlightStoryMs = 0;
+
+    // Uebergangserkennung "in die Landeanflugphase gewechselt" fuer bereits
+    // per Watchlist erkannte Flugzeuge (radar_screen.cpp::
+    // updateProximityAlert(), SettingsStore::ntfyApproachAlertEnabled()) -
+    // haelt fest, ob dieses Flugzeug beim letzten Zyklus schon als im Anflug
+    // galt (FlightPhase::Approach oder ::Landing). Gleiches Uebergangs-
+    // Prinzip wie wasWatched/wasEmergency oben, MUSS aber wie
+    // lastFlightStoryMs ueber den Fetch-Zyklus-Schnappschuss in
+    // adsb_client.cpp hinweg erhalten bleiben, sonst wuerde die Meldung bei
+    // JEDEM Abfragezyklus (alle ~8s) erneut ausgeloest, solange das
+    // Flugzeug im Anflug bleibt - genau das soll NICHT passieren (Alex'
+    // Wunsch: nur der Uebergang, nicht die ganze Phase).
+    bool wasApproachPhase = false;
+
+    // Route-Watchlist (route_watchlist.h/.cpp) - Start-/Zielflughafen (ICAO)
+    // dieses Flugzeugs, EINMALIG im Hintergrund ermittelt (RouteWatchlist::
+    // pollBackground(), net_task.cpp, Core 0) ueber dieselbe Fallback-Kette
+    // wie das Detail-Panel (AircraftDetails::fetchRoute()). routeLookupDone
+    // haelt fest, ob ueberhaupt schon ein Versuch stattfand (erfolgreich
+    // ODER nicht) - verhindert, dass ein Flugzeug ohne ermittelbare Route
+    // (z.B. Sichtflug ohne Flugplan) bei JEDEM Zyklus erneut angefragt wird.
+    // Alle drei Felder MUESSEN wie lastFlightStoryMs/wasApproachPhase oben
+    // ueber den Fetch-Zyklus-Schnappschuss in adsb_client.cpp hinweg
+    // erhalten bleiben, sonst wuerde der einmalige Lookup bei jedem
+    // ADS-B-Zyklus (alle ~8s) wiederholt.
+    char routeOrigin[5] = {0};
+    char routeDest[5] = {0};
+    bool routeLookupDone = false;
 };

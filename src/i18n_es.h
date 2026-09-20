@@ -584,6 +584,36 @@ static const char* const I18N_ES[] = {
     "Rendimiento: ",
     "Normal",
     "Reducido (nivel %d/3)",
+
+    "Alerta de aproximación",
+    "Alerta de aproximación",
+    "Envía una notificación push de ntfy independiente cuando una aeronave que ya está en una de tus listas de vigilancia (indicativo, squawk o tipo de aeronave) entra recién en su aproximación de aterrizaje. Se activa una sola vez por aproximación, no repetidamente mientras permanece en esa fase.",
+
+    "Aeronave militar detectada cerca: %s - a %s",
+    "Helicóptero sobre la zona: %s - a %s",
+    "Vuelo a baja altitud detectado: %s a %s",
+    "El vuelo %s está ahora en aproximación final",
+
+    "Lista de Rutas",
+    "Lista de Rutas",
+    "El LED azul parpadea cuando la ruta",
+    "de un vuelo coincide con una de estas entradas.",
+    "Añadir ruta",
+    "Aeropuerto de salida (OACI)",
+    "Aeropuerto de destino (OACI)",
+    "Dejar vacío",
+    "Aún no hay rutas vigiladas.",
+    "Búsqueda de ruta",
+    "Búsqueda de ruta",
+    "Busca en línea, en segundo plano, el aeropuerto de salida/destino de cada aeronave visible (una vez por vuelo, luego se guarda en caché) para compararlo con la lista de rutas de abajo. Desactivado por defecto para evitar tráfico de red innecesario.",
+    "Cómo funciona la lista de rutas",
+    "Introduce un aeropuerto de salida y/o destino como código OACI (p. ej. EDDS, LWSK) - deja un campo vacío (\"Dejar vacío\") para que coincida con cualquier ruta desde/hacia solo el otro aeropuerto. Se pueden vigilar hasta 5 rutas a la vez.",
+    "En cuanto la ruta obtenida de una aeronave visible coincide, recibe un anillo cian y el LED parpadea en azul, igual que las demás listas de vigilancia. La ruta solo se conoce una vez que la búsqueda en segundo plano (ver el interruptor \"Búsqueda de ruta\" arriba) ha terminado para ese vuelo.",
+
+    "Interesante: ",
+    "Solo interesante",
+    "Muestra solo aeronaves que cumplan al menos uno de estos criterios: vuelo militar/gubernamental, squawk de emergencia, coincidencia en una de tus cuatro listas de vigilancia (indicativo, squawk, tipo, ruta), o una aeronave Heavy (categoría de emisor ADS-B). Se combina con los demás filtros de arriba.",
+    "Interesante",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

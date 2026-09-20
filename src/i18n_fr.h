@@ -584,6 +584,36 @@ static const char* const I18N_FR[] = {
     "Performance : ",
     "Normal",
     "Réduit (niveau %d/3)",
+
+    "Alerte d'approche",
+    "Alerte d'approche",
+    "Envoie une notification push ntfy distincte lorsqu'un avion déjà présent sur l'une de vos listes de surveillance (indicatif, squawk ou type d'avion) entre nouvellement en approche d'atterrissage. Se déclenche une seule fois par approche, pas de manière répétée pendant toute la phase.",
+
+    "Avion militaire repéré à proximité : %s - à %s",
+    "Hélicoptère au-dessus de la zone : %s - à %s",
+    "Vol à basse altitude détecté : %s à %s",
+    "Le vol %s est maintenant en approche finale",
+
+    "Liste Routes",
+    "Liste Routes",
+    "La LED bleue clignote quand la route",
+    "d'un vol correspond à l'une de ces entrées.",
+    "Ajouter une route",
+    "Aéroport de départ (OACI)",
+    "Aéroport de destination (OACI)",
+    "Laisser vide",
+    "Aucune route surveillée pour le moment.",
+    "Recherche de route",
+    "Recherche de route",
+    "Recherche en ligne, en arrière-plan, l'aéroport de départ/destination de chaque avion visible (une fois par vol, puis mis en cache) pour le comparer à la liste de routes ci-dessous. Désactivé par défaut pour éviter un trafic réseau inutile.",
+    "Fonctionnement de la liste de routes",
+    "Saisissez un aéroport de départ et/ou de destination sous forme de code OACI (ex. EDDS, LWSK) - laissez un champ vide (\"Laisser vide\") pour faire correspondre n'importe quelle route depuis/vers seulement l'autre aéroport. Jusqu'à 5 routes peuvent être surveillées simultanément.",
+    "Dès que la route trouvée d'un avion visible correspond, il reçoit un anneau cyan et la LED clignote en bleu - exactement comme les autres listes de surveillance. La route n'est connue qu'une fois la recherche en arrière-plan (voir l'interrupteur \"Recherche de route\" ci-dessus) terminée pour ce vol.",
+
+    "Intéressant : ",
+    "Uniquement intéressant",
+    "Affiche uniquement les avions correspondant à au moins l'un des critères suivants : vol militaire/gouvernemental, squawk d'urgence, correspondance sur l'une de vos quatre listes de surveillance (indicatif, squawk, type, route), ou un avion Heavy (catégorie d'émetteur ADS-B). Se combine avec les autres filtres ci-dessus.",
+    "Intéressant",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

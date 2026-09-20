@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "6.7.0";
+    constexpr const char* APP_VERSION = "6.7.5";
 
     // Projekt-Repo-URL fuer den GitHub-QR-Code - zentral hier hinterlegt,
     // damit main.cpp (Ueber-Screen, grosser QR-Code) und menu_screen.cpp

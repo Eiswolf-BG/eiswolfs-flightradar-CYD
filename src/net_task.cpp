@@ -7,6 +7,7 @@
 #include "aircraft.h"
 #include "settings_store.h"
 #include "aircraft_details.h"
+#include "route_watchlist.h"
 #include "previously_seen.h"
 #include "flight_logbook.h"
 #include "led_alert.h"
@@ -118,6 +119,13 @@ namespace {
             }
 
             AircraftDetails::update();
+            // Route-Watchlist (SettingsStore::routeWatchlistAlertEnabled(),
+            // AUS per Default, siehe route_watchlist.h) - kuemmert sich
+            // intern selbst darum, hoechstens EINE Route pro Aufruf zu
+            // ermitteln, nur fuer aktuell sichtbare Flugzeuge ohne bereits
+            // abgeschlossenen Lookup, gleiches "jede Schleife mit
+            // aufrufen"-Muster wie AircraftDetails::update() oben.
+            RouteWatchlist::pollBackground();
             PreviouslySeen::update();
             Weather::update();
             // Bonus-Feature (siehe iss_tracker.h) - kuemmert sich intern

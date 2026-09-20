@@ -67,6 +67,102 @@ Info get(const char* hex) {
     return out;
 }
 
+bool fetchRoute(WiFiClientSecure& client, const String& callsign,
+                 char* origin, size_t originSize, char* dest, size_t destSize,
+                 char* originIata, size_t originIataSize, char* destIata, size_t destIataSize) {
+    origin[0] = 0;
+    dest[0] = 0;
+    if (originIata && originIataSize) originIata[0] = 0;
+    if (destIata && destIataSize) destIata[0] = 0;
+
+    String trimmedCallsign = callsign;
+    trimmedCallsign.trim();
+    trimmedCallsign.toUpperCase();
+    if (trimmedCallsign.length() == 0) return false;
+
+    constexpr uint32_t HEXDB_TIMEOUT_MS = 1200;
+    constexpr uint32_t OTHER_TIMEOUT_MS = 4000;
+
+    auto applyRouteCodes = [&](const String& codes) {
+        int dash = codes.indexOf('-');
+        if (dash > 0 && dash < (int)codes.length() - 1) {
+            strncpy(origin, codes.substring(0, dash).c_str(), originSize - 1);
+            origin[originSize - 1] = 0;
+            strncpy(dest, codes.substring(dash + 1).c_str(), destSize - 1);
+            dest[destSize - 1] = 0;
+        }
+    };
+    auto applyRouteCodesIata = [&](const String& codes) {
+        if (!originIata || !destIata) return;
+        int dash = codes.indexOf('-');
+        if (dash > 0 && dash < (int)codes.length() - 1) {
+            strncpy(originIata, codes.substring(0, dash).c_str(), originIataSize - 1);
+            originIata[originIataSize - 1] = 0;
+            strncpy(destIata, codes.substring(dash + 1).c_str(), destIataSize - 1);
+            destIata[destIataSize - 1] = 0;
+        }
+    };
+
+    // Quellen-Reihenfolge/Timeouts (Messung vom 30.08., siehe CLAUDE.md
+    // "Bekannte Probleme" fuer die Herleitung):
+    //   1. VRS-Standing-Data-Mirror (adsb.lol) - schnellste/zuverlaessigste
+    //      Quelle, liefert ICAO UND IATA im selben JSON.
+    if (trimmedCallsign.length() >= 2) {
+        String folder = trimmedCallsign.substring(0, 2);
+        String body;
+        if (httpGetString(client, String("https://vrs-standing-data.adsb.lol/routes/") + folder + "/" + trimmedCallsign + ".json", body, OTHER_TIMEOUT_MS)) {
+            JsonDocument doc;
+            if (!deserializeJson(doc, body)) {
+                applyRouteCodes(String((const char*)(doc["airport_codes"] | "")));
+                applyRouteCodesIata(String((const char*)(doc["_airport_codes_iata"] | "")));
+            }
+        }
+    }
+
+    //   2. adsbdb.com Callsign-Endpunkt - ebenfalls ICAO UND IATA im selben
+    //      JSON, falls Quelle 1 nichts geliefert hat.
+    if (!origin[0] || !dest[0]) {
+        String body;
+        if (httpGetString(client, String("https://api.adsbdb.com/v0/callsign/") + trimmedCallsign, body, OTHER_TIMEOUT_MS)) {
+            JsonDocument doc;
+            if (!deserializeJson(doc, body)) {
+                const char* originIcao = doc["response"]["flightroute"]["origin"]["icao_code"] | "";
+                const char* destIcao = doc["response"]["flightroute"]["destination"]["icao_code"] | "";
+                if (originIcao[0] && destIcao[0]) {
+                    strncpy(origin, originIcao, originSize - 1);
+                    origin[originSize - 1] = 0;
+                    strncpy(dest, destIcao, destSize - 1);
+                    dest[destSize - 1] = 0;
+                    if (originIata && destIata) {
+                        const char* oIata = doc["response"]["flightroute"]["origin"]["iata_code"] | "";
+                        const char* dIata = doc["response"]["flightroute"]["destination"]["iata_code"] | "";
+                        if (oIata[0] && dIata[0]) {
+                            strncpy(originIata, oIata, originIataSize - 1);
+                            originIata[originIataSize - 1] = 0;
+                            strncpy(destIata, dIata, destIataSize - 1);
+                            destIata[destIataSize - 1] = 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    //   3. hexdb.io Route-Endpunkt - letzter Fallback, kurzer Timeout
+    //      (liefert NIE IATA-Codes, nur ICAO).
+    if (!origin[0] || !dest[0]) {
+        String body;
+        if (httpGetString(client, String("https://hexdb.io/api/v1/route/icao/") + trimmedCallsign, body, HEXDB_TIMEOUT_MS)) {
+            JsonDocument doc;
+            if (!deserializeJson(doc, body)) {
+                applyRouteCodes(String((const char*)(doc["route"] | "")));
+            }
+        }
+    }
+
+    return origin[0] != 0 && dest[0] != 0;
+}
+
 void update() {
     ensureMutex();
 
@@ -133,118 +229,17 @@ void update() {
         }
     }
 
-    // Flugroute (Start-/Zielflughafen) - Kette aus DREI unabhaengigen
-    // kostenlosen Quellen. Reihenfolge am 30.08. anhand echter Messungen
-    // (8 Live-Callsigns, siehe Chat-Verlauf) neu sortiert - vorher stand
-    // hexdb.io an zweiter Stelle, lieferte dabei aber in 8/8 Faellen
-    // ueberhaupt keine Antwort mehr (TCP/TLS-Verbindung gelingt sofort,
-    // aber keine HTTP-Antwort - vermutlich ein Ausfall auf hexdb.io-Seite,
-    // Datum siehe CLAUDE.md "Bekannte Probleme"). Jede Anfrage, die
-    // hexdb.io an zweiter Stelle durchlaufen musste, wartete dadurch
-    // faktisch immer den vollen Timeout aus, bevor der eigentlich meist
-    // erfolgreiche dritte Server (adsbdb.com) ueberhaupt gefragt wurde:
-    //   1. VRS-Standing-Data-Mirror (adsb.lol) - bleibt an erster Stelle,
-    //      stuendlich aktualisierter Spiegel des Virtual-Radar-Server-
-    //      Projekts, in frueheren wie in dieser Messung die schnellste und
-    //      (fuer Fluege mit hinterlegtem Flugplan) zuverlaessigste Quelle.
-    //      Pfad = erste 2 Zeichen des (GROSSGESCHRIEBENEN - der Dienst ist
-    //      case-sensitiv) Rufzeichens als Ordner, liefert
-    //      "airport_codes":"ORIG-DEST" (ICAO).
-    //   2. adsbdb.com Callsign-Endpunkt - VORGEZOGEN von Platz 3 auf 2 (war
-    //      in der Messung durchgehend schnell UND traf beide getesteten
-    //      Linienflug-Callsigns, waehrend hexdb.io an dieser Stelle nur
-    //      Wartezeit ohne Ergebnis erzeugte).
-    //   3. hexdb.io - eigener Route-Endpunkt (andere URL als der Aircraft-
-    //      Endpunkt weiter oben), liefert "route":"ORIG-DEST". Ans Ende
-    //      verschoben UND mit kurzem HEXDB_TIMEOUT_MS (1200ms statt vorher
-    //      wirkungslos gemeintem 3000ms) versehen - faellt der Dienst
-    //      erneut aus, kostet das jetzt nur noch ~1,2s statt ~5s, und nur
-    //      noch in den (seltenen) Faellen, in denen weder VRS noch adsbdb
-    //      etwas hatten.
-    // Nur versuchen, wenn ueberhaupt ein Rufzeichen bekannt ist -
-    // Sichtflug-Maschinen ohne Callsign haben ohnehin keine darueber
-    // auswertbare Route.
-    String trimmedCallsign = String(callsign);
-    trimmedCallsign.trim();
-    trimmedCallsign.toUpperCase();
-
-    auto applyRouteCodes = [&](const String& codes) {
-        int dash = codes.indexOf('-');
-        if (dash > 0 && dash < (int)codes.length() - 1) {
-            strncpy(result.routeOrigin, codes.substring(0, dash).c_str(), sizeof(result.routeOrigin) - 1);
-            strncpy(result.routeDest, codes.substring(dash + 1).c_str(), sizeof(result.routeDest) - 1);
-        }
-    };
-
-    // Gleiches "ORIG-DEST"-Aufsplitten wie applyRouteCodes() oben, nur fuer
-    // die IATA-Variante (siehe routeOriginIata/routeDestIata in
-    // aircraft_details.h) - eigene Funktion statt Parameter an
-    // applyRouteCodes(), da die Ziel-Puffer eine andere Groesse haben.
-    auto applyRouteCodesIata = [&](const String& codes) {
-        int dash = codes.indexOf('-');
-        if (dash > 0 && dash < (int)codes.length() - 1) {
-            strncpy(result.routeOriginIata, codes.substring(0, dash).c_str(), sizeof(result.routeOriginIata) - 1);
-            strncpy(result.routeDestIata, codes.substring(dash + 1).c_str(), sizeof(result.routeDestIata) - 1);
-        }
-    };
-
-    if (trimmedCallsign.length() >= 2) {
-        // 1. VRS-Standing-Data-Mirror.
-        String folder = trimmedCallsign.substring(0, 2);
-        String body3;
-        if (httpGetString(client, String("https://vrs-standing-data.adsb.lol/routes/") + folder + "/" + trimmedCallsign + ".json", body3, OTHER_TIMEOUT_MS)) {
-            JsonDocument doc3;
-            if (!deserializeJson(doc3, body3)) {
-                const char* codes = doc3["airport_codes"] | "";
-                applyRouteCodes(String(codes));
-                // Diese Quelle liefert die IATA-Variante gleich im selben
-                // Aufruf mit ("_airport_codes_iata") - kein zusaetzlicher
-                // API-Call noetig, siehe routeOriginIata/routeDestIata in
-                // aircraft_details.h.
-                const char* codesIata = doc3["_airport_codes_iata"] | "";
-                applyRouteCodesIata(String(codesIata));
-            }
-        }
-    }
-
-    // 2. adsbdb.com Callsign-Endpunkt - vorgezogen von Platz 3 auf Platz 2
-    // (siehe Begruendung oben), falls Quelle 1 nichts geliefert hat.
-    if (trimmedCallsign.length() > 0 && (!result.routeOrigin[0] || !result.routeDest[0])) {
-        String body5;
-        if (httpGetString(client, String("https://api.adsbdb.com/v0/callsign/") + trimmedCallsign, body5, OTHER_TIMEOUT_MS)) {
-            JsonDocument doc5;
-            if (!deserializeJson(doc5, body5)) {
-                const char* originIcao = doc5["response"]["flightroute"]["origin"]["icao_code"] | "";
-                const char* destIcao = doc5["response"]["flightroute"]["destination"]["icao_code"] | "";
-                if (originIcao[0] && destIcao[0]) {
-                    strncpy(result.routeOrigin, originIcao, sizeof(result.routeOrigin) - 1);
-                    strncpy(result.routeDest, destIcao, sizeof(result.routeDest) - 1);
-                    // Auch diese Quelle liefert IATA-Codes im selben JSON
-                    // mit ("iata_code" statt "icao_code") - kein
-                    // zusaetzlicher API-Call noetig.
-                    const char* originIata = doc5["response"]["flightroute"]["origin"]["iata_code"] | "";
-                    const char* destIata = doc5["response"]["flightroute"]["destination"]["iata_code"] | "";
-                    if (originIata[0] && destIata[0]) {
-                        strncpy(result.routeOriginIata, originIata, sizeof(result.routeOriginIata) - 1);
-                        strncpy(result.routeDestIata, destIata, sizeof(result.routeDestIata) - 1);
-                    }
-                }
-            }
-        }
-    }
-
-    // 3. hexdb.io Route-Endpunkt - ans Ende verschoben, kurzer Timeout
-    // (siehe Begruendung oben), letzter Fallback statt zweiter Versuch.
-    if (trimmedCallsign.length() > 0 && (!result.routeOrigin[0] || !result.routeDest[0])) {
-        String body4;
-        if (httpGetString(client, String("https://hexdb.io/api/v1/route/icao/") + trimmedCallsign, body4, HEXDB_TIMEOUT_MS)) {
-            JsonDocument doc4;
-            if (!deserializeJson(doc4, body4)) {
-                const char* route = doc4["route"] | "";
-                applyRouteCodes(String(route));
-            }
-        }
-    }
+    // Flugroute (Start-/Zielflughafen) - ueber die gemeinsame fetchRoute()-
+    // Fallback-Kette oben (VRS-Standing-Data-Mirror -> adsbdb.com ->
+    // hexdb.io, siehe dortige Kommentare zur Quellen-Reihenfolge/Messung
+    // vom 30.08.), inklusive IATA-Codes (werden von zwei der drei Quellen
+    // im selben JSON mitgeliefert, siehe routeOriginIata/routeDestIata in
+    // aircraft_details.h) - kein zweiter, eigener Aufruf-Code mehr noetig
+    // (frueher hier dupliziert, jetzt mit route_watchlist.cpp geteilt).
+    fetchRoute(client, callsign, result.routeOrigin, sizeof(result.routeOrigin),
+               result.routeDest, sizeof(result.routeDest),
+               result.routeOriginIata, sizeof(result.routeOriginIata),
+               result.routeDestIata, sizeof(result.routeDestIata));
 
     xSemaphoreTake(mutex, portMAX_DELAY);
     strncpy(cachedHex, hex, sizeof(cachedHex) - 1);

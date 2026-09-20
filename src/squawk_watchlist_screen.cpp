@@ -233,22 +233,39 @@ void run(TFT_eSPI& tft) {
         tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::SQUAWK_WATCH_TITLE));
-        tft.setCursor(10, 40);
-        tft.println(I18n::t(StringId::SQUAWK_WATCH_DESC1));
-        tft.setCursor(10, 52);
-        tft.println(I18n::t(StringId::SQUAWK_WATCH_DESC2));
+
+        // BUGFIX (Alex' Meldung, Foto vom Geraet - gleicher Fehler wie beim
+        // Typ-Wachliste-Screen): DESC1/DESC2 liefen vorher ueber rohes
+        // setCursor()/println() an FESTEN Y-Positionen - bei laengeren
+        // Uebersetzungen brach TFT_eSPI's eingebautes Auto-Wrap mitten im
+        // Wort auf eine dritte Zeile um, die dann mit dem darunter fest
+        // positionierten "leere Liste"-Platzhalter ueberlappte. Jetzt ueber
+        // layoutWrapped() (echter wortweiser Umbruch anhand der
+        // tatsaechlichen Pixelbreite, CLAUDE.md-Pflicht fuer variablen
+        // Text) als ein zusammenhaengender Absatz, die Liste beginnt
+        // dynamisch unter der gemessenen End-Y-Position statt an einer
+        // festen Zahl.
+        String descText = String(I18n::t(StringId::SQUAWK_WATCH_DESC1)) + " " +
+                           I18n::t(StringId::SQUAWK_WATCH_DESC2);
+        int16_t descEndY = layoutWrapped(tft, 10, 40, (int16_t)(Config::SCREEN_WIDTH - 20), 16,
+                                          descText, 0, 0, Config::SCREEN_HEIGHT, true);
 
         uint8_t count = SquawkWatchlist::count();
-        int16_t y = 56;
+        int16_t y = (int16_t)(descEndY + 16);
 
         Rect rowRects[SquawkWatchlist::MAX_WATCHED];
         Rect removeRects[SquawkWatchlist::MAX_WATCHED];
 
         if (count == 0) {
+            // BUGFIX (Alex' Meldung): derselbe Ueberlapp-Fehler wie beim
+            // Erklaertext oben steckte auch im "leere Liste"-Platzhalter -
+            // jetzt ebenfalls ueber layoutWrapped() mit grosszuegigerem
+            // Zeilenabstand/Puffer statt rohem setCursor()/println() mit
+            // nur einer ROW_H Platz.
             tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-            tft.setCursor(10, y + 14);
-            tft.println(I18n::t(StringId::SQUAWK_WATCH_EMPTY));
-            y += ROW_H;
+            y = layoutWrapped(tft, 10, (int16_t)(y + 14), (int16_t)(Config::SCREEN_WIDTH - 20), 18,
+                               I18n::t(StringId::SQUAWK_WATCH_EMPTY), 0, 0, Config::SCREEN_HEIGHT, true);
+            y += 20;
         }
 
         for (uint8_t i = 0; i < count; i++) {
@@ -275,7 +292,11 @@ void run(TFT_eSPI& tft) {
             y += 40 + 10;
         }
 
-        Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+        // Dynamisch statt fest an SCREEN_HEIGHT-50 verankert (Bugfix oben) -
+        // der Erklaertext kann je nach Sprache mehr Platz brauchen als
+        // vorher angenommen, ein fester Wert koennte sonst wieder mit der
+        // Liste/dem "Hinzufuegen"-Button ueberlappen.
+        Rect backBtn = {10, y, (int16_t)(Config::SCREEN_WIDTH - 20), 40};
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
         TouchInput::Point tap;

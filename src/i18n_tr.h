@@ -584,6 +584,36 @@ static const char* const I18N_TR[] = {
     "Performans: ",
     "Normal",
     "Azaltıldı (seviye %d/3)",
+
+    "Yaklaşma Uyarısı",
+    "Yaklaşma Uyarısı",
+    "Zaten izleme listelerinizden birinde (çağrı işareti, squawk veya uçak tipi) bulunan bir uçak yeni bir iniş yaklaşmasına girdiğinde ayrı bir ntfy push bildirimi gönderir. Her yaklaşma için yalnızca bir kez tetiklenir, o aşamada kaldığı sürece tekrar tekrar değil.",
+
+    "Yakında bir askeri uçak tespit edildi: %s - %s uzaklıkta",
+    "Bölge üzerinde helikopter: %s - %s uzaklıkta",
+    "Alçak irtifa uçuşu tespit edildi: %s, %s irtifada",
+    "%s uçuşu şimdi son yaklaşmada",
+
+    "Rota İzleme",
+    "Rota İzleme",
+    "Bir uçuşun rotası bu kayıtlardan",
+    "biriyle eşleştiğinde mavi LED yanıp söner.",
+    "Rota ekle",
+    "Kalkış havalimanı (ICAO)",
+    "Varış havalimanı (ICAO)",
+    "Boş bırak",
+    "Henüz izlenen rota yok.",
+    "Rota Sorgulama",
+    "Rota Sorgulama",
+    "Görünen her uçağın kalkış/varış havalimanını arka planda çevrimiçi olarak sorgular (uçuş başına bir kez, ardından önbelleğe alınır) ve aşağıdaki rota izleme listesiyle karşılaştırır. Gereksiz ağ trafiğini önlemek için varsayılan olarak kapalıdır.",
+    "Rota izleme nasıl çalışır",
+    "Bir kalkış ve/veya varış havalimanını ICAO kodu olarak girin (örn. EDDS, LWSK) - yalnızca diğer havalimanından/havalimanına giden herhangi bir rotayı eşleştirmek için bir alanı boş bırakın (\"Boş bırak\"). Aynı anda 5 rotaya kadar izlenebilir.",
+    "Görünen bir uçağın sorgulanan rotası eşleştiğinde, diğer izleme listelerinde olduğu gibi camgöbeği bir halka alır ve LED mavi yanıp söner - rota, yalnızca bu uçuş için arka plan sorgulaması (yukarıdaki \"Rota Sorgulama\" düğmesine bakın) tamamlandığında bilinir.",
+
+    "İlginç: ",
+    "Sadece İlginç",
+    "Yalnızca şu kriterlerden en az birine uyan uçakları gösterir: askeri/resmi uçuş, acil durum squawk kodu, dört izleme listenizden birinde eşleşme (çağrı işareti, squawk, tip, rota) veya bir Heavy uçak (ADS-B yayıcı kategorisi). Yukarıdaki diğer filtrelerle birleşir.",
+    "İlginç",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

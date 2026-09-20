@@ -85,23 +85,21 @@ namespace {
     // Einziger Durchlauf ueber die bereits vorhandene AircraftTable - reine
     // Aggregation, KEIN zusaetzlicher Netzwerk-/SD-Zugriff (Alex' Vorgabe).
     // Respektiert dieselben Filter wie Radar/Flugzeugliste (Reichweite,
-    // Bodenfahrzeuge, Nur-Helikopter, Airline-Filter), damit die
-    // Zusammenfassung exakt zu dem passt, was gerade auf dem Radar zu sehen
-    // ist.
+    // Bodenfahrzeuge, Nur-Helikopter, Nur-Niedrigflieger, Nur-Interessantes,
+    // Airline-Filter) ueber RadarScreen::isAircraftCurrentlyVisible() - EIN
+    // gemeinsamer Filter-Check statt einer zweiten, separat gepflegten
+    // Kopie (Alex' Wunsch: alle Ansichten sollen konsistent dieselbe
+    // Sichtbarkeitsmenge zeigen wie der Radar-Screen selbst).
     Stats computeStats() {
         Stats s;
-        float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
         AircraftTable::lock();
         Aircraft* table = AircraftTable::raw();
         for (uint8_t i = 0; i < AircraftTable::capacity(); i++) {
             Aircraft& a = table[i];
             if (!a.valid) continue;
-            if (a.distanceKm > rangeKm * 1.05f) continue;
-            if (SettingsStore::hideGroundVehicles() && a.category[0] == 'C') continue;
+            if (!RadarScreen::isAircraftCurrentlyVisible(a)) continue;
             bool rotorcraft = RadarScreen::isRotorcraftCategory(a.category);
-            if (SettingsStore::onlyHelicopters() && !rotorcraft) continue;
-            if (AirlineFilter::isHidden(a.callsign)) continue;
 
             s.total++;
 

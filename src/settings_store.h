@@ -154,6 +154,16 @@ namespace SettingsStore {
     bool onlyLowAltitude();
     void setOnlyLowAltitude(bool on);
 
+    // Filter "Nur Interessantes" (Alex' Wunsch, Menue > Flugoptionen >
+    // Anzeigefilter, gleiche Stelle wie onlyHelicopters()/onlyLowAltitude()
+    // oben) - zeigt nur Flugzeuge, auf die mindestens eine bereits
+    // bestehende Erkennung zutrifft (Militaer-/Behoerdenflug, Notfall-
+    // Squawk, Watchlist-Treffer, Heavy), siehe radar_screen.cpp::
+    // isInterestingAircraft(). Gleiches Speicher-/Getter-/Setter-Muster wie
+    // die beiden Geschwister oben, AUS per Default.
+    bool onlyInteresting();
+    void setOnlyInteresting(bool on);
+
     // Modus des Airline-Filters (airline_filter.h/.cpp) - false (Default)
     // = "Ausblenden" (bisheriges Verhalten: eingetragene Airlines werden
     // versteckt, alle anderen bleiben sichtbar), true = "Nur anzeigen"
@@ -320,6 +330,25 @@ namespace SettingsStore {
     // per Default.
     bool ntfyFlightStoriesEnabled();
     void setNtfyFlightStoriesEnabled(bool on);
+
+    // "Anflug-Alarm" - eigene ntfy-Push-Benachrichtigung, sobald ein bereits
+    // per Watchlist (Rufzeichen/Squawk/Typ) erkanntes Flugzeug neu in die
+    // Landeanflugphase wechselt, siehe radar_screen.cpp::
+    // updateProximityAlert(). Eigener Schalter, unabhaengig von
+    // ntfyPushEnabled()/ntfyFlightStoriesEnabled() oben - AUS per Default.
+    bool ntfyApproachAlertEnabled();
+    void setNtfyApproachAlertEnabled(bool on);
+
+    // Ein/Aus-Schalter fuer die Route-Watchlist (route_watchlist.h) - AUS
+    // per Default, anders als die drei bestehenden Watchlists (Rufzeichen/
+    // Squawk/Typ), die kein eigenes Ein/Aus haben: die Route steckt NICHT
+    // im ADS-B-Signal, sondern erfordert einen eigenen Hintergrund-HTTPS-
+    // Lookup pro Flugzeug (RouteWatchlist::pollBackground(), siehe
+    // net_task.cpp) - dieser Schalter kontrolliert daher sowohl den Alarm
+    // ALS AUCH, ob ueberhaupt jemals ein solcher Lookup ausgeloest wird
+    // (Alex' Wunsch: API-Last im Blick behalten).
+    bool routeWatchlistAlertEnabled();
+    void setRouteWatchlistAlertEnabled(bool on);
 
     // Zuletzt vom Geraet GEBOOTETE Firmware-Version (Config::APP_VERSION zum
     // Zeitpunkt des letzten Speicherns) - main.cpp::setup() vergleicht dies

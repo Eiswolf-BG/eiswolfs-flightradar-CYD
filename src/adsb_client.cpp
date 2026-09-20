@@ -263,6 +263,24 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
     struct PrevFlightStory { char hex[7]; uint32_t lastMs; };
     PrevFlightStory prevFlightStoryByHex[Config::MAX_TRACKED_AIRCRAFT];
     uint8_t prevFlightStoryCount = 0;
+    // Gleicher Schnappschuss-Bedarf wie oben, fuer die Uebergangserkennung
+    // des "Anflug-Alarm"-Features (aircraft.h::wasApproachPhase, siehe
+    // dortiger Kommentar) - ohne diesen Schnappschuss wuerde der Zustand
+    // durch "a = Aircraft{}" unten bei JEDEM Fetch-Zyklus (alle ~8s)
+    // faelschlich auf "nicht im Anflug" zurueckgesetzt und die Meldung bei
+    // jedem Zyklus erneut ausgeloest, solange das Flugzeug im Anflug bleibt.
+    struct PrevApproachPhase { char hex[7]; bool wasApproach; };
+    PrevApproachPhase prevApproachPhaseByHex[Config::MAX_TRACKED_AIRCRAFT];
+    uint8_t prevApproachPhaseCount = 0;
+    // Gleicher Schnappschuss-Bedarf wie oben, fuer die einmalige Route-
+    // Watchlist-Ermittlung (aircraft.h::routeOrigin/routeDest/
+    // routeLookupDone, siehe dortiger Kommentar) - ohne diesen Schnappschuss
+    // wuerde der bereits ermittelte (oder als "nicht ermittelbar" markierte)
+    // Zustand durch "a = Aircraft{}" unten bei JEDEM Fetch-Zyklus verworfen
+    // und der Hintergrund-Lookup unnoetig wiederholt.
+    struct PrevRoute { char hex[7]; char origin[5]; char dest[5]; bool lookupDone; };
+    PrevRoute prevRouteByHex[Config::MAX_TRACKED_AIRCRAFT];
+    uint8_t prevRouteCount = 0;
     for (uint8_t j = 0; j < tableCapacity && j < Config::MAX_TRACKED_AIRCRAFT; j++) {
         if (table[j].hex[0] != '\0') {
             strncpy(prevAirportDistByHex[prevAirportDistCount].hex, table[j].hex,
@@ -296,6 +314,22 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
             prevFlightStoryByHex[prevFlightStoryCount].hex[sizeof(prevFlightStoryByHex[0].hex) - 1] = 0;
             prevFlightStoryByHex[prevFlightStoryCount].lastMs = table[j].lastFlightStoryMs;
             prevFlightStoryCount++;
+
+            strncpy(prevApproachPhaseByHex[prevApproachPhaseCount].hex, table[j].hex,
+                    sizeof(prevApproachPhaseByHex[0].hex) - 1);
+            prevApproachPhaseByHex[prevApproachPhaseCount].hex[sizeof(prevApproachPhaseByHex[0].hex) - 1] = 0;
+            prevApproachPhaseByHex[prevApproachPhaseCount].wasApproach = table[j].wasApproachPhase;
+            prevApproachPhaseCount++;
+
+            strncpy(prevRouteByHex[prevRouteCount].hex, table[j].hex,
+                    sizeof(prevRouteByHex[0].hex) - 1);
+            prevRouteByHex[prevRouteCount].hex[sizeof(prevRouteByHex[0].hex) - 1] = 0;
+            strncpy(prevRouteByHex[prevRouteCount].origin, table[j].routeOrigin, sizeof(prevRouteByHex[0].origin) - 1);
+            prevRouteByHex[prevRouteCount].origin[sizeof(prevRouteByHex[0].origin) - 1] = 0;
+            strncpy(prevRouteByHex[prevRouteCount].dest, table[j].routeDest, sizeof(prevRouteByHex[0].dest) - 1);
+            prevRouteByHex[prevRouteCount].dest[sizeof(prevRouteByHex[0].dest) - 1] = 0;
+            prevRouteByHex[prevRouteCount].lookupDone = table[j].routeLookupDone;
+            prevRouteCount++;
         }
     }
 
@@ -431,6 +465,28 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
             for (uint8_t j = 0; j < prevFlightStoryCount; j++) {
                 if (strcmp(prevFlightStoryByHex[j].hex, hex) == 0) {
                     a.lastFlightStoryMs = prevFlightStoryByHex[j].lastMs;
+                    break;
+                }
+            }
+            // wasApproachPhase ebenso wiederherstellen (siehe Kommentar beim
+            // Schnappschuss oben) - fuer die "Anflug-Alarm"-
+            // Uebergangserkennung. Nicht gefunden = neues Flugzeug, bleibt
+            // beim Aircraft{}-Default false.
+            for (uint8_t j = 0; j < prevApproachPhaseCount; j++) {
+                if (strcmp(prevApproachPhaseByHex[j].hex, hex) == 0) {
+                    a.wasApproachPhase = prevApproachPhaseByHex[j].wasApproach;
+                    break;
+                }
+            }
+            // routeOrigin/routeDest/routeLookupDone ebenso wiederherstellen
+            // (siehe Kommentar beim Schnappschuss oben) - fuer die einmalige
+            // Route-Watchlist-Ermittlung. Nicht gefunden = neues Flugzeug,
+            // bleibt beim Aircraft{}-Default (leer/false).
+            for (uint8_t j = 0; j < prevRouteCount; j++) {
+                if (strcmp(prevRouteByHex[j].hex, hex) == 0) {
+                    strncpy(a.routeOrigin, prevRouteByHex[j].origin, sizeof(a.routeOrigin) - 1);
+                    strncpy(a.routeDest, prevRouteByHex[j].dest, sizeof(a.routeDest) - 1);
+                    a.routeLookupDone = prevRouteByHex[j].lookupDone;
                     break;
                 }
             }
