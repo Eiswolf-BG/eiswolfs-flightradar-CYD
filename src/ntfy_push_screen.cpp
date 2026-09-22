@@ -121,7 +121,7 @@ namespace {
         return prefix + shown;
     }
 
-    constexpr uint8_t ROW_COUNT = 6; // Enable, Topic, Flight Stories, Approach Alert, Test-Push, Zurueck
+    constexpr uint8_t ROW_COUNT = 8; // Enable, Topic, Flight Stories, Approach Alert, Quiet Hours, Quiet Hours Range, Test-Push, Zurueck
     constexpr int16_t ROW_GAP = 6;
     constexpr int16_t START_Y = 40;
     constexpr int16_t END_Y = Config::SCREEN_HEIGHT - 10;
@@ -288,6 +288,102 @@ namespace {
 
         return confirmed ? String(buf) : String();
     }
+
+    // "22-7" bzw. "22:00-07:00" - kurze Anzeige fuer die Werte-Zeile im
+    // Hauptscreen (siehe run() unten). Zweistellig mit fuehrender Null,
+    // damit die Zeile bei jedem Wert gleich breit bleibt.
+    String hourRangeLabel(uint8_t startHour, uint8_t endHour) {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%02u-%02u", (unsigned)startHour, (unsigned)endHour);
+        return String(buf);
+    }
+
+    // Kleiner Stunden-Einsteller (0-23, volle Stunden reichen, Alex'
+    // Wunsch) fuer Start-/Endzeit der ntfy-Ruhezeit - gleiches -/+ Knopf-
+    // Muster wie brightness_screen.cpp, hier lokal fuer diesen Screen
+    // (CLAUDE.md "jeder Screen unabhaengig lauffaehig"). Aenderungen werden
+    // SOFORT uebernommen (kein extra Speichern-Knopf, gleiches Prinzip wie
+    // die -/+ Helligkeitstasten) - Zurueck verlaesst einfach den Editor.
+    void runQuietHoursEditor(TFT_eSPI& tft) {
+        bool done = false;
+        MenuStars::reset();
+
+        Rect startMinusBtn = {10, 90, 70, 50};
+        Rect startPlusBtn  = {(int16_t)(Config::SCREEN_WIDTH - 80), 90, 70, 50};
+        Rect endMinusBtn   = {10, 170, 70, 50};
+        Rect endPlusBtn    = {(int16_t)(Config::SCREEN_WIDTH - 80), 170, 70, 50};
+        Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - 50),
+                         (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+
+        auto redraw = [&]() {
+            uint8_t startHour = SettingsStore::ntfyQuietHoursStartHour();
+            uint8_t endHour = SettingsStore::ntfyQuietHoursEndHour();
+
+            tft.fillScreen(TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+            tft.setCursor(10, 14);
+            tft.println(I18n::t(StringId::NTFY_QUIET_HOURS_LABEL));
+
+            tft.setTextDatum(MC_DATUM);
+            tft.setTextSize(1);
+            tft.drawString(I18n::t(StringId::NTFY_QUIET_HOURS_START_LABEL), Config::SCREEN_WIDTH / 2, 68);
+            tft.setTextSize(3);
+            char startBuf[8];
+            snprintf(startBuf, sizeof(startBuf), "%02u", (unsigned)startHour);
+            tft.drawString(startBuf, Config::SCREEN_WIDTH / 2, 115);
+            tft.setTextSize(1);
+
+            tft.drawString(I18n::t(StringId::NTFY_QUIET_HOURS_END_LABEL), Config::SCREEN_WIDTH / 2, 148);
+            tft.setTextSize(3);
+            char endBuf[8];
+            snprintf(endBuf, sizeof(endBuf), "%02u", (unsigned)endHour);
+            tft.drawString(endBuf, Config::SCREEN_WIDTH / 2, 195);
+            tft.setTextSize(1);
+            tft.setTextDatum(TL_DATUM);
+
+            drawButton(tft, startMinusBtn, "-");
+            drawButton(tft, startPlusBtn, "+");
+            drawButton(tft, endMinusBtn, "-");
+            drawButton(tft, endPlusBtn, "+");
+            drawButton(tft, backBtn, I18n::t(StringId::BACK));
+        };
+
+        redraw();
+
+        while (!done) {
+            TouchInput::Point tap;
+            while (true) {
+                if (TouchInput::wasTapped(tap)) break;
+                if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) { done = true; break; }
+                MenuStars::update(tft);
+                delay(20);
+            }
+            if (done) break;
+
+            // Volle Stunden, zyklisch (23 -> 0 bzw. 0 -> 23) - ein
+            // Mitternachts-uebergreifendes Fenster (z.B. 22-7) ist
+            // ausdruecklich erlaubt, siehe NtfyPush::isQuietHoursActive().
+            if (startMinusBtn.contains(tap.x, tap.y)) {
+                uint8_t h = SettingsStore::ntfyQuietHoursStartHour();
+                SettingsStore::setNtfyQuietHoursStartHour((uint8_t)((h + 23) % 24));
+                redraw();
+            } else if (startPlusBtn.contains(tap.x, tap.y)) {
+                uint8_t h = SettingsStore::ntfyQuietHoursStartHour();
+                SettingsStore::setNtfyQuietHoursStartHour((uint8_t)((h + 1) % 24));
+                redraw();
+            } else if (endMinusBtn.contains(tap.x, tap.y)) {
+                uint8_t h = SettingsStore::ntfyQuietHoursEndHour();
+                SettingsStore::setNtfyQuietHoursEndHour((uint8_t)((h + 23) % 24));
+                redraw();
+            } else if (endPlusBtn.contains(tap.x, tap.y)) {
+                uint8_t h = SettingsStore::ntfyQuietHoursEndHour();
+                SettingsStore::setNtfyQuietHoursEndHour((uint8_t)((h + 1) % 24));
+                redraw();
+            } else if (backBtn.contains(tap.x, tap.y)) {
+                done = true;
+            }
+        }
+    }
 }
 
 void run(TFT_eSPI& tft) {
@@ -339,15 +435,33 @@ void run(TFT_eSPI& tft) {
                          SettingsStore::ntfyApproachAlertEnabled());
         drawRowInfoButton(tft, approachAlertRow);
 
+        // Ruhezeiten (Alex' Wunsch, "alles kann, nichts muss") - eigener
+        // Ein/Aus-Schalter (AUS per Default), unterdrueckt bei Aktivierung
+        // ALLE ntfy-Push-Typen oben innerhalb des Stunden-Fensters direkt
+        // darunter (siehe NtfyPush::isQuietHoursActive()). Zwei Zeilen wie
+        // beim Topic oben: eine Checkbox-Zeile fuer An/Aus, eine zweite
+        // Werte-Zeile, die den Editor (runQuietHoursEditor()) oeffnet -
+        // gleiches Muster wie enableRow/topicRow.
+        Rect quietHoursRow = rowRect(4);
+        drawCheckboxRow(tft, quietHoursRow, I18n::t(StringId::NTFY_QUIET_HOURS_LABEL),
+                         SettingsStore::ntfyQuietHoursEnabled());
+        drawRowInfoButton(tft, quietHoursRow);
+
+        Rect quietHoursRangeRow = rowRect(5);
+        String quietHoursRangeLabel = String(I18n::t(StringId::NTFY_QUIET_HOURS_LABEL)) + ": " +
+                                       hourRangeLabel(SettingsStore::ntfyQuietHoursStartHour(),
+                                                       SettingsStore::ntfyQuietHoursEndHour());
+        drawLeftButton(tft, quietHoursRangeRow, quietHoursRangeLabel);
+
         // Nur antippbar, wenn ueberhaupt ein Topic gesetzt ist - ohne Topic
         // weiss NtfyPush::update() ohnehin nicht, wohin gesendet werden
         // soll (siehe dortiger stiller Abbruch), ein deaktiviert wirkender
         // Knopf ist hier klarer als ein Tap, der sichtbar nichts bewirkt.
         bool canTest = topic.length() > 0;
-        Rect testBtn = rowRect(4);
+        Rect testBtn = rowRect(6);
         drawButton(tft, testBtn, I18n::t(StringId::NTFY_PUSH_TEST_BUTTON));
 
-        Rect backBtn = rowRect(5);
+        Rect backBtn = rowRect(7);
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
         TouchInput::Point tap;
@@ -378,12 +492,21 @@ void run(TFT_eSPI& tft) {
             MenuScreen::showInfoScreen(tft, I18n::t(StringId::NTFY_APPROACH_ALERT_INFO_TITLE),
                                         I18n::t(StringId::NTFY_APPROACH_ALERT_INFO_BODY),
                                         UiTheme::accentColor(tft), I18n::t(StringId::OK));
+        } else if (rowInfoBtnRect(quietHoursRow).contains(tap.x, tap.y)) {
+            MenuScreen::showInfoScreen(tft, I18n::t(StringId::NTFY_QUIET_HOURS_INFO_TITLE),
+                                        I18n::t(StringId::NTFY_QUIET_HOURS_INFO_BODY),
+                                        UiTheme::accentColor(tft), I18n::t(StringId::OK));
         } else if (enableRow.contains(tap.x, tap.y)) {
             SettingsStore::setNtfyPushEnabled(!SettingsStore::ntfyPushEnabled());
         } else if (flightStoriesRow.contains(tap.x, tap.y)) {
             SettingsStore::setNtfyFlightStoriesEnabled(!SettingsStore::ntfyFlightStoriesEnabled());
         } else if (approachAlertRow.contains(tap.x, tap.y)) {
             SettingsStore::setNtfyApproachAlertEnabled(!SettingsStore::ntfyApproachAlertEnabled());
+        } else if (quietHoursRow.contains(tap.x, tap.y)) {
+            SettingsStore::setNtfyQuietHoursEnabled(!SettingsStore::ntfyQuietHoursEnabled());
+        } else if (quietHoursRangeRow.contains(tap.x, tap.y)) {
+            runQuietHoursEditor(tft);
+            MenuStars::reset();
         } else if (topicRow.contains(tap.x, tap.y)) {
             String value = runTopicKeypad(tft, I18n::t(StringId::NTFY_PUSH_TOPIC_PROMPT));
             if (value.length() > 0) SettingsStore::setNtfyPushTopic(value);

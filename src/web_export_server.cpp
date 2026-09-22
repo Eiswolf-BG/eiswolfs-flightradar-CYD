@@ -22,6 +22,7 @@
 #include <SD.h>
 #include <cstring>
 #include <cmath>
+#include <atomic>
 
 namespace WebExportServer {
 
@@ -60,6 +61,37 @@ namespace {
     // guenstig vor z.B. versehentlichen Doppel-Taps oder mehreren schnell
     // hintereinander umgelegten Checkboxen.
     uint32_t lastModeCommandMs = 0;
+
+    // BUGFIX (Alex' Meldung: Live-Farbwechsel aus der Web-UI kam erst nach
+    // 2-3 Minuten Verzoegerung am Geraet an, und dabei blieb der Radius-
+    // Button in der alten Farbe haengen, waehrend alles andere korrekt
+    // umfaerbte). Root Cause: main.cpp::loop() ruft RadarScreen::render()
+    // (das den kompletten sichtbaren Bereich inkl. Radius-Button MIT der
+    // jeweils aktuellen Theme-Farbe neu zeichnet, siehe themeBaseColor()/
+    // UiTheme::accentColor() - dort KEIN hartkodierter Amber-Wert) bisher
+    // NUR dann auf, wenn AircraftTable::version() sich aendert - das
+    // passiert wiederum NUR nach einem ERFOLGREICHEN ADS-B-Abruf. Ein
+    // Fernsteuerungsbefehl von hier (Core 0/NetTask) aendert zwar sofort
+    // SettingsStore::radarThemeIndex() etc., aber Core 1 (UI) bekam davon
+    // nichts mit, bis zufaellig der naechste erfolgreiche ADS-B-Zyklus kam
+    // - bei intakter Verbindung meist nur ein paar Sekunden, aber bei
+    // fehlschlagenden Abrufen (siehe CLAUDE.md "Bekannte Probleme", TLS/
+    // Heap-Fragmentierung) mit Backoff bis zu Config::FETCH_BACKOFF_MAX_MS
+    // (3 Minuten) - exakt die von Alex beobachtete Verzoegerung. Der
+    // Radius-Button wirkte dabei "haengengeblieben", weil er (wie alle
+    // anderen sichtbaren Elemente auch) schlicht ueberhaupt nicht neu
+    // gezeichnet wurde, nicht weil seine Farbe falsch verdrahtet waere.
+    //
+    // Fix: dieses Flag wird von JEDEM Fernsteuerungs-Handler unten gesetzt,
+    // der tatsaechlich (nicht debounce-uebersprungen) eine sichtbare
+    // Einstellung aendert (Farbschema, Reichweite, Mode-Checkboxen) -
+    // main.cpp::loop() (Core 1) konsumiert es ueber
+    // WebExportServer::consumeRemoteSettingsChanged() (siehe .h) bei jedem
+    // Schleifendurchlauf und erzwingt darueber sofort ein forceRedraw,
+    // VOELLIG unabhaengig vom ADS-B-Abruf - identisches Cross-Core-Signal-
+    // Muster wie I18n::reloadPending/consumeReloadPending() fuer die SD-
+    // Sprachdateien.
+    std::atomic<bool> remoteSettingsChanged{false};
 
     // Web-Pendant zu UiTheme::accentColor() (siehe ui_theme.h/.cpp auf dem
     // Geraet) - Alex' Wunsch, das WebUI-Farbthema (Gruen/Amber/Blau)
@@ -2164,6 +2196,12 @@ namespace {
         if (now - lastRangeCommandMs >= MIN_CONTROL_INTERVAL_MS) {
             SettingsStore::setRangeIndex((uint8_t)matchedIdx);
             lastRangeCommandMs = now;
+            // Siehe remoteSettingsChanged-Kommentar oben - erzwingt ein
+            // sofortiges Geraete-Redraw, statt auf den naechsten
+            // erfolgreichen ADS-B-Zyklus zu warten (der Radius-Button zeigt
+            // sonst denselben Verzoegerungs-/"haengt fest"-Effekt wie beim
+            // Farbschema).
+            remoteSettingsChanged.store(true, std::memory_order_relaxed);
         }
         // Trotzdem 200 OK, auch wenn das Debounce-Fenster diese konkrete
         // Anfrage uebersprungen hat - kein Fehler im Browser, der aktuelle
@@ -2189,6 +2227,10 @@ namespace {
         if (now - lastModeCommandMs >= MIN_CONTROL_INTERVAL_MS) {
             SettingsStore::setRadarThemeIndex((uint8_t)idx);
             lastModeCommandMs = now;
+            // Siehe remoteSettingsChanged-Kommentar oben - Kern des Fixes
+            // fuer Alex' Meldung (Farbwechsel kam erst nach 2-3 Minuten an,
+            // Radius-Button blieb haengen).
+            remoteSettingsChanged.store(true, std::memory_order_relaxed);
         }
         server.send(200, "text/plain", "ok");
     }
@@ -2224,6 +2266,11 @@ namespace {
                 if (now - lastModeCommandMs >= MIN_CONTROL_INTERVAL_MS) {
                     MODE_TOGGLE_CONTROLS[i].setter(on);
                     lastModeCommandMs = now;
+                    // Siehe remoteSettingsChanged-Kommentar oben - beide
+                    // Toggles (Militaer/Behoerde-Ringe, Regen-Effekt) sind
+                    // auf dem Geraete-Display sichtbar und unterliegen
+                    // sonst demselben Verzoegerungs-Bug.
+                    remoteSettingsChanged.store(true, std::memory_order_relaxed);
                 }
                 server.send(200, "text/plain", "ok");
                 return;
@@ -2747,6 +2794,14 @@ void update() {
 bool isRadarUiActive() {
     return lastRadarJsonRequestMs != 0 &&
            (millis() - lastRadarJsonRequestMs) < RADAR_UI_ACTIVE_WINDOW_MS;
+}
+
+// Siehe remoteSettingsChanged-Kommentar weiter oben - von main.cpp::loop()
+// (Core 1) bei jedem Schleifendurchlauf abgefragt. exchange(false, ...)
+// setzt das Flag beim Lesen sofort zurueck, damit ein einzelner Web-Befehl
+// genau EIN forceRedraw ausloest, nicht wiederholt.
+bool consumeRemoteSettingsChanged() {
+    return remoteSettingsChanged.exchange(false, std::memory_order_relaxed);
 }
 
 }

@@ -616,6 +616,15 @@ static const char* const I18N_NL[] = {
     "Alleen interessant",
     "Toont alleen vliegtuigen die aan minstens een van deze criteria voldoen: militaire/overheidsvlucht, noodsquawk, een treffer op een van je vier volglijsten (roepnaam, squawk, type, route), of een Heavy-vliegtuig (ADS-B-zendercategorie). Combineert met de andere filters hierboven.",
     "Interessant",
+
+    "Stille Uren",
+    "Stille Uren",
+    "Indien ingeschakeld worden ALLE ntfy-pushmeldingen (noodsquawk, volglijsttreffers, Flight Stories, naderingswaarschuwingen) onderdrukt binnen het ingestelde uurvenster. Alleen de pushmelding op je telefoon wordt beïnvloed - het scherm en de LED-alarmen op het apparaat blijven normaal werken. Het venster kan middernacht overschrijden (bijv. 22 tot 7 uur).",
+    "Start",
+    "Einde",
+
+    "Datum: ",
+    "Zonsopgang/zonsondergang nog niet beschikbaar",
 };
 
 static_assert(sizeof(I18N_NL) / sizeof(I18N_NL[0]) == (size_t)StringId::COUNT,

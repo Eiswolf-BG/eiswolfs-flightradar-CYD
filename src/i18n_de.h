@@ -614,6 +614,15 @@ static const char* const I18N_DE[] = {
     "Nur Interessantes",
     "Zeigt nur Flugzeuge, auf die mindestens eines zutrifft: Militär-/Behördenflug, Notfall-Squawk, ein Treffer auf einer deiner vier Wachlisten (Rufzeichen, Squawk, Typ, Route) oder ein Heavy-Flugzeug (ADS-B-Emitter-Kategorie). Kombiniert sich mit den anderen Filtern oben.",
     "Interessant",
+
+    "Ruhezeiten",
+    "Ruhezeiten",
+    "Wenn aktiviert, werden ALLE ntfy-Push-Benachrichtigungen (Notfall-Squawk, Watchlist-Treffer, Flight Stories, Anflug-Alarm) innerhalb des eingestellten Stunden-Fensters unterdrückt. Betroffen ist nur die Push-Benachrichtigung aufs Handy - die Anzeige und die LED-Alarme am Gerät funktionieren weiterhin normal. Das Fenster kann über Mitternacht hinweg laufen (z. B. 22 bis 7 Uhr).",
+    "Start",
+    "Ende",
+
+    "Datum: ",
+    "Sonnenauf-/-untergang noch nicht verfügbar",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

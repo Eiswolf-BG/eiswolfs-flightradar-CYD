@@ -419,6 +419,25 @@ behoben halten oder denselben gescheiterten Lösungsansatz wiederholen.
   gemeldete Hängenbleiben erneut auftritt. Kein Fix vorgenommen, Stand:
   v4.6.0+.
 
+- **Einmaliger Geräte-Neustart nach einem Farbwechsel aus der Web-UI**
+  (22.09., waehrend der Live-Diagnose des "Farbwechsel kommt verzoegert
+  an"-Bugs beobachtet, siehe Git-Historie/Chat): Alex meldete einen
+  Neustart des Geraets direkt nach einem Farbwechsel im Web-Live-Radar,
+  vermutete zunaechst eine Nebenwirkung des neuen Cross-Core-Signals
+  (`WebExportServer::consumeRemoteSettingsChanged()`/`forceRedraw` in
+  `main.cpp::loop()`, siehe Standard-Workflow-Historie zu v6.8.0). Trotz
+  gezielter Reproduktionsversuche (mehrere Farbwechsel hintereinander per
+  `curl` an `/control/theme` sowie durch Alex selbst ueber die echte
+  Web-UI, jeweils mit laufendem seriellem Mitschnitt) trat der Neustart
+  kein zweites Mal auf - kein Crash-Log, kein Reset-Grund, keine
+  Absturzschleife gefunden, das Signal selbst lief in allen
+  Wiederholungsversuchen (inkl. eines 150s-Dauertests im kombinierten
+  v6.8.0-Release-Stand) sauber durch. Beobachtet, NICHT reproduzierbar -
+  im Auge behalten, falls es erneut auftritt (dann moeglichst sofort mit
+  laufendem seriellem Monitor reproduzieren, siehe Abschnitt
+  "Eigenstaendige Seriell-Diagnose" unten). Kein Fix vorgenommen (mangels
+  reproduzierbarer Ursache), Stand: v6.8.0.
+
 ## Standard-Workflow: Push & Release
 
 WICHTIG - wann dieser Workflow startet: Der komplette Release-Workflow
@@ -430,6 +449,28 @@ Release-Workflow zu starten. Bei kleineren Fixes/Änderungen bitte NUR bauen
 und flashen (siehe Abschnitt "Nach jedem erfolgreichen Build automatisch
 flashen" unten), aber NICHT committen/taggen/pushen, bis ausdrücklich danach
 gefragt wird.
+
+⚠️ ZWINGEND, KEINE AUSNAHME - Test-Schritte VOR Commit/Tag/Push/Release
+IMMER zuerst tatsächlich durchführen UND als erfolgreich bestätigen, bevor
+irgendein Commit/Tag/Push/Release passiert (Vorfall v6.7.6, siehe
+Git-Historie/Chat: Commit+Tag+Push+GitHub-Release liefen VOR dem in Alex'
+eigener Anweisung an Position 5 stehenden "bauen, flashen, live testen,
+bestätigen" - die dabei entdeckte Absturzschleife war zu diesem Zeitpunkt
+bereits oeffentlich veroeffentlicht). Nennt Alex' Push-/Release-Wunsch
+selbst eine nummerierte Schritt-Reihenfolge, die einen Bau-/Flash-/
+Test-/Bestätigungs-Schritt VOR den Commit-/Tag-/Push-/Release-Schritten
+enthält (unabhängig davon, ob das der Standard-Workflow unten oder eine
+davon abweichende eigene Nummerierung ist), gilt diese Reihenfolge als
+ZWINGEND und STRIKT einzuhalten - niemals Commit/Tag/Push/Release VORZIEHEN,
+auch nicht um Zeit zu sparen oder weil andere Vorbereitungsschritte (README,
+Versionsnummer, Changelog) schon fertig sind. Ergibt der vorgelagerte Test
+IRGENDEIN Problem (Absturz, Fehlverhalten, unklares Ergebnis): Workflow
+SOFORT anhalten, NICHTS committen/taggen/pushen/veröffentlichen, Alex aktiv
+über den Fund informieren und auf Rückmeldung warten - nicht erst selbst
+stundenlang weiter debuggen und schon veröffentlichte Artefakte nachträglich
+korrigieren. Diese Regel gilt zusätzlich zu und unabhängig von der Frage,
+ob der Release ueberhaupt angefordert wurde (das war er in diesem Vorfall
+durchaus) - sie betrifft ausschliesslich die REIHENFOLGE der Ausführung.
 
 Sobald der Workflow explizit angefordert wurde, automatisch folgende Schritte
 in dieser Reihenfolge:

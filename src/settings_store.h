@@ -339,6 +339,23 @@ namespace SettingsStore {
     bool ntfyApproachAlertEnabled();
     void setNtfyApproachAlertEnabled(bool on);
 
+    // Ruhezeiten fuer ntfy-Push (Alex' Wunsch, "alles kann, nichts muss") -
+    // AUS per Default. Wenn eingeschaltet, werden ALLE ntfy-Push-Typen
+    // (Notfall/Watchlist, Flight Stories, Anflug-Alarm) innerhalb des
+    // eingestellten Stunden-Fensters unterdrueckt (siehe NtfyPush::
+    // isQuietHoursActive() in ntfy_push.h/.cpp) - betrifft NUR die Push-
+    // Benachrichtigung aufs Handy, die normale Anzeige/Alarme auf dem
+    // Geraete-Display selbst bleiben unveraendert. Start-/Endstunde sind
+    // volle Stunden (0-23, siehe ntfy_push_screen.cpp fuer den Editor) -
+    // ein ueber Mitternacht laufendes Fenster (z.B. 22 bis 7) ist
+    // ausdruecklich vorgesehen, siehe isQuietHoursActive().
+    bool ntfyQuietHoursEnabled();
+    void setNtfyQuietHoursEnabled(bool on);
+    uint8_t ntfyQuietHoursStartHour();
+    void setNtfyQuietHoursStartHour(uint8_t hour);
+    uint8_t ntfyQuietHoursEndHour();
+    void setNtfyQuietHoursEndHour(uint8_t hour);
+
     // Ein/Aus-Schalter fuer die Route-Watchlist (route_watchlist.h) - AUS
     // per Default, anders als die drei bestehenden Watchlists (Rufzeichen/
     // Squawk/Typ), die kein eigenes Ein/Aus haben: die Route steckt NICHT

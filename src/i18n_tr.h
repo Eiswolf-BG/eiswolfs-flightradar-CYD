@@ -614,6 +614,15 @@ static const char* const I18N_TR[] = {
     "Sadece İlginç",
     "Yalnızca şu kriterlerden en az birine uyan uçakları gösterir: askeri/resmi uçuş, acil durum squawk kodu, dört izleme listenizden birinde eşleşme (çağrı işareti, squawk, tip, rota) veya bir Heavy uçak (ADS-B yayıcı kategorisi). Yukarıdaki diğer filtrelerle birleşir.",
     "İlginç",
+
+    "Sessiz Saatler",
+    "Sessiz Saatler",
+    "Etkinleştirildiğinde, seçilen saat aralığında TÜM ntfy push bildirimleri (acil durum squawk kodu, izleme listesi eşleşmeleri, Flight Stories, yaklaşma uyarıları) bastırılır. Yalnızca telefonunuza gelen push bildirimi etkilenir - cihazdaki ekran ve LED alarmları normal şekilde çalışmaya devam eder. Aralık gece yarısını kapsayabilir (örn. 22'den 7'ye).",
+    "Başlangıç",
+    "Bitiş",
+
+    "Tarih: ",
+    "Gün doğumu/batımı henüz kullanılamıyor",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

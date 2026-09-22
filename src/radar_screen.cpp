@@ -5617,7 +5617,13 @@ void updateProximityAlert(uint32_t nowMs) {
     // Schleife trotzdem bereits korrekt auf true gesetzt, es gibt also
     // keinen verwaisten Zustand - nur die Meldung selbst entfaellt fuer
     // diesen einen Zyklus.
-    if ((newEmergencyHit || newWatchHit || approachMsg[0] != 0) && SettingsStore::ntfyPushEnabled()) {
+    // Ruhezeiten (SettingsStore::ntfyQuietHoursEnabled(), Alex' Wunsch,
+    // "alles kann, nichts muss") - unterdrueckt ALLE ntfy-Push-Typen
+    // gleichermassen, siehe NtfyPush::isQuietHoursActive(). Betrifft NUR
+    // die Push-Benachrichtigung aufs Handy, die LED-/Display-Alarme oben
+    // (updateProximityAlert()) laufen unveraendert weiter.
+    bool ntfyQuiet = NtfyPush::isQuietHoursActive();
+    if ((newEmergencyHit || newWatchHit || approachMsg[0] != 0) && SettingsStore::ntfyPushEnabled() && !ntfyQuiet) {
         char msg[160];
         if (pushIsEmergency) {
             snprintf(msg, sizeof(msg), "%s%s: %s", I18n::t(StringId::NTFY_PUSH_MSG_EMERGENCY_PREFIX),
@@ -5645,7 +5651,7 @@ void updateProximityAlert(uint32_t nowMs) {
     // (eigenes "flight-story"-Event-Topic) wurde bewusst wieder entfernt -
     // widerspricht der dokumentierten Feature-14-Regel, dass MQTT nur fuer
     // Dauerzustaende (Sensoren) genutzt wird, keine Einzelereignisse.
-    if (flightStoryMsg[0] != 0 && !newEmergencyHit && !newWatchHit && SettingsStore::ntfyPushEnabled()) {
+    if (flightStoryMsg[0] != 0 && !newEmergencyHit && !newWatchHit && SettingsStore::ntfyPushEnabled() && !ntfyQuiet) {
         NtfyPush::request(flightStoryMsg);
     }
 

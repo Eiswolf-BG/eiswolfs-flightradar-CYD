@@ -6,6 +6,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <cstring>
+#include <time.h>
 
 namespace NtfyPush {
 
@@ -67,6 +68,26 @@ void update() {
         Serial.printf("[ntfy] Push fehlgeschlagen: HTTP %d\n", code);
     }
     http.end();
+}
+
+bool isQuietHoursActive() {
+    if (!SettingsStore::ntfyQuietHoursEnabled()) return false;
+
+    time_t now = time(nullptr);
+    if (now <= 8 * 3600 * 2) return false; // Uhrzeit noch nicht per NTP synchronisiert
+
+    struct tm tmNow;
+    localtime_r(&now, &tmNow);
+    int hour = tmNow.tm_hour;
+
+    uint8_t startHour = SettingsStore::ntfyQuietHoursStartHour();
+    uint8_t endHour = SettingsStore::ntfyQuietHoursEndHour();
+    if (startHour == endHour) return true; // durchgehendes 24h-Fenster
+    if (startHour < endHour) {
+        return hour >= startHour && hour < endHour;
+    }
+    // Fenster laeuft ueber Mitternacht (z.B. 22 bis 7 Uhr).
+    return hour >= startHour || hour < endHour;
 }
 
 }

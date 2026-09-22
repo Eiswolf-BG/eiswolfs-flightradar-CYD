@@ -30,4 +30,23 @@ namespace NtfyPush {
     // fehlgeschlagene Zustellung darf nie die App zum Haengen bringen oder
     // abstuerzen lassen.
     void update();
+
+    // Ruhezeiten (SettingsStore::ntfyQuietHoursEnabled()/-StartHour()/
+    // -EndHour(), Alex' Wunsch) - true, wenn die aktuelle lokale Uhrzeit
+    // gerade im eingestellten Ruhezeit-Fenster liegt UND die Ruhezeit
+    // ueberhaupt eingeschaltet ist. Bewusst NICHT hier in request()/
+    // update() geprueft (gleiches Prinzip wie ntfyPushEnabled(), siehe
+    // Kommentar bei request() oben) - der Aufrufer (radar_screen.cpp)
+    // entscheidet, ob eine konkrete Meldung ueberhaupt erst angestossen
+    // wird. Der Test-Button (ntfy_push_screen.cpp) ruft das bewusst NICHT
+    // auf, damit ein Testversand auch waehrend der Ruhezeit funktioniert
+    // (gleiche Ausnahme wie beim Haupt-Ein/Aus-Schalter).
+    //
+    // Kein NTP-Zeitabgleich vorhanden -> false (kein "false positive"
+    // Unterdruecken, solange die Uhrzeit noch unbekannt ist). Handhabt ein
+    // ueber Mitternacht laufendes Fenster (z.B. 22 bis 7 Uhr) korrekt: bei
+    // startHour > endHour gilt die Ruhezeit als aktiv, wenn die aktuelle
+    // Stunde >= startHour ODER < endHour ist. startHour == endHour wird als
+    // durchgehendes 24h-Fenster gewertet (kein sinnvoller 0-Stunden-Fall).
+    bool isQuietHoursActive();
 }

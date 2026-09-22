@@ -614,6 +614,15 @@ static const char* const I18N_FR[] = {
     "Uniquement intéressant",
     "Affiche uniquement les avions correspondant à au moins l'un des critères suivants : vol militaire/gouvernemental, squawk d'urgence, correspondance sur l'une de vos quatre listes de surveillance (indicatif, squawk, type, route), ou un avion Heavy (catégorie d'émetteur ADS-B). Se combine avec les autres filtres ci-dessus.",
     "Intéressant",
+
+    "Heures de silence",
+    "Heures de silence",
+    "Une fois activé, TOUTES les notifications push ntfy (squawk d'urgence, alertes de liste de surveillance, Flight Stories, alertes d'approche) sont supprimées pendant la plage horaire choisie. Seule la notification push sur votre téléphone est concernée - l'affichage et les alarmes LED sur l'appareil continuent de fonctionner normalement. La plage peut chevaucher minuit (par ex. 22h à 7h).",
+    "Début",
+    "Fin",
+
+    "Date : ",
+    "Lever/coucher du soleil pas encore disponible",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

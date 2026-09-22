@@ -1390,6 +1390,34 @@ enum class StringId : uint16_t {
     // wie die drei bestehenden Eintraege dort.
     RADAR_FILTER_NAME_INTERESTING,
 
+    // Ruhezeiten fuer ntfy-Push (Alex' Wunsch, "alles kann, nichts muss",
+    // Menue > System > "ntfy.sh Push") - eigener Ein/Aus-Schalter (AUS per
+    // Default, siehe SettingsStore::ntfyQuietHoursEnabled()), unterdrueckt
+    // bei Aktivierung ALLE ntfy-Push-Typen (Notfall/Watchlist, Flight
+    // Stories, Anflug-Alarm) innerhalb eines frei waehlbaren Stunden-
+    // Fensters (volle Stunden, ueber Mitternacht hinweg moeglich, siehe
+    // NtfyPush::isQuietHoursActive()). NTFY_QUIET_HOURS_LABEL dient sowohl
+    // als Checkbox-Beschriftung als auch als Titel/Praefix des kleinen
+    // Start-/End-Stunden-Editors (ntfy_push_screen.cpp).
+    NTFY_QUIET_HOURS_LABEL,
+    NTFY_QUIET_HOURS_INFO_TITLE,
+    NTFY_QUIET_HOURS_INFO_BODY,
+    NTFY_QUIET_HOURS_START_LABEL,
+    NTFY_QUIET_HOURS_END_LABEL,
+
+    // Aktuelles Datum + Platzhalter fuer "Sonnenauf-/untergang noch nicht
+    // berechenbar" im Wetter-Info-Fenster (main.cpp::showWeatherInfo(),
+    // Alex' Wunsch) - ergaenzt die bereits bestehenden WEATHER_SUNRISE_
+    // PREFIX/WEATHER_SUNSET_PREFIX/WEATHER_POLAR_DAY/WEATHER_POLAR_NIGHT
+    // oben (Zeile ~458) um zwei fehlende Stuecke: bisher wurde die
+    // Sonnenauf-/untergangs-Zeile bei fehlendem GPS-Fix bzw. noch nicht
+    // synchronisierter NTP-Zeit STILL weggelassen - jetzt zeigt
+    // WEATHER_SUN_UNAVAILABLE stattdessen einen neutralen Platzhalter
+    // (Alex' ausdruecklicher Wunsch: "keine falschen oder erfundenen
+    // Werte", aber auch kein kommentarloses Fehlen der Zeile).
+    WEATHER_DATE_PREFIX,
+    WEATHER_SUN_UNAVAILABLE,
+
     COUNT
 };
 

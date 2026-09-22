@@ -13,4 +13,12 @@ namespace WebExportServer {
     // Netzwerk-/Speicherlast staendig bestehen, auch fuer Nutzer, die das
     // WebUI nie oeffnen.
     bool isRadarUiActive();
+
+    // True (und setzt sich dabei zurueck), wenn seit dem letzten Aufruf ein
+    // Fernsteuerungsbefehl (Farbschema, Reichweite, Mode-Checkboxen) via
+    // Web-UI tatsaechlich angewendet wurde - von main.cpp::loop() (Core 1)
+    // genutzt, um sofort ein forceRedraw auszuloesen, statt auf den
+    // naechsten erfolgreichen ADS-B-Zyklus zu warten (siehe Bugfix-
+    // Kommentar bei remoteSettingsChanged in web_export_server.cpp).
+    bool consumeRemoteSettingsChanged();
 }

@@ -614,6 +614,15 @@ static const char* const I18N_IT[] = {
     "Solo interessanti",
     "Mostra solo aerei che soddisfano almeno uno di questi criteri: volo militare/governativo, squawk di emergenza, corrispondenza in una delle tue quattro liste di controllo (nominativo, squawk, tipo, rotta), oppure un aereo Heavy (categoria emittente ADS-B). Si combina con gli altri filtri sopra.",
     "Interessante",
+
+    "Ore silenziose",
+    "Ore silenziose",
+    "Se attivato, TUTTE le notifiche push ntfy (squawk di emergenza, corrispondenze delle liste di controllo, Flight Stories, avvisi di avvicinamento) vengono soppresse durante la fascia oraria selezionata. È interessata solo la notifica push sul telefono - il display e gli allarmi LED del dispositivo continuano a funzionare normalmente. La fascia può attraversare la mezzanotte (ad es. dalle 22 alle 7).",
+    "Inizio",
+    "Fine",
+
+    "Data: ",
+    "Alba/tramonto non ancora disponibili",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

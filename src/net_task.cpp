@@ -42,9 +42,26 @@ namespace {
     // Config::FETCH_BACKOFF_MAX_MS, und kehrt nach jeder erfolgreichen
     // Abfrage schrittweise (nicht abrupt) zum Grundintervall zurueck. Bei
     // einem einzelnen sonstigen Fehlschlag (Timeout/SSL) wird stattdessen
-    // fest Config::FETCH_RETRY_DELAY_MS gewartet, um bei kurzen WLAN-
-    // Aussetzern keine Anfragen-Flut auszuloesen.
+    // Config::FETCH_RETRY_DELAY_MS gewartet (siehe genericFailureBackoffMs
+    // unten fuer das Verhalten bei MEHREREN Fehlschlaegen in Folge).
     uint32_t currentIntervalMs = Config::FETCH_INTERVAL_MS;
+
+    // BUGFIX/VERBESSERUNG (Alex' Auftrag, Heap-Fragmentierungs-
+    // Untersuchung): generische Verbindungsfehler (Timeout/SSL/"HTTP -1",
+    // siehe adsb_client.cpp) warteten bisher IMMER fest
+    // Config::FETCH_RETRY_DELAY_MS (18s), egal wie viele Fehlschlaege schon
+    // in Folge aufgetreten sind - bei einer laengeren Pechstraehne (z.B.
+    // voruebergehend zu fragmentierter Heap fuer den TLS-Handshake, siehe
+    // CLAUDE.md "Bekannte Probleme") fuehrte das zu vielen aussichtslosen
+    // Handshake-Versuchen im 18s-Takt. Jetzt: eigener, vom 429-Backoff
+    // UNABHAENGIGER Zaehler, der bei JEDEM weiteren generischen Fehlschlag
+    // in Folge verdoppelt wird (18s -> 36s -> 72s -> ...), gedeckelt bei
+    // Config::FETCH_BACKOFF_MAX_MS (derselbe Deckel wie beim 429-Pfad,
+    // kein neuer Konstantenwert noetig) - und bei JEDEM erfolgreichen
+    // Abruf sofort wieder auf den Ausgangswert (Config::FETCH_RETRY_DELAY_MS)
+    // zurueckgesetzt, damit eine kuenftige NEUE Pechstraehne wieder bei 18s
+    // beginnt, nicht beim zuletzt erreichten Maximum.
+    uint32_t genericFailureBackoffMs = Config::FETCH_RETRY_DELAY_MS;
 
     // Von NetTask (Core 0) geschrieben, von pause() (Core 1, siehe unten)
     // gelesen - std::atomic statt eines ungeschuetzten bool, gleiches
@@ -384,6 +401,11 @@ namespace {
                                 ? Config::FETCH_INTERVAL_MS
                                 : Config::FETCH_INTERVAL_MS + excess / 2;
                         }
+                        // Siehe genericFailureBackoffMs-Kommentar oben -
+                        // JEDER Erfolg beendet eine evtl. laufende
+                        // Pechstraehne generischer Fehlschlaege, die naechste
+                        // beginnt wieder bei Config::FETCH_RETRY_DELAY_MS.
+                        genericFailureBackoffMs = Config::FETCH_RETRY_DELAY_MS;
                     } else if (result.httpCode == 429) {
                         // TESTWEISE - exponentielles Backoff nach HTTP 429:
                         // Retry-After-Header bevorzugen, falls vorhanden,
@@ -397,10 +419,15 @@ namespace {
                         Serial.printf("[NetTask] HTTP 429 - naechste Abfrage in %lums (retryAfterSec=%d)\n",
                                       (unsigned long)currentIntervalMs, result.retryAfterSec);
                     } else {
-                        // TESTWEISE - einzelner sonstiger Fehlschlag
-                        // (Timeout/SSL/...): feste moderate Wartezeit statt
-                        // sofort wieder im Grundintervall weiterzumachen.
-                        currentIntervalMs = max(currentIntervalMs, Config::FETCH_RETRY_DELAY_MS);
+                        // Sonstiger Fehlschlag (Timeout/SSL/"HTTP -1"/...):
+                        // siehe genericFailureBackoffMs-Kommentar oben -
+                        // wartet den aktuellen Backoff-Wert ab und verdoppelt
+                        // ihn danach fuer den naechsten Fehlschlag in Folge
+                        // (gedeckelt bei FETCH_BACKOFF_MAX_MS), unabhaengig
+                        // vom 429-Backoff in currentIntervalMs.
+                        currentIntervalMs = genericFailureBackoffMs;
+                        genericFailureBackoffMs = min(genericFailureBackoffMs * 2,
+                                                       Config::FETCH_BACKOFF_MAX_MS);
                         Serial.printf("[NetTask] Abfrage fehlgeschlagen (HTTP %d), naechster Versuch in %lums\n",
                                       result.httpCode, (unsigned long)currentIntervalMs);
                     }

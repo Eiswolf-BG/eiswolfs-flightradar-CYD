@@ -615,6 +615,15 @@ static const char* const I18N_EN[] = {
     "Interesting Only",
     "Shows only aircraft matching at least one of: military/government flight, emergency squawk, a hit on any of your four watchlists (callsign, squawk, type, route), or a Heavy aircraft (ADS-B emitter category). Combines with the other filters above.",
     "Interesting",
+
+    "Quiet Hours",
+    "Quiet Hours",
+    "When enabled, ALL ntfy push notifications (emergency squawk, watchlist hits, Flight Stories, approach alerts) are suppressed during the selected hour window. Only the push notification to your phone is affected - the on-device display and LED alarms keep working as usual. The window can span midnight (e.g. 22 to 7).",
+    "Start",
+    "End",
+
+    "Date: ",
+    "Sunrise/Sunset not available yet",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

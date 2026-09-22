@@ -41,9 +41,19 @@ namespace {
     // stattdessen per Web Audio API im Browser jedes Betrachters, der die
     // Webseite gerade offen hat.
     bool webAudioAlertOn = true;
-    uint8_t screenTimeoutMin = 0;
+    // Werkseinstellung fuer eine Neuinstallation/leere SD-Karte (Alex'
+    // Wunsch): Bildschirm-Timeout 5 Minuten, Ruhebildschirm an. Betrifft
+    // NUR den C++-Default-Wert, der greift, solange applyKeyValue() oben
+    // (Zeilen "screen_timeout_min"/"screensaver") beim Laden keinen
+    // eigenen gespeicherten Wert aus der Settings-Datei findet - bereits
+    // bestehende Geraete mit eigener gespeicherter Konfiguration sind
+    // davon unberuehrt, auch wenn sie zufaellig noch beim alten Default
+    // (Nie/Aus) stehen sollten, da fuer sie ohnehin ein Eintrag in der
+    // Datei existiert (der beim naechsten Speichern ihren AKTUELLEN, nicht
+    // diesen neuen Default-Wert schreibt).
+    uint8_t screenTimeoutMin = 5;
     bool nightDimmingOn = true;
-    bool screensaverOn = false;
+    bool screensaverOn = true;
     bool hideGroundVehiclesOn = true;
     bool onlyHelicoptersOn = false;
     bool onlyLowAltitudeOn = false;
@@ -107,6 +117,14 @@ namespace {
     // AUS (Alex' Wunsch: fuer bestehende Nutzer aendert sich nichts
     // automatisch).
     bool ntfyApproachAlertOn = false;
+
+    // Ruhezeiten fuer ntfy-Push (SettingsStore::ntfyQuietHoursEnabled(),
+    // siehe .h) - Default AUS, Start/Ende defaulten auf ein sinnvolles
+    // 22-7-Uhr-Fenster (greift aber erst, wenn der Schalter eingeschaltet
+    // wird).
+    bool ntfyQuietHoursOn = false;
+    uint8_t ntfyQuietHoursStart = 22;
+    uint8_t ntfyQuietHoursEnd = 7;
 
     // Route-Watchlist (SettingsStore::routeWatchlistAlertEnabled(), siehe
     // route_watchlist.h) - Default AUS (Alex' Wunsch: kein automatischer
@@ -262,6 +280,14 @@ namespace {
             ntfyFlightStoriesOn = (value.toInt() != 0);
         } else if (key == "ntfy_approach_alert_enabled") {
             ntfyApproachAlertOn = (value.toInt() != 0);
+        } else if (key == "ntfy_quiet_hours_enabled") {
+            ntfyQuietHoursOn = (value.toInt() != 0);
+        } else if (key == "ntfy_quiet_hours_start") {
+            int v = value.toInt();
+            ntfyQuietHoursStart = (v >= 0 && v <= 23) ? (uint8_t)v : 22;
+        } else if (key == "ntfy_quiet_hours_end") {
+            int v = value.toInt();
+            ntfyQuietHoursEnd = (v >= 0 && v <= 23) ? (uint8_t)v : 7;
         } else if (key == "route_watchlist_alert_enabled") {
             routeWatchlistAlertOn = (value.toInt() != 0);
         } else if (key == "ntfy_push_topic") {
@@ -368,6 +394,9 @@ void save() {
     f.printf("ntfy_push_enabled=%d\n", ntfyPushOn ? 1 : 0);
     f.printf("ntfy_flight_stories_enabled=%d\n", ntfyFlightStoriesOn ? 1 : 0);
     f.printf("ntfy_approach_alert_enabled=%d\n", ntfyApproachAlertOn ? 1 : 0);
+    f.printf("ntfy_quiet_hours_enabled=%d\n", ntfyQuietHoursOn ? 1 : 0);
+    f.printf("ntfy_quiet_hours_start=%d\n", (int)ntfyQuietHoursStart);
+    f.printf("ntfy_quiet_hours_end=%d\n", (int)ntfyQuietHoursEnd);
     f.printf("route_watchlist_alert_enabled=%d\n", routeWatchlistAlertOn ? 1 : 0);
     f.printf("ntfy_push_topic=%s\n", ntfyPushTopicBuf);
     f.printf("last_seen_version=%s\n", lastSeenVersionBuf);
@@ -743,6 +772,29 @@ bool ntfyApproachAlertEnabled() { return ntfyApproachAlertOn; }
 
 void setNtfyApproachAlertEnabled(bool on) {
     ntfyApproachAlertOn = on;
+    save();
+}
+
+bool ntfyQuietHoursEnabled() { return ntfyQuietHoursOn; }
+
+void setNtfyQuietHoursEnabled(bool on) {
+    ntfyQuietHoursOn = on;
+    save();
+}
+
+uint8_t ntfyQuietHoursStartHour() { return ntfyQuietHoursStart; }
+
+void setNtfyQuietHoursStartHour(uint8_t hour) {
+    if (hour > 23) return;
+    ntfyQuietHoursStart = hour;
+    save();
+}
+
+uint8_t ntfyQuietHoursEndHour() { return ntfyQuietHoursEnd; }
+
+void setNtfyQuietHoursEndHour(uint8_t hour) {
+    if (hour > 23) return;
+    ntfyQuietHoursEnd = hour;
     save();
 }
 

@@ -52,6 +52,7 @@
 #include "changelog.h"
 #include "ota_update.h"
 #include "auto_brightness.h"
+#include "web_export_server.h"
 #include <math.h>
 
 TFT_eSPI tft = TFT_eSPI();
@@ -524,39 +525,56 @@ void showWeatherInfo(TFT_eSPI& tftRef) {
         }
     }
 
-    // Sonnenauf-/untergang fuer den aktuell aktiven Standort (gleiche
-    // Berechnung wie isNightDimHours(), siehe dort) - passt thematisch gut
-    // in den Wetter-Info-Screen und die Rechenlogik existierte bereits
-    // (bisher nur intern fuer die Nachtdimmung genutzt, nie angezeigt).
+    // Aktuelles Datum + Sonnenauf-/untergang fuer den aktuell aktiven
+    // Standort (Alex' Wunsch) - gleiche Berechnung wie isNightDimHours(),
+    // siehe dort, die Rechenlogik existierte bereits (bisher nur intern
+    // fuer die Nachtdimmung genutzt). Das Datum braucht NUR eine bekannte
+    // Uhrzeit (kein GPS-Fix noetig) - ohne synchronisierte NTP-Zeit gibt es
+    // schlicht kein bekanntes Datum, dieser ganze Absatz entfaellt dann wie
+    // die anderen bedingten Absaetze oben (METAR/Wind). Die Sonnenauf-/
+    // untergangs-Zeile selbst zeigt bei fehlendem GPS-Fix (Standort noch
+    // 0,0) ODER falls SunTimes::compute() aus einem anderen Grund kein
+    // gueltiges Ergebnis liefert (sun.valid == false) einen neutralen
+    // Platzhalter (WEATHER_SUN_UNAVAILABLE) statt die Zeile einfach
+    // wegzulassen - Alex' ausdruecklicher Wunsch: "keine falschen oder
+    // erfundenen Werte", aber auch keine stillschweigend fehlende Zeile.
     {
-        double lat = 0, lon = 0;
-        LocationManager::getHomeLocation(lat, lon);
-        if (lat != 0.0 || lon != 0.0) {
-            time_t now = time(nullptr);
-            if (now > 8 * 3600 * 2) { // NTP-Zeit schon synchronisiert (siehe isNightDimHours())
-                struct tm tmNow;
-                localtime_r(&now, &tmNow);
-                SunTimes::Result sun = SunTimes::compute(lat, lon, tmNow.tm_year + 1900, tmNow.tm_mon + 1,
-                                                          tmNow.tm_mday, LocationManager::utcOffsetSeconds());
-                if (sun.valid) {
-                    String sunLine;
-                    if (sun.alwaysDay) {
-                        sunLine = I18n::t(StringId::WEATHER_POLAR_DAY);
-                    } else if (sun.alwaysNight) {
-                        sunLine = I18n::t(StringId::WEATHER_POLAR_NIGHT);
-                    } else {
-                        char sunriseBuf[6];
-                        char sunsetBuf[6];
-                        int sunriseMin = (int)roundf(sun.sunriseHour * 60.0f) % (24 * 60);
-                        int sunsetMin = (int)roundf(sun.sunsetHour * 60.0f) % (24 * 60);
-                        snprintf(sunriseBuf, sizeof(sunriseBuf), "%02d:%02d", sunriseMin / 60, sunriseMin % 60);
-                        snprintf(sunsetBuf, sizeof(sunsetBuf), "%02d:%02d", sunsetMin / 60, sunsetMin % 60);
-                        sunLine = String(I18n::t(StringId::WEATHER_SUNRISE_PREFIX)) + sunriseBuf + "   " +
-                                  String(I18n::t(StringId::WEATHER_SUNSET_PREFIX)) + sunsetBuf;
-                    }
-                    body += "\n\n";
-                    body += sunLine;
+        time_t now = time(nullptr);
+        if (now > 8 * 3600 * 2) { // NTP-Zeit schon synchronisiert (siehe isNightDimHours())
+            struct tm tmNow;
+            localtime_r(&now, &tmNow);
+
+            body += "\n\n";
+            char dateBuf[16];
+            snprintf(dateBuf, sizeof(dateBuf), "%02d.%02d.%04d", tmNow.tm_mday, tmNow.tm_mon + 1,
+                     tmNow.tm_year + 1900);
+            body += String(I18n::t(StringId::WEATHER_DATE_PREFIX)) + dateBuf;
+            body += "\n";
+
+            double lat = 0, lon = 0;
+            LocationManager::getHomeLocation(lat, lon);
+            bool locationKnown = (lat != 0.0 || lon != 0.0);
+            SunTimes::Result sun = locationKnown
+                ? SunTimes::compute(lat, lon, tmNow.tm_year + 1900, tmNow.tm_mon + 1, tmNow.tm_mday,
+                                     LocationManager::utcOffsetSeconds())
+                : SunTimes::Result{};
+            if (sun.valid) {
+                if (sun.alwaysDay) {
+                    body += I18n::t(StringId::WEATHER_POLAR_DAY);
+                } else if (sun.alwaysNight) {
+                    body += I18n::t(StringId::WEATHER_POLAR_NIGHT);
+                } else {
+                    char sunriseBuf[6];
+                    char sunsetBuf[6];
+                    int sunriseMin = (int)roundf(sun.sunriseHour * 60.0f) % (24 * 60);
+                    int sunsetMin = (int)roundf(sun.sunsetHour * 60.0f) % (24 * 60);
+                    snprintf(sunriseBuf, sizeof(sunriseBuf), "%02d:%02d", sunriseMin / 60, sunriseMin % 60);
+                    snprintf(sunsetBuf, sizeof(sunsetBuf), "%02d:%02d", sunsetMin / 60, sunsetMin % 60);
+                    body += String(I18n::t(StringId::WEATHER_SUNRISE_PREFIX)) + sunriseBuf + "   " +
+                            String(I18n::t(StringId::WEATHER_SUNSET_PREFIX)) + sunsetBuf;
                 }
+            } else {
+                body += I18n::t(StringId::WEATHER_SUN_UNAVAILABLE);
             }
         }
     }
@@ -2009,6 +2027,21 @@ void setup() {
 }
 
 void loop() {
+    // Bugfix (Alex' Meldung: Farbwechsel aus der Web-UI kam erst nach 2-3
+    // Minuten an, Radius-Button blieb dabei haengen) - billige Abfrage
+    // jeden Tick: wird nur true, wenn NetTask (Core 0) gerade einen
+    // Fernsteuerungsbefehl (Farbschema/Reichweite/Mode-Checkbox) aus der
+    // Web-UI tatsaechlich angewendet hat (siehe WebExportServer::
+    // consumeRemoteSettingsChanged()). Erzwingt ein sofortiges Redraw,
+    // UNABHAENGIG vom naechsten ADS-B-Abruf - vorher haengte die
+    // Sichtbarkeit einer Web-Aenderung am Geraet komplett am naechsten
+    // ERFOLGREICHEN Abruf (AircraftTable::version()-Aenderung), was bei
+    // WLAN-/API-Aussetzern (siehe CLAUDE.md "Bekannte Probleme") auf bis zu
+    // Config::FETCH_BACKOFF_MAX_MS (3 Minuten) anwuchs.
+    if (WebExportServer::consumeRemoteSettingsChanged()) {
+        forceRedraw = true;
+    }
+
     TouchInput::Point tap;
     bool tapped = TouchInput::wasTapped(tap);
 
