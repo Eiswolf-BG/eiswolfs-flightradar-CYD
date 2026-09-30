@@ -24,7 +24,10 @@
 // routeDest/routeLookupDone) statt bei jedem ADS-B-Zyklus erneut
 // anzufragen.
 namespace RouteWatchlist {
-    constexpr uint8_t MAX_WATCHED = 5;
+    // Erhoeht von 5 auf 12 (Alex' Auftrag) - siehe aircraft_watchlist.h fuer
+    // die volle Begruendung (Scrollen jetzt vorhanden; 20 scheiterte am
+    // knappen internen RAM, 12 wurde live gegen dieses Limit getestet).
+    constexpr uint8_t MAX_WATCHED = 12;
 
     void init();
 

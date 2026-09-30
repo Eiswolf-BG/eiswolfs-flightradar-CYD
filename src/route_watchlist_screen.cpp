@@ -290,8 +290,23 @@ namespace {
 }
 
 void run(TFT_eSPI& tft) {
+    constexpr int16_t ROW_H = 32;
+    constexpr int16_t ROW_GAP = 6;
+    constexpr int16_t REMOVE_BTN_W = 60;
+    constexpr int16_t ADD_BTN_H = 40;
+    constexpr int16_t BACK_BTN_H = 40;
+    constexpr int16_t BTN_GAP = 8;
+    constexpr int16_t SCROLL_ROW_H = 36;
+    constexpr int16_t BOTTOM_MARGIN = 8;
+
     bool done = false;
     MenuStars::reset();
+    // Siehe gleicher Bugfix-Kommentar in aircraft_watchlist_screen.cpp -
+    // echtes zeilenweises Scrollen statt der bisherigen "Zeilen bei Bedarf
+    // zusammenquetschen"-Notloesung (die selbst nur bis zu einer festen
+    // Mindesthoehe funktionierte und bei mehr Eintraegen ebenfalls
+    // ueberlaufen waere).
+    uint8_t scrollIndex = 0;
     while (!done) {
         tft.fillScreen(TFT_BLACK);
 
@@ -327,45 +342,47 @@ void run(TFT_eSPI& tft) {
 
         uint8_t count = RouteWatchlist::count();
         bool canAdd = count < RouteWatchlist::MAX_WATCHED;
-        int16_t y = (int16_t)(descEndY + 14);
 
-        // Zeilenhoehe/-abstand werden aus dem TATSAECHLICH noch verfuegbaren
-        // Platz errechnet (Alex' Meldung: viel ungenutzter Platz unten bei
-        // wenigen Eintraegen) statt fest verdrahtet zu sein - bei wenigen
-        // Eintraegen wird jede Zeile grosszuegiger, bei einer vollen Liste
-        // (bis zu MAX_WATCHED=5) automatisch kompakter, damit "Hinzufuegen"/
-        // "Zurueck" auch dann garantiert noch auf den Bildschirm passen,
-        // unabhaengig davon, wie lang der Erklaertext oben in der jeweiligen
-        // Sprache ausgefallen ist (descEndY ist bereits das tatsaechliche
-        // Messergebnis von layoutWrapped() oben, keine Schaetzung).
-        constexpr int16_t ADD_BTN_H = 44;
-        constexpr int16_t BACK_BTN_H = 40;
-        constexpr int16_t BOTTOM_MARGIN = 10;
-        int16_t reserved = (int16_t)((canAdd ? ADD_BTN_H + 10 : 0) + BACK_BTN_H + 10);
-        int16_t availableForList = (int16_t)(Config::SCREEN_HEIGHT - BOTTOM_MARGIN - y - reserved);
-        uint8_t rowSlots = count > 0 ? count : 1;
-        int16_t rowTotal = availableForList / rowSlots;
-        if (rowTotal > 46) rowTotal = 46; // bei wenig Eintraegen nicht uebertrieben hoch
-        if (rowTotal < 20) rowTotal = 20; // Mindesthoehe fuer Lesbarkeit/Antippbarkeit
-        int16_t ROW_GAP = (int16_t)(rowTotal / 5);
-        if (ROW_GAP < 4) ROW_GAP = 4;
-        if (ROW_GAP > 10) ROW_GAP = 10;
-        int16_t ROW_H = (int16_t)(rowTotal - ROW_GAP);
-        constexpr int16_t REMOVE_BTN_W = 60;
+        Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - BOTTOM_MARGIN - BACK_BTN_H),
+                         (int16_t)(Config::SCREEN_WIDTH - 20), BACK_BTN_H};
+        Rect addBtn = {10, (int16_t)(backBtn.y - BTN_GAP - ADD_BTN_H),
+                       (int16_t)(Config::SCREEN_WIDTH - 20), ADD_BTN_H};
+        int16_t bottomAnchorY = canAdd ? addBtn.y : backBtn.y;
+
+        int16_t listTop = (int16_t)(descEndY + 14);
+        constexpr int16_t ROW_STEP = ROW_H + ROW_GAP;
+
+        int16_t viewBottomNoScroll = (int16_t)(bottomAnchorY - BTN_GAP);
+        uint8_t rowsFitNoScroll = (uint8_t)max(1, (viewBottomNoScroll - listTop) / ROW_STEP);
+
+        bool scrollable = count > rowsFitNoScroll;
+        int16_t viewBottom = viewBottomNoScroll;
+        uint8_t rowsPerPage = rowsFitNoScroll;
+        Rect upBtn, downBtn;
+        if (scrollable) {
+            int16_t arrowRowY = (int16_t)(bottomAnchorY - BTN_GAP - SCROLL_ROW_H);
+            upBtn = {10, arrowRowY, 100, SCROLL_ROW_H};
+            downBtn = {(int16_t)(Config::SCREEN_WIDTH - 110), arrowRowY, 100, SCROLL_ROW_H};
+            viewBottom = (int16_t)(arrowRowY - BTN_GAP);
+            rowsPerPage = (uint8_t)max(1, (viewBottom - listTop) / ROW_STEP);
+        }
+
+        uint8_t maxScrollIndex = (count > rowsPerPage) ? (uint8_t)(count - rowsPerPage) : 0;
+        if (scrollIndex > maxScrollIndex) scrollIndex = maxScrollIndex;
 
         Rect rowRects[RouteWatchlist::MAX_WATCHED];
         Rect removeRects[RouteWatchlist::MAX_WATCHED];
 
+        int16_t y = listTop;
         if (count == 0) {
             tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
             tft.setTextDatum(MC_DATUM);
             tft.drawString(I18n::t(StringId::ROUTE_WATCH_EMPTY), Config::SCREEN_WIDTH / 2,
                             (int16_t)(y + ROW_H / 2));
             tft.setTextDatum(TL_DATUM);
-            y += ROW_H;
         }
 
-        for (uint8_t i = 0; i < count; i++) {
+        for (uint8_t i = scrollIndex; i < count && i < (uint8_t)(scrollIndex + rowsPerPage); i++) {
             Rect rowRect = {10, y, (int16_t)(Config::SCREEN_WIDTH - 20 - REMOVE_BTN_W - 6), ROW_H};
             Rect removeRect = {(int16_t)(Config::SCREEN_WIDTH - 10 - REMOVE_BTN_W), y, REMOVE_BTN_W, ROW_H};
             rowRects[i] = rowRect;
@@ -380,21 +397,16 @@ void run(TFT_eSPI& tft) {
             tft.setTextDatum(TL_DATUM);
             drawButton(tft, removeRect, "X", true);
 
-            y += ROW_H + ROW_GAP;
+            y += ROW_STEP;
         }
 
-        y += 10; // zusaetzlicher Luftabstand vor dem "Hinzufuegen"-Button
-        Rect addBtn = {10, y, (int16_t)(Config::SCREEN_WIDTH - 20), ADD_BTN_H};
+        if (scrollable) {
+            drawButton(tft, upBtn, "^");
+            drawButton(tft, downBtn, "v");
+        }
         if (canAdd) {
             drawButton(tft, addBtn, I18n::t(StringId::ROUTE_WATCH_ADD));
-            y += ADD_BTN_H + 10;
         }
-
-        // Dynamisch statt fester Y-Position (anders als bei den anderen
-        // Wachlisten-Screens) - hier kommt zusaetzlich die Checkbox-Zeile
-        // oben dazu, ein fester Wert haette bei voller Liste zu knapp
-        // bemessenem/ueberlappendem Platz gefuehrt.
-        Rect backBtn = {10, y, (int16_t)(Config::SCREEN_WIDTH - 20), BACK_BTN_H};
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
         TouchInput::Point tap;
@@ -424,7 +436,15 @@ void run(TFT_eSPI& tft) {
             SettingsStore::setRouteWatchlistAlertEnabled(!SettingsStore::routeWatchlistAlertEnabled());
             handled = true;
         }
-        for (uint8_t i = 0; i < count && !handled; i++) {
+        if (!handled && scrollable && upBtn.contains(tap.x, tap.y) && scrollIndex > 0) {
+            scrollIndex--;
+            handled = true;
+        }
+        if (!handled && scrollable && downBtn.contains(tap.x, tap.y) && scrollIndex < maxScrollIndex) {
+            scrollIndex++;
+            handled = true;
+        }
+        for (uint8_t i = scrollIndex; i < count && !handled && i < (uint8_t)(scrollIndex + rowsPerPage); i++) {
             if (removeRects[i].contains(tap.x, tap.y)) {
                 RouteWatchlist::removeWatched(i);
                 handled = true;

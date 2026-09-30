@@ -12,6 +12,7 @@
 #include "location_manager.h"
 #include "ui_theme.h"
 #include <cstring>
+#include <cmath>
 
 namespace LiveTrafficScreen {
 
@@ -60,10 +61,84 @@ namespace {
         tft.println(truncated);
     }
 
+    // Gleiche Hoehen-Bucket-Beschriftung wie altitudeLegendLabels() in
+    // radar_screen.cpp (dort lokal/privat, hier dupliziert - CLAUDE.md-
+    // Konvention) - identische Grenzwerte/Rundung, damit die Zahlen auf
+    // diesem Screen exakt zur Hoehen-Farblegende auf dem Radar passen.
+    void altitudeBucketLabels(char* lowLabel, size_t lowSz, char* midLabel, size_t midSz,
+                               char* highLabel, size_t highSz) {
+        bool metric = LocationManager::useMetricUnits();
+        if (metric) {
+            int lowM = (int)(Units::feetToMeters(Config::COLOR_LOW_ALT_THRESHOLD_FT) / 100) * 100;
+            int midM = (int)(Units::feetToMeters(Config::COLOR_MID_ALT_THRESHOLD_FT) / 100) * 100;
+            snprintf(lowLabel, lowSz, "<%dm", lowM);
+            snprintf(midLabel, midSz, "%d-%dm", lowM, midM);
+            snprintf(highLabel, highSz, ">%dm", midM);
+        } else {
+            snprintf(lowLabel, lowSz, "<10k ft");
+            snprintf(midLabel, midSz, "10-30k");
+            snprintf(highLabel, highSz, ">30k ft");
+        }
+    }
+
+    struct Chip { String text; };
+
+    // Zeichnet (oder vermisst nur, draw=false) ein Chip-Raster - EIN- oder
+    // ZWEIspaltig, je nachdem ob der laengste Chip-Text bei zwei Spalten
+    // ueberhaupt noch passt (gleiches Prinzip wie zuvor direkt in run()
+    // fuer die Typ-Aufschluesselung, jetzt als gemeinsame Funktion fuer
+    // Typ- UND Richtungs-Chips). Gleiches Dual-Zweck-Muster wie
+    // layoutWrapped() (draw=false liefert nur die End-Y-Position fuer eine
+    // vorherige Hoehenberechnung, ohne irgendetwas zu zeichnen) - so kann
+    // die Gesamthoehe des scrollbaren Inhalts VOR dem eigentlichen
+    // Zeichnen ermittelt werden, fuer maxScroll unten in run().
+    int16_t drawChipGrid(TFT_eSPI& tft, const Chip* chips, uint8_t chipCount, int16_t x, int16_t topY,
+                          int16_t maxWidth, int16_t rowH, int16_t scrollY, int16_t viewTop,
+                          int16_t viewBottom, bool draw) {
+        if (chipCount == 0) return topY;
+        int16_t halfColW = (int16_t)((maxWidth - 10) / 2);
+        bool twoColumns = true;
+        for (uint8_t i = 0; i < chipCount; i++) {
+            if (tft.textWidth(chips[i].text) > halfColW) { twoColumns = false; break; }
+        }
+        uint8_t cols = twoColumns ? 2 : 1;
+        int16_t colW = twoColumns ? (int16_t)(halfColW + 10) : maxWidth;
+        for (uint8_t i = 0; i < chipCount; i++) {
+            uint8_t col = i % cols;
+            uint8_t row = i / cols;
+            int16_t cx = (int16_t)(x + col * colW);
+            int16_t cy = (int16_t)(topY + row * rowH);
+            if (draw) {
+                int16_t screenY = cy - scrollY;
+                if (screenY >= viewTop && screenY <= viewBottom) {
+                    tft.setCursor(cx, screenY);
+                    tft.println(chips[i].text);
+                }
+            }
+        }
+        uint8_t rows = (uint8_t)((chipCount + cols - 1) / cols);
+        return (int16_t)(topY + rows * rowH);
+    }
+
     struct Stats {
         uint16_t total = 0;
         uint16_t airliner = 0, privateJet = 0, turboprop = 0, unknownType = 0;
         uint16_t helicopters = 0, heavy = 0;
+
+        // Verkehrsrichtung (Alex' Wunsch) - Verteilung nach 8 Himmels-
+        // richtungs-Sektoren, basierend auf Aircraft::headingDeg (der
+        // tatsaechliche Kurs des Flugzeugs, NICHT bearingDeg - das ist die
+        // Peilung VOM Heimatstandort ZUM Flugzeug, siehe aircraft.h). Reihen-
+        // folge N/NE/E/SE/S/SW/W/NW passt exakt zur StringId-Reihenfolge
+        // COMPASS_N..COMPASS_NW (i18n.h) - direkte Index-Zuordnung moeglich.
+        uint16_t dirCount[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+        // Hoehenverteilung (Alex' Wunsch) - dieselben drei Bereiche wie die
+        // Hoehen-Farbcodierung (Config::COLOR_LOW_ALT_THRESHOLD_FT/
+        // COLOR_MID_ALT_THRESHOLD_FT, siehe radar_screen.cpp::
+        // colorForAltitude()) - keine neue Kategorisierung, nur ein neuer
+        // Blickwinkel auf bereits bestehende Grenzwerte.
+        uint16_t altLow = 0, altMid = 0, altHigh = 0;
 
         bool hasNearest = false;
         char nearestLabel[9] = {0};
@@ -120,6 +195,18 @@ namespace {
             }
             if (RadarScreen::isHeavyAircraftCategory(a.category)) s.heavy++;
 
+            // Gleiche Sektor-Formel wie windCompassLabel() in main.cpp/
+            // compassLabel() in radar_screen.cpp (dort lokal dupliziert,
+            // hier ebenso - CLAUDE.md-Konvention "jeder Screen dupliziert
+            // seine eigenen kleinen Helfer").
+            int sector = ((int)lround(a.headingDeg + 22.5f) / 45) % 8;
+            if (sector < 0) sector += 8;
+            s.dirCount[sector]++;
+
+            if (a.altBaroFt < Config::COLOR_LOW_ALT_THRESHOLD_FT) s.altLow++;
+            else if (a.altBaroFt < Config::COLOR_MID_ALT_THRESHOLD_FT) s.altMid++;
+            else s.altHigh++;
+
             const char* label = a.callsign[0] ? a.callsign : a.hex;
 
             if (!s.hasNearest || a.distanceKm < s.nearestKm) {
@@ -149,19 +236,44 @@ namespace {
 }
 
 void run(TFT_eSPI& tft) {
+    constexpr int16_t LINE_X = 10;
+    constexpr int16_t LINE_MAX_W = Config::SCREEN_WIDTH - 20;
+    constexpr int16_t CHIP_ROW_H = 20;
+    constexpr int16_t EXTREME_ROW_H = 22;
+    constexpr int16_t VIEW_TOP = 58;
+    constexpr int16_t BACK_BTN_H = 40;
+    constexpr int16_t BOTTOM_MARGIN = 10;
+    constexpr int16_t SCROLL_ROW_H = 36;
+    constexpr int16_t BTN_GAP = 8;
+
     bool done = false;
     MenuStars::reset();
+    // BUGFIX/VERBESSERUNG (Alex' Auftrag): mit den zwei neuen Anzeigen
+    // (Verkehrsrichtung, Hoehenverteilung) kann der Inhalt bei vielfaeltigem
+    // Verkehr (viele Typen + viele Richtungssektoren + alle vier
+    // Extremwerte) mehr Platz brauchen, als auf den Bildschirm passt -
+    // gleiches Scroll-Prinzip wie bei den vier Wachlisten-Screens (▲/▼-
+    // Tasten, feste Zurueck-Position), hier aber in PIXELN statt ganzen
+    // Zeilen, da der Inhalt aus unterschiedlich hohen Abschnitten besteht
+    // (Chip-Raster + Einzelzeilen) - gleiches Grundprinzip wie der
+    // bestehende Info-Popup-Scroll. Lebt AUSSERHALB der while-Schleife,
+    // damit er bei jedem Neuzeichnen erhalten bleibt.
+    int16_t scrollY = 0;
 
     while (!done) {
         Stats s = computeStats();
         bool metric = LocationManager::useMetricUnits();
-        constexpr int16_t LINE_X = 10;
-        constexpr int16_t LINE_MAX_W = Config::SCREEN_WIDTH - 20;
 
         tft.fillScreen(TFT_BLACK);
         tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
         tft.setCursor(LINE_X, 14);
         tft.println(I18n::t(StringId::MENU_LIVE_TRAFFIC));
+
+        Rect backBtn = {LINE_X, (int16_t)(Config::SCREEN_HEIGHT - BOTTOM_MARGIN - BACK_BTN_H),
+                         LINE_MAX_W, BACK_BTN_H};
+        Rect upBtn, downBtn;
+        bool scrollable = false;
+        int16_t maxScroll = 0;
 
         if (s.total == 0) {
             tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
@@ -169,85 +281,187 @@ void run(TFT_eSPI& tft) {
             tft.println(I18n::t(StringId::AIRCRAFT_LIST_EMPTY));
         } else {
             // Gesamtzahl-Zeile bewusst in DERSELBEN Groesse (Size 1) wie
-            // der Rest des Screens, statt wie urspruenglich in Size 2 -
-            // bei Size 2 lief die deutsche Uebersetzung "Flugzeuge in
-            // Reichweite: " (und vermutlich auch einige andere Sprachen)
-            // bereits bei einstelligen Zahlen ueber die Bildschirmbreite
-            // und brach per eingebautem Auto-Wrap in eine zweite Zeile um,
-            // die direkt in die Typ-Aufschluesselung darunter hineinlief
-            // (Alex' Meldung/Foto). Gleiches Prinzip wie im Statistik-
-            // Screen (siehe CLAUDE.md: einheitliche Groesse ist robuster
-            // als zwei unterschiedliche Groessen dicht nebeneinander) -
-            // "prominent" kommt hier stattdessen durch eine eigene Zeile
-            // mit etwas Abstand nach oben/unten, nicht durch groessere
-            // Schrift.
+            // der Rest des Screens - siehe historischer Bugfix-Kommentar
+            // (vorher Size 2, brach bei laengeren Uebersetzungen um). Titel
+            // + Gesamtzahl bleiben als fester Kopf immer sichtbar, nur der
+            // Inhalt DARUNTER (ab VIEW_TOP) scrollt bei Bedarf.
             String totalLine = String(I18n::t(StringId::LIVE_TRAFFIC_TOTAL_PREFIX)) + s.total;
             tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(LINE_X, 38);
             tft.println(totalLine);
-            int16_t chipTop = 58;
 
-            // Typ-Aufschluesselung: NUR Kategorien mit count>0 aufnehmen
-            // und dann luecken-frei einsortieren (Alex' Vorgabe: eine leere
-            // Kategorie, z.B. gerade keine Hubschrauber sichtbar, soll
-            // weder als stoerende "0" auftauchen noch eine leere Luecke im
-            // Raster hinterlassen - sie wird einfach komplett weggelassen,
-            // die uebrigen Eintraege ruecken luecken-frei nach).
-            struct Chip { String text; };
-            Chip chips[6];
-            uint8_t chipCount = 0;
-            auto addChip = [&](StringId id, uint16_t count) {
+            // Typ-Aufschluesselung (bestehend): NUR Kategorien mit count>0
+            // aufnehmen und luecken-frei einsortieren (Alex' Vorgabe: eine
+            // leere Kategorie soll weder als stoerende "0" auftauchen noch
+            // eine leere Luecke im Raster hinterlassen).
+            Chip typeChips[6];
+            uint8_t typeChipCount = 0;
+            auto addTypeChip = [&](StringId id, uint16_t count) {
                 if (count == 0) return;
-                chips[chipCount++].text = String(I18n::t(id)) + ": " + count;
+                typeChips[typeChipCount++].text = String(I18n::t(id)) + ": " + count;
             };
-            addChip(StringId::LIVE_TRAFFIC_TYPE_AIRLINER, s.airliner);
-            addChip(StringId::LIVE_TRAFFIC_TYPE_PRIVATE_JET, s.privateJet);
-            addChip(StringId::LIVE_TRAFFIC_TYPE_TURBOPROP, s.turboprop);
-            addChip(StringId::LIVE_TRAFFIC_TYPE_UNKNOWN, s.unknownType);
-            addChip(StringId::RADAR_FILTER_NAME_HELICOPTERS, s.helicopters);
-            addChip(StringId::LEGEND_HEAVY, s.heavy);
+            addTypeChip(StringId::LIVE_TRAFFIC_TYPE_AIRLINER, s.airliner);
+            addTypeChip(StringId::LIVE_TRAFFIC_TYPE_PRIVATE_JET, s.privateJet);
+            addTypeChip(StringId::LIVE_TRAFFIC_TYPE_TURBOPROP, s.turboprop);
+            addTypeChip(StringId::LIVE_TRAFFIC_TYPE_UNKNOWN, s.unknownType);
+            addTypeChip(StringId::RADAR_FILTER_NAME_HELICOPTERS, s.helicopters);
+            addTypeChip(StringId::LEGEND_HEAVY, s.heavy);
 
-            // Zweispaltig NUR wenn der laengste vorhandene Chip-Text auch
-            // wirklich in eine halbe Zeilenbreite passt (Alex' Vorgabe:
-            // "ggf. zweispaltig wenn Platz reicht") - sonst einspaltig,
-            // damit lange Uebersetzungen (z.B. "Avion de ligne: 3") nie
-            // abgeschnitten werden.
-            int16_t halfColW = (int16_t)((LINE_MAX_W - 10) / 2);
-            bool twoColumns = true;
-            for (uint8_t i = 0; i < chipCount; i++) {
-                if (tft.textWidth(chips[i].text) > halfColW) { twoColumns = false; break; }
+            // NEU (Alex' Auftrag): Verkehrsrichtung - gleiches Chip-Raster-
+            // Prinzip wie oben, nur mit den 8 Himmelsrichtungs-Sektoren
+            // (s.dirCount, siehe computeStats()) statt Flugzeug-Typen.
+            Chip dirChips[8];
+            uint8_t dirChipCount = 0;
+            for (uint8_t sec = 0; sec < 8; sec++) {
+                if (s.dirCount[sec] == 0) continue;
+                StringId label = (StringId)((int)StringId::COMPASS_N + sec);
+                dirChips[dirChipCount++].text = String(I18n::t(label)) + ": " + s.dirCount[sec];
             }
 
-            constexpr int16_t CHIP_ROW_H = 20;
-            uint8_t chipCols = twoColumns ? 2 : 1;
-            int16_t chipColW = twoColumns ? (int16_t)(halfColW + 10) : LINE_MAX_W;
+            // NEU: Hauptflussrichtung - der Sektor mit den meisten Treffern,
+            // angezeigt als "Von <Gegenrichtung> nach <Hauptrichtung>" (z.B.
+            // "SW -> NE") - bei einem Ueberflug leichter verstaendlich als
+            // eine einzelne Richtungsangabe.
+            uint8_t dominantSector = 0;
+            uint16_t dominantCount = 0;
+            for (uint8_t sec = 0; sec < 8; sec++) {
+                if (s.dirCount[sec] > dominantCount) {
+                    dominantCount = s.dirCount[sec];
+                    dominantSector = sec;
+                }
+            }
+            uint8_t oppositeSector = (uint8_t)((dominantSector + 4) % 8);
+            String dominantLine = String(I18n::t(StringId::LIVE_TRAFFIC_DOMINANT_PREFIX)) +
+                I18n::t((StringId)((int)StringId::COMPASS_N + oppositeSector)) + " -> " +
+                I18n::t((StringId)((int)StringId::COMPASS_N + dominantSector));
+
+            // NEU: Hoehenverteilung - dieselben drei Bereiche wie die
+            // Hoehen-Farblegende, Einheit folgt Metrisch/Imperial wie
+            // ueberall im Projekt (altitudeBucketLabels() oben). Als
+            // Chip-Raster (wie Typ/Richtung), NICHT als eine einzige
+            // konkatenierte Zeile mit printFittingLine() - Bugfix: bei
+            // zweistelligen Zaehlern oder laengeren Sprachen passte die
+            // komplette Zeile nicht in LINE_MAX_W, und weil "full" und
+            // "fallback" identisch waren, kuerzte printFittingLine()
+            // zeichenweise vom ENDE ab - genau dort stand die dritte
+            // Kategorie (">9100m"/">30k ft"), die dadurch unsichtbar
+            // verschwand, ohne dass die Summe je zur Gesamtzahl passte.
+            // Ein Chip-Raster kann das nicht: jede Kategorie ist ein
+            // eigener Chip und wird nie abgeschnitten.
+            char lowLabel[10], midLabel[10], highLabel[10];
+            altitudeBucketLabels(lowLabel, sizeof(lowLabel), midLabel, sizeof(midLabel),
+                                  highLabel, sizeof(highLabel));
+            Chip altChips[3];
+            uint8_t altChipCount = 0;
+            auto addAltChip = [&](const char* label, uint16_t count) {
+                if (count == 0) return;
+                altChips[altChipCount++].text = String(label) + ": " + count;
+            };
+            addAltChip(lowLabel, s.altLow);
+            addAltChip(midLabel, s.altMid);
+            addAltChip(highLabel, s.altHigh);
+
+            // --- Schritt 1: Hoehe des GESAMTEN scrollbaren Inhalts
+            // ermitteln (draw=false fuer beide Chip-Raster, feste
+            // Zeilenhoehen fuer den Rest) - exakt dasselbe Dual-Zweck-
+            // Prinzip wie layoutWrapped() in den anderen Screens: einmal
+            // nur vermessen, um maxScroll zu kennen, BEVOR ueberhaupt etwas
+            // gezeichnet wird.
+            int16_t contentEndY = VIEW_TOP;
+            contentEndY = drawChipGrid(tft, typeChips, typeChipCount, LINE_X, contentEndY,
+                                        LINE_MAX_W, CHIP_ROW_H, 0, 0, 0, false);
+            contentEndY += 16;
+            contentEndY += EXTREME_ROW_H; // "Richtung:"-Kopfzeile
+            contentEndY = drawChipGrid(tft, dirChips, dirChipCount, LINE_X, contentEndY,
+                                        LINE_MAX_W, CHIP_ROW_H, 0, 0, 0, false);
+            contentEndY += 16;
+            contentEndY += EXTREME_ROW_H; // Hauptflussrichtung-Zeile
+            contentEndY += EXTREME_ROW_H; // "Hoehe:"-Kopfzeile
+            contentEndY = drawChipGrid(tft, altChips, altChipCount, LINE_X, contentEndY,
+                                        LINE_MAX_W, CHIP_ROW_H, 0, 0, 0, false);
+            contentEndY += 8;
+            if (s.hasNearest) contentEndY += EXTREME_ROW_H;
+            if (s.hasHighest) contentEndY += EXTREME_ROW_H;
+            if (s.hasLowest) contentEndY += EXTREME_ROW_H;
+            if (s.hasFastest) contentEndY += EXTREME_ROW_H;
+
+            // --- Schritt 2: feste Anker fuer Zurueck/Scroll-Pfeile (gleiches
+            // Muster wie bei den vier Wachlisten-Screens) - erst jetzt, mit
+            // der bekannten Gesamthoehe, entscheiden, ob ueberhaupt
+            // gescrollt werden muss.
+            int16_t viewBottomNoScroll = (int16_t)(backBtn.y - BTN_GAP);
+            scrollable = contentEndY > viewBottomNoScroll;
+            int16_t viewBottom = viewBottomNoScroll;
+            if (scrollable) {
+                int16_t arrowRowY = (int16_t)(backBtn.y - BTN_GAP - SCROLL_ROW_H);
+                upBtn = {LINE_X, arrowRowY, 100, SCROLL_ROW_H};
+                downBtn = {(int16_t)(Config::SCREEN_WIDTH - 110), arrowRowY, 100, SCROLL_ROW_H};
+                viewBottom = (int16_t)(arrowRowY - BTN_GAP);
+            }
+            maxScroll = (int16_t)max(0, contentEndY - viewBottom);
+            if (scrollY > maxScroll) scrollY = maxScroll;
+            if (scrollY < 0) scrollY = 0;
+
+            // --- Schritt 3: eigentliches Zeichnen, jetzt mit Scroll-
+            // Versatz/Clipping (gleiche screenY>=viewTop && <=viewBottom-
+            // Pruefung wie in layoutWrapped()).
             tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
-            for (uint8_t i = 0; i < chipCount; i++) {
-                uint8_t col = i % chipCols;
-                uint8_t row = i / chipCols;
-                int16_t x = (int16_t)(LINE_X + col * chipColW);
-                int16_t y = (int16_t)(chipTop + row * CHIP_ROW_H);
-                tft.setCursor(x, y);
-                tft.println(chips[i].text);
+            int16_t y = VIEW_TOP;
+            y = drawChipGrid(tft, typeChips, typeChipCount, LINE_X, y, LINE_MAX_W, CHIP_ROW_H,
+                              scrollY, VIEW_TOP, viewBottom, true);
+            y += 16;
+
+            // Kleine Kopfzeile ueber dem Richtungs-Raster, sonst waeren
+            // Kompass-Kuerzel ("N: 3" etc.) ohne Kontext leicht mit der
+            // Typ-Aufschluesselung zu verwechseln.
+            {
+                int16_t screenY = y - scrollY;
+                if (screenY >= VIEW_TOP && screenY <= viewBottom) {
+                    tft.setCursor(LINE_X, screenY);
+                    tft.println(I18n::t(StringId::LIVE_TRAFFIC_DIRECTION_HEADER));
+                }
             }
+            y += EXTREME_ROW_H;
+            y = drawChipGrid(tft, dirChips, dirChipCount, LINE_X, y, LINE_MAX_W, CHIP_ROW_H,
+                              scrollY, VIEW_TOP, viewBottom, true);
+            y += 16;
 
-            uint8_t chipRows = chipCount == 0 ? 0 : (uint8_t)((chipCount + chipCols - 1) / chipCols);
-            int16_t y = (int16_t)(chipTop + chipRows * CHIP_ROW_H + 16);
-            constexpr int16_t EXTREME_ROW_H = 22;
+            // printFittingLine() garantiert, dass jede Zeile in JEDER der 8
+            // Sprachen innerhalb LINE_MAX_W bleibt (siehe Kommentar dort) -
+            // hier zusaetzlich mit Scroll-Versatz/Sichtbarkeits-Pruefung.
+            auto drawIfVisible = [&](const String& full, const String& fallback) {
+                int16_t screenY = y - scrollY;
+                if (screenY >= VIEW_TOP && screenY <= viewBottom) {
+                    printFittingLine(tft, LINE_X, screenY, LINE_MAX_W, full, fallback);
+                }
+                y += EXTREME_ROW_H;
+            };
 
-            // Vier Extremwerte - jede Zeile nur, wenn ein gueltiger Wert
-            // vorliegt (bei total>0 hier immer der Fall, defensiv trotzdem
-            // geprueft). printFittingLine() garantiert, dass die Zeile in
-            // JEDER der 8 Sprachen innerhalb LINE_MAX_W bleibt (siehe
-            // Kommentar dort).
+            drawIfVisible(dominantLine, dominantLine);
+
+            // Kopfzeile ueber dem Hoehen-Raster, analog zur Richtungs-
+            // Kopfzeile oben.
+            {
+                int16_t screenY = y - scrollY;
+                if (screenY >= VIEW_TOP && screenY <= viewBottom) {
+                    tft.setCursor(LINE_X, screenY);
+                    tft.println(I18n::t(StringId::LIVE_TRAFFIC_ALTITUDE_HEADER));
+                }
+            }
+            y += EXTREME_ROW_H;
+            y = drawChipGrid(tft, altChips, altChipCount, LINE_X, y, LINE_MAX_W, CHIP_ROW_H,
+                              scrollY, VIEW_TOP, viewBottom, true);
+            y += 8;
+
+            // Vier Extremwerte (bestehend) - jede Zeile nur, wenn ein
+            // gueltiger Wert vorliegt.
             if (s.hasNearest) {
                 String prefix = I18n::t(StringId::LIVE_TRAFFIC_NEAREST_PREFIX);
                 String fallback = prefix + s.nearestLabel;
                 String full = metric
                     ? fallback + " (" + String(s.nearestKm, 0) + "km)"
                     : fallback + " (" + String(Units::kmToNm(s.nearestKm), 0) + "nm)";
-                printFittingLine(tft, LINE_X, y, LINE_MAX_W, full, fallback);
-                y += EXTREME_ROW_H;
+                drawIfVisible(full, fallback);
             }
             if (s.hasHighest) {
                 String prefix = I18n::t(StringId::LIVE_TRAFFIC_HIGHEST_PREFIX);
@@ -255,8 +469,7 @@ void run(TFT_eSPI& tft) {
                 String full = metric
                     ? fallback + " (" + String(Units::feetToMeters((float)s.highestFt), 0) + "m)"
                     : fallback + " (" + String((long)s.highestFt) + "ft)";
-                printFittingLine(tft, LINE_X, y, LINE_MAX_W, full, fallback);
-                y += EXTREME_ROW_H;
+                drawIfVisible(full, fallback);
             }
             if (s.hasLowest) {
                 String prefix = I18n::t(StringId::LIVE_TRAFFIC_LOWEST_PREFIX);
@@ -264,8 +477,7 @@ void run(TFT_eSPI& tft) {
                 String full = metric
                     ? fallback + " (" + String(Units::feetToMeters((float)s.lowestFt), 0) + "m)"
                     : fallback + " (" + String((long)s.lowestFt) + "ft)";
-                printFittingLine(tft, LINE_X, y, LINE_MAX_W, full, fallback);
-                y += EXTREME_ROW_H;
+                drawIfVisible(full, fallback);
             }
             if (s.hasFastest) {
                 String prefix = I18n::t(StringId::LIVE_TRAFFIC_FASTEST_PREFIX);
@@ -273,12 +485,14 @@ void run(TFT_eSPI& tft) {
                 String full = metric
                     ? fallback + " (" + String(Units::ktToKmh(s.fastestKt), 0) + "km/h)"
                     : fallback + " (" + String(s.fastestKt, 0) + "kt)";
-                printFittingLine(tft, LINE_X, y, LINE_MAX_W, full, fallback);
-                y += EXTREME_ROW_H;
+                drawIfVisible(full, fallback);
             }
         }
 
-        Rect backBtn = {LINE_X, (int16_t)(Config::SCREEN_HEIGHT - 50), LINE_MAX_W, 40};
+        if (scrollable) {
+            drawButton(tft, upBtn, "^");
+            drawButton(tft, downBtn, "v");
+        }
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
         TouchInput::Point tap;
@@ -288,7 +502,17 @@ void run(TFT_eSPI& tft) {
             MenuStars::update(tft);
             delay(20);
         }
-        if (backBtn.contains(tap.x, tap.y)) done = true;
+        if (done) break;
+
+        if (backBtn.contains(tap.x, tap.y)) {
+            done = true;
+        } else if (scrollable && upBtn.contains(tap.x, tap.y) && scrollY > 0) {
+            scrollY -= 40;
+            if (scrollY < 0) scrollY = 0;
+        } else if (scrollable && downBtn.contains(tap.x, tap.y) && scrollY < maxScroll) {
+            scrollY += 40;
+            if (scrollY > maxScroll) scrollY = maxScroll;
+        }
     }
 }
 

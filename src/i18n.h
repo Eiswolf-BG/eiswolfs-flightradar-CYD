@@ -1418,6 +1418,17 @@ enum class StringId : uint16_t {
     WEATHER_DATE_PREFIX,
     WEATHER_SUN_UNAVAILABLE,
 
+    // Zwei neue Anzeigen auf dem Live-Traffic-Screen (Alex' Auftrag,
+    // live_traffic_screen.cpp) - Verkehrsrichtung (8-Sektoren-Aufschluesse-
+    // lung nach Aircraft::headingDeg, gefolgt von einer kompakten Haupt-
+    // flussrichtungs-Zeile, z.B. "SW -> NE") und Hoehenverteilung (dieselben
+    // drei Bereiche wie die Hoehen-Farblegende). Nutzen zusaetzlich die
+    // bereits bestehenden COMPASS_N..COMPASS_NW fuer die 8 Richtungs-Chips
+    // selbst - hier nur die drei neuen Kopf-/Praefix-Texte.
+    LIVE_TRAFFIC_DIRECTION_HEADER,
+    LIVE_TRAFFIC_DOMINANT_PREFIX,
+    LIVE_TRAFFIC_ALTITUDE_HEADER,
+
     COUNT
 };
 

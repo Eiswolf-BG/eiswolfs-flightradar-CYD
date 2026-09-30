@@ -9,7 +9,10 @@
 // Zeichen), daher hier ebenfalls auf 4 Zeichen begrenzt - ICAO-Typ-
 // Designatoren sind ohnehin nie laenger.
 namespace TypeWatchlist {
-    constexpr uint8_t MAX_WATCHED = 5;
+    // Erhoeht von 5 auf 12 (Alex' Auftrag) - siehe aircraft_watchlist.h fuer
+    // die volle Begruendung (Scrollen jetzt vorhanden; 20 scheiterte am
+    // knappen internen RAM, 12 wurde live gegen dieses Limit getestet).
+    constexpr uint8_t MAX_WATCHED = 12;
 
     void init();
 

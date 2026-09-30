@@ -623,6 +623,10 @@ static const char* const I18N_FR[] = {
 
     "Date : ",
     "Lever/coucher du soleil pas encore disponible",
+
+    "Direction :",
+    "Flux principal : ",
+    "Altitude : ",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

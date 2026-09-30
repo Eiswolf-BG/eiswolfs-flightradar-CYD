@@ -235,9 +235,18 @@ void run(TFT_eSPI& tft) {
     constexpr int16_t ROW_H = 32;
     constexpr int16_t ROW_GAP = 6;
     constexpr int16_t REMOVE_BTN_W = 60;
+    constexpr int16_t ADD_BTN_H = 40;
+    constexpr int16_t BACK_BTN_H = 40;
+    constexpr int16_t BTN_GAP = 8;
+    constexpr int16_t SCROLL_ROW_H = 36;
+    constexpr int16_t BOTTOM_MARGIN = 8;
 
     bool done = false;
     MenuStars::reset();
+    // Siehe gleicher Bugfix-Kommentar in aircraft_watchlist_screen.cpp -
+    // echtes zeilenweises Scrollen statt der bisherigen festen Liste ohne
+    // Scroll-Unterstuetzung.
+    uint8_t scrollIndex = 0;
     while (!done) {
         tft.fillScreen(TFT_BLACK);
 
@@ -264,28 +273,51 @@ void run(TFT_eSPI& tft) {
                                           descText, 0, 0, Config::SCREEN_HEIGHT, true);
 
         uint8_t count = TypeWatchlist::count();
-        int16_t y = (int16_t)(descEndY + 16);
+        bool canAdd = count < TypeWatchlist::MAX_WATCHED;
+
+        Rect backBtn = {10, (int16_t)(Config::SCREEN_HEIGHT - BOTTOM_MARGIN - BACK_BTN_H),
+                         (int16_t)(Config::SCREEN_WIDTH - 20), BACK_BTN_H};
+        Rect addBtn = {10, (int16_t)(backBtn.y - BTN_GAP - ADD_BTN_H),
+                       (int16_t)(Config::SCREEN_WIDTH - 20), ADD_BTN_H};
+        int16_t bottomAnchorY = canAdd ? addBtn.y : backBtn.y;
+
+        int16_t listTop = (int16_t)(descEndY + 16);
+        constexpr int16_t ROW_STEP = ROW_H + ROW_GAP;
+
+        int16_t viewBottomNoScroll = (int16_t)(bottomAnchorY - BTN_GAP);
+        uint8_t rowsFitNoScroll = (uint8_t)max(1, (viewBottomNoScroll - listTop) / ROW_STEP);
+
+        bool scrollable = count > rowsFitNoScroll;
+        int16_t viewBottom = viewBottomNoScroll;
+        uint8_t rowsPerPage = rowsFitNoScroll;
+        Rect upBtn, downBtn;
+        if (scrollable) {
+            int16_t arrowRowY = (int16_t)(bottomAnchorY - BTN_GAP - SCROLL_ROW_H);
+            upBtn = {10, arrowRowY, 100, SCROLL_ROW_H};
+            downBtn = {(int16_t)(Config::SCREEN_WIDTH - 110), arrowRowY, 100, SCROLL_ROW_H};
+            viewBottom = (int16_t)(arrowRowY - BTN_GAP);
+            rowsPerPage = (uint8_t)max(1, (viewBottom - listTop) / ROW_STEP);
+        }
+
+        uint8_t maxScrollIndex = (count > rowsPerPage) ? (uint8_t)(count - rowsPerPage) : 0;
+        if (scrollIndex > maxScrollIndex) scrollIndex = maxScrollIndex;
 
         Rect rowRects[TypeWatchlist::MAX_WATCHED];
         Rect removeRects[TypeWatchlist::MAX_WATCHED];
 
+        int16_t y = listTop;
         if (count == 0) {
             // BUGFIX (Alex' Meldung, zweites Foto): derselbe Ueberlapp-
             // Fehler wie beim Erklaertext oben steckte auch noch im "leere
-            // Liste"-Platzhalter - der lief ebenfalls ueber rohes
-            // setCursor()/println() mit nur EINER ROW_H Platz reserviert,
-            // brach bei laengeren Uebersetzungen aber auf eine zweite Zeile
-            // um und ragte dadurch in den "Hinzufuegen"-Button hinein. Jetzt
-            // ebenfalls ueber layoutWrapped() mit grosszuegigerem
-            // Zeilenabstand/Puffer, die Buttons ruecken dynamisch weiter
-            // runter statt zu knapp zu folgen.
+            // Liste"-Platzhalter - jetzt ueber layoutWrapped() mit
+            // grosszuegigerem Zeilenabstand/Puffer statt rohem
+            // setCursor()/println().
             tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-            y = layoutWrapped(tft, 10, (int16_t)(y + 14), (int16_t)(Config::SCREEN_WIDTH - 20), 18,
-                               I18n::t(StringId::TYPE_WATCH_EMPTY), 0, 0, Config::SCREEN_HEIGHT, true);
-            y += 20;
+            layoutWrapped(tft, 10, (int16_t)(y + 14), (int16_t)(Config::SCREEN_WIDTH - 20), 18,
+                          I18n::t(StringId::TYPE_WATCH_EMPTY), 0, 0, Config::SCREEN_HEIGHT, true);
         }
 
-        for (uint8_t i = 0; i < count; i++) {
+        for (uint8_t i = scrollIndex; i < count && i < (uint8_t)(scrollIndex + rowsPerPage); i++) {
             Rect rowRect = {10, y, (int16_t)(Config::SCREEN_WIDTH - 20 - REMOVE_BTN_W - 6), ROW_H};
             Rect removeRect = {(int16_t)(Config::SCREEN_WIDTH - 10 - REMOVE_BTN_W), y, REMOVE_BTN_W, ROW_H};
             rowRects[i] = rowRect;
@@ -299,21 +331,16 @@ void run(TFT_eSPI& tft) {
             tft.setTextDatum(TL_DATUM);
             drawButton(tft, removeRect, "X", true);
 
-            y += ROW_H + ROW_GAP;
+            y += ROW_STEP;
         }
 
-        Rect addBtn = {10, y, (int16_t)(Config::SCREEN_WIDTH - 20), 40};
-        bool canAdd = count < TypeWatchlist::MAX_WATCHED;
+        if (scrollable) {
+            drawButton(tft, upBtn, "^");
+            drawButton(tft, downBtn, "v");
+        }
         if (canAdd) {
             drawButton(tft, addBtn, I18n::t(StringId::TYPE_WATCH_ADD));
-            y += 40 + 10;
         }
-
-        // Dynamisch statt fest an SCREEN_HEIGHT-50 verankert (Bugfix oben) -
-        // der Erklaertext kann je nach Sprache mehr Platz brauchen als
-        // vorher angenommen, ein fester Wert koennte sonst wieder mit der
-        // Liste/dem "Hinzufuegen"-Button ueberlappen.
-        Rect backBtn = {10, y, (int16_t)(Config::SCREEN_WIDTH - 20), 40};
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
         TouchInput::Point tap;
@@ -323,13 +350,22 @@ void run(TFT_eSPI& tft) {
             MenuStars::update(tft);
             delay(20);
         }
+        if (done) break;
 
         bool handled = false;
         if (infoBtn.contains(tap.x, tap.y)) {
             runInfoScreen(tft);
             handled = true;
         }
-        for (uint8_t i = 0; i < count && !handled; i++) {
+        if (!handled && scrollable && upBtn.contains(tap.x, tap.y) && scrollIndex > 0) {
+            scrollIndex--;
+            handled = true;
+        }
+        if (!handled && scrollable && downBtn.contains(tap.x, tap.y) && scrollIndex < maxScrollIndex) {
+            scrollIndex++;
+            handled = true;
+        }
+        for (uint8_t i = scrollIndex; i < count && !handled && i < (uint8_t)(scrollIndex + rowsPerPage); i++) {
             if (removeRects[i].contains(tap.x, tap.y)) {
                 TypeWatchlist::removeWatched(i);
                 handled = true;
