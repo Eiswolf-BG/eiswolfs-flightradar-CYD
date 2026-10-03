@@ -8,6 +8,13 @@ namespace Config {
     // Git-Tag passen.
     constexpr const char* APP_VERSION = "6.9.0";
 
+    // Projekt-Repo-URL fuer den GitHub-QR-Code - zentral hier hinterlegt,
+    // damit main.cpp (Ueber-Screen, grosser QR-Code) und menu_screen.cpp
+    // (kleiner QR-Code unten auf den OTA-Screens) garantiert denselben
+    // Text kodieren, statt die URL an zwei Stellen im Code zu duplizieren
+    // und dadurch auseinanderlaufen zu koennen.
+    constexpr const char* GITHUB_REPO_URL = "https://github.com/Eiswolf-BG/eiswolfs-flightradar-CYD";
+
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
     // ein Defekt wirken statt wie eine Einstellung.
