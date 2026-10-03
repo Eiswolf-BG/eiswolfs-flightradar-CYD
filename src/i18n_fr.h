@@ -91,7 +91,7 @@ static const char* const I18N_FR[] = {
     "Ajouter un avion (indicatif)",
     "Aucun avion surveille pour l'instant.",
     "Comment fonctionne la liste de surveillance",
-    "Entrez l'indicatif exact d'un vol precis (ex. DLH441) - pas un code compagnie comme pour le filtre. Jusqu'a 5 avions peuvent etre suivis a la fois.",
+    "Entrez l'indicatif exact d'un vol précis (ex. DLH441), ou utilisez \"*\" comme joker pour en cibler plusieurs (ex. DLH* pour tous les vols Lufthansa, *441 pour tout vol se terminant par 441) - pas un code compagnie comme pour le filtre. Jusqu'à 12 avions peuvent être suivis à la fois.",
     "Des qu'un avion surveille apparait quelque part sur le radar, il recoit un anneau cyan et la LED clignote en bleu - pratique pour reperer un vol precis, par exemple l'arrivee de quelqu'un que vous connaissez.",
 
     "Positions enregistrées",
@@ -329,9 +329,6 @@ static const char* const I18N_FR[] = {
     "Comment fonctionne la veille squawk",
     "Entrez un code squawk octal a 4 chiffres (0000-7777, chiffres 0-7 uniquement) - par ex. un code utilise par votre controle aerien local pour un but precis. Jusqu'a 5 codes peuvent etre suivis a la fois.",
     "Des qu'un avion emet un code squawk surveille, il recoit un anneau cyan et la LED clignote en bleu - meme alerte que la liste de surveillance des avions. Les codes d'urgence (7500/7600/7700) restent toujours geres separement par l'alarme d'urgence rouge, independamment de cette liste.",
-    "Marqueur ISS : ",
-    "À propos du marqueur ISS",
-    "Affiche la Station spatiale internationale (ISS) sous forme de marqueur special lorsqu'elle passe actuellement dans votre portee radar. En raison de sa grande vitesse (~7,66 km/s), elle n'est generalement visible que pendant quelques secondes, si tant est qu'elle le soit.",
 
     "Démarrage...",
     "Initialisation du récepteur transpondeur...",
@@ -585,6 +582,10 @@ static const char* const I18N_FR[] = {
     "Normal",
     "Réduit (niveau %d/3)",
 
+    "Direction :",
+    "Flux principal : ",
+    "Altitude : ",
+
     "Alerte d'approche",
     "Alerte d'approche",
     "Envoie une notification push ntfy distincte lorsqu'un avion déjà présent sur l'une de vos listes de surveillance (indicatif, squawk ou type d'avion) entre nouvellement en approche d'atterrissage. Se déclenche une seule fois par approche, pas de manière répétée pendant toute la phase.",
@@ -624,9 +625,37 @@ static const char* const I18N_FR[] = {
     "Date : ",
     "Lever/coucher du soleil pas encore disponible",
 
-    "Direction :",
-    "Flux principal : ",
-    "Altitude : ",
+    "Alt. moy. : ",
+    "Vit. moy. : ",
+    "Densité : ",
+    "FAIBLE",
+    "MOYEN",
+    "ÉLEVÉ",
+    "Tendance : ",
+
+    "Presque à la verticale",
+    "Passe à gauche",
+    "Passe à droite",
+    "Sort de la portée dans ~",
+
+    "Probablement audible",
+    "Peut-être audible",
+    "À peine audible",
+
+    "Nouveau pic de trafic du jour : ",
+    "Premier vol militaire/gouvernemental du jour repéré",
+    "Premier avion Heavy du jour repéré",
+    "Le carnet de vol va se désactiver automatiquement bientôt",
+
+    "Points forts du jour - se réinitialise chaque nuit.",
+    "Suivi le plus long : ",
+    "Montée la plus rapide : ",
+    "Descente la plus rapide : ",
+    "Premier vu aujourd'hui : ",
+    "Dernière arrivée : ",
+    "Plus de retours aujourd'hui : ",
+
+    "Dernier : ",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

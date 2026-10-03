@@ -91,7 +91,7 @@ static const char* const I18N_NL[] = {
     "Vliegtuig toevoegen (roepnaam)",
     "Nog geen vliegtuigen gevolgd.",
     "Hoe de volglijst werkt",
-    "Voer de exacte roepnaam van een specifieke vlucht in (bijv. DLH441) - geen maatschappijcode zoals bij het luchtvaartmaatschappijfilter. Er kunnen tot 5 vliegtuigen tegelijk worden gevolgd.",
+    "Voer de exacte roepnaam van een specifieke vlucht in (bijv. DLH441), of gebruik \"*\" als jokerteken voor meerdere (bijv. DLH* voor alle Lufthansa-vluchten, *441 voor elke vlucht die eindigt op 441) - geen maatschappijcode zoals bij het luchtvaartmaatschappijfilter. Er kunnen tot 12 vliegtuigen tegelijk worden gevolgd.",
     "Zodra een gevolgd vliegtuig ergens op de radar verschijnt, krijgt het een cyaan ring en knippert de LED blauw - handig om een specifieke vlucht te spotten, bijv. wanneer iemand die je kent aankomt.",
 
     "Locatievoorinstellingen",
@@ -330,9 +330,6 @@ static const char* const I18N_NL[] = {
     "Hoe squawk-bewaking werkt",
     "Voer een 4-cijferige octale squawk-code in (0000-7777, alleen cijfers 0-7) - bijv. een code die je lokale luchtverkeersleiding voor een specifiek doel gebruikt. Er kunnen tot 5 codes tegelijk worden gevolgd.",
     "Zodra een vliegtuig een bewaakte squawk-code uitzendt, krijgt het een cyaan ring en knippert de LED blauw - hetzelfde alarm als de vliegtuig-volglijst. Noodcodes (7500/7600/7700) worden altijd apart afgehandeld door het rode noodalarm, ongeacht deze lijst.",
-    "ISS-marker: ",
-    "Over de ISS-marker",
-    "Toont het Internationaal Ruimtestation (ISS) als speciale marker wanneer het momenteel binnen je radarbereik passeert. Omdat het zo snel beweegt (~7,66 km/s), is het meestal maar een paar seconden zichtbaar, als het al zichtbaar is.",
 
     "Opstarten...",
     "Transponderontvanger initialiseren...",
@@ -587,6 +584,10 @@ static const char* const I18N_NL[] = {
     "Normaal",
     "Verminderd (niveau %d/3)",
 
+    "Richting:",
+    "Hoofdrichting: ",
+    "Hoogte: ",
+
     "Nadering-alarm",
     "Nadering-alarm",
     "Stuurt een aparte ntfy-pushmelding wanneer een vliegtuig dat al op een van je volglijsten staat (roepnaam, squawk of vliegtuigtype) nieuw de landingsnadering ingaat. Wordt maar één keer per nadering geactiveerd, niet herhaaldelijk zolang het in die fase blijft.",
@@ -626,9 +627,37 @@ static const char* const I18N_NL[] = {
     "Datum: ",
     "Zonsopgang/zonsondergang nog niet beschikbaar",
 
-    "Richting:",
-    "Hoofdrichting: ",
-    "Hoogte: ",
+    "Gem. hoogte: ",
+    "Gem. snelh.: ",
+    "Dichtheid: ",
+    "LAAG",
+    "GEMIDDELD",
+    "HOOG",
+    "Trend: ",
+
+    "Bijna recht boven je",
+    "Passeert links",
+    "Passeert rechts",
+    "Verlaat bereik over ~",
+
+    "Waarschijnlijk hoorbaar",
+    "Misschien hoorbaar",
+    "Nauwelijks hoorbaar",
+
+    "Nieuwe dagelijkse verkeerspiek: ",
+    "Eerste militaire/overheidsvlucht van de dag gespot",
+    "Eerste Heavy-vliegtuig van de dag gespot",
+    "Vluchtlogboek wordt binnenkort automatisch uitgeschakeld",
+
+    "Hoogtepunten van vandaag - wordt elke nacht gereset.",
+    "Langste tracking: ",
+    "Snelste klim: ",
+    "Snelste daling: ",
+    "Eerst gezien vandaag: ",
+    "Laatste nieuwkomer: ",
+    "Meeste terugkeerders vandaag: ",
+
+    "Laatste: ",
 };
 
 static_assert(sizeof(I18N_NL) / sizeof(I18N_NL[0]) == (size_t)StringId::COUNT,

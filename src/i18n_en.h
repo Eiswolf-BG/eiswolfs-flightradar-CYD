@@ -91,7 +91,7 @@ static const char* const I18N_EN[] = {
     "Add aircraft (callsign)",
     "No aircraft watched yet.",
     "How the watchlist works",
-    "Enter the exact callsign of a specific flight (e.g. DLH441) - not an airline code like the Airline Filter. Up to 5 aircraft can be tracked at once.",
+    "Enter the exact callsign of a specific flight (e.g. DLH441), or use \"*\" as a wildcard to match several (e.g. DLH* for all Lufthansa flights, *441 for any flight ending in 441) - not an airline code like the Airline Filter. Up to 12 aircraft can be tracked at once.",
     "As soon as a watched aircraft appears anywhere on the radar, it gets a cyan ring and the LED blinks blue - great for spotting a specific flight, e.g. when someone you know is arriving.",
 
     "Location presets",
@@ -330,9 +330,6 @@ static const char* const I18N_EN[] = {
     "How squawk watch works",
     "Enter a 4-digit octal squawk code (0000-7777, digits 0-7 only) - e.g. a code your local ATC uses for a specific purpose. Up to 5 codes can be tracked at once.",
     "As soon as any aircraft transmits a watched squawk code, it gets a cyan ring and the LED blinks blue - same alert as the aircraft watchlist. Emergency codes (7500/7600/7700) are always handled separately by the red emergency alarm, regardless of this list.",
-    "ISS marker: ",
-    "About the ISS marker",
-    "Shows the International Space Station (ISS) as a special marker when it's currently passing within your radar range. Because it moves so fast (~7.66 km/s), it's usually only visible for a few seconds, if at all.",
 
     "Booting...",
     "Initializing transponder receiver...",
@@ -586,6 +583,10 @@ static const char* const I18N_EN[] = {
     "Normal",
     "Reduced (level %d/3)",
 
+    "Direction:",
+    "Main flow: ",
+    "Altitude: ",
+
     "Approach Alert",
     "Approach Alert",
     "Sends a separate ntfy push notification when an aircraft already on one of your watchlists (callsign, squawk, or aircraft type) newly enters its landing approach. Fires once per approach, not repeatedly while it stays in that phase.",
@@ -625,9 +626,37 @@ static const char* const I18N_EN[] = {
     "Date: ",
     "Sunrise/Sunset not available yet",
 
-    "Direction:",
-    "Main flow: ",
-    "Altitude: ",
+    "Avg alt: ",
+    "Avg speed: ",
+    "Density: ",
+    "LOW",
+    "MED",
+    "HIGH",
+    "Trend: ",
+
+    "Nearly overhead",
+    "Passing left",
+    "Passing right",
+    "Exits range in ~",
+
+    "Likely audible",
+    "Maybe audible",
+    "Barely audible",
+
+    "New daily peak traffic: ",
+    "First military/government flight of the day spotted",
+    "First heavy aircraft of the day spotted",
+    "Flight logbook will auto-off within the hour",
+
+    "Today's highlights - resets every midnight.",
+    "Longest tracked: ",
+    "Fastest climb: ",
+    "Fastest descent: ",
+    "First seen today: ",
+    "Last new arrival: ",
+    "Most returns today: ",
+
+    "Last: ",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,

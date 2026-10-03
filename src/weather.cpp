@@ -416,7 +416,7 @@ namespace {
             fetchAirportIata(client, nearest.icao, na.iata, sizeof(na.iata));
             currentNearestAirportData = na;
         } else {
-            Serial.println("[Weather] METAR uebersprungen: kein Flughafen in airports.csv auf der SD-Karte gefunden.");
+            Serial.println("[Weather] METAR uebersprungen: kein Flughafen in der eingebetteten Flughafendatenbank gefunden.");
             currentMetarData = Metar{};
             currentNearestAirportData = NearestAirport{};
         }

@@ -155,26 +155,36 @@ namespace {
         bool hasFastest = false;
         char fastestLabel[9] = {0};
         float fastestKt = 0;
+
+        // Durchschnittshoehe/-geschwindigkeit (Alex' Wunsch) - einfache
+        // Mittelwerte ueber ALLE sichtbaren Flugzeuge (gleiche Grundmenge
+        // wie total, keine zusaetzliche Gueltigkeitspruefung - Bodenfahr-
+        // zeuge mit 0ft/0kt ziehen den Schnitt bewusst mit nach unten,
+        // genau wie sie auch in altLow/die uebrigen Zaehler einfliessen).
+        float sumAltFt = 0;
+        float sumSpeedKt = 0;
     };
 
     // Einziger Durchlauf ueber die bereits vorhandene AircraftTable - reine
     // Aggregation, KEIN zusaetzlicher Netzwerk-/SD-Zugriff (Alex' Vorgabe).
     // Respektiert dieselben Filter wie Radar/Flugzeugliste (Reichweite,
-    // Bodenfahrzeuge, Nur-Helikopter, Nur-Niedrigflieger, Nur-Interessantes,
-    // Airline-Filter) ueber RadarScreen::isAircraftCurrentlyVisible() - EIN
-    // gemeinsamer Filter-Check statt einer zweiten, separat gepflegten
-    // Kopie (Alex' Wunsch: alle Ansichten sollen konsistent dieselbe
-    // Sichtbarkeitsmenge zeigen wie der Radar-Screen selbst).
+    // Bodenfahrzeuge, Nur-Helikopter, Airline-Filter), damit die
+    // Zusammenfassung exakt zu dem passt, was gerade auf dem Radar zu sehen
+    // ist.
     Stats computeStats() {
         Stats s;
+        float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
         AircraftTable::lock();
         Aircraft* table = AircraftTable::raw();
         for (uint8_t i = 0; i < AircraftTable::capacity(); i++) {
             Aircraft& a = table[i];
             if (!a.valid) continue;
-            if (!RadarScreen::isAircraftCurrentlyVisible(a)) continue;
+            if (a.distanceKm > rangeKm * 1.05f) continue;
+            if (SettingsStore::hideGroundVehicles() && a.category[0] == 'C') continue;
             bool rotorcraft = RadarScreen::isRotorcraftCategory(a.category);
+            if (SettingsStore::onlyHelicopters() && !rotorcraft) continue;
+            if (AirlineFilter::isHidden(a.callsign)) continue;
 
             s.total++;
 
@@ -207,6 +217,9 @@ namespace {
             else if (a.altBaroFt < Config::COLOR_MID_ALT_THRESHOLD_FT) s.altMid++;
             else s.altHigh++;
 
+            s.sumAltFt += a.altBaroFt;
+            s.sumSpeedKt += a.groundSpeedKt;
+
             const char* label = a.callsign[0] ? a.callsign : a.hex;
 
             if (!s.hasNearest || a.distanceKm < s.nearestKm) {
@@ -232,6 +245,60 @@ namespace {
         }
         AircraftTable::unlock();
         return s;
+    }
+
+    // Verkehrstrend (Alex' Auftrag): kleiner Ringpuffer im RAM, keine
+    // Persistierung ueber einen Neustart hinweg noetig. 6 Slots x 5 Minuten
+    // Abstand = bis zu 25 Minuten Spanne zwischen aeltestem und neuestem
+    // Sample (liegt damit innerhalb der gewuenschten ~15-30 Minuten).
+    // recordTrendSample() wird von net_task.cpp auf Core 0 aufgerufen,
+    // computeTrend()/run() lesen auf Core 1 - bewusst OHNE eigenes Lock:
+    // im denkbar ungluecklichsten Fall liest run() einen gerade erst zur
+    // Haelfte geschriebenen Ringpuffer-Slot und zeigt den Trend fuer einen
+    // Zyklus lang minimal ungenau an - fuer eine rein informative Anzeige
+    // (kein Alarm, keine sicherheitsrelevante Logik) ein bewusst in Kauf
+    // genommener Kompromiss, der ein zusaetzliches Lock/eine weitere
+    // Cross-Core-Synchronisation fuer diesen Zweck unnoetig macht.
+    constexpr uint8_t TREND_SAMPLE_CAPACITY = 6;
+    constexpr uint32_t TREND_SAMPLE_INTERVAL_MS = 5UL * 60UL * 1000UL;
+
+    uint16_t trendSamples[TREND_SAMPLE_CAPACITY] = {0};
+    uint8_t trendSampleCount = 0;
+    uint8_t trendSampleHead = 0;
+    uint32_t lastTrendSampleMs = 0;
+    bool trendSampleStarted = false;
+
+    // Liefert true, wenn genug Samples fuer einen sinnvollen Trend
+    // vorliegen (mind. 2), sonst false - der Aufrufer zeigt die Trend-Zeile
+    // dann einfach gar nicht an (gleiches Muster wie "hasNearest" etc. oben,
+    // kein erfundener Wert statt echter Daten).
+    bool computeTrend(float& percentChange, bool& rising) {
+        if (trendSampleCount < 2) return false;
+        uint8_t oldestIdx = (uint8_t)((trendSampleHead + TREND_SAMPLE_CAPACITY - trendSampleCount) % TREND_SAMPLE_CAPACITY);
+        uint8_t newestIdx = (uint8_t)((trendSampleHead + TREND_SAMPLE_CAPACITY - 1) % TREND_SAMPLE_CAPACITY);
+        uint16_t oldest = trendSamples[oldestIdx];
+        uint16_t newest = trendSamples[newestIdx];
+        rising = newest >= oldest;
+        if (oldest == 0) {
+            // Division durch 0 vermeiden: kein Verkehr -> jetzt Verkehr wird
+            // als "+100%" dargestellt statt als undefinierter Wert; blieb
+            // es bei 0, gibt es schlicht keine Aenderung (0%).
+            percentChange = (newest == 0) ? 0.0f : 100.0f;
+        } else {
+            percentChange = ((float)newest - (float)oldest) / (float)oldest * 100.0f;
+        }
+        return true;
+    }
+}
+
+void recordTrendSample(uint16_t visibleTotal) {
+    uint32_t now = millis();
+    if (!trendSampleStarted || now - lastTrendSampleMs >= TREND_SAMPLE_INTERVAL_MS) {
+        trendSampleStarted = true;
+        lastTrendSampleMs = now;
+        trendSamples[trendSampleHead] = visibleTotal;
+        trendSampleHead = (uint8_t)((trendSampleHead + 1) % TREND_SAMPLE_CAPACITY);
+        if (trendSampleCount < TREND_SAMPLE_CAPACITY) trendSampleCount++;
     }
 }
 
@@ -361,6 +428,54 @@ void run(TFT_eSPI& tft) {
             addAltChip(midLabel, s.altMid);
             addAltChip(highLabel, s.altHigh);
 
+            // NEU: Durchschnittshoehe/-geschwindigkeit - als Chip-Paar
+            // (gleiches robustes Raster-Muster wie oben), damit auch hier
+            // nichts abgeschnitten werden kann.
+            float avgAltFt = s.total > 0 ? s.sumAltFt / s.total : 0;
+            float avgSpeedKt = s.total > 0 ? s.sumSpeedKt / s.total : 0;
+            Chip avgChips[2];
+            avgChips[0].text = String(I18n::t(StringId::LIVE_TRAFFIC_AVG_ALT_PREFIX)) +
+                (metric ? String(Units::feetToMeters(avgAltFt), 0) + "m"
+                        : String((long)avgAltFt) + "ft");
+            avgChips[1].text = String(I18n::t(StringId::LIVE_TRAFFIC_AVG_SPEED_PREFIX)) +
+                (metric ? String(Units::ktToKmh(avgSpeedKt), 0) + "km/h"
+                        : String(avgSpeedKt, 0) + "kt");
+            uint8_t avgChipCount = 2;
+
+            // NEU: Verkehrsdichte-Index - normiert auf Flugzeuge pro 100km
+            // Radar-Reichweite (Radius, nicht Flaeche - Alex' Vorgabe
+            // "Flugzeuge pro 100km"), damit die Einstufung nicht allein von
+            // der aktuell eingestellten Reichweite abhaengt (sonst waere
+            // "LOW" bei 10km und "HIGH" bei 100km mit identischem echten
+            // Verkehrsaufkommen quasi garantiert). Schwellwerte 10/25 bewusst
+            // so gewaehlt, dass ein normaler Tagesverkehr in dicht befahrenem
+            // europaeischem Luftraum (z.B. Sueddeutschland) bei 50-100km
+            // Reichweite typischerweise MED erreicht, nur bei spuerbar
+            // ueberdurchschnittlichem Aufkommen (z.B. mehrere parallele
+            // Luftstrassen/Anflugsektoren gleichzeitig aktiv) HIGH - und ein
+            // leerer bis duenn befahrener Himmel (einzelne Flugzeuge bei
+            // kleiner Reichweite) klar als LOW auffaellt.
+            float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
+            float density = rangeKm > 0 ? (float)s.total * 100.0f / rangeKm : 0;
+            StringId densityLevelId = StringId::LIVE_TRAFFIC_DENSITY_LOW;
+            if (density >= 25.0f) densityLevelId = StringId::LIVE_TRAFFIC_DENSITY_HIGH;
+            else if (density >= 10.0f) densityLevelId = StringId::LIVE_TRAFFIC_DENSITY_MED;
+            String densityLevelText = I18n::t(densityLevelId);
+            String densityLine = String(I18n::t(StringId::LIVE_TRAFFIC_DENSITY_PREFIX)) + densityLevelText;
+
+            // NEU: Verkehrstrend - nur anzeigen, wenn der Ringpuffer schon
+            // mind. 2 Samples hat (siehe computeTrend()) - in den ersten
+            // ~5 Minuten nach dem Einschalten absichtlich keine Zeile statt
+            // eines erfundenen Werts.
+            float trendPercent = 0;
+            bool trendRising = false;
+            bool hasTrend = computeTrend(trendPercent, trendRising);
+            String trendLine, trendFallback;
+            if (hasTrend) {
+                trendFallback = (trendRising ? "^ +" : "v -") + String(fabsf(trendPercent), 0) + "%";
+                trendLine = String(I18n::t(StringId::LIVE_TRAFFIC_TREND_PREFIX)) + trendFallback;
+            }
+
             // --- Schritt 1: Hoehe des GESAMTEN scrollbaren Inhalts
             // ermitteln (draw=false fuer beide Chip-Raster, feste
             // Zeilenhoehen fuer den Rest) - exakt dasselbe Dual-Zweck-
@@ -380,10 +495,16 @@ void run(TFT_eSPI& tft) {
             contentEndY = drawChipGrid(tft, altChips, altChipCount, LINE_X, contentEndY,
                                         LINE_MAX_W, CHIP_ROW_H, 0, 0, 0, false);
             contentEndY += 8;
+            contentEndY = drawChipGrid(tft, avgChips, avgChipCount, LINE_X, contentEndY,
+                                        LINE_MAX_W, CHIP_ROW_H, 0, 0, 0, false);
+            contentEndY += 8;
             if (s.hasNearest) contentEndY += EXTREME_ROW_H;
             if (s.hasHighest) contentEndY += EXTREME_ROW_H;
             if (s.hasLowest) contentEndY += EXTREME_ROW_H;
             if (s.hasFastest) contentEndY += EXTREME_ROW_H;
+            contentEndY += 8;
+            contentEndY += EXTREME_ROW_H; // Verkehrsdichte-Zeile
+            if (hasTrend) contentEndY += EXTREME_ROW_H;
 
             // --- Schritt 2: feste Anker fuer Zurueck/Scroll-Pfeile (gleiches
             // Muster wie bei den vier Wachlisten-Screens) - erst jetzt, mit
@@ -453,6 +574,11 @@ void run(TFT_eSPI& tft) {
                               scrollY, VIEW_TOP, viewBottom, true);
             y += 8;
 
+            // NEU: Durchschnittshoehe/-geschwindigkeit als Chip-Paar.
+            y = drawChipGrid(tft, avgChips, avgChipCount, LINE_X, y, LINE_MAX_W, CHIP_ROW_H,
+                              scrollY, VIEW_TOP, viewBottom, true);
+            y += 8;
+
             // Vier Extremwerte (bestehend) - jede Zeile nur, wenn ein
             // gueltiger Wert vorliegt.
             if (s.hasNearest) {
@@ -486,6 +612,19 @@ void run(TFT_eSPI& tft) {
                     ? fallback + " (" + String(Units::ktToKmh(s.fastestKt), 0) + "km/h)"
                     : fallback + " (" + String(s.fastestKt, 0) + "kt)";
                 drawIfVisible(full, fallback);
+            }
+            y += 8;
+
+            // NEU: Verkehrsdichte-Index (immer sichtbar, braucht keine
+            // "hasX"-Pruefung - s.total ist ja per Definition schon bekannt).
+            // Fallback ohne Praefix, analog zu den Extremwert-Zeilen oben -
+            // gleiches Prinzip, das den Hoehenverteilungs-Bug behoben hat:
+            // NIE dieselbe Zeichenkette als full UND fallback uebergeben.
+            drawIfVisible(densityLine, densityLevelText);
+
+            // NEU: Verkehrstrend - nur wenn genug Ringpuffer-Samples da sind.
+            if (hasTrend) {
+                drawIfVisible(trendLine, trendFallback);
             }
         }
 

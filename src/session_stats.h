@@ -13,7 +13,12 @@ namespace SessionStats {
     // Zyklus aufgerufen (nicht nur beim erstmaligen Sichten) - Distanz-/
     // Geschwindigkeits-/Hoehen-Rekorde muessen ja auch bei spaeteren
     // Zyklen desselben Flugzeugs noch aktualisiert werden koennen.
-    void record(const Aircraft& a);
+    // newToday (Alex' Auftrag, Session-Highlights) kommt von
+    // DailySightings::record() (MUSS davor aufgerufen werden, siehe
+    // aircraft_table.cpp) - true genau beim allerersten Sichten dieses
+    // Flugzeugs an diesem Kalendertag, spart ein zweites, eigenes Dedup-
+    // Set hier (haette sonst wieder einen DRAM-Ueberlauf ausgeloest).
+    void record(const Aircraft& a, bool newToday);
 
     struct Snapshot {
         // Eindeutige ICAO-Hex-Adressen, nicht Sichtungen (Alex' Vorgabe).
@@ -35,6 +40,50 @@ namespace SessionStats {
         bool hasTopType = false;
         char topType[5] = {0};
         uint16_t topTypeCount = 0;
+
+        // Ab hier: TAGESBEZOGENE Werte (Alex' Auftrag, "Grok"-Ideenliste) -
+        // setzen sich taeglich (lokale Kalenderzeit) zurueck, ANDERS als
+        // die Werte oben, die seit dem Neustart laufen. Eigener
+        // Tageswechsel-Mechanismus in session_stats.cpp (gleiches String-
+        // Datumsvergleich-Muster wie DailySightings/FlightLogbook).
+
+        // "Seltenster Typ heute"/"meistgesehene Airline heute" wurden
+        // wieder entfernt - eine eigene Haeufigkeits-Tabelle dafuer hat den
+        // verfuegbaren statischen RAM-Rest gesprengt (siehe Kommentar in
+        // session_stats.cpp), selbst stark verkleinert. Alex wurde darueber
+        // informiert.
+
+        // Laengste durchgehend verfolgte Sichtung heute (groesste "seen
+        // for"-Dauer, siehe Aircraft::firstSeenMs) - EIN laufender
+        // Hoechstwert, der bei jedem Zyklus fuer jedes aktuell gueltige
+        // Flugzeug neu geprueft wird (auch nachdem das Flugzeug selbst
+        // schon wieder aus der Tabelle verschwunden ist, bleibt der Rekord
+        // einfach stehen).
+        bool hasLongestTracked = false;
+        char longestTrackedCallsign[9] = {0};
+        uint32_t longestTrackedSec = 0;
+
+        // Hoechste Steig-/Sinkrate heute (Aircraft::vertRateFtMin) - zwei
+        // getrennte Rekorde (Steigen/Sinken sind fuer einen Beobachter
+        // unterschiedlich interessant, z.B. ein extremer Sinkflug wirkt
+        // dramatischer als ein normaler Steigflug).
+        bool hasMaxClimb = false;
+        char maxClimbCallsign[9] = {0};
+        int16_t maxClimbFtMin = 0;
+        bool hasMaxDescent = false;
+        char maxDescentCallsign[9] = {0};
+        int16_t maxDescentFtMin = 0;
+
+        // Erstes/letztes NEU gesehenes Flugzeug heute (chronologisch nach
+        // Aircraft::firstSeenEpoch, echte Wanduhrzeit) - "letztes" bedeutet
+        // hier "das zuletzt zum ERSTEN Mal heute aufgetauchte Flugzeug",
+        // nicht "das Flugzeug, das zuletzt noch sichtbar war".
+        bool hasFirstSeenToday = false;
+        char firstSeenTodayCallsign[9] = {0};
+        uint32_t firstSeenTodayEpoch = 0;
+        bool hasLastSeenToday = false;
+        char lastSeenTodayCallsign[9] = {0};
+        uint32_t lastSeenTodayEpoch = 0;
     };
     Snapshot get();
 }

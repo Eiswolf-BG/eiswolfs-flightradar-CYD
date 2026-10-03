@@ -43,30 +43,18 @@ namespace {
     }
 }
 
-void request(const char* hex, const char* callsign) {
-    ensureMutex();
-    xSemaphoreTake(mutex, portMAX_DELAY);
-    if (strcmp(cachedHex, hex) != 0 && strcmp(pendingHex, hex) != 0) {
-        strncpy(pendingHex, hex, sizeof(pendingHex) - 1);
-        strncpy(pendingCallsign, callsign ? callsign : "", sizeof(pendingCallsign) - 1);
-        hasPending = true;
-    }
-    xSemaphoreGive(mutex);
-}
-
-Info get(const char* hex) {
-    ensureMutex();
-    xSemaphoreTake(mutex, portMAX_DELAY);
-    Info out;
-    if (strcmp(cachedHex, hex) == 0) {
-        out = cached;
-    } else if (strcmp(pendingHex, hex) == 0 && hasPending) {
-        out.loading = true;
-    }
-    xSemaphoreGive(mutex);
-    return out;
-}
-
+// Herausgezogen aus update() (frueher dort inline) - damit route_watchlist.cpp
+// dieselbe, bereits bewaehrte Drei-Quellen-Fallback-Kette (inkl. Fehler-
+// behandlung/Timeouts) fuer die Route-Watchlist nutzen kann, statt sie ein
+// zweites Mal zu implementieren ODER doppelte Netzwerkanfragen fuer ICAO-
+// und IATA-Codes separat auszuloesen (beide stecken bereits in derselben
+// Quellen-Antwort). Die vier IATA-Parameter sind optional (nullptr/0 =
+// nicht gebraucht, siehe route_watchlist.cpp, das nur ICAO braucht).
+// Blockierender HTTPS-Aufruf - NUR aus einem Core-0/Hintergrund-Kontext
+// aufrufen, niemals vom UI-Thread (Core 1). 'client' wird vom Aufrufer
+// gestellt (kein eigener Verbindungsaufbau hier), 'callsign' darf
+// Kleinbuchstaben/Leerzeichen enthalten (wird intern normalisiert). Gibt
+// true zurueck, wenn ein ICAO-Origin UND -Dest gefunden wurden.
 bool fetchRoute(WiFiClientSecure& client, const String& callsign,
                  char* origin, size_t originSize, char* dest, size_t destSize,
                  char* originIata, size_t originIataSize, char* destIata, size_t destIataSize) {
@@ -163,6 +151,30 @@ bool fetchRoute(WiFiClientSecure& client, const String& callsign,
     return origin[0] != 0 && dest[0] != 0;
 }
 
+void request(const char* hex, const char* callsign) {
+    ensureMutex();
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    if (strcmp(cachedHex, hex) != 0 && strcmp(pendingHex, hex) != 0) {
+        strncpy(pendingHex, hex, sizeof(pendingHex) - 1);
+        strncpy(pendingCallsign, callsign ? callsign : "", sizeof(pendingCallsign) - 1);
+        hasPending = true;
+    }
+    xSemaphoreGive(mutex);
+}
+
+Info get(const char* hex) {
+    ensureMutex();
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    Info out;
+    if (strcmp(cachedHex, hex) == 0) {
+        out = cached;
+    } else if (strcmp(pendingHex, hex) == 0 && hasPending) {
+        out.loading = true;
+    }
+    xSemaphoreGive(mutex);
+    return out;
+}
+
 void update() {
     ensureMutex();
 
@@ -234,8 +246,7 @@ void update() {
     // hexdb.io, siehe dortige Kommentare zur Quellen-Reihenfolge/Messung
     // vom 30.08.), inklusive IATA-Codes (werden von zwei der drei Quellen
     // im selben JSON mitgeliefert, siehe routeOriginIata/routeDestIata in
-    // aircraft_details.h) - kein zweiter, eigener Aufruf-Code mehr noetig
-    // (frueher hier dupliziert, jetzt mit route_watchlist.cpp geteilt).
+    // aircraft_details.h).
     fetchRoute(client, callsign, result.routeOrigin, sizeof(result.routeOrigin),
                result.routeDest, sizeof(result.routeDest),
                result.routeOriginIata, sizeof(result.routeOriginIata),

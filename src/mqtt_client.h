@@ -59,6 +59,37 @@ namespace MqttClient {
         uint16_t heavy = 0;
         bool militaryDetected = false;
         bool emergencyDetected = false;
+
+        // Fuenf weitere Sensoren (Alex' Auftrag, "Grok"-Ideenliste) - alle
+        // reine Dauerzustaende (nicht einmalige Events, siehe Feature-14-
+        // Regel oben im Header-Kommentar), genau wie alle bisherigen
+        // TrafficStats-Felder mit nur EINEM Durchlauf in net_task.cpp
+        // ermittelt.
+        bool hasNextOverflight = false;
+        float nextOverflightEtaMin = 0;
+
+        // Flugphase des naechstgelegenen Flugzeugs (RadarScreen::
+        // flightPhaseLabelFor(), feste englische Fachbegriffe wie
+        // "CRUISE"/"CLIMB" - siehe dortiger Kommentar) - leerer String,
+        // wenn kein Flugzeug in Reichweite ist ODER keine Phase bestimmbar
+        // war (FlightPhase::None).
+        char nearestPhase[12] = {0};
+
+        // Aktuelle Wetterlage (Weather::Condition als fester, kurzer
+        // englischer Code - "clear"/"rain"/... - siehe net_task.cpp) -
+        // "unknown", solange noch keine erfolgreiche Wetterabfrage lief.
+        char weatherCode[16] = {0};
+
+        // GPS-Fix vorhanden? NUR ein einfaches Ja/Nein (LocationManager::
+        // hasGpsFix()) - eine feinere "Fix-Qualitaet" (z.B. HDOP/Anzahl
+        // Satelliten) wird aktuell nirgends im Projekt erfasst, siehe
+        // Rueckmeldung an Alex.
+        bool gpsFixAvailable = false;
+
+        // Anzahl aktuell gefilterter Airlines (AirlineFilter::count()) -
+        // unabhaengig davon, ob der Filter im "Ausblenden"- oder "Nur
+        // diese zeigen"-Modus laeuft (beide Modi nutzen dieselbe Liste).
+        uint8_t filteredAirlineCount = 0;
     };
 
     // Sendet die aktuellen Kennzahlen als retained MQTT-Nachrichten (siehe

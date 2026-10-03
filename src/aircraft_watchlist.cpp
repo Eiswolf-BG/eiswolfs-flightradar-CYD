@@ -39,6 +39,29 @@ namespace {
         out[j] = '\0';
     }
 
+    // Einfaches Glob-Pattern-Matching, NUR "*" als Platzhalter fuer
+    // beliebig viele Zeichen (Alex' Auftrag - kein echtes RegEx, bewusst
+    // simpel gehalten). Klassischer iterativer Zwei-Zeiger-Algorithmus mit
+    // Backtracking-Merkpunkt beim letzten "*": faellt text[] zu frueh aus,
+    // wird einfach ein Zeichen mehr unter dem letzten "*" "verschluckt" und
+    // von dort neu versucht. Ein pattern OHNE "*" verhaelt sich exakt wie
+    // ein normaler strcmp()-Vergleich (bisheriges Verhalten bleibt dadurch
+    // automatisch abwaertskompatibel, ohne Sonderfall-Code).
+    bool globMatch(const char* pattern, const char* text) {
+        const char* p = pattern;
+        const char* t = text;
+        const char* starP = nullptr;
+        const char* starT = nullptr;
+        while (*t) {
+            if (*p == *t) { p++; t++; }
+            else if (*p == '*') { starP = p++; starT = t; }
+            else if (starP) { p = starP + 1; t = ++starT; }
+            else return false;
+        }
+        while (*p == '*') p++;
+        return *p == '\0';
+    }
+
     void saveToSd() {
         if (!SdStorage::isMounted()) return;
         SdMutex::Guard guard;
@@ -146,7 +169,10 @@ bool isWatched(const char* callsign) {
     xSemaphoreTake(mutex, portMAX_DELAY);
     bool found = false;
     for (uint8_t i = 0; i < watchedCount; i++) {
-        if (strcmp(watched[i], normalized) == 0) { found = true; break; }
+        // globMatch() deckt sowohl Wildcard- ALS AUCH exakte Eintraege ab
+        // (ein Pattern ohne "*" verhaelt sich darin identisch zu strcmp(),
+        // siehe Kommentar dort) - kein separater Exact-Match-Zweig noetig.
+        if (globMatch(watched[i], normalized)) { found = true; break; }
     }
     xSemaphoreGive(mutex);
     return found;

@@ -213,19 +213,24 @@ void postFetchUpdate(double homeLat, double homeLon) {
             a.sessionMaxSpeedKt = a.groundSpeedKt;
         }
 
+        // Taeglicher (lokale Kalenderzeit) Sichtungszaehler fuers Detail-
+        // Panel (Alex' Wunsch, siehe daily_sightings.h) - bewusst VOR
+        // SessionStats::record() aufgerufen (Reihenfolge seit den Session-
+        // Highlights wichtig, Alex' Auftrag): der bool-Rueckgabewert
+        // (true = heute erstmals gesehen) wird von SessionStats direkt
+        // als "heute neu"-Signal weitergegeben, OHNE dass SessionStats
+        // dafuer ein eigenes, zweites Dedup-Set im RAM braucht (haette
+        // beim ersten Versuch prompt wieder einen DRAM-Ueberlauf ausgeloest,
+        // siehe Kommentar dort).
+        bool newToday = DailySightings::record(a);
+
         // Reine In-RAM-Sitzungsstatistik (Alex' Wunsch, siehe
         // session_stats.h) - GLOBAL ueber ALLE Flugzeuge dieser Sitzung
         // hinweg, im Unterschied zu sessionMinDistanceKm/sessionMaxSpeedKt
         // oben (die nur PRO Flugzeug gelten). Bewusst unabhaengig vom
         // Flugbuch-Schalter (SettingsStore::flightLogbookEnabled()), laeuft
         // also immer mit.
-        SessionStats::record(a);
-
-        // Taeglicher (lokale Kalenderzeit) Sichtungszaehler fuers Detail-
-        // Panel (Alex' Wunsch, siehe daily_sightings.h) - eigenstaendig
-        // von SessionStats oben, da dort ausschliesslich seit dem letzten
-        // Neustart gezaehlt wird, hier dagegen taeglich zurueckgesetzt.
-        DailySightings::record(a);
+        SessionStats::record(a, newToday);
 
         // "Ueberflug"-CPA (Closest Point of Approach, siehe aircraft.h::
         // cpaRelevant/cpaEtaMin und Config::CPA_*) - reine Momentaufnahme

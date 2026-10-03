@@ -34,17 +34,17 @@
 #include "menu_stars.h"
 #include "i18n.h"
 #include "config.h"
+#include "github_screen_logo_image.h"
 #include "changelog.h"
 #include <time.h>
-#include <qrcode.h>
 #include "ui_theme.h"
 
 // In main.cpp definiert, ohne eigenen Header (globale Funktion, kein
-// Namespace) - zeigt den GitHub-QR-Code-Screen im Vollformat. Frueher
-// ueber den inzwischen entfernten Header-Titel "Eiswolfs FR" erreichbar,
-// seitdem verwaist - wird jetzt ueber den neuen "Über"-Menuepunkt
-// (System > Werkzeuge) wieder erreichbar gemacht, ohne die bestehende
-// Funktion/Logik anzufassen.
+// Namespace) - zeigt den GitHub-QR-Code-Screen mit Alex' Avatar-Bild
+// (siehe github_screen_logo_image.h). Frueher ueber den inzwischen
+// entfernten Header-Titel "Eiswolfs FR" erreichbar, seitdem verwaist -
+// wird jetzt ueber den neuen "Über"-Menuepunkt (System > Werkzeuge) wieder
+// erreichbar gemacht, ohne die bestehende Funktion/Logik anzufassen.
 void runGithubQrScreen(TFT_eSPI& tftRef);
 
 namespace MenuScreen {
@@ -102,10 +102,8 @@ namespace {
     // startY optional ueberschreibbar (Default weiterhin ROW_START_Y) - fuer
     // Seiten mit einem zusaetzlichen "?"-Info-Button oben rechts im Header,
     // der bei ROW_START_Y=18 mit der ersten Zeile ueberlappen wuerde.
-    // Aktuell von keiner Seite mehr genutzt (der bisher einzige Anwendungs-
-    // fall, Page::FlightFilters, hat seinen "?"-Button inzwischen direkt in
-    // die ISS-Marker-Zeile verlegt, siehe drawRowInfoButton()) - Parameter
-    // bleibt fuer kuenftige Seiten mit demselben Bedarf erhalten.
+    // Aktuell von keiner Seite mehr genutzt - Parameter bleibt fuer
+    // kuenftige Seiten mit demselben Bedarf erhalten.
     Rect subMenuRowRect(uint8_t index, uint8_t count, int16_t gap = 10, int16_t startY = ROW_START_Y) {
         int16_t endY = Config::SCREEN_HEIGHT - 10;
         int16_t rowH = (int16_t)((endY - startY - (int16_t)(count - 1) * gap) / count);
@@ -157,9 +155,8 @@ namespace {
     // wie sonst oben rechts im Seiten-Header) - gleiches Prinzip/gleiche
     // Groesse wie die neuen "?"-Buttons in radar_theme_screen.cpp (dort
     // bewusst dupliziert statt geteilt, siehe CLAUDE.md "jeder Screen
-    // unabhaengig lauffaehig"). Bislang nur fuer die ISS-Marker-Zeile
-    // gebraucht (siehe Page::FlightFilters), aber generisch genug fuer
-    // jede subMenuRowRect()-Zeile.
+    // unabhaengig lauffaehig"). Generisch genug fuer jede
+    // subMenuRowRect()-Zeile.
     constexpr int16_t ROW_INFO_BTN_SIZE = 20;
     constexpr int16_t ROW_INFO_BTN_PAD = 6;
 
@@ -516,36 +513,49 @@ namespace {
         }
     }
 
-    // Kleiner GitHub-QR-Code (ersetzt das vorherige Avatar-Foto, Alex'
-    // Wunsch: Flash-Speicher zurueckgewinnen) fuer die OTA-Screens unten
-    // mittig - identische Ziel-URL wie der grosse QR-Code auf dem
-    // "Ueber"-Screen (main.cpp::runGithubQrScreen(), siehe
-    // Config::GITHUB_REPO_URL), aber zur Laufzeit neu erzeugt statt als
-    // Bild im Flash gespeichert. "size" ist eine Zielgroesse - da sich
-    // ein QR-Code nur in ganzzahligen Modul-Blockgroessen sauber
-    // darstellen laesst, faellt die tatsaechliche Pixelgroesse ggf. etwas
-    // kleiner aus und wird innerhalb des "size"-Bereichs zentriert (siehe
-    // auch die QR_BLOCK-Kommentare bei runGithubQrScreen() in main.cpp).
-    void drawSmallGithubQr(TFT_eSPI& t, int16_t centerX, int16_t topY, int16_t size) {
-        constexpr uint8_t QR_VERSION = 4;
-        constexpr int16_t QR_QUIET = 2;
-        uint8_t qrData[qrcode_getBufferSize(QR_VERSION)];
-        QRCode qrcode;
-        qrcode_initText(&qrcode, qrData, QR_VERSION, ECC_LOW, Config::GITHUB_REPO_URL);
+    // Kleine, herunterskalierte Kopie von Alex' Avatar-Bild (siehe
+    // github_screen_logo_image.h, dort normalerweise 240x240px fuer den
+    // GitHub-QR-Screen) fuer die OTA-Screens unten - Alex' Wunsch: "unten
+    // mittig noch mein Logo platzieren". Dekodiert den RLE-Strom wie
+    // main.cpp::drawGithubScreenLogo() zeilenweise (kein 115.200-Byte-
+    // Vollbild-Puffer noetig), tastet dabei aber pro Ausgabezeile/-spalte
+    // nur den naechstgelegenen Quellpixel ab (Nearest-Neighbor) statt
+    // wirklich zu mitteln - fuer ein derart kleines Deko-Icon ausreichend
+    // und ohne zusaetzlichen Rechenaufwand. Bricht die Dekodierung ab,
+    // sobald alle "size" Ausgabezeilen gezeichnet sind, statt immer den
+    // kompletten 240-Zeilen-Strom zu lesen.
+    void drawSmallAvatarLogo(TFT_eSPI& t, int16_t centerX, int16_t topY, int16_t size) {
+        uint16_t lineBuf[GITHUB_SCREEN_LOGO_W];
+        uint16_t outBuf[GITHUB_SCREEN_LOGO_W]; // "size" bleibt <= 240 (Quellbildbreite), siehe Aufrufer
+        int16_t lineFill = 0;
+        int16_t row = 0;
+        int16_t outRow = 0;
+        size_t pos = 0;
+        int16_t x = (int16_t)(centerX - size / 2);
+        while (row < GITHUB_SCREEN_LOGO_H && outRow < size && pos + 2 < GITHUB_SCREEN_LOGO_RLE_LEN) {
+            uint8_t count = GITHUB_SCREEN_LOGO_RLE[pos];
+            uint16_t value = (uint16_t)GITHUB_SCREEN_LOGO_RLE[pos + 1] |
+                              ((uint16_t)GITHUB_SCREEN_LOGO_RLE[pos + 2] << 8);
+            pos += 3;
 
-        int16_t totalModules = qrcode.size + 2 * QR_QUIET;
-        int16_t block = size / totalModules;
-        if (block < 1) block = 1;
-        int16_t pixelSize = block * totalModules;
-        int16_t x = (int16_t)(centerX - pixelSize / 2);
-
-        t.fillRect(x, topY, pixelSize, pixelSize, TFT_WHITE);
-        for (uint8_t my = 0; my < qrcode.size; my++) {
-            for (uint8_t mx = 0; mx < qrcode.size; mx++) {
-                if (qrcode_getModule(&qrcode, mx, my)) {
-                    int16_t px = (int16_t)(x + (QR_QUIET + mx) * block);
-                    int16_t py = (int16_t)(topY + (QR_QUIET + my) * block);
-                    t.fillRect(px, py, block, block, TFT_BLACK);
+            while (count > 0) {
+                int16_t spaceInLine = GITHUB_SCREEN_LOGO_W - lineFill;
+                int16_t take = count < spaceInLine ? count : spaceInLine;
+                for (int16_t i = 0; i < take; i++) lineBuf[lineFill + i] = value;
+                lineFill += take;
+                count -= take;
+                if (lineFill == GITHUB_SCREEN_LOGO_W) {
+                    int32_t srcForOutRow = (int32_t)outRow * GITHUB_SCREEN_LOGO_H / size;
+                    if (row == srcForOutRow) {
+                        for (int16_t c = 0; c < size; c++) {
+                            int16_t srcCol = (int16_t)((int32_t)c * GITHUB_SCREEN_LOGO_W / size);
+                            outBuf[c] = lineBuf[srcCol];
+                        }
+                        t.pushImage(x, (int16_t)(topY + outRow), size, 1, outBuf);
+                        outRow++;
+                    }
+                    lineFill = 0;
+                    row++;
                 }
             }
         }
@@ -566,8 +576,7 @@ namespace {
     // nicht mehr haben. Gleicher Kasten-/Titel-/Text-Aufbau wie
     // infoScreen() unten, nur ohne Button/Scroll (der kurze Text passt in
     // allen 8 Sprachen ohne Scrollen).
-    void drawOtaSuccessMessage(TFT_eSPI& tft, const String& title, const String& body, uint16_t accentColor,
-                                int16_t logoSize = 84) {
+    void drawOtaSuccessMessage(TFT_eSPI& tft, const String& title, const String& body, uint16_t accentColor) {
         constexpr int16_t BOX_X = 4;
         constexpr int16_t BOX_Y = 4;
         constexpr int16_t BOX_W = Config::SCREEN_WIDTH - 2 * BOX_X;
@@ -597,36 +606,23 @@ namespace {
         tft.setTextSize(1);
         tft.setTextDatum(TL_DATUM);
 
-        // QR-Code unten mittig (ersetzt das frühere Avatar-Logo, Alex'
-        // Wunsch) - der Text-Bereich bekommt dafuer ein reduziertes
-        // viewBottom, statt den Platz erst NACH dem Zeichnen zu
-        // reservieren - so kann eine laengere Uebersetzung den QR-Code
-        // nie ueberlappen (wird stattdessen wie ein normaler
+        // Logo unten mittig (Alex' Wunsch) - der Text-Bereich bekommt dafuer
+        // ein reduziertes viewBottom, statt den Logo-Platz erst NACH dem
+        // Zeichnen zu reservieren - so kann eine laengere Uebersetzung das
+        // Logo nie ueberlappen (wird stattdessen wie ein normaler
         // Sichtfenster-Rand einfach nicht mehr gezeichnet, siehe
         // layoutWrapped()-Sichtfenster-Parameter oben).
+        // 300% groesser (Alex' Wunsch) - 3x 28px -> 84px.
+        constexpr int16_t LOGO_SIZE = 84;
         constexpr int16_t LOGO_BOTTOM_MARGIN = 8;
-        int16_t reservedLogoTopY = (int16_t)(BOX_Y + BOX_H - logoSize - LOGO_BOTTOM_MARGIN);
-        int16_t textViewBottom = (int16_t)(reservedLogoTopY - 6);
+        int16_t logoTopY = (int16_t)(BOX_Y + BOX_H - LOGO_SIZE - LOGO_BOTTOM_MARGIN);
+        int16_t textViewBottom = (int16_t)(logoTopY - 6);
 
         int16_t viewTop = (int16_t)(TITLE_Y + titleLineCount * LINE_H + 12);
         tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
-        int16_t textEndY = layoutWrapped(tft, BOX_X + 10, viewTop, TEXT_MAX_WIDTH, LINE_H, body, 0, 0, textViewBottom, true);
+        layoutWrapped(tft, BOX_X + 10, viewTop, TEXT_MAX_WIDTH, LINE_H, body, 0, 0, textViewBottom, true);
 
-        // Bei einem groesseren QR-Code (Alex' Wunsch: "im ersten Screen
-        // doppelt so gross und zentriert") wird er nicht mehr unten
-        // festgeklebt, sondern in der freien Flaeche zwischen tatsaechlichem
-        // Textende und Box-Unterkante vertikal zentriert - bei der kleinen
-        // Standardgroesse (Update-installiert-Screen) bleibt die bisherige,
-        // an der Unterkante verankerte Position unveraendert (dort bereits
-        // getestet und bestaetigt, "der Rest passt").
-        int16_t logoTopY = reservedLogoTopY;
-        if (logoSize > 84) {
-            int16_t availableTop = (int16_t)(textEndY + 6);
-            int16_t availableBottom = (int16_t)(BOX_Y + BOX_H - LOGO_BOTTOM_MARGIN);
-            logoTopY = (int16_t)(availableTop + (availableBottom - availableTop - logoSize) / 2);
-        }
-
-        drawSmallGithubQr(tft, Config::SCREEN_WIDTH / 2, logoTopY, logoSize);
+        drawSmallAvatarLogo(tft, Config::SCREEN_WIDTH / 2, logoTopY, LOGO_SIZE);
     }
 
     // Einfacher Info-Screen mit nur EINEM Button (kein Abbrechen) - fuer
@@ -1035,18 +1031,18 @@ namespace {
                                               0, 0, Config::SCREEN_HEIGHT, true);
             t.setTextDatum(TL_DATUM);
 
-            // QR-Code unten mittig (ersetzt das fruehere Avatar-Logo,
-            // Alex' Wunsch, gleiche Groesse 84px) - Teil des einmaligen
-            // Aufbaus, da er sich waehrend des Downloads nie aendert und
-            // sonst bei jedem Prozent-Update unnoetig erneut gezeichnet
-            // wuerde. Position dynamisch UNTER dem tatsaechlichen Ende
-            // des Hinweistexts (layoutWrapped()-Rueckgabewert) statt an
-            // einer festen Bildschirmposition - so kann der QR-Code den
-            // Hinweistext in keiner der 8 Sprachen ueberlappen, selbst
-            // wenn dieser dort mal auf 2 Zeilen umbricht.
+            // Logo unten mittig (Alex' Wunsch, jetzt 300% groesser = 3x
+            // 28px -> 84px) - Teil des einmaligen Aufbaus, da es sich
+            // waehrend des Downloads nie aendert und sonst bei jedem
+            // Prozent-Update unnoetig erneut gezeichnet wuerde. Position
+            // dynamisch UNTER dem tatsaechlichen Ende des Hinweistexts
+            // (layoutWrapped()-Rueckgabewert) statt an einer festen
+            // Bildschirmposition - so kann das jetzt deutlich groessere
+            // Logo den Hinweistext in keiner der 8 Sprachen ueberlappen,
+            // selbst wenn dieser dort mal auf 2 Zeilen umbricht.
             constexpr int16_t LOGO_SIZE = 84;
             int16_t logoTopY = (int16_t)(hintEndY + 10);
-            drawSmallGithubQr(t, Config::SCREEN_WIDTH / 2, logoTopY, LOGO_SIZE);
+            drawSmallAvatarLogo(t, Config::SCREEN_WIDTH / 2, logoTopY, LOGO_SIZE);
         }
 
         // Echte Aenderung? Sonst gibt es nichts zu aktualisieren (deckt den
@@ -1180,14 +1176,8 @@ namespace {
         // (grosse, ggf. automatisch umgebrochene Titelschrift plus
         // mehrzeiliger Text darunter), hier bewusst wiederverwendet statt
         // eine eigene Variante zu bauen.
-        // QR-Code auf diesem Screen doppelt so gross wie sonst und
-        // vertikal zentriert statt unten verankert (Alex' Wunsch,
-        // nachdem er den Screen am echten Geraet gesehen hat: "genug
-        // Platz, der Rest passt") - der "Update installiert"-Screen
-        // (drawOtaSuccessMessage()-Aufruf weiter unten) bleibt bei der
-        // Standardgroesse von 84px.
         drawOtaSuccessMessage(tft, I18n::t(StringId::OTA_RESTART_TITLE), I18n::t(StringId::OTA_RESTARTING),
-                              UiTheme::accentColor(tft), 168);
+                              UiTheme::accentColor(tft));
         delay(1200);
         SettingsStore::setOtaPendingInstall(info.downloadUrl);
         ESP.restart();
@@ -1682,39 +1672,11 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             } else if (resetBtn.contains(tap.x, tap.y)) {
                 if (confirmWarningScreen(tft, I18n::t(StringId::MENU_LOGBOOK_WARNING_TITLE),
                                           I18n::t(StringId::MENU_FACTORY_RESET_WARNING_BODY))) {
-                    // BUGFIX (Alex' Meldung: bei umfangreichen Logbuchdaten
-                    // kann das Loeschen weit ueber 20s dauern, OHNE jeden
-                    // sichtbaren Fortschritt - wirkte auf Nutzer wie ein
-                    // Absturz, Gefahr, dass das USB-Kabel gezogen wird,
-                    // mitten im Loeschvorgang). Bisher nur eine einzelne
-                    // zentrierte Zeile - jetzt ueber layoutWrapped() auf den
-                    // GESAMTEN verfuegbaren Bildschirmbereich verteilt
-                    // (gleiches, bereits bewaehrtes Muster wie drawOtaProgress()
-                    // weiter unten: Ueberschrift Size 2 oben, Hinweistext
-                    // Size 1 darunter, beides zeilenumbruchsicher), statt
-                    // alles mittig zusammenzuquetschen.
-                    constexpr int16_t X_MARGIN = 15;
-                    constexpr int16_t TEXT_MAX_WIDTH = Config::SCREEN_WIDTH - 2 * X_MARGIN;
                     tft.fillScreen(TFT_BLACK);
+                    tft.setTextDatum(MC_DATUM);
                     tft.setTextColor(TFT_RED, TFT_BLACK);
-                    tft.setTextSize(2);
-                    int16_t headingEndY = layoutWrapped(tft, X_MARGIN, 60, TEXT_MAX_WIDTH, 20,
-                                                         I18n::t(StringId::MENU_FACTORY_RESET_DELETING),
-                                                         0, 0, Config::SCREEN_HEIGHT, true);
-                    // Noch KEINE eigene StringId fuer den Dauer-/Warnhinweis
-                    // (neue uebersetzte Strings brauchen aktualisierte
-                    // lang_XX.bin-Assets auf GitHub - diese Aufgabe ist
-                    // bewusst "nur bauen und flashen, nicht pushen", daher
-                    // hier absichtlich englisch hart kodiert wie schon beim
-                    // Neustart-Hinweis in language_screen.cpp. Sollte beim
-                    // naechsten echten Asset-Update sauber uebersetzt werden.
-                    tft.setTextSize(1);
-                    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-                    layoutWrapped(tft, X_MARGIN, (int16_t)(headingEndY + 20), TEXT_MAX_WIDTH, 16,
-                                  "This can take up to a minute with a lot of logbook data. "
-                                  "Please do not unplug or turn off the device.",
-                                  0, 0, Config::SCREEN_HEIGHT, true);
-                    tft.setTextSize(1);
+                    tft.drawString(I18n::t(StringId::MENU_FACTORY_RESET_DELETING),
+                                    Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
                     tft.setTextDatum(TL_DATUM);
                     // Erfolgsfall: factoryReset() startet das Geraet neu und
                     // kehrt nie zurueck - dieser Code danach laeuft nur im
@@ -2016,19 +1978,14 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             tft.println(I18n::t(StringId::MENU_CATEGORY_FILTERS));
 
             // Kein Seiten-Header-"?"-Button mehr (frueher oben rechts, siehe
-            // Git-Historie) - der ISS-Marker-Hilfetext haengt jetzt direkt an
-            // der ISS-Marker-Zeile selbst (drawRowInfoButton() unten), analog
-            // zu den neuen "?"-Buttons in radar_theme_screen.cpp. Zeilen
-            // starten deshalb wieder beim normalen ROW_START_Y=18 (Default-
-            // Parameter von subMenuRowRect()) statt der bisherigen, wegen des
-            // Header-Buttons nach unten verschobenen 34.
-            Rect airlineBtn        = subMenuRowRect(0, 7);
-            Rect groundBtn         = subMenuRowRect(1, 7);
-            Rect helicoptersBtn    = subMenuRowRect(2, 7);
-            Rect lowAltitudeBtn    = subMenuRowRect(3, 7);
-            Rect interestingBtn    = subMenuRowRect(4, 7);
-            Rect issMarkerBtn      = subMenuRowRect(5, 7);
-            Rect backBtn           = subMenuRowRect(6, 7);
+            // Git-Historie) - Zeilen starten deshalb beim normalen
+            // ROW_START_Y=18 (Default-Parameter von subMenuRowRect()).
+            Rect airlineBtn        = subMenuRowRect(0, 6);
+            Rect groundBtn         = subMenuRowRect(1, 6);
+            Rect helicoptersBtn    = subMenuRowRect(2, 6);
+            Rect lowAltitudeBtn    = subMenuRowRect(3, 6);
+            Rect interestingBtn    = subMenuRowRect(4, 6);
+            Rect backBtn           = subMenuRowRect(5, 6);
 
             drawButton(tft, airlineBtn, I18n::t(StringId::MENU_AIRLINE_FILTER));
             // Label jetzt "Bodenfahrzeuge anzeigen" statt "...ausblenden" -
@@ -2049,11 +2006,6 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             // Pflicht fuer jeden neuen Toggle).
             drawButton(tft, interestingBtn, I18n::t(StringId::MENU_ONLY_INTERESTING) + onOff(SettingsStore::onlyInteresting()));
             drawRowInfoButton(tft, interestingBtn);
-            // Kein Sichtbarkeitsfilter im engeren Sinne (blendet keine
-            // Flugzeuge aus), aber thematisch am ehesten hier passend - "was
-            // wird zusaetzlich auf dem Radar angezeigt". Siehe iss_tracker.h.
-            drawButton(tft, issMarkerBtn, I18n::t(StringId::MENU_ISS_MARKER) + onOff(SettingsStore::issMarkerEnabled()));
-            drawRowInfoButton(tft, issMarkerBtn);
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -2064,17 +2016,11 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 delay(20);
             }
 
-            // "?"-Info-Button zuerst pruefen (kleine Flaeche innerhalb der
-            // ISS-Marker-Zeile) - sonst wuerde ein Tap darauf faelschlich als
-            // Tap auf die ganze Zeile (Schalter umlegen) gewertet, gleiches
-            // Prinzip wie in radar_theme_screen.cpp.
-            if (rowInfoBtnRect(issMarkerBtn).contains(tap.x, tap.y)) {
-                infoScreen(tft, I18n::t(StringId::ISS_MARKER_INFO_TITLE), I18n::t(StringId::ISS_MARKER_INFO_BODY),
-                           UiTheme::accentColor(tft), I18n::t(StringId::OK));
-            } else if (rowInfoBtnRect(interestingBtn).contains(tap.x, tap.y)) {
+            if (rowInfoBtnRect(interestingBtn).contains(tap.x, tap.y)) {
                 // VOR dem Zeilen-Toggle direkt unten geprueft, sonst wuerde
                 // der kleine "?"-Button von der groesseren Zeilen-Bounding-
-                // Box geschluckt (gleiches Muster wie beim ISS-Marker oben).
+                // Box geschluckt (gleiches Muster wie bei anderen
+                // "?"-Buttons im Projekt).
                 infoScreen(tft, I18n::t(StringId::MENU_ONLY_INTERESTING_INFO_TITLE),
                            I18n::t(StringId::MENU_ONLY_INTERESTING_INFO_BODY),
                            UiTheme::accentColor(tft), I18n::t(StringId::OK));
@@ -2088,8 +2034,6 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 SettingsStore::setOnlyLowAltitude(!SettingsStore::onlyLowAltitude());
             } else if (interestingBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setOnlyInteresting(!SettingsStore::onlyInteresting());
-            } else if (issMarkerBtn.contains(tap.x, tap.y)) {
-                SettingsStore::setIssMarkerEnabled(!SettingsStore::issMarkerEnabled());
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::Flight;
             }

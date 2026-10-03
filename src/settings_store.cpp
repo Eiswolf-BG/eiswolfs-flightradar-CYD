@@ -41,19 +41,9 @@ namespace {
     // stattdessen per Web Audio API im Browser jedes Betrachters, der die
     // Webseite gerade offen hat.
     bool webAudioAlertOn = true;
-    // Werkseinstellung fuer eine Neuinstallation/leere SD-Karte (Alex'
-    // Wunsch): Bildschirm-Timeout 5 Minuten, Ruhebildschirm an. Betrifft
-    // NUR den C++-Default-Wert, der greift, solange applyKeyValue() oben
-    // (Zeilen "screen_timeout_min"/"screensaver") beim Laden keinen
-    // eigenen gespeicherten Wert aus der Settings-Datei findet - bereits
-    // bestehende Geraete mit eigener gespeicherter Konfiguration sind
-    // davon unberuehrt, auch wenn sie zufaellig noch beim alten Default
-    // (Nie/Aus) stehen sollten, da fuer sie ohnehin ein Eintrag in der
-    // Datei existiert (der beim naechsten Speichern ihren AKTUELLEN, nicht
-    // diesen neuen Default-Wert schreibt).
-    uint8_t screenTimeoutMin = 5;
+    uint8_t screenTimeoutMin = 0;
     bool nightDimmingOn = true;
-    bool screensaverOn = true;
+    bool screensaverOn = false;
     bool hideGroundVehiclesOn = true;
     bool onlyHelicoptersOn = false;
     bool onlyLowAltitudeOn = false;
@@ -76,7 +66,6 @@ namespace {
     // bestehende Geraete behalten ihren in den Preferences gespeicherten
     // Wert, der in applyKeyValue() unten weiterhin Vorrang hat.
     bool radarPulseOn = true;
-    bool issMarkerOn = true;
     bool classicRadarOn = false;
     bool militarySquawkDetectionOn = false;
     bool followMeModeOn = false;
@@ -245,8 +234,6 @@ namespace {
             crtPhosphorOn = (value.toInt() != 0);
         } else if (key == "radar_pulse") {
             radarPulseOn = (value.toInt() != 0);
-        } else if (key == "iss_marker") {
-            issMarkerOn = (value.toInt() != 0);
         } else if (key == "classic_radar") {
             classicRadarOn = (value.toInt() != 0);
         } else if (key == "military_squawk_detection") {
@@ -378,7 +365,6 @@ void save() {
     f.printf("radar_theme=%d\n", radarThemeIdx);
     f.printf("crt_phosphor=%d\n", crtPhosphorOn ? 1 : 0);
     f.printf("radar_pulse=%d\n", radarPulseOn ? 1 : 0);
-    f.printf("iss_marker=%d\n", issMarkerOn ? 1 : 0);
     f.printf("classic_radar=%d\n", classicRadarOn ? 1 : 0);
     f.printf("military_squawk_detection=%d\n", militarySquawkDetectionOn ? 1 : 0);
     f.printf("follow_me_mode=%d\n", followMeModeOn ? 1 : 0);
@@ -692,13 +678,6 @@ bool rainEffectEnabled() { return rainEffectOn; }
 
 void setRainEffectEnabled(bool on) {
     rainEffectOn = on;
-    save();
-}
-
-bool issMarkerEnabled() { return issMarkerOn; }
-
-void setIssMarkerEnabled(bool on) {
-    issMarkerOn = on;
     save();
 }
 

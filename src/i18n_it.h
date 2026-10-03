@@ -91,7 +91,7 @@ static const char* const I18N_IT[] = {
     "Aggiungi aereo (nominativo)",
     "Ancora nessun aereo monitorato.",
     "Come funziona la lista di controllo",
-    "Inserisci il nominativo esatto di un volo specifico (es. DLH441) - non un codice compagnia come nel Filtro compagnie. Puoi monitorare fino a 5 aerei contemporaneamente.",
+    "Inserisci il nominativo esatto di un volo specifico (es. DLH441), oppure usa \"*\" come carattere jolly per più voli (es. DLH* per tutti i voli Lufthansa, *441 per qualsiasi volo che termina con 441) - non un codice compagnia come nel Filtro compagnie. Puoi monitorare fino a 12 aerei contemporaneamente.",
     "Non appena un aereo monitorato appare ovunque sul radar, riceve un anello ciano e il LED lampeggia in blu - utile per individuare un volo specifico, ad esempio l'arrivo di una persona conosciuta.",
 
     "Posizioni salvate",
@@ -329,9 +329,6 @@ static const char* const I18N_IT[] = {
     "Come funziona il controllo squawk",
     "Inserisci un codice squawk ottale a 4 cifre (0000-7777, solo cifre 0-7) - es. un codice usato dal tuo controllo del traffico aereo locale per uno scopo specifico. Puoi monitorare fino a 5 codici contemporaneamente.",
     "Non appena un aereo trasmette un codice squawk monitorato, riceve un anello ciano e il LED lampeggia in blu - stesso avviso della lista di controllo aerei. I codici di emergenza (7500/7600/7700) vengono sempre gestiti separatamente dall'allarme di emergenza rosso, indipendentemente da questa lista.",
-    "Marcatore ISS: ",
-    "Informazioni sul marcatore ISS",
-    "Mostra la Stazione Spaziale Internazionale (ISS) come marcatore speciale quando sta passando entro il raggio del tuo radar. A causa della sua alta velocita (~7,66 km/s), di solito e visibile solo per pochi secondi, se non del tutto.",
 
     "Avvio in corso...",
     "Inizializzazione ricevitore transponder...",
@@ -585,6 +582,10 @@ static const char* const I18N_IT[] = {
     "Normale",
     "Ridotto (livello %d/3)",
 
+    "Direzione:",
+    "Flusso principale: ",
+    "Altitudine: ",
+
     "Allarme avvicinamento",
     "Allarme avvicinamento",
     "Invia una notifica push ntfy separata quando un aereo già presente in una delle tue liste di controllo (nominativo, squawk o tipo di aereo) entra nella fase di avvicinamento all'atterraggio. Si attiva una sola volta per avvicinamento, non ripetutamente per tutta la fase.",
@@ -624,9 +625,37 @@ static const char* const I18N_IT[] = {
     "Data: ",
     "Alba/tramonto non ancora disponibili",
 
-    "Direzione:",
-    "Flusso principale: ",
-    "Altitudine: ",
+    "Alt. media: ",
+    "Vel. media: ",
+    "Densità: ",
+    "BASSA",
+    "MEDIA",
+    "ALTA",
+    "Tendenza: ",
+
+    "Quasi in verticale",
+    "Passa a sinistra",
+    "Passa a destra",
+    "Esce dalla portata tra ~",
+
+    "Probabilmente udibile",
+    "Forse udibile",
+    "Appena udibile",
+
+    "Nuovo picco di traffico giornaliero: ",
+    "Primo volo militare/governativo del giorno rilevato",
+    "Primo aereo Heavy del giorno rilevato",
+    "Il diario di volo si disattiverà automaticamente a breve",
+
+    "I momenti salienti di oggi - si azzera ogni notte.",
+    "Tracciamento più lungo: ",
+    "Salita più rapida: ",
+    "Discesa più rapida: ",
+    "Primo visto oggi: ",
+    "Ultimo nuovo arrivo: ",
+    "Più ritorni oggi: ",
+
+    "Ultimo: ",
 };
 
 static_assert(sizeof(I18N_IT) / sizeof(I18N_IT[0]) == (size_t)StringId::COUNT,

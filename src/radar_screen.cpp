@@ -32,7 +32,6 @@
 #include "menu_screen.h"
 #include "live_traffic_screen.h"
 #include "location_presets_screen.h"
-#include "iss_tracker.h"
 #include "weather.h"
 #include "ui_theme.h"
 #include <qrcode.h>
@@ -1884,26 +1883,6 @@ namespace {
         }
     }
 
-    // Marker fuer die ISS (Bonus-Feature, siehe iss_tracker.h) - ein
-    // achtstrahliger "Stern"/Sparkle statt Kreis+Pfeilkopf, damit er auf
-    // den ersten Blick eindeutig NICHT mit einem Flugzeug/Hubschrauber/
-    // Bodenfahrzeug verwechselt werden kann. Eigene, sonst auf dem Radar
-    // ungenutzte Farbe (Magenta) statt der ueblichen Hoehenfarbe - die ISS
-    // hat keine sinnvolle "Hoehenkategorie" im Sinne des Radars.
-    constexpr uint16_t ISS_MARKER_COLOR = TFT_MAGENTA;
-
-    void drawIssMarker(TFT_eSPI& gfx, int16_t x, int16_t y) {
-        constexpr int16_t R_OUTER = 8;
-        constexpr int16_t R_INNER = 3;
-        gfx.fillCircle(x, y, R_INNER, ISS_MARKER_COLOR);
-        for (int i = 0; i < 8; i++) {
-            double rad = i * 45.0 * PI / 180.0;
-            int16_t ex = x + (int16_t)(sin(rad) * R_OUTER);
-            int16_t ey = y - (int16_t)(cos(rad) * R_OUTER);
-            gfx.drawLine(x, y, ex, ey, ISS_MARKER_COLOR);
-        }
-    }
-
     void printLineTruncated(TFT_eSPI& gfx, int16_t x, int16_t y, int16_t maxWidth, const String& text) {
         String s = text;
         if (gfx.textWidth(s) > maxWidth) {
@@ -2678,7 +2657,43 @@ namespace {
         } else {
             snprintf(buf, sizeof(buf), "%s%.0fkt", I18n::t(StringId::DETAIL_SPEED), a.groundSpeedKt);
         }
-        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.speed, String(buf), forceFull);
+        String speedLine = buf;
+
+        // Laerm-/Hoerbarkeits-Schaetzung (Alex' Auftrag) - reine
+        // Faustregel, KEINE echte Akustik-Simulation. Nutzt die schraege
+        // Entfernung (Hypotenuse aus Horizontal-Distanz und Hoehe, nicht
+        // nur die horizontale a.distanceKm) als Naeherung fuer den
+        // tatsaechlichen Schallweg. Je nach Flugzeugtyp unterschiedliche
+        // Hoerbarkeits-Radien: Hubschrauber traditionell am lautesten
+        // relativ zur Groesse (daher trotz kleinerer Maschine groesserer
+        // Radius als bei normalen Jets), Heavy am lautesten absolut
+        // (groesste Triebwerke), Turboprops am leisesten (kein Strahltriebwerk).
+        // An die Geschwindigkeits-Zeile angehaengt, da beides Momentaufnahme-
+        // Werte des aktuellen Flugs sind - ueber dieselbe robuste Marquee-
+        // Pipeline wie jede andere Zeile hier, kein Abschneide-Risiko.
+        {
+            float altKm = Units::feetToMeters((float)a.altBaroFt) / 1000.0f;
+            float slantKm = sqrtf(a.distanceKm * a.distanceKm + altKm * altKm);
+            bool rotor = RadarScreen::isRotorcraftCategory(a.category);
+            bool heavy = RadarScreen::isHeavyAircraftCategory(a.category);
+            float audibleKm, maybeKm;
+            if (rotor) { audibleKm = 3.0f; maybeKm = 6.0f; }
+            else if (heavy) { audibleKm = 5.0f; maybeKm = 10.0f; }
+            else {
+                switch (RadarScreen::classifyAircraftType(a.typeCode)) {
+                    case RadarScreen::AircraftCategory::Turboprop: audibleKm = 2.0f; maybeKm = 4.0f; break;
+                    case RadarScreen::AircraftCategory::PrivateJet: audibleKm = 3.0f; maybeKm = 6.0f; break;
+                    case RadarScreen::AircraftCategory::Airliner: audibleKm = 3.5f; maybeKm = 7.0f; break;
+                    default: audibleKm = 2.5f; maybeKm = 5.0f; break;
+                }
+            }
+            StringId audibilityId = slantKm <= audibleKm ? StringId::DETAIL_AUDIBLE_LIKELY
+                                   : slantKm <= maybeKm   ? StringId::DETAIL_AUDIBLE_MAYBE
+                                                           : StringId::DETAIL_AUDIBLE_UNLIKELY;
+            speedLine += "  ";
+            speedLine += I18n::t(audibilityId);
+        }
+        updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.speed, speedLine, forceFull);
         y += LINE_H;
 
         String squawkLine = String(I18n::t(StringId::DETAIL_SQUAWK)) + (a.squawk[0] ? a.squawk : I18n::t(StringId::DETAIL_UNKNOWN));
@@ -2751,6 +2766,39 @@ namespace {
         // "->" wie im Routen-Text oben). Bei "Unknown" (erster Zyklus
         // dieses Flugzeugs, noch keine Vorwert-Messung) wird nichts
         // angehaengt, statt einen falschen Zustand zu suggerieren.
+        // Flugrichtung relativ zum Standort (Alex' Auftrag) - rein
+        // geometrisch aus dem AKTUELLEN Kurs (a.headingDeg) gegen die
+        // Peilung zum eigenen Standort berechnet, UNABHAENGIG vom
+        // empirischen distanceTrend oben (das vergleicht tatsaechliche
+        // Distanzen ueber mehrere Zyklen, hier zaehlt nur die Momentaufnahme
+        // dieses einen Zyklus). a.bearingDeg ist die Peilung VOM Standort
+        // ZUM Flugzeug (siehe compassLabel()-Kommentar oben) - die Peilung
+        // IN DIE ANDERE RICHTUNG (vom Flugzeug zum Standort) ist deren
+        // Gegenrichtung, also +180°. relAngle > 0 bedeutet, der Kurs ist im
+        // Uhrzeigersinn gegenueber "direkt zum Standort" verdreht (zieht
+        // rechts vorbei), < 0 entsprechend links. Gleiche Vorsichtsschwelle
+        // wie bei CPA/Exit-ETA (Config::CPA_MIN_SPEED_KT) - bei zu geringer
+        // Geschwindigkeit ist der gemeldete Kurs oft Rauschen, dann bleibt
+        // die Zeile lieber ganz leer statt einer falschen Einstufung.
+        // "Naehert sich"/"Entfernt sich" nutzen bewusst dieselben
+        // StringIds wie trendText unten (DETAIL_APPROACHING/_DEPARTING) -
+        // identische Bedeutung, kein Grund fuer doppelte Uebersetzungen.
+        const char* relDirText = "";
+        if (a.groundSpeedKt >= Config::CPA_MIN_SPEED_KT) {
+            float bearingToUs = fmodf(a.bearingDeg + 180.0f, 360.0f);
+            float relAngle = fmodf(a.headingDeg - bearingToUs + 540.0f, 360.0f) - 180.0f;
+            float absRel = fabsf(relAngle);
+            if (absRel < 30.0f) {
+                relDirText = I18n::t(StringId::DETAIL_APPROACHING);
+            } else if (absRel > 150.0f) {
+                relDirText = I18n::t(StringId::DETAIL_DEPARTING);
+            } else if (relAngle > 0.0f) {
+                relDirText = I18n::t(StringId::DETAIL_PASSING_RIGHT);
+            } else {
+                relDirText = I18n::t(StringId::DETAIL_PASSING_LEFT);
+            }
+        }
+
         const char* trendSymbol = "";
         const char* trendText = "";
         switch (a.distanceTrend) {
@@ -2790,6 +2838,80 @@ namespace {
                 snprintf(cpaBuf, sizeof(cpaBuf), "%s%ds%s",
                          I18n::t(StringId::DETAIL_OVERFLIGHT_PREFIX), secs,
                          I18n::t(StringId::DETAIL_OVERFLIGHT_SUFFIX));
+            }
+        }
+
+        // "Radar-Exit-ETA" (Alex' Auftrag) - Erweiterung derselben
+        // Ueberflug-ETA-Zeile um die umgekehrte Frage: wann verlaesst das
+        // Flugzeug bei gleichbleibendem Kurs/Geschwindigkeit die aktuell
+        // eingestellte Radar-Reichweite? Bewusst HIER lokal berechnet statt
+        // wie CPA als eigenes Aircraft-Feld in aircraft_table.cpp (erster
+        // Versuch: fuehrte zu einem DRAM-Ueberlauf, da die Aircraft-Struktur
+        // in SECHS verschiedenen statischen Aircraft[40]-Arrays dupliziert
+        // wird - aircraft_table.cpp, net_task.cpp, flight_logbook.cpp
+        // (zweimal), aircraft_list_screen.cpp, radar_screen.cpp selbst -
+        // zwei zusaetzliche Felder dort hatten sich dadurch mit Faktor 6x40
+        // multipliziert. Hier dagegen nur EINE einzelne Berechnung fuer das
+        // GERADE angezeigte Flugzeug, kein zusaetzlicher Speicher noetig.
+        // Nur relevant, wenn sich das Flugzeug ueberhaupt entfernt
+        // (distanceTrend==Departing) - ein sich annaeherndes Flugzeug zeigt
+        // diese Zeile also nie (Alex' ausdrueckliche Vorgabe: lieber
+        // weglassen als eine falsche ETA). Nutzt DETAIL_OVERFLIGHT_SUFFIX
+        // (" (ca.)") wieder - identischer "Naeherungswert, Kurs kann sich
+        // aendern"-Hinweis wie bei der Ueberflug-ETA oben.
+        char rangeExitBuf[48] = {0};
+        if (a.distanceTrend == Aircraft::DistanceTrend::Departing &&
+            a.category[0] != 'C' &&
+            a.groundSpeedKt >= Config::CPA_MIN_SPEED_KT) {
+            constexpr double DEG2RAD = M_PI / 180.0;
+            double bearingRad = a.bearingDeg * DEG2RAD;
+            double rx = a.distanceKm * sin(bearingRad);
+            double ry = a.distanceKm * cos(bearingRad);
+            double headingRad = a.headingDeg * DEG2RAD;
+            double speedKmPerMin = Units::ktToKmh(a.groundSpeedKt) / 60.0;
+            double vx = speedKmPerMin * sin(headingRad);
+            double vy = speedKmPerMin * cos(headingRad);
+
+            double rangeKmNow = (double)Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
+
+            // |r + v*t| = rangeKmNow aufgeloest nach t (quadratische
+            // Gleichung a2*t^2 + b2*t + c2 = 0). Das Flugzeug ist aktuell
+            // INNERHALB der Reichweite sichtbar (a.distanceKm < rangeKmNow,
+            // sonst waere das Detail-Panel gar nicht offen), c2 ist also
+            // immer negativ - das Produkt der beiden Nullstellen (c2/a2)
+            // ist damit immer negativ, es gibt also garantiert genau eine
+            // positive und eine negative Nullstelle. Die positive ist der
+            // gesuchte Austrittszeitpunkt.
+            double rv = rx * vx + ry * vy;
+            double vv = vx * vx + vy * vy;
+            double a2 = vv;
+            double b2 = 2.0 * rv;
+            double c2 = (rx * rx + ry * ry) - rangeKmNow * rangeKmNow;
+            double tExit = -1.0;
+            if (a2 > 0.0001) {
+                double disc = b2 * b2 - 4.0 * a2 * c2;
+                if (disc >= 0.0) {
+                    double sq = sqrt(disc);
+                    double t1 = (-b2 + sq) / (2.0 * a2);
+                    double t2 = (-b2 - sq) / (2.0 * a2);
+                    if (t1 > 0.0 && t2 > 0.0) tExit = (t1 < t2) ? t1 : t2;
+                    else if (t1 > 0.0) tExit = t1;
+                    else if (t2 > 0.0) tExit = t2;
+                }
+            }
+            if (tExit > 0.0 && tExit <= (double)Config::RANGE_EXIT_MAX_TIME_MIN) {
+                int totalSec = (int)(tExit * 60.0 + 0.5);
+                int mins = totalSec / 60;
+                int secs = totalSec % 60;
+                if (mins > 0) {
+                    snprintf(rangeExitBuf, sizeof(rangeExitBuf), "%s%dmin %02ds%s",
+                             I18n::t(StringId::DETAIL_RANGE_EXIT_PREFIX), mins, secs,
+                             I18n::t(StringId::DETAIL_OVERFLIGHT_SUFFIX));
+                } else {
+                    snprintf(rangeExitBuf, sizeof(rangeExitBuf), "%s%ds%s",
+                             I18n::t(StringId::DETAIL_RANGE_EXIT_PREFIX), secs,
+                             I18n::t(StringId::DETAIL_OVERFLIGHT_SUFFIX));
+                }
             }
         }
 
@@ -2981,16 +3103,27 @@ namespace {
         // Peilungs-Gradmass (a.bearingDeg) - die Himmelsrichtung allein
         // reicht zum Hinschauen, die genaue Gradzahl war ohnehin nur eine
         // Verfeinerung derselben Info wie compassLabel().
-        char lookBuf[24];
+        char lookBuf[64];
         snprintf(lookBuf, sizeof(lookBuf), "%s%s %.0f°",
                  I18n::t(StringId::DETAIL_LOOK_PREFIX), compassLabel(a.bearingDeg), elevDeg);
 
-        char distBuf[560]; // vergroessert (vorher 400) fuer den neuen Hoehenwinkel- und Steckbrief-Zusatz
-        snprintf(distBuf, sizeof(distBuf), "%s%s  %s%.0f  %s  %s %s  %s  %s  %s  %s",
+        // Overhead-Erkennung (Alex' Auftrag) - nutzt den oben bereits
+        // berechneten Hoehenwinkel (elevDeg) wieder, keine neue
+        // Trigonometrie noetig. Haengt aus demselben Platzgrund wie alles
+        // andere hier an eine bestehende Zeile an (die Look-Zeile passt
+        // inhaltlich am besten, da beides "wo am Himmel"-Angaben sind). Nur
+        // ab >70° - darunter bleibt die Zeile unveraendert wie bisher.
+        if (elevDeg > 70.0f) {
+            size_t used = strlen(lookBuf);
+            snprintf(lookBuf + used, sizeof(lookBuf) - used, "  %s", I18n::t(StringId::DETAIL_OVERHEAD));
+        }
+
+        char distBuf[700]; // vergroessert (vorher 560) fuer relDirText/rangeExitBuf (Alex' Auftrag)
+        snprintf(distBuf, sizeof(distBuf), "%s%s  %s%.0f  %s  %s  %s %s  %s  %s  %s  %s  %s",
                  I18n::t(StringId::DETAIL_DIST), distValBuf,
                  I18n::t(StringId::DETAIL_HDG), a.headingDeg,
-                 lookBuf,
-                 trendSymbol, trendText, cpaBuf, firstSeenBuf, dailyBuf, previouslySeenBuf);
+                 lookBuf, relDirText,
+                 trendSymbol, trendText, cpaBuf, rangeExitBuf, firstSeenBuf, dailyBuf, previouslySeenBuf);
         updateMarqueeLine(gfx, y, LINE_H, textMaxWidth, themeBaseColor(gfx), lastPanel.distHeading, String(distBuf), forceFull);
         y += LINE_H;
 
@@ -4998,45 +5131,6 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
         tft.setTextDatum(TL_DATUM);
     }
 
-    // ISS-Marker (Bonus-Feature, siehe iss_tracker.h) - im selben
-    // Rendering-Durchlauf wie die Flugzeug-Marker oben, mit derselben
-    // Distanz-/Peilungsberechnung (RadarMath::toPolar()/toScreen()), aber
-    // bewusst NICHT Teil von hitPoints[]/visibleCountNow - zaehlt nicht
-    // als "Flugzeug", loest keinen Alarm/Ton aus und ist nicht antippbar.
-    // Nur gezeichnet, wenn der Schalter an ist (SettingsStore::
-    // issMarkerEnabled(), Menue > Flugoptionen > Anzeigefilter, AN per
-    // Default) UND eine Position bekannt UND innerhalb des aktuell
-    // eingestellten Radius ist - da die ISS mit ~7,66 km/s extrem schnell
-    // ist, ist das vermutlich nur fuer wenige Sekunden der Fall, wenn
-    // ueberhaupt (so beabsichtigt, nicht kuenstlich verlaengert).
-    if (SettingsStore::issMarkerEnabled()) {
-        IssTracker::Position iss = IssTracker::current();
-        // Zusaetzliche Alterspruefung (Alex' Meldung: bei wiederholt
-        // fehlschlagenden Hintergrund-Abrufen - siehe iss_tracker.cpp -
-        // blieb der Marker unbegrenzt lange an der letzten erfolgreich
-        // abgerufenen Stelle eingefroren stehen, statt zu verschwinden).
-        // Ueberlaufsicherer millis()-Vergleich (unsigned-Subtraktion statt
-        // direktem Groesser/Kleiner), gleiches Muster wie z.B. STALE_TIMEOUT_MS
-        // in aircraft_table.cpp - bleibt auch nach einem millis()-Ueberlauf
-        // (~49 Tage Laufzeit) korrekt.
-        if (iss.available && (millis() - iss.fetchedAtMs) > Config::ISS_POSITION_STALE_MS) {
-            iss.available = false;
-        }
-        if (iss.available) {
-            double homeLat = 0, homeLon = 0;
-            LocationManager::getHomeLocation(homeLat, homeLon);
-            RadarMath::PolarCoord issPolar = RadarMath::toPolar(homeLat, homeLon, iss.lat, iss.lon);
-            if (issPolar.distanceKm <= rangeKm * 1.05f) {
-                RadarMath::ScreenPoint issPt = RadarMath::toScreen(issPolar, L.cx, L.cy, L.radius, rangeKm, followMeRotDeg);
-                drawIssMarker(tft, issPt.x, issPt.y);
-                tft.setTextColor(ISS_MARKER_COLOR);
-                tft.setTextDatum(BC_DATUM);
-                tft.drawString("ISS", issPt.x, issPt.y - 10);
-                tft.setTextDatum(TL_DATUM);
-            }
-        }
-    }
-
     uint8_t visibleCountNow = 0;
     for (uint8_t i = 0; i < MAX_HIT_POINTS; i++) {
         if (hitPoints[i].valid) visibleCountNow++;
@@ -5401,11 +5495,11 @@ void updateProximityAlert(uint32_t nowMs) {
     bool pushIsEmergency = false;
 
     // "Flight Stories" (Alex' Wunsch) - automatische Ereignis-Meldungen
-    // (Militaer-/Hubschrauber-Sichtung, Tiefflug) per ntfy-Push und/oder
-    // MQTT. flightStoryMsg merkt sich das ZUERST in diesem Zyklus
-    // gefundene Ereignis (gleiches "nur eins pro Zyklus"-Prinzip wie
-    // pushCallsign oben) - bei mehreren gleichzeitigen Kandidaten im selben
-    // Zyklus wird bewusst nur einer verschickt.
+    // (Militaer-/Hubschrauber-Sichtung, Tiefflug) per ntfy-Push.
+    // flightStoryMsg merkt sich das ZUERST in diesem Zyklus gefundene
+    // Ereignis (gleiches "nur eins pro Zyklus"-Prinzip wie pushCallsign
+    // oben) - bei mehreren gleichzeitigen Kandidaten im selben Zyklus wird
+    // bewusst nur einer verschickt.
     bool flightStoriesOn = SettingsStore::ntfyFlightStoriesEnabled();
     char flightStoryMsg[160] = {0};
 
@@ -5528,11 +5622,10 @@ void updateProximityAlert(uint32_t nowMs) {
                  nowMs - table[i].lastFlightStoryMs > Config::FLIGHT_STORY_REPEAT_SUPPRESS_MS)) {
                 const char* name = table[i].callsign[0] ? table[i].callsign : table[i].hex;
                 // Distanz/Hoehe respektieren die zentrale Metrisch/Imperial-
-                // Einstellung (Alex' Wunsch) statt fest auf km/ft zu stehen -
-                // gleiche Umrechnung/Formatierung wie an anderen Stellen im
-                // Projekt (z.B. "Naechster Flughafen"-Distanz, Detail-Panel-
-                // Hoehe: LocationManager::useMetricUnits() + Units::
-                // kmToNm()/feetToMeters()). Der fertige, einheitenbehaftete
+                // Einstellung statt fest auf km/ft zu stehen - gleiche
+                // Umrechnung/Formatierung wie an anderen Stellen im Projekt
+                // (LocationManager::useMetricUnits() + Units::kmToNm()/
+                // feetToMeters()). Der fertige, einheitenbehaftete
                 // Textbaustein wird per "%s" in den uebersetzten Satz
                 // eingesetzt statt die Einheit im Format-String selbst
                 // fest zu verdrahten.
@@ -5605,17 +5698,15 @@ void updateProximityAlert(uint32_t nowMs) {
     // deren Deklaration oben) ausgeloest, nicht bei jedem Zyklus, solange
     // dasselbe Flugzeug weiter sichtbar bleibt - request() selbst merkt nur
     // vor, die eigentliche HTTPS-Anfrage laeuft asynchron auf Core 0
-    // (net_task.cpp::NtfyPush::update()). Der "Anflug-Alarm" (approachMsg,
-    // Alex' Wunsch) liegt auf DERSELBEN Prioritaetsstufe wie ein normaler
-    // Watchlist-Treffer (newWatchHit) - beide konkurrieren hier um denselben
-    // Ein-Platz-Sendeplatz. Grenzfall (Alex' Frage): taucht ein Flugzeug im
-    // selben Zyklus gleichzeitig NEU auf der Watchlist auf UND befindet
-    // sich schon im Anflug, gewinnt bewusst die einfache Watchlist-Meldung
-    // (newWatchHit zuerst geprueft) - das grundlegendere "wird jetzt
-    // beobachtet"-Ereignis wiegt in diesem seltenen Zusammentreffen schwerer
-    // als der Anflug-Hinweis; table[i].wasApproachPhase wurde oben in der
-    // Schleife trotzdem bereits korrekt auf true gesetzt, es gibt also
-    // keinen verwaisten Zustand - nur die Meldung selbst entfaellt fuer
+    // (net_task.cpp::NtfyPush::update()). Der "Anflug-Alarm" (approachMsg)
+    // liegt auf DERSELBEN Prioritaetsstufe wie ein normaler Watchlist-
+    // Treffer (newWatchHit) - beide konkurrieren hier um denselben
+    // Ein-Platz-Sendeplatz. Grenzfall: taucht ein Flugzeug im selben
+    // Zyklus gleichzeitig NEU auf der Watchlist auf UND befindet sich
+    // schon im Anflug, gewinnt bewusst die einfache Watchlist-Meldung
+    // (newWatchHit zuerst geprueft) - table[i].wasApproachPhase wurde oben
+    // in der Schleife trotzdem bereits korrekt auf true gesetzt, es gibt
+    // also keinen verwaisten Zustand, nur die Meldung selbst entfaellt fuer
     // diesen einen Zyklus.
     // Ruhezeiten (SettingsStore::ntfyQuietHoursEnabled(), Alex' Wunsch,
     // "alles kann, nichts muss") - unterdrueckt ALLE ntfy-Push-Typen
@@ -5647,10 +5738,7 @@ void updateProximityAlert(uint32_t nowMs) {
     // ein knapp verpasster ntfy-Slot fuehrt also NICHT zu einem sofortigen
     // zweiten Versuch im naechsten Zyklus, sondern erst wieder nach der
     // vollen Sperrzeit (bewusst einfach gehalten, kein Nachhol-Mechanismus
-    // fuer dieses "nice to have"-Feature). Ein separater MQTT-Versand
-    // (eigenes "flight-story"-Event-Topic) wurde bewusst wieder entfernt -
-    // widerspricht der dokumentierten Feature-14-Regel, dass MQTT nur fuer
-    // Dauerzustaende (Sensoren) genutzt wird, keine Einzelereignisse.
+    // fuer dieses "nice to have"-Feature).
     if (flightStoryMsg[0] != 0 && !newEmergencyHit && !newWatchHit && SettingsStore::ntfyPushEnabled() && !ntfyQuiet) {
         NtfyPush::request(flightStoryMsg);
     }
@@ -5740,13 +5828,13 @@ bool isMilitaryGovSquawkCode(const char* squawk) {
     return isMilitaryGovSquawk(squawk);
 }
 
-bool isAircraftVisibleAtRange(const Aircraft& a, float rangeKm) {
-    return isAircraftVisibleOnRadar(a, rangeKm) && !AirlineFilter::isHidden(a.callsign);
+const char* flightPhaseLabelFor(const Aircraft& a) {
+    return flightPhaseLabel(computeFlightPhase(a));
 }
 
 bool isAircraftCurrentlyVisible(const Aircraft& a) {
     float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
-    return isAircraftVisibleAtRange(a, rangeKm);
+    return isAircraftVisibleOnRadar(a, rangeKm) && !AirlineFilter::isHidden(a.callsign);
 }
 
 }

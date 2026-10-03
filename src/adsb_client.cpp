@@ -5,6 +5,8 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <time.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace AdsbClient {
 
@@ -13,6 +15,55 @@ namespace {
 
     WiFiClientSecure persistentClient;
     bool clientConfigured = false;
+
+    // BUGFIX (echter ESP32-Task-Watchdog-Crash, live mit seriellem
+    // Mitschnitt auf ZWEI verschiedenen Geraeten reproduziert - "IDLE0
+    // (CPU 0)" kam nicht rechtzeitig dran, "CPU 0: NetTask" lief zu lange
+    // am Stueck): Die Streaming-Parse-Schleife unten (fetch(), "for (;;)")
+    // verarbeitet bei grosser Reichweite/vielen Flugzeugen potenziell
+    // hunderte Objekte am Stueck OHNE jemals zu yielden - FreeRTOS'
+    // IDLE0-Task (zustaendig fuer den Watchdog-Reset) kommt dann nicht
+    // mehr zum Zug. Dieser duenne Stream-Wrapper reicht ALLE Lesezugriffe
+    // unveraendert an den echten Stream weiter (readBytes() ist die
+    // EINZIGE Methode, die ArduinoJson fuer Stream-Quellen tatsaechlich
+    // aufruft - siehe ArduinoStreamReader.hpp in der ArduinoJson-
+    // Bibliothek, sowohl der Einzelbyte- als auch der Mehrbyte-Lesepfad
+    // laufen dort intern beide ueber readBytes()) und gibt nur ZUSAETZLICH
+    // alle YIELD_EVERY_BYTES gelesenen Bytes kurz an den Scheduler ab
+    // (vTaskDelay(1), NICHT esp_task_wdt_reset() - das wuerde nur den
+    // eigenen NetTask-Eintrag zuruecksetzen, aber IDLE0 nicht tatsaechlich
+    // zum Laufen bringen, da es ja um fehlende CPU-Zeit fuer IDLE0 geht,
+    // nicht um einen fehlenden Watchdog-Reset von NetTask selbst). KEINE
+    // Aenderung an Parse-/Allokationslogik, KEIN JsonDocument angefasst -
+    // bewusst der minimalste moegliche Eingriff.
+    class WatchdogYieldingStream : public Stream {
+    public:
+        explicit WatchdogYieldingStream(Stream& inner) : inner_(inner) {}
+
+        size_t readBytes(char* buffer, size_t length) override {
+            size_t n = inner_.readBytes(buffer, length);
+            bytesSinceYield_ += n;
+            if (bytesSinceYield_ >= YIELD_EVERY_BYTES) {
+                bytesSinceYield_ = 0;
+                vTaskDelay(1);
+            }
+            return n;
+        }
+
+        // Pure Virtuals von Stream/Print - werden von ArduinoJson beim
+        // Stream-Parsen nicht genutzt (siehe Kommentar oben), muessen aber
+        // implementiert sein, damit die Klasse ueberhaupt instanziierbar
+        // ist. Reine Durchreiche ohne Zusatzlogik.
+        int available() override { return inner_.available(); }
+        int read() override { return inner_.read(); }
+        int peek() override { return inner_.peek(); }
+        size_t write(uint8_t b) override { return inner_.write(b); }
+
+    private:
+        Stream& inner_;
+        size_t bytesSinceYield_ = 0;
+        static constexpr size_t YIELD_EVERY_BYTES = 2048;
+    };
 
     bool isJsonSpace(char c) {
         return c == ' ' || c == '\t' || c == '\n' || c == '\r';
@@ -196,7 +247,9 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
     filter["squawk"]    = true;
     filter["category"]  = true;
 
-    Stream& stream = http.getStream();
+    Stream& rawStream = http.getStream();
+    WatchdogYieldingStream watchdogYieldStream(rawStream);
+    Stream& stream = watchdogYieldStream;
     if (!skipToArrayStart(stream, "\"ac\":", 512)) {
         http.end();
         result.ok = false;
@@ -258,29 +311,17 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
     // Gleicher Schnappschuss-Bedarf wie oben, fuer die Wiederholungssperre
     // des "Flight Stories"-Features (aircraft.h::lastFlightStoryMs, siehe
     // dortiger Kommentar) - ohne diesen Schnappschuss wuerde die Sperre
-    // durch "a = Aircraft{}" unten bei JEDEM Fetch-Zyklus (alle ~10s)
-    // wirkungslos auf 0 zurueckgesetzt.
+    // durch "a = Aircraft{}" unten bei JEDEM Fetch-Zyklus wirkungslos auf
+    // 0 zurueckgesetzt.
     struct PrevFlightStory { char hex[7]; uint32_t lastMs; };
     PrevFlightStory prevFlightStoryByHex[Config::MAX_TRACKED_AIRCRAFT];
     uint8_t prevFlightStoryCount = 0;
     // Gleicher Schnappschuss-Bedarf wie oben, fuer die Uebergangserkennung
-    // des "Anflug-Alarm"-Features (aircraft.h::wasApproachPhase, siehe
-    // dortiger Kommentar) - ohne diesen Schnappschuss wuerde der Zustand
-    // durch "a = Aircraft{}" unten bei JEDEM Fetch-Zyklus (alle ~8s)
-    // faelschlich auf "nicht im Anflug" zurueckgesetzt und die Meldung bei
-    // jedem Zyklus erneut ausgeloest, solange das Flugzeug im Anflug bleibt.
+    // des "Anflug-Alarms" (aircraft.h::wasApproachPhase, siehe dortiger
+    // Kommentar).
     struct PrevApproachPhase { char hex[7]; bool wasApproach; };
     PrevApproachPhase prevApproachPhaseByHex[Config::MAX_TRACKED_AIRCRAFT];
     uint8_t prevApproachPhaseCount = 0;
-    // Gleicher Schnappschuss-Bedarf wie oben, fuer die einmalige Route-
-    // Watchlist-Ermittlung (aircraft.h::routeOrigin/routeDest/
-    // routeLookupDone, siehe dortiger Kommentar) - ohne diesen Schnappschuss
-    // wuerde der bereits ermittelte (oder als "nicht ermittelbar" markierte)
-    // Zustand durch "a = Aircraft{}" unten bei JEDEM Fetch-Zyklus verworfen
-    // und der Hintergrund-Lookup unnoetig wiederholt.
-    struct PrevRoute { char hex[7]; char origin[5]; char dest[5]; bool lookupDone; };
-    PrevRoute prevRouteByHex[Config::MAX_TRACKED_AIRCRAFT];
-    uint8_t prevRouteCount = 0;
     for (uint8_t j = 0; j < tableCapacity && j < Config::MAX_TRACKED_AIRCRAFT; j++) {
         if (table[j].hex[0] != '\0') {
             strncpy(prevAirportDistByHex[prevAirportDistCount].hex, table[j].hex,
@@ -320,16 +361,6 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
             prevApproachPhaseByHex[prevApproachPhaseCount].hex[sizeof(prevApproachPhaseByHex[0].hex) - 1] = 0;
             prevApproachPhaseByHex[prevApproachPhaseCount].wasApproach = table[j].wasApproachPhase;
             prevApproachPhaseCount++;
-
-            strncpy(prevRouteByHex[prevRouteCount].hex, table[j].hex,
-                    sizeof(prevRouteByHex[0].hex) - 1);
-            prevRouteByHex[prevRouteCount].hex[sizeof(prevRouteByHex[0].hex) - 1] = 0;
-            strncpy(prevRouteByHex[prevRouteCount].origin, table[j].routeOrigin, sizeof(prevRouteByHex[0].origin) - 1);
-            prevRouteByHex[prevRouteCount].origin[sizeof(prevRouteByHex[0].origin) - 1] = 0;
-            strncpy(prevRouteByHex[prevRouteCount].dest, table[j].routeDest, sizeof(prevRouteByHex[0].dest) - 1);
-            prevRouteByHex[prevRouteCount].dest[sizeof(prevRouteByHex[0].dest) - 1] = 0;
-            prevRouteByHex[prevRouteCount].lookupDone = table[j].routeLookupDone;
-            prevRouteCount++;
         }
     }
 
@@ -478,18 +509,6 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
                     break;
                 }
             }
-            // routeOrigin/routeDest/routeLookupDone ebenso wiederherstellen
-            // (siehe Kommentar beim Schnappschuss oben) - fuer die einmalige
-            // Route-Watchlist-Ermittlung. Nicht gefunden = neues Flugzeug,
-            // bleibt beim Aircraft{}-Default (leer/false).
-            for (uint8_t j = 0; j < prevRouteCount; j++) {
-                if (strcmp(prevRouteByHex[j].hex, hex) == 0) {
-                    strncpy(a.routeOrigin, prevRouteByHex[j].origin, sizeof(a.routeOrigin) - 1);
-                    strncpy(a.routeDest, prevRouteByHex[j].dest, sizeof(a.routeDest) - 1);
-                    a.routeLookupDone = prevRouteByHex[j].lookupDone;
-                    break;
-                }
-            }
             if (a.firstSeenMs == 0) {
                 a.firstSeenMs = millis();
                 // Echte Wanduhrzeit NUR erfassen, wenn sie GENAU JETZT (beim
@@ -564,6 +583,22 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
                 // unveraendert.
             }
         }
+
+        // Zweiter Yield-Punkt - der WatchdogYieldingStream-Fix oben yieldet
+        // nur WAEHREND des Stream-Lesens (also waehrend deserializeJson()
+        // selbst laeuft), deckt aber NICHT die Nachbearbeitung JEDES
+        // geparsten Objekts ab: mehrere verschachtelte lineare Restore-/
+        // Dedup-Suchen oben (idx-Duplikat-Check plus die diversen
+        // "prevXyzByHex"-Wiederherstellungen) laufen komplett NACH dem
+        // deserializeJson()-Aufruf, also ausserhalb jedes Stream-Lesevor-
+        // gangs - der WatchdogYieldingStream bekommt davon nichts mit. Bei
+        // 100km (~150 Objekte) ergibt das ohne Yield hier einen
+        // durchgehenden Block, der lang genug sein kann, um IDLE0 wieder
+        // verhungern zu lassen. Ein Yield pro Objekt kostet im
+        // schlechtesten Fall ca. 150ms zusaetzliche Gesamtlaufzeit - gegen
+        // einen echten Watchdog-Absturz ein klar akzeptabler Tausch, OHNE
+        // jegliche Parse-/Speicherlogik zu aendern.
+        vTaskDelay(1);
 
         int sep = readNextNonSpace(stream, 32);
         if (sep == ',') continue;

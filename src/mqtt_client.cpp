@@ -233,6 +233,39 @@ namespace {
                                             "emergency_detected", "mdi:alarm-light", "safety", nullptr,
                                             nullptr, true, nullptr).c_str(),
                      true);
+
+        // Fuenf weitere Sensoren (Alex' Auftrag) - gleiches Prinzip wie die
+        // Feature-14-Sensoren oben, aus derselben TrafficStats-Erweiterung
+        // gespeist (siehe mqtt_client.h).
+        mqtt.publish(topicFor("sensor", "next_overflight_eta").c_str(),
+                     buildDiscoveryPayload("Next Overflight ETA", (prefix + "next-overflight-eta-min").c_str(),
+                                            "next_overflight_eta", "mdi:timer-sand", nullptr, "measurement",
+                                            "min", false, nullptr).c_str(),
+                     true);
+
+        mqtt.publish(topicFor("sensor", "nearest_phase").c_str(),
+                     buildDiscoveryPayload("Nearest Aircraft Flight Phase", (prefix + "nearest-phase").c_str(),
+                                            "nearest_phase", "mdi:airplane-cog", nullptr, nullptr,
+                                            nullptr, false, nullptr).c_str(),
+                     true);
+
+        mqtt.publish(topicFor("sensor", "weather_code").c_str(),
+                     buildDiscoveryPayload("Weather Code", (prefix + "weather-code").c_str(),
+                                            "weather_code", "mdi:weather-partly-cloudy", nullptr, nullptr,
+                                            nullptr, false, nullptr).c_str(),
+                     true);
+
+        mqtt.publish(topicFor("binary_sensor", "gps_fix").c_str(),
+                     buildDiscoveryPayload("GPS Fix", (prefix + "gps-fix").c_str(),
+                                            "gps_fix", "mdi:crosshairs-gps", "connectivity", nullptr,
+                                            nullptr, true, "diagnostic").c_str(),
+                     true);
+
+        mqtt.publish(topicFor("sensor", "filtered_airline_count").c_str(),
+                     buildDiscoveryPayload("Filtered Airline Count", (prefix + "filtered-airline-count").c_str(),
+                                            "filtered_airline_count", "mdi:filter-outline", nullptr, "measurement",
+                                            nullptr, false, "diagnostic").c_str(),
+                     true);
     }
 
     bool tryConnect() {
@@ -373,6 +406,22 @@ void publishStatus(uint8_t aircraftCount, bool watchlistAlert, bool proximityAle
 
     mqtt.publish((prefix + "military-detected").c_str(), traffic.militaryDetected ? "ON" : "OFF", true);
     mqtt.publish((prefix + "emergency-detected").c_str(), traffic.emergencyDetected ? "ON" : "OFF", true);
+
+    // Fuenf weitere Sensoren (Alex' Auftrag) - gleiches "nur bei
+    // vorhandenem Wert senden"-Prinzip wie die vier Extremwerte oben.
+    if (traffic.hasNextOverflight) {
+        snprintf(buf, sizeof(buf), "%.1f", traffic.nextOverflightEtaMin);
+        mqtt.publish((prefix + "next-overflight-eta-min").c_str(), buf, true);
+    }
+    if (traffic.nearestPhase[0]) {
+        mqtt.publish((prefix + "nearest-phase").c_str(), traffic.nearestPhase, true);
+    }
+    if (traffic.weatherCode[0]) {
+        mqtt.publish((prefix + "weather-code").c_str(), traffic.weatherCode, true);
+    }
+    mqtt.publish((prefix + "gps-fix").c_str(), traffic.gpsFixAvailable ? "ON" : "OFF", true);
+    snprintf(smallBuf, sizeof(smallBuf), "%u", (unsigned)traffic.filteredAirlineCount);
+    mqtt.publish((prefix + "filtered-airline-count").c_str(), smallBuf, true);
 }
 
 }

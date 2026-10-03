@@ -267,13 +267,6 @@ namespace SettingsStore {
     bool rainEffectEnabled();
     void setRainEffectEnabled(bool on);
 
-    // ISS-Marker-Bonusfeature (siehe iss_tracker.h) - AN per Default. Bei
-    // AUS unterbleibt sowohl die periodische Positionsabfrage (kein
-    // Netzwerk-Traffic) als auch das Zeichnen des Markers (siehe
-    // IssTracker::update()/radar_screen.cpp).
-    bool issMarkerEnabled();
-    void setIssMarkerEnabled(bool on);
-
     // Steuert NUR das LED-Blinken bei verfuegbarem Update (dreimal kurz
     // Magenta, siehe radar_screen.cpp) - AN per Default (bisheriges
     // Verhalten). Der rote Punkt am "Nach Update suchen"-Button bleibt bei
@@ -320,11 +313,9 @@ namespace SettingsStore {
     // "geheim" wie der Topic-Name selbst).
     bool ntfyPushEnabled();
     void setNtfyPushEnabled(bool on);
-    String ntfyPushTopic();
-    void setNtfyPushTopic(const String& topic);
 
     // "Flight Stories" - automatische, kurze Ereignis-Meldungen (Militaer-/
-    // Hubschrauber-Sichtung, Tiefflug) per ntfy-Push und/oder MQTT, siehe
+    // Hubschrauber-Sichtung, Tiefflug) per ntfy-Push, siehe
     // radar_screen.cpp::updateProximityAlert(). Eigener Schalter, unabhaengig
     // von ntfyPushEnabled() oben (der nur Notfall/Watchlist steuert) - AUS
     // per Default.
@@ -366,6 +357,9 @@ namespace SettingsStore {
     // (Alex' Wunsch: API-Last im Blick behalten).
     bool routeWatchlistAlertEnabled();
     void setRouteWatchlistAlertEnabled(bool on);
+
+    String ntfyPushTopic();
+    void setNtfyPushTopic(const String& topic);
 
     // Zuletzt vom Geraet GEBOOTETE Firmware-Version (Config::APP_VERSION zum
     // Zeitpunkt des letzten Speicherns) - main.cpp::setup() vergleicht dies

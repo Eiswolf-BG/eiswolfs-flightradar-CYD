@@ -91,7 +91,7 @@ static const char* const I18N_PT[] = {
     "Adicionar avião (indicativo)",
     "Ainda não há aviões monitorados.",
     "Como funciona a lista de observação",
-    "Digite o indicativo exato de um voo específico (ex. DLH441) - não um código de companhia aérea como no Filtro de companhias aéreas. É possível monitorar até 5 aviões ao mesmo tempo.",
+    "Digite o indicativo exato de um voo específico (ex. DLH441), ou use \"*\" como caractere universal para vários (ex. DLH* para todos os voos da Lufthansa, *441 para qualquer voo terminado em 441) - não um código de companhia aérea como no Filtro de companhias aéreas. É possível monitorar até 12 aviões ao mesmo tempo.",
     "Assim que um avião monitorado aparece em qualquer lugar no radar, ele recebe um anel ciano e o LED pisca em azul - ótimo para detectar um voo específico, por exemplo quando alguém conhecido está chegando.",
 
     "Locais salvos",
@@ -329,9 +329,6 @@ static const char* const I18N_PT[] = {
     "Como funciona o monitoramento de squawk",
     "Digite um código squawk octal de 4 dígitos (0000-7777, apenas dígitos 0-7) - por exemplo, um código usado pelo seu controle de tráfego aéreo local para um propósito específico. É possível monitorar até 5 códigos ao mesmo tempo.",
     "Assim que um avião transmite um código squawk monitorado, ele recebe um anel ciano e o LED pisca em azul - o mesmo alerta da lista de observação de aviões. Os códigos de emergência (7500/7600/7700) sempre são tratados separadamente pelo alarme de emergência vermelho, independentemente desta lista.",
-    "Marcador da ISS: ",
-    "Sobre o marcador da ISS",
-    "Mostra a Estação Espacial Internacional (ISS) como um marcador especial quando ela passa dentro do seu alcance de radar. Devido à sua alta velocidade (~7,66 km/s), normalmente só fica visível por alguns segundos, quando muito.",
 
     "Iniciando...",
     "Inicializando receptor de transponder...",
@@ -585,6 +582,10 @@ static const char* const I18N_PT[] = {
     "Normal",
     "Reduzido (nível %d/3)",
 
+    "Direção:",
+    "Fluxo principal: ",
+    "Altitude: ",
+
     "Alerta de aproximação",
     "Alerta de aproximação",
     "Envia uma notificação push ntfy separada quando uma aeronave que já está em uma das suas listas de observação (indicativo, squawk ou tipo de aeronave) entra agora na aproximação de pouso. É acionado apenas uma vez por aproximação, não repetidamente enquanto permanece nessa fase.",
@@ -624,9 +625,37 @@ static const char* const I18N_PT[] = {
     "Data: ",
     "Nascer/pôr do sol ainda não disponível",
 
-    "Direção:",
-    "Fluxo principal: ",
-    "Altitude: ",
+    "Alt. média: ",
+    "Vel. média: ",
+    "Densidade: ",
+    "BAIXA",
+    "MÉDIA",
+    "ALTA",
+    "Tendência: ",
+
+    "Quase na vertical",
+    "Passando pela esquerda",
+    "Passando pela direita",
+    "Sai do alcance em ~",
+
+    "Provavelmente audível",
+    "Talvez audível",
+    "Pouco audível",
+
+    "Novo pico de tráfego do dia: ",
+    "Primeiro voo militar/governamental do dia detectado",
+    "Primeiro avião Heavy do dia detectado",
+    "O diário de voo será desativado automaticamente em breve",
+
+    "Destaques de hoje - reinicia todas as noites.",
+    "Rastreamento mais longo: ",
+    "Subida mais rápida: ",
+    "Descida mais rápida: ",
+    "Primeiro visto hoje: ",
+    "Última chegada nova: ",
+    "Mais retornos hoje: ",
+
+    "Último: ",
 };
 
 static_assert(sizeof(I18N_PT) / sizeof(I18N_PT[0]) == (size_t)StringId::COUNT,

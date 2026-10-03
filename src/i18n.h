@@ -633,15 +633,6 @@ enum class StringId : uint16_t {
     SQUAWK_WATCH_INFO_PARA1,
     SQUAWK_WATCH_INFO_PARA2,
 
-    // ISS-Marker-Bonusfeature (siehe iss_tracker.h, SettingsStore::
-    // issMarkerEnabled()) - Schalter lebt in Menue > Flugoptionen >
-    // Anzeigefilter (Page::FlightFilters in menu_screen.cpp), zusammen mit
-    // einem neuen "?"-Info-Button auf derselben Seite (die vorher keinen
-    // hatte), der genau diesen kurzen Erklaertext zeigt.
-    MENU_ISS_MARKER,
-    ISS_MARKER_INFO_TITLE,
-    ISS_MARKER_INFO_BODY,
-
     // Terminal-Stil-Boot-Sequenz, immer aktiv (kein Schalter), spielt vor
     // dem eigentlichen Splash-Screen ab (siehe SplashScreen::
     // playBootSequence() in splash_screen.cpp) - rein kosmetischer
@@ -664,8 +655,7 @@ enum class StringId : uint16_t {
     // Kleine "?"-Info-Buttons rechts in den drei Schalter-Zeilen auf der
     // "Radar-Darstellung"-Seite (radar_theme_screen.cpp) - CRT-Phosphor/
     // Radar-Puls/Klassik-Radar, jeweils eigener kurzer Erklaertext ueber
-    // MenuScreen::showInfoScreen(), gleiches Prinzip wie ISS_MARKER_INFO_*
-    // oben. RADAR_CLASSIC_INFO_BODY deckt bewusst ALLE Klassik-Radar-
+    // MenuScreen::showInfoScreen(). RADAR_CLASSIC_INFO_BODY deckt bewusst ALLE Klassik-Radar-
     // Teileffekte ab (Kometenschweif, Rasterspeichen, Sonar-Ping,
     // Signal-Rauschen), nicht nur den Namen des Schalters.
     RADAR_THEME_CRT_INFO_TITLE,
@@ -1312,13 +1302,25 @@ enum class StringId : uint16_t {
     SYSTEM_STATUS_PERF_NORMAL,
     SYSTEM_STATUS_PERF_REDUCED,
 
+
+    // Zwei neue Anzeigen auf dem Live-Traffic-Screen (Alex' Auftrag,
+    // live_traffic_screen.cpp) - Verkehrsrichtung (8-Sektoren-Aufschluesse-
+    // lung nach Aircraft::headingDeg, gefolgt von einer kompakten Haupt-
+    // flussrichtungs-Zeile, z.B. "SW -> NE") und Hoehenverteilung (dieselben
+    // drei Bereiche wie die Hoehen-Farblegende). Nutzen zusaetzlich die
+    // bereits bestehenden COMPASS_N..COMPASS_NW fuer die 8 Richtungs-Chips
+    // selbst - hier nur die drei neuen Kopf-/Praefix-Texte.
+    LIVE_TRAFFIC_DIRECTION_HEADER,
+    LIVE_TRAFFIC_DOMINANT_PREFIX,
+    LIVE_TRAFFIC_ALTITUDE_HEADER,
+
     // "Anflug-Alarm" fuer bereits per Watchlist (Rufzeichen/Squawk/Typ)
     // erkannte Flugzeuge (Alex' Wunsch) - eigener ntfy.sh-Push, sobald ein
     // beobachtetes Flugzeug NEU in die Anflugphase wechselt (FlightPhase::
     // Approach/::Landing, radar_screen.cpp::computeFlightPhase(), bereits
-    // bestehende Erkennung seit v6.4.0), AUS per Default. Eigener Schalter
-    // auf dem ntfy.sh-Push-Screen (ntfy_push_screen.cpp), analog zum
-    // bestehenden Flight-Stories-Schalter dort.
+    // bestehende Erkennung). Eigener Schalter auf dem ntfy.sh-Push-Screen
+    // (ntfy_push_screen.cpp), analog zum bestehenden Flight-Stories-
+    // Schalter dort.
     NTFY_APPROACH_ALERT_LABEL,
     NTFY_APPROACH_ALERT_INFO_TITLE,
     NTFY_APPROACH_ALERT_INFO_BODY,
@@ -1409,25 +1411,78 @@ enum class StringId : uint16_t {
     // berechenbar" im Wetter-Info-Fenster (main.cpp::showWeatherInfo(),
     // Alex' Wunsch) - ergaenzt die bereits bestehenden WEATHER_SUNRISE_
     // PREFIX/WEATHER_SUNSET_PREFIX/WEATHER_POLAR_DAY/WEATHER_POLAR_NIGHT
-    // oben (Zeile ~458) um zwei fehlende Stuecke: bisher wurde die
-    // Sonnenauf-/untergangs-Zeile bei fehlendem GPS-Fix bzw. noch nicht
-    // synchronisierter NTP-Zeit STILL weggelassen - jetzt zeigt
-    // WEATHER_SUN_UNAVAILABLE stattdessen einen neutralen Platzhalter
-    // (Alex' ausdruecklicher Wunsch: "keine falschen oder erfundenen
-    // Werte", aber auch kein kommentarloses Fehlen der Zeile).
+    // um zwei fehlende Stuecke: bisher wurde die Sonnenauf-/untergangs-
+    // Zeile bei fehlendem GPS-Fix bzw. noch nicht synchronisierter NTP-Zeit
+    // STILL weggelassen - jetzt zeigt WEATHER_SUN_UNAVAILABLE stattdessen
+    // einen neutralen Platzhalter (Alex' ausdruecklicher Wunsch: "keine
+    // falschen oder erfundenen Werte", aber auch kein kommentarloses
+    // Fehlen der Zeile).
     WEATHER_DATE_PREFIX,
     WEATHER_SUN_UNAVAILABLE,
 
-    // Zwei neue Anzeigen auf dem Live-Traffic-Screen (Alex' Auftrag,
-    // live_traffic_screen.cpp) - Verkehrsrichtung (8-Sektoren-Aufschluesse-
-    // lung nach Aircraft::headingDeg, gefolgt von einer kompakten Haupt-
-    // flussrichtungs-Zeile, z.B. "SW -> NE") und Hoehenverteilung (dieselben
-    // drei Bereiche wie die Hoehen-Farblegende). Nutzen zusaetzlich die
-    // bereits bestehenden COMPASS_N..COMPASS_NW fuer die 8 Richtungs-Chips
-    // selbst - hier nur die drei neuen Kopf-/Praefix-Texte.
-    LIVE_TRAFFIC_DIRECTION_HEADER,
-    LIVE_TRAFFIC_DOMINANT_PREFIX,
-    LIVE_TRAFFIC_ALTITUDE_HEADER,
+    // Drei weitere Live-Traffic-Statistiken (Alex' Auftrag): Durchschnitts-
+    // hoehe/-geschwindigkeit (als Chip-Paar, siehe live_traffic_screen.cpp),
+    // ein Verkehrsdichte-Index (LOW/MED/HIGH, normiert auf Flugzeuge pro
+    // 100km Radar-Reichweite - Schwellwerte dort kommentiert) und ein
+    // Verkehrstrend (Entwicklung der Gesamtzahl ueber die letzten bis zu
+    // ~25-30 Minuten anhand eines In-RAM-Ringpuffers, alle 5 Minuten ein
+    // Sample, siehe LiveTrafficScreen::recordTrendSample()).
+    LIVE_TRAFFIC_AVG_ALT_PREFIX,
+    LIVE_TRAFFIC_AVG_SPEED_PREFIX,
+    LIVE_TRAFFIC_DENSITY_PREFIX,
+    LIVE_TRAFFIC_DENSITY_LOW,
+    LIVE_TRAFFIC_DENSITY_MED,
+    LIVE_TRAFFIC_DENSITY_HIGH,
+    LIVE_TRAFFIC_TREND_PREFIX,
+
+    // Drei neue Detail-Panel-Features (Alex' Auftrag, radar_screen.cpp::
+    // drawDetailPanel()) - Overhead-Erkennung (haengt an die bestehende
+    // "Look: NE 21°"-Zeile an, nutzt den dort schon berechneten elevDeg),
+    // Flugrichtung relativ zum Standort (Naehert sich/Entfernt sich nutzen
+    // bewusst die BEREITS VORHANDENEN DETAIL_APPROACHING/DETAIL_DEPARTING
+    // von oben wieder - nur fuer "zieht rechts/links vorbei" sind die zwei
+    // folgenden StringIds neu) und Radar-Exit-ETA (haengt an die
+    // bestehende CPA-Zeile an, nutzt DETAIL_OVERFLIGHT_SUFFIX fuer das
+    // abschliessende " (ca.)" wieder).
+    DETAIL_OVERHEAD,
+    DETAIL_PASSING_LEFT,
+    DETAIL_PASSING_RIGHT,
+    DETAIL_RANGE_EXIT_PREFIX,
+
+    // Laerm-/Hoerbarkeits-Schaetzung (Alex' Auftrag, radar_screen.cpp::
+    // drawDetailPanel()) - haengt an die Geschwindigkeits-Zeile an, reine
+    // Faustregel-Einstufung (siehe dortiger Kommentar fuer die Schwellwerte).
+    DETAIL_AUDIBLE_LIKELY,
+    DETAIL_AUDIBLE_MAYBE,
+    DETAIL_AUDIBLE_UNLIKELY,
+
+    // Vier neue ntfy-Push-Events (Alex' Auftrag, net_task.cpp) - gleiches
+    // Prinzip wie NTFY_PUSH_MSG_EMERGENCY_PREFIX/_WATCHLIST_PREFIX oben
+    // (dort vor COMPASS_N einsortiert, hier bewusst am Ende angehaengt, um
+    // keine bestehende Position zu verschieben).
+    NTFY_PUSH_MSG_PEAK_TRAFFIC_PREFIX,
+    NTFY_PUSH_MSG_FIRST_MILITARY,
+    NTFY_PUSH_MSG_FIRST_HEAVY,
+    NTFY_PUSH_MSG_LOGBOOK_AUTO_OFF,
+
+    // Session-Highlights-Erweiterung (Alex' Auftrag, session_stats_screen.cpp) -
+    // neue, TAGESBEZOGENE Zeilen unterhalb der bestehenden "seit Neustart"-
+    // Zeilen (siehe SESSION_STATS_SINCE_BOOT_NOTE oben).
+    SESSION_STATS_TODAY_NOTE,
+    SESSION_STATS_LONGEST_TRACKED_PREFIX,
+    SESSION_STATS_MAX_CLIMB_PREFIX,
+    SESSION_STATS_MAX_DESCENT_PREFIX,
+    SESSION_STATS_FIRST_SEEN_TODAY_PREFIX,
+    SESSION_STATS_LAST_SEEN_TODAY_PREFIX,
+    SESSION_STATS_PASS_BY_PREFIX,
+
+    // "Was war das gerade?"-Rueckblick (Alex' Auftrag, main.cpp) - zeigt
+    // einen Tap auf die Ruhebildschirm-Flugzeugzeile den eingefrorenen
+    // Schnappschuss des zuletzt naechstgelegenen Flugzeugs. Fuer "noch
+    // keine Daten" wird bewusst die bestehende SESSION_STATS_NO_DATA
+    // wiederverwendet statt eines eigenen, praktisch gleichbedeutenden
+    // Strings.
+    SCREENSAVER_RECALL_PREFIX,
 
     COUNT
 };

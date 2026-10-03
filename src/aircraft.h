@@ -167,20 +167,18 @@ struct Aircraft {
     char     airlineName[24] = {0};
     uint16_t estSeats         = 0;
 
-    // Wiederholungssperre fuers "Flight Stories"-Feature (ntfy_push.cpp/
-    // mqtt_client.cpp, siehe radar_screen.cpp::updateProximityAlert()) -
-    // haelt fest, wann fuer DIESES Flugzeug zuletzt eine automatische
-    // Ereignis-Meldung (Militaer/Hubschrauber/Tiefflug) verschickt wurde,
-    // GANZ EGAL welche der drei Arten - verhindert z.B., dass ein
-    // tieffliegender Militaerhubschrauber gleich mehrere Meldungen auf
-    // einmal ausloest. Anders als wasEmergency/wasWatched oben (die
-    // bewusst JEDEN Fetch-Zyklus erneut ausloesen duerfen) MUSS dieser
-    // Wert ueber den Fetch-Zyklus-Schnappschuss in adsb_client.cpp hinweg
-    // erhalten bleiben (siehe dortiges PrevFlightStory), sonst waere die
-    // Sperre alle ~10s wirkungslos - genau das soll hier ausdruecklich
-    // NICHT passieren (Alex' Wunsch: keine Wiederholung "alle paar
-    // Sekunden", solange das Flugzeug in Reichweite bleibt). 0 = noch nie
-    // eine Meldung fuer dieses Flugzeug verschickt.
+    // Wiederholungssperre fuers "Flight Stories"-Feature (ntfy_push.cpp,
+    // siehe radar_screen.cpp::updateProximityAlert()) - haelt fest, wann
+    // fuer DIESES Flugzeug zuletzt eine automatische Ereignis-Meldung
+    // (Militaer/Hubschrauber/Tiefflug) verschickt wurde, GANZ EGAL welche
+    // der drei Arten - verhindert z.B., dass ein tieffliegender
+    // Militaerhubschrauber gleich mehrere Meldungen auf einmal ausloest.
+    // Anders als wasEmergency/wasWatched oben (die bewusst JEDEN Fetch-
+    // Zyklus erneut ausloesen duerfen) MUSS dieser Wert ueber den Fetch-
+    // Zyklus-Schnappschuss in adsb_client.cpp hinweg erhalten bleiben
+    // (siehe dortiges PrevFlightStory), sonst waere die Sperre alle paar
+    // Sekunden wirkungslos. 0 = noch nie eine Meldung fuer dieses
+    // Flugzeug verschickt.
     uint32_t lastFlightStoryMs = 0;
 
     // Uebergangserkennung "in die Landeanflugphase gewechselt" fuer bereits
@@ -191,23 +189,8 @@ struct Aircraft {
     // Prinzip wie wasWatched/wasEmergency oben, MUSS aber wie
     // lastFlightStoryMs ueber den Fetch-Zyklus-Schnappschuss in
     // adsb_client.cpp hinweg erhalten bleiben, sonst wuerde die Meldung bei
-    // JEDEM Abfragezyklus (alle ~8s) erneut ausgeloest, solange das
-    // Flugzeug im Anflug bleibt - genau das soll NICHT passieren (Alex'
-    // Wunsch: nur der Uebergang, nicht die ganze Phase).
+    // JEDEM Abfragezyklus erneut ausgeloest, solange das Flugzeug im Anflug
+    // bleibt - genau das soll NICHT passieren (Alex' Wunsch: nur der
+    // Uebergang, nicht die ganze Phase).
     bool wasApproachPhase = false;
-
-    // Route-Watchlist (route_watchlist.h/.cpp) - Start-/Zielflughafen (ICAO)
-    // dieses Flugzeugs, EINMALIG im Hintergrund ermittelt (RouteWatchlist::
-    // pollBackground(), net_task.cpp, Core 0) ueber dieselbe Fallback-Kette
-    // wie das Detail-Panel (AircraftDetails::fetchRoute()). routeLookupDone
-    // haelt fest, ob ueberhaupt schon ein Versuch stattfand (erfolgreich
-    // ODER nicht) - verhindert, dass ein Flugzeug ohne ermittelbare Route
-    // (z.B. Sichtflug ohne Flugplan) bei JEDEM Zyklus erneut angefragt wird.
-    // Alle drei Felder MUESSEN wie lastFlightStoryMs/wasApproachPhase oben
-    // ueber den Fetch-Zyklus-Schnappschuss in adsb_client.cpp hinweg
-    // erhalten bleiben, sonst wuerde der einmalige Lookup bei jedem
-    // ADS-B-Zyklus (alle ~8s) wiederholt.
-    char routeOrigin[5] = {0};
-    char routeDest[5] = {0};
-    bool routeLookupDone = false;
 };

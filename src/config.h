@@ -6,14 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "6.8.5";
-
-    // Projekt-Repo-URL fuer den GitHub-QR-Code - zentral hier hinterlegt,
-    // damit main.cpp (Ueber-Screen, grosser QR-Code) und menu_screen.cpp
-    // (kleiner QR-Code unten auf den OTA-Screens) garantiert denselben
-    // Text kodieren, statt die URL an zwei Stellen im Code zu duplizieren
-    // und dadurch auseinanderlaufen zu koennen.
-    constexpr const char* GITHUB_REPO_URL = "https://github.com/Eiswolf-BG/eiswolfs-flightradar-CYD";
+    constexpr const char* APP_VERSION = "6.9.0";
 
     // Display-Helligkeit (Menue > System > Helligkeit), in Prozent.
     // MIN bewusst nicht 0 - ein komplett dunkles Display koennte sonst wie
@@ -152,40 +145,6 @@ namespace Config {
     // Ruhebildschirm) nicht bis zu 10 Minuten zu spaet erkannt wird.
     constexpr uint32_t WEATHER_FETCH_INTERVAL_MS = 300000; // 5 Minuten
 
-    // ISS-Positions-Bonusfeature (siehe iss_tracker.h) - Open-Notify liefert
-    // ohnehin nur eine grob gerundete Momentaufnahme, ein kuerzeres
-    // Intervall als hier haette keinen praktischen Mehrwert (die ISS
-    // bewegt sich vorhersagbar, ~7,66 km/s).
-    constexpr uint32_t ISS_FETCH_INTERVAL_MS = 20000; // 20 Sekunden
-
-    // Eigener, grosszuegigerer Timeout nur fuer die ISS-Abfrage, getrennt
-    // von HTTP_TIMEOUT_MS (siehe Root-Cause-Diagnose im Chat, eigener
-    // serieller Mitschnitt mit DNS-/TCP-Connect-Trennung): DNS loeste bei
-    // JEDEM gemessenen Versuch sofort auf (~0ms), der TCP-Connect zum
-    // Open-Notify-Server (kleines Hobby-Projekt auf einer einzelnen VM,
-    // keine CDN-Absicherung) schwankte dagegen stark zwischen ~200ms und
-    // ueber 5,9s - ALLE gemessenen Fehlschlaege trafen exakt die alte
-    // 6000ms-Grenze (HTTP_TIMEOUT_MS), waren also echte Server-Timeouts
-    // bei einem gelegentlich ueberlasteten Server, keine sofortigen
-    // Verbindungsablehnungen und kein Netzwerk-/DNS-Problem auf Alex'
-    // Seite. 12s gibt dem Server ausreichend Spielraum, ohne den NetTask-
-    // Loop bei einem echten Totalausfall unnoetig lange zu blockieren -
-    // das ISS-Feature ist rein dekorativ, ein paar Sekunden mehr Wartezeit
-    // bei einem einzelnen langsamen Zyklus faellt nicht negativ auf.
-    constexpr uint32_t ISS_HTTP_TIMEOUT_MS = 12000;
-
-    // Aeltere Position ausblenden statt eingefroren weiter anzuzeigen
-    // (Alex' Meldung: bei wiederholt fehlschlagenden Abrufen - siehe
-    // iss_tracker.cpp - blieb der Marker unbegrenzt lange an der letzten
-    // erfolgreich abgerufenen Stelle stehen). 2 Minuten = 6x das normale
-    // 20s-Abrufintervall, toleriert also ein paar aufeinanderfolgende
-    // Fehlschlaege ohne staendiges Ein-/Ausblenden, faellt bei laenger
-    // anhaltenden Problemen aber zuverlaessig weg - bei ~7,66 km/s legt die
-    // ISS in dieser Zeit ohnehin schon ueber 900km zurueck, die Position
-    // waere laengst nicht mehr aussagekraeftig.
-    constexpr uint32_t ISS_POSITION_STALE_MS = 120000; // 2 Minuten
-
-
     // Intervall fuer die automatische Hintergrund-Pruefung auf neue
     // Firmware-Updates (siehe OtaUpdate::pollBackground(), aufgerufen aus
     // net_task.cpp) - ein neues Firmware-Release erscheint zwar hoechstens
@@ -273,6 +232,13 @@ namespace Config {
     constexpr float CPA_MAX_TIME_MIN    = 30.0f;
     constexpr float CPA_MIN_SPEED_KT    = 20.0f;
 
+    // "Radar-Exit-ETA" (Alex' Auftrag) - gleiche Zeitbegrenzung wie
+    // CPA_MAX_TIME_MIN aus demselben Grund (Kurs kann sich binnen 30
+    // Minuten laengst geaendert haben), bewusst als EIGENE Konstante statt
+    // direkt wiederverwendet, damit beide unabhaengig voneinander
+    // nachjustiert werden koennen, falls sich das als noetig herausstellt.
+    constexpr float RANGE_EXIT_MAX_TIME_MIN = 30.0f;
+
     // Circle-Crossing-Puls (radar_screen.cpp, siehe Aircraft::
     // ringCrossedAtMs) - wie lange der visuelle Puls-Ring nach einem
     // tatsaechlichen Ring-Durchgang sichtbar bleibt.
@@ -312,11 +278,11 @@ namespace Config {
     // initialen Steigflug.
     constexpr uint32_t PHASE_TAKEOFF_RECENT_MS = 120000;
 
-    // "Flight Stories"-Feature (ntfy_push.cpp/mqtt_client.cpp, automatische
-    // Ereignis-Meldungen bei Militaer-/Hubschrauber-Sichtung oder Tiefflug,
-    // siehe radar_screen.cpp::updateProximityAlert()) - Wiederholungssperre
-    // pro Flugzeug (aircraft.h::lastFlightStoryMs): 10 Minuten, deutlich
-    // grosszuegiger als der ~10s-ADS-B-Abrufzyklus (Alex' ausdruecklicher
+    // "Flight Stories"-Feature (ntfy_push.cpp, automatische Ereignis-
+    // Meldungen bei Militaer-/Hubschrauber-Sichtung oder Tiefflug, siehe
+    // radar_screen.cpp::updateProximityAlert()) - Wiederholungssperre pro
+    // Flugzeug (aircraft.h::lastFlightStoryMs): 10 Minuten, deutlich
+    // grosszuegiger als der ADS-B-Abrufzyklus (Alex' ausdruecklicher
     // Wunsch: keine Wiederholung "alle paar Sekunden", solange dasselbe
     // Flugzeug in Reichweite bleibt), aber kurz genug, dass ein Flugzeug,
     // das laenger in der Naehe bleibt, nicht komplett stumm bleibt.
@@ -359,7 +325,6 @@ namespace Config {
     constexpr const char* SD_ROOT_DIR              = "/Flightradar_cyd";
     constexpr const char* SD_AIRLINES_CSV          = "/Flightradar_cyd/airlines.csv";
     constexpr const char* SD_AIRCRAFT_TYPES_CSV    = "/Flightradar_cyd/aircraft_types.csv";
-    constexpr const char* SD_AIRPORTS_CSV          = "/Flightradar_cyd/airports.csv";
     constexpr const char* SD_LOG_DIR               = "/Flightradar_cyd/logs";
     constexpr const char* SD_SCREENSHOT_DIR         = "/Flightradar_cyd/screenshots";
     constexpr const char* SD_SETTINGS_FILE         = "/Flightradar_cyd/config.txt";

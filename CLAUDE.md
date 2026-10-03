@@ -294,36 +294,6 @@ explizit erwähnt.
   beachten, auch wenn `.claude/settings.json` aus irgendeinem Grund mal
   fehlen sollte.
 
-## Flash-Speicher: Große statische Daten bevorzugt auf SD-Karte
-
-Die SD-Karte ist für dieses Projekt zwingend erforderliche Hardware (das
-Gerät startet ohne erkannte SD-Karte gar nicht erst, siehe
-`main.cpp::haltWithSdRequiredScreen()`), UND der Flash-Speicher ist
-konstant knapp (Stand v6.5.5: >93% belegt, siehe Flash-Analyse-Bericht im
-Chat-Verlauf zu i18n-Sprachtabellen/Flughafendatenbank/GitHub-Logo als
-größten Verbrauchern). Deshalb gilt ab sofort:
-
-Bei JEDEM neuen Feature, das eine größere statische Datentabelle braucht
-(z.B. Lookup-Tabellen, Bilder/Icons, längere Textblöcke, Sprachdaten o.ä.),
-zuerst prüfen, ob diese Daten stattdessen zur Laufzeit von der SD-Karte
-geladen werden können, statt sie fest ins Flash-Image (PROGMEM/`const`-
-Array) einzubetten. Nur echter Programmcode/Logik, der zwingend ausführbar
-im Flash liegen muss, bleibt davon ausgenommen — reine Daten sind der
-Regelfall für eine Auslagerung, keine Ausnahme.
-
-Bei SD-basierten Daten gilt zwingend:
-- **Automatisches, sauberes Anlegen/Herunterladen** der benötigten Datei
-  beim ersten Bedarf (z.B. per HTTPS-Download bei erstem Zugriff, siehe
-  `github_logo_cache.cpp` als Vorbild, oder per Einmal-Seed von einer noch
-  im Flash verbleibenden Quelle, siehe `sd_storage.cpp::seedAirportsFile()`)
-  - KEIN manueller Nutzer-Schritt, KEIN Reinstall nötig, ein normales
-    OTA-Update muss genügen.
-- **Sauberer Fallback ohne Absturz**, falls das Lesen/Laden fehlschlägt
-  (z.B. defekte Karte, kein WLAN für einen nötigen Erst-Download, korrupte
-  Datei) - die Funktion/Anzeige fällt dann einfach weg oder auf einen
-  einfacheren Zustand zurück, nie ein Crash oder eine verunsichernde
-  Fehlermeldung.
-
 ## Sprache: Projekt-Außendarstellung immer Englisch
 
 Alle nach außen sichtbaren Texte sind IMMER auf Englisch zu verfassen —
@@ -419,24 +389,28 @@ behoben halten oder denselben gescheiterten Lösungsansatz wiederholen.
   gemeldete Hängenbleiben erneut auftritt. Kein Fix vorgenommen, Stand:
   v4.6.0+.
 
-- **Einmaliger Geräte-Neustart nach einem Farbwechsel aus der Web-UI**
-  (22.09., waehrend der Live-Diagnose des "Farbwechsel kommt verzoegert
-  an"-Bugs beobachtet, siehe Git-Historie/Chat): Alex meldete einen
-  Neustart des Geraets direkt nach einem Farbwechsel im Web-Live-Radar,
-  vermutete zunaechst eine Nebenwirkung des neuen Cross-Core-Signals
-  (`WebExportServer::consumeRemoteSettingsChanged()`/`forceRedraw` in
-  `main.cpp::loop()`, siehe Standard-Workflow-Historie zu v6.8.0). Trotz
-  gezielter Reproduktionsversuche (mehrere Farbwechsel hintereinander per
-  `curl` an `/control/theme` sowie durch Alex selbst ueber die echte
-  Web-UI, jeweils mit laufendem seriellem Mitschnitt) trat der Neustart
-  kein zweites Mal auf - kein Crash-Log, kein Reset-Grund, keine
-  Absturzschleife gefunden, das Signal selbst lief in allen
-  Wiederholungsversuchen (inkl. eines 150s-Dauertests im kombinierten
-  v6.8.0-Release-Stand) sauber durch. Beobachtet, NICHT reproduzierbar -
-  im Auge behalten, falls es erneut auftritt (dann moeglichst sofort mit
-  laufendem seriellem Monitor reproduzieren, siehe Abschnitt
-  "Eigenstaendige Seriell-Diagnose" unten). Kein Fix vorgenommen (mangels
-  reproduzierbarer Ursache), Stand: v6.8.0.
+## Known-Good-Backup-Ordner (dauerhaft, nicht löschen)
+
+Es existiert ein fester, dauerhafter Backup-Ordner als Sicherheitsnetz:
+
+    /Users/alexdemurtas/CYD Flightradar_known-good-2026-10-02/
+
+Das ist eine reine Dateisystem-Kopie (per `rsync`, kein Git-Mechanismus)
+des Projektordners zu einem von Alex bestätigten, lauffähigen Stand -
+NICHT der aktuelle Arbeitsstand. Der Ordner bleibt dauerhaft bestehen
+(wird nicht geloescht) und dient als schneller Rueckfallpunkt, falls ein
+spaeter hinzugefuegtes Feature Probleme macht (einfach zurueckkopieren,
+`pio run` + flashen, statt muehsam per Git-Historie zu suchen). Eine
+`KNOWN_GOOD_NOTES.md` im Ordner selbst dokumentiert, was genau enthalten
+ist und die Historie der Aktualisierungen.
+
+**Wichtigste Regel: Der INHALT dieses Ordners wird NUR veraendert
+(synchronisiert/aktualisiert), wenn Alex das ausdruecklich sagt** (z.B.
+"sichere das im known good Ordner", "das kann als known good"). Ohne
+diese ausdrueckliche Anweisung bleibt der Ordner unberuehrt, auch wenn
+zwischendurch neue Features erfolgreich gebaut/geflasht/getestet werden -
+der Ordner repraesentiert bewusst einen bestimmten, von Alex eingefrorenen
+Stand, keinen automatisch mitlaufenden Spiegel des Arbeitsverzeichnisses.
 
 ## Standard-Workflow: Push & Release
 
@@ -449,28 +423,6 @@ Release-Workflow zu starten. Bei kleineren Fixes/Änderungen bitte NUR bauen
 und flashen (siehe Abschnitt "Nach jedem erfolgreichen Build automatisch
 flashen" unten), aber NICHT committen/taggen/pushen, bis ausdrücklich danach
 gefragt wird.
-
-⚠️ ZWINGEND, KEINE AUSNAHME - Test-Schritte VOR Commit/Tag/Push/Release
-IMMER zuerst tatsächlich durchführen UND als erfolgreich bestätigen, bevor
-irgendein Commit/Tag/Push/Release passiert (Vorfall v6.7.6, siehe
-Git-Historie/Chat: Commit+Tag+Push+GitHub-Release liefen VOR dem in Alex'
-eigener Anweisung an Position 5 stehenden "bauen, flashen, live testen,
-bestätigen" - die dabei entdeckte Absturzschleife war zu diesem Zeitpunkt
-bereits oeffentlich veroeffentlicht). Nennt Alex' Push-/Release-Wunsch
-selbst eine nummerierte Schritt-Reihenfolge, die einen Bau-/Flash-/
-Test-/Bestätigungs-Schritt VOR den Commit-/Tag-/Push-/Release-Schritten
-enthält (unabhängig davon, ob das der Standard-Workflow unten oder eine
-davon abweichende eigene Nummerierung ist), gilt diese Reihenfolge als
-ZWINGEND und STRIKT einzuhalten - niemals Commit/Tag/Push/Release VORZIEHEN,
-auch nicht um Zeit zu sparen oder weil andere Vorbereitungsschritte (README,
-Versionsnummer, Changelog) schon fertig sind. Ergibt der vorgelagerte Test
-IRGENDEIN Problem (Absturz, Fehlverhalten, unklares Ergebnis): Workflow
-SOFORT anhalten, NICHTS committen/taggen/pushen/veröffentlichen, Alex aktiv
-über den Fund informieren und auf Rückmeldung warten - nicht erst selbst
-stundenlang weiter debuggen und schon veröffentlichte Artefakte nachträglich
-korrigieren. Diese Regel gilt zusätzlich zu und unabhängig von der Frage,
-ob der Release ueberhaupt angefordert wurde (das war er in diesem Vorfall
-durchaus) - sie betrifft ausschliesslich die REIHENFOLGE der Ausführung.
 
 Sobald der Workflow explizit angefordert wurde, automatisch folgende Schritte
 in dieser Reihenfolge:

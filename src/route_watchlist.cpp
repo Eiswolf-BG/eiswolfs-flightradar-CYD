@@ -89,16 +89,63 @@ namespace {
         f.close();
     }
 
+    // Eigener, EINZIGER Lookup-Cache (siehe ausfuehrlicher Kommentar in
+    // route_watchlist.h) - Hex -> Origin/Dest/lookupDone, GENAU EINE
+    // Instanz statt (wie urspruenglich versucht) sechsfach dupliziert ueber
+    // den Aircraft-Datensatz. Gleiche Groesse wie die AircraftTable selbst
+    // (Config::MAX_TRACKED_AIRCRAFT), da nie mehr gleichzeitig sichtbare
+    // Flugzeuge existieren koennen.
+    struct RouteCacheEntry {
+        char hex[7] = {0};
+        char origin[5] = {0};
+        char dest[5] = {0};
+        bool lookupDone = false;
+    };
+    RouteCacheEntry cache[Config::MAX_TRACKED_AIRCRAFT];
+
+    RouteCacheEntry* findCacheEntry(const char* hex) {
+        for (auto& e : cache) {
+            if (e.hex[0] && strcmp(e.hex, hex) == 0) return &e;
+        }
+        return nullptr;
+    }
+
+    // Entfernt Cache-Eintraege, deren Flugzeug nicht mehr (als 'valid') in
+    // der AircraftTable steckt - gibt deren Slots fuer neu erschienene
+    // Flugzeuge frei. AircraftTable MUSS bereits gesperrt sein (siehe
+    // Aufrufer unten), damit raw()/capacity() gefahrlos gelesen werden
+    // koennen.
+    void pruneCacheLocked(Aircraft* table, uint8_t tableCapacity) {
+        for (auto& e : cache) {
+            if (!e.hex[0]) continue;
+            bool stillTracked = false;
+            for (uint8_t j = 0; j < tableCapacity; j++) {
+                if (table[j].valid && strcmp(table[j].hex, e.hex) == 0) {
+                    stillTracked = true;
+                    break;
+                }
+            }
+            if (!stillTracked) e = RouteCacheEntry{};
+        }
+    }
+
+    RouteCacheEntry* findFreeCacheSlot() {
+        for (auto& e : cache) {
+            if (!e.hex[0]) return &e;
+        }
+        return nullptr;
+    }
+
     // Throttle fuer pollBackground() (Alex' Wunsch: API-Last im Blick
     // behalten) - verhindert, dass unmittelbar nach dem Einschalten des
-    // Schalters (viele Flugzeuge gleichzeitig ohne routeLookupDone) sofort
-    // Schlag auf Schlag Lookups ausgeloest werden, ohne dem naechsten
-    // ADS-B-Abruf ueberhaupt Luft zu lassen. Kein Problem fuer den
-    // Normalbetrieb (jedes Flugzeug wird ohnehin nur EINMAL nachgefragt,
-    // siehe aircraft.h::routeLookupDone), aber ein sanfter Mindestabstand
-    // zwischen zwei Lookups ist trotzdem sinnvoll fuer den Fall vieler
-    // gleichzeitig neu erschienener Flugzeuge (z.B. beim Einschalten mit
-    // bereits vollem Himmel).
+    // Schalters (viele Flugzeuge gleichzeitig ohne abgeschlossenen Lookup)
+    // sofort Schlag auf Schlag Lookups ausgeloest werden, ohne dem
+    // naechsten ADS-B-Abruf ueberhaupt Luft zu lassen. Kein Problem fuer
+    // den Normalbetrieb (jedes Flugzeug wird ohnehin nur EINMAL
+    // nachgefragt, siehe RouteCacheEntry::lookupDone), aber ein sanfter
+    // Mindestabstand zwischen zwei Lookups ist trotzdem sinnvoll fuer den
+    // Fall vieler gleichzeitig neu erschienener Flugzeuge (z.B. beim
+    // Einschalten mit bereits vollem Himmel).
     constexpr uint32_t MIN_GAP_MS = 3000;
     uint32_t lastLookupMs = 0;
 }
@@ -177,21 +224,24 @@ void removeWatched(uint8_t index) {
     if (changed) saveToSd();
 }
 
-bool isWatched(const char* aircraftOrigin, const char* aircraftDest) {
-    if ((!aircraftOrigin || !aircraftOrigin[0]) && (!aircraftDest || !aircraftDest[0])) return false;
+bool isWatched(const char* hex) {
+    if (!hex || !hex[0]) return false;
+    RouteCacheEntry* e = findCacheEntry(hex);
+    if (!e || !e->lookupDone) return false;
+    if (!e->origin[0] && !e->dest[0]) return false;
 
     ensureMutex();
     xSemaphoreTake(mutex, portMAX_DELAY);
     bool found = false;
     for (uint8_t i = 0; i < watchedCount; i++) {
-        const Entry& e = watched[i];
-        bool originMatches = !e.origin[0] || (aircraftOrigin && strcmp(e.origin, aircraftOrigin) == 0);
-        bool destMatches = !e.dest[0] || (aircraftDest && strcmp(e.dest, aircraftDest) == 0);
+        const Entry& w = watched[i];
+        bool originMatches = !w.origin[0] || strcmp(w.origin, e->origin) == 0;
+        bool destMatches = !w.dest[0] || strcmp(w.dest, e->dest) == 0;
         // Mindestens EIN Feld muss im Eintrag tatsaechlich gesetzt sein
         // (sonst waere ein komplett leerer Eintrag ein Treffer auf alles) -
         // addWatched() verhindert das bereits beim Anlegen, hier zur
         // Sicherheit nochmal geprueft.
-        if ((e.origin[0] || e.dest[0]) && originMatches && destMatches) {
+        if ((w.origin[0] || w.dest[0]) && originMatches && destMatches) {
             found = true;
             break;
         }
@@ -217,9 +267,18 @@ void pollBackground() {
     {
         AircraftTable::lock();
         Aircraft* table = AircraftTable::raw();
-        for (uint8_t i = 0; i < AircraftTable::capacity(); i++) {
-            if (!table[i].valid || !table[i].callsign[0] || table[i].routeLookupDone) continue;
+        uint8_t tableCapacity = AircraftTable::capacity();
+        pruneCacheLocked(table, tableCapacity);
+        for (uint8_t i = 0; i < tableCapacity; i++) {
+            if (!table[i].valid || !table[i].callsign[0]) continue;
             if (!RadarScreen::isAircraftCurrentlyVisible(table[i])) continue;
+            RouteCacheEntry* e = findCacheEntry(table[i].hex);
+            if (e && e->lookupDone) continue; // bereits ermittelt
+            if (!e) {
+                e = findFreeCacheSlot();
+                if (!e) continue; // Cache gerade voll (sehr selten) - naechste Runde versuchen
+                strncpy(e->hex, table[i].hex, sizeof(e->hex) - 1);
+            }
             strncpy(hex, table[i].hex, sizeof(hex) - 1);
             strncpy(callsign, table[i].callsign, sizeof(callsign) - 1);
             found = true;
@@ -240,17 +299,12 @@ void pollBackground() {
     // bleiben weg (Default nullptr/0, siehe aircraft_details.h).
     AircraftDetails::fetchRoute(client, callsign, origin, sizeof(origin), dest, sizeof(dest));
 
-    AircraftTable::lock();
-    Aircraft* table = AircraftTable::raw();
-    for (uint8_t i = 0; i < AircraftTable::capacity(); i++) {
-        if (strcmp(table[i].hex, hex) == 0) {
-            strncpy(table[i].routeOrigin, origin, sizeof(table[i].routeOrigin) - 1);
-            strncpy(table[i].routeDest, dest, sizeof(table[i].routeDest) - 1);
-            table[i].routeLookupDone = true;
-            break;
-        }
+    RouteCacheEntry* e = findCacheEntry(hex);
+    if (e) {
+        strncpy(e->origin, origin, sizeof(e->origin) - 1);
+        strncpy(e->dest, dest, sizeof(e->dest) - 1);
+        e->lookupDone = true;
     }
-    AircraftTable::unlock();
 }
 
 }

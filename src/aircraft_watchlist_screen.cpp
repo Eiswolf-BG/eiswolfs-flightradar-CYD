@@ -275,17 +275,15 @@ void run(TFT_eSPI& tft) {
         tft.setCursor(10, 14);
         tft.println(I18n::t(StringId::WATCHLIST_TITLE));
 
-        // BUGFIX (Alex' Meldung, Foto vom Geraet - gleicher Fehler wie beim
-        // Typ-Wachliste-Screen): DESC1/DESC2 liefen vorher ueber rohes
+        // BUGFIX (Foto vom Geraet): DESC1/DESC2 liefen vorher ueber rohes
         // setCursor()/println() an FESTEN Y-Positionen - bei laengeren
         // Uebersetzungen brach TFT_eSPI's eingebautes Auto-Wrap mitten im
-        // Wort auf eine dritte Zeile um, die dann mit dem darunter fest
-        // positionierten "leere Liste"-Platzhalter ueberlappte. Jetzt ueber
-        // layoutWrapped() (echter wortweiser Umbruch anhand der
-        // tatsaechlichen Pixelbreite, CLAUDE.md-Pflicht fuer variablen
-        // Text) als ein zusammenhaengender Absatz, die Liste beginnt
-        // dynamisch unter der gemessenen End-Y-Position statt an einer
-        // festen Zahl.
+        // Wort auf eine dritte Zeile um, die dann mit der darunter fest
+        // positionierten Liste ueberlappte. Jetzt ueber layoutWrapped()
+        // (echter wortweiser Umbruch anhand der tatsaechlichen
+        // Pixelbreite) als ein zusammenhaengender Absatz, die Liste
+        // beginnt dynamisch unter der gemessenen End-Y-Position statt an
+        // einer festen Zahl.
         String descText = String(I18n::t(StringId::WATCHLIST_DESC1)) + " " +
                            I18n::t(StringId::WATCHLIST_DESC2);
         int16_t descEndY = layoutWrapped(tft, 10, 40, (int16_t)(Config::SCREEN_WIDTH - 20), 16,
@@ -335,11 +333,6 @@ void run(TFT_eSPI& tft) {
 
         int16_t y = listTop;
         if (count == 0) {
-            // BUGFIX (Alex' Meldung): derselbe Ueberlapp-Fehler wie beim
-            // Erklaertext oben steckte auch im "leere Liste"-Platzhalter -
-            // jetzt ebenfalls ueber layoutWrapped() mit grosszuegigerem
-            // Zeilenabstand/Puffer statt rohem setCursor()/println() mit
-            // nur einer ROW_H Platz.
             tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
             layoutWrapped(tft, 10, (int16_t)(y + 14), (int16_t)(Config::SCREEN_WIDTH - 20), 18,
                           I18n::t(StringId::WATCHLIST_EMPTY), 0, 0, Config::SCREEN_HEIGHT, true);

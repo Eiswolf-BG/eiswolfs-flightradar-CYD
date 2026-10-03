@@ -20,14 +20,26 @@
 // routeWatchlistAlertEnabled(), AUS per Default) UND pollBackground()
 // (von net_task.cpp/Core 0 aufgerufen) - ermittelt hoechstens EINE Route pro
 // Aufruf, nur fuer aktuell auf dem Radar sichtbare Flugzeuge (Alex' Wunsch,
-// API-Last), und cached das Ergebnis pro Flugzeug (aircraft.h::routeOrigin/
-// routeDest/routeLookupDone) statt bei jedem ADS-B-Zyklus erneut
-// anzufragen.
+// API-Last).
+//
+// WICHTIGER UNTERSCHIED zur ersten Implementierung (02.10., siehe CLAUDE.md
+// "Bekannte Probleme"/Git-Historie): Das per-Flugzeug-Lookup-Ergebnis
+// (Hex -> Origin/Dest/lookupDone) wurde FRUEHER direkt in aircraft.h als
+// drei zusaetzliche Felder auf dem Aircraft-Datensatz gespeichert. Da dieser
+// Datensatz im Projekt an SECHS verschiedenen Stellen als statisches
+// Aircraft[Config::MAX_TRACKED_AIRCRAFT]-Array dupliziert wird (siehe
+// aircraft_table.cpp/net_task.cpp/flight_logbook.cpp x2/
+// aircraft_list_screen.cpp/radar_screen.cpp), multiplizierte sich der
+// Speicherbedarf der drei neuen Felder mit sechs - genug, um einen
+// "DRAM segment does not fit"-Linker-Fehler auszuloesen, der nur durch eine
+// Kapazitaetskuerzung an ganz ANDERER Stelle (dev_file_manager_screen.cpp)
+// behoben werden konnte, und vermutlich zur beobachteten TLS-Speichernot
+// (haeufige "SSL - Memory allocation failed") beigetragen hat. Jetzt liegt
+// der Lookup-Cache stattdessen in einer EIGENEN, einzigen, hier intern
+// gehaltenen Tabelle (siehe route_watchlist.cpp) - exakt EINE Instanz statt
+// sechs, selber Speicherbedarf wie vorher EINMAL, nicht sechsmal.
 namespace RouteWatchlist {
-    // Erhoeht von 5 auf 12 (Alex' Auftrag) - siehe aircraft_watchlist.h fuer
-    // die volle Begruendung (Scrollen jetzt vorhanden; 20 scheiterte am
-    // knappen internen RAM, 12 wurde live gegen dieses Limit getestet).
-    constexpr uint8_t MAX_WATCHED = 12;
+    constexpr uint8_t MAX_WATCHED = 5;
 
     void init();
 
@@ -42,10 +54,11 @@ namespace RouteWatchlist {
     bool addWatched(const char* origin, const char* dest);
     void removeWatched(uint8_t index);
 
-    // aircraftOrigin/aircraftDest sind die per Hintergrund-Lookup ermittelten
-    // ICAO-Codes eines konkreten Flugzeugs (aircraft.h) - leer, falls (noch)
-    // nicht ermittelt. Siehe Abgleich-Regeln oben.
-    bool isWatched(const char* aircraftOrigin, const char* aircraftDest);
+    // Prueft den (intern gecachten) Routen-Lookup-Stand des Flugzeugs mit
+    // diesem Hex-Code gegen die Wachliste - liefert false, solange der
+    // Hintergrund-Lookup fuer dieses Flugzeug noch nicht abgeschlossen ist
+    // (siehe pollBackground()).
+    bool isWatched(const char* hex);
 
     // Von net_task.cpp (Core 0) bei JEDER Schleifeniteration aufgerufen,
     // kuemmert sich intern selbst darum, hoechstens EINE Route pro Aufruf zu

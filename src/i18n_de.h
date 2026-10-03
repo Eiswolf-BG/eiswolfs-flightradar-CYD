@@ -91,7 +91,7 @@ static const char* const I18N_DE[] = {
     "Flugzeug hinzufügen (Rufzeichen)",
     "Noch keine Flugzeuge beobachtet.",
     "Wie die Beobachtungsliste funktioniert",
-    "Trage das exakte Rufzeichen eines bestimmten Flugs ein (z.B. DLH441) - keinen Airline-Code wie beim Airline-Filter. Bis zu 5 Flugzeuge lassen sich gleichzeitig beobachten.",
+    "Trage das exakte Rufzeichen eines bestimmten Flugs ein (z.B. DLH441), oder nutze \"*\" als Platzhalter für mehrere (z.B. DLH* für alle Lufthansa-Flüge, *441 für jeden Flug, der auf 441 endet) - keinen Airline-Code wie beim Airline-Filter. Bis zu 12 Flugzeuge lassen sich gleichzeitig beobachten.",
     "Sobald ein beobachtetes Flugzeug irgendwo im Radar auftaucht, bekommt es einen cyanfarbenen Ring und die LED blinkt blau - praktisch, um einen bestimmten Flug zu erkennen, z.B. wenn jemand Bekanntes ankommt.",
 
     "Standort-Presets",
@@ -329,9 +329,6 @@ static const char* const I18N_DE[] = {
     "So funktioniert die Squawk-Wachliste",
     "Gib einen 4-stelligen oktalen Squawk-Code ein (0000-7777, nur Ziffern 0-7) - z.B. einen Code, den deine örtliche Flugsicherung für einen bestimmten Zweck nutzt. Bis zu 5 Codes können gleichzeitig überwacht werden.",
     "Sobald ein Flugzeug einen überwachten Squawk-Code sendet, bekommt es einen türkisfarbenen Ring und die LED blinkt blau - derselbe Alarm wie bei der Beobachtungsliste. Notfall-Codes (7500/7600/7700) werden davon unabhängig immer über den roten Notfall-Alarm behandelt.",
-    "ISS-Marker: ",
-    "Über den ISS-Marker",
-    "Zeigt die Internationale Raumstation (ISS) als Sondermarker, wenn sie gerade innerhalb eurer Radar-Reichweite vorbeifliegt. Wegen ihrer hohen Geschwindigkeit (~7,66 km/s) ist das meist nur für wenige Sekunden sichtbar, wenn überhaupt.",
 
     "Systemstart...",
     "Initialisiere Transponder-Empfänger...",
@@ -585,6 +582,10 @@ static const char* const I18N_DE[] = {
     "Normal",
     "Reduziert (Stufe %d/3)",
 
+    "Richtung:",
+    "Hauptrichtung: ",
+    "Höhe: ",
+
     "Anflug-Alarm",
     "Anflug-Alarm",
     "Sendet eine eigene ntfy-Push-Benachrichtigung, sobald ein bereits auf einer deiner Wachlisten (Rufzeichen, Squawk oder Flugzeugtyp) erkanntes Flugzeug neu in die Landeanflugphase wechselt. Löst nur einmal pro Anflug aus, nicht wiederholt während der ganzen Phase.",
@@ -624,9 +625,37 @@ static const char* const I18N_DE[] = {
     "Datum: ",
     "Sonnenauf-/-untergang noch nicht verfügbar",
 
-    "Richtung:",
-    "Hauptrichtung: ",
-    "Höhe: ",
+    "Ø Höhe: ",
+    "Ø Geschw.: ",
+    "Dichte: ",
+    "NIEDRIG",
+    "MITTEL",
+    "HOCH",
+    "Trend: ",
+
+    "Fast senkrecht über dir",
+    "Zieht links vorbei",
+    "Zieht rechts vorbei",
+    "Verlässt Reichweite in ~",
+
+    "Wahrscheinlich hörbar",
+    "Evtl. hörbar",
+    "Kaum hörbar",
+
+    "Neuer Tageshöchststand Verkehr: ",
+    "Erster Militär-/Behördenflug des Tages gesichtet",
+    "Erstes Heavy-Flugzeug des Tages gesichtet",
+    "Flugbuch schaltet sich in Kürze automatisch ab",
+
+    "Highlights von heute - setzt sich jede Nacht zurück.",
+    "Längste Verfolgung: ",
+    "Schnellster Steigflug: ",
+    "Schnellster Sinkflug: ",
+    "Erstes heute: ",
+    "Letzte Neuankunft: ",
+    "Meiste Rückkehrer heute: ",
+
+    "Zuletzt: ",
 };
 
 static_assert(sizeof(I18N_DE) / sizeof(I18N_DE[0]) == (size_t)StringId::COUNT,

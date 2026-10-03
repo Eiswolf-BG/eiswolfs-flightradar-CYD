@@ -10,7 +10,7 @@ bool isHit(const Aircraft& a) {
     return AircraftWatchlist::isWatched(a.callsign) ||
            SquawkWatchlist::isWatched(a.squawk) ||
            TypeWatchlist::isWatched(a.typeCode) ||
-           RouteWatchlist::isWatched(a.routeOrigin, a.routeDest);
+           RouteWatchlist::isWatched(a.hex);
 }
 
 }

@@ -412,12 +412,11 @@ void run(TFT_eSPI& tft) {
 
         // "Flight Stories" (Alex' Wunsch) - automatische Ereignis-Meldungen
         // (Militaer-/Hubschrauber-Sichtung, Tiefflug), unabhaengig vom
-        // Haupt-Notfall-/Watchlist-Schalter oben. Noch KEINE eigene
-        // StringId (neue uebersetzte Strings brauchen aktualisierte
-        // lang_XX.bin-Assets auf GitHub - diese Aufgabe ist bewusst "nur
-        // bauen und flashen, nicht pushen"), daher hier absichtlich
-        // englisch hart kodiert, gleiches Vorgehen wie an mehreren anderen
-        // Stellen heute (z.B. Loesch-Bildschirm-Hinweis).
+        // Haupt-Notfall-/Watchlist-Schalter oben. Bewusst englisch hart
+        // kodiert statt eigener StringId - "Flight Stories" bleibt als
+        // Feature-Name immer englisch (Alex' Vorgabe, siehe auch die
+        // uebersetzten NTFY_FLIGHT_STORY_*_FMT-Nachrichtentexte selbst
+        // weiter unten in i18n.h).
         Rect flightStoriesRow = rowRect(2);
         drawCheckboxRow(tft, flightStoriesRow, "Flight Stories", SettingsStore::ntfyFlightStoriesEnabled());
         drawRowInfoButton(tft, flightStoriesRow);
@@ -426,10 +425,7 @@ void run(TFT_eSPI& tft) {
         // ein bereits per Watchlist erkanntes Flugzeug neu in den
         // Landeanflug wechselt (radar_screen.cpp::updateProximityAlert()).
         // Eigene, echte StringIds diesmal (anders als "Flight Stories"
-        // oben) - das Sprachsystem ist weiterhin ausschliesslich
-        // hinsichtlich Lade-/Cache-Mechanismus tabu, das reine Hinzufuegen
-        // neuer, in i18n_XX.h fest einkompilierter Eintraege ist normale
-        // Feature-Arbeit wie bei jedem anderen Toggle im Projekt.
+        // oben, das bewusst englisch hart kodiert bleibt).
         Rect approachAlertRow = rowRect(3);
         drawCheckboxRow(tft, approachAlertRow, I18n::t(StringId::NTFY_APPROACH_ALERT_LABEL),
                          SettingsStore::ntfyApproachAlertEnabled());

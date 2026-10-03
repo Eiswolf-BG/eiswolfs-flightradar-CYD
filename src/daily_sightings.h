@@ -22,10 +22,29 @@ namespace DailySightings {
 
     // Von aircraft_table.cpp::postFetchUpdate() JEDEN Zyklus fuer jedes
     // aktuell gueltige Flugzeug aufgerufen - analog zu SessionStats::
-    // record().
-    void record(const Aircraft& a);
+    // record(). Liefert true GENAU beim allerersten Aufruf fuer diesen Hex-
+    // Code an diesem Kalendertag (neuer Entry wird angelegt) - SessionStats
+    // nutzt das als "heute neu gesehen"-Signal (Alex' Auftrag, Session-
+    // Highlights), OHNE dafuer ein zweites, eigenes Dedup-Set im RAM
+    // vorzuhalten (haette beim ersten Versuch prompt wieder den bekannten
+    // DRAM-Ueberlauf ausgeloest, siehe Kommentar oben zu MAX_SEEN).
+    bool record(const Aircraft& a);
 
     // Von radar_screen.cpp::drawDetailPanel() abgefragt, um den aktuellen
     // Zustand des ausgewaehlten Flugzeugs anzuzeigen.
     Info get(const char* hex);
+
+    // "Pass-by-Zaehler" (Alex' Auftrag) - welches Flugzeug heute am
+    // haeufigsten erneut aufgetaucht ist (hoechster count-Wert ueber ALLE
+    // heute gesehenen Flugzeuge, nicht nur das aktuell abgefragte). Nur der
+    // Hex-Code wird gemerkt (kein Rufzeichen-Feld hier, um die Entry-
+    // Struktur klein zu halten, siehe Kommentar zu MAX_SEEN in .cpp) - der
+    // Aufrufer (session_stats_screen.cpp) loest das Rufzeichen bei Bedarf
+    // selbst ueber die AircraftTable auf, mit Fallback auf den Hex-Code.
+    struct TopReturning {
+        bool available = false;
+        char hex[7] = {0};
+        uint16_t count = 0;
+    };
+    TopReturning topReturning();
 }

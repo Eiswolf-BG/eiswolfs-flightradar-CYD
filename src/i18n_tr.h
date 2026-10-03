@@ -91,7 +91,7 @@ static const char* const I18N_TR[] = {
     "Uçak ekle (çağrı işareti)",
     "Henüz izlenen uçak yok.",
     "İzleme listesi nasıl çalışır",
-    "Belirli bir ucusun tam cagri isaretini girin (orn. DLH441) - Havayolu Filtresi'ndeki gibi bir havayolu kodu degil. Ayni anda 5 adete kadar ucak izlenebilir.",
+    "Belirli bir uçuşun tam çağrı işaretini girin (örn. DLH441), veya birden fazlasını eşlemek için \"*\" joker karakterini kullanın (örn. tüm Lufthansa uçuşları için DLH*, 441 ile biten herhangi bir uçuş için *441) - Havayolu Filtresi'ndeki gibi bir havayolu kodu değil. Aynı anda 12 adete kadar uçak izlenebilir.",
     "Izlenen bir ucak radarda herhangi bir yerde gorundugunde, cevresinde camgobegi bir halka belirir ve LED mavi yanip soner - taniidik birinin varisi gibi belirli bir ucusu fark etmek icin harika.",
 
     "Konum ön ayarları",
@@ -329,9 +329,6 @@ static const char* const I18N_TR[] = {
     "Squawk izleme nasıl çalışır",
     "4 haneli oktal bir squawk kodu girin (0000-7777, sadece 0-7 rakamlari) - orn. yerel hava trafik kontrolunuzun belirli bir amac icin kullandigi bir kod. Ayni anda 5 adede kadar kod izlenebilir.",
     "Izlenen bir squawk kodu herhangi bir ucak tarafindan gonderildiginde, o ucagin cevresinde camgobegi bir halka belirir ve LED mavi yanip soner - ucak izleme listesiyle ayni uyari. Acil durum kodlari (7500/7600/7700) bu listeden bagimsiz olarak her zaman kirmizi acil durum alarmiyla ayri islenir.",
-    "ISS işareti: ",
-    "ISS işareti hakkında",
-    "Uluslararasi Uzay Istasyonu'nu (ISS), radar menzilinizin icinden gectigi anda ozel bir isaret olarak gosterir. Yuksek hizi (~7,66 km/sn) nedeniyle bu genellikle sadece birkac saniye icin, hatta hic gorunmeyebilir.",
 
     "Başlatılıyor...",
     "Transponder alıcısı başlatılıyor...",
@@ -585,6 +582,10 @@ static const char* const I18N_TR[] = {
     "Normal",
     "Azaltıldı (seviye %d/3)",
 
+    "Yön:",
+    "Ana yön: ",
+    "İrtifa: ",
+
     "Yaklaşma Uyarısı",
     "Yaklaşma Uyarısı",
     "Zaten izleme listelerinizden birinde (çağrı işareti, squawk veya uçak tipi) bulunan bir uçak yeni bir iniş yaklaşmasına girdiğinde ayrı bir ntfy push bildirimi gönderir. Her yaklaşma için yalnızca bir kez tetiklenir, o aşamada kaldığı sürece tekrar tekrar değil.",
@@ -624,9 +625,37 @@ static const char* const I18N_TR[] = {
     "Tarih: ",
     "Gün doğumu/batımı henüz kullanılamıyor",
 
-    "Yön:",
-    "Ana yön: ",
-    "İrtifa: ",
+    "Ort. irtifa: ",
+    "Ort. hız: ",
+    "Yoğunluk: ",
+    "DÜŞÜK",
+    "ORTA",
+    "YÜKSEK",
+    "Eğilim: ",
+
+    "Tam üstünde",
+    "Soldan geçiyor",
+    "Sağdan geçiyor",
+    "Menzilden çıkış ~",
+
+    "Muhtemelen işitilir",
+    "Belki işitilir",
+    "Zar zor işitilir",
+
+    "Günün yeni trafik zirvesi: ",
+    "Günün ilk askeri/resmi uçuşu görüldü",
+    "Günün ilk Heavy uçağı görüldü",
+    "Uçuş defteri kısa süre içinde otomatik kapanacak",
+
+    "Bugünün öne çıkanları - her gece sıfırlanır.",
+    "En uzun takip: ",
+    "En hızlı tırmanış: ",
+    "En hızlı iniş: ",
+    "Bugün ilk görülen: ",
+    "Son yeni varış: ",
+    "Bugün en çok dönen: ",
+
+    "Son: ",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

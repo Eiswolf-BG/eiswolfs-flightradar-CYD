@@ -8,7 +8,6 @@
 #include "type_watchlist.h"
 #include "watchlist_alert.h"
 #include "aircraft_table.h"
-#include "radar_screen.h"
 #include "settings_store.h"
 #include "location_manager.h"
 #include "units.h"
@@ -23,6 +22,8 @@
 #include <cstring>
 #include <cmath>
 #include <atomic>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace WebExportServer {
 
@@ -32,11 +33,7 @@ namespace {
     WebServer server(80);
 
     // Zeitstempel der letzten "/radar.json"-Abfrage - Grundlage fuer
-    // isRadarUiActive() (siehe web_export_server.h). Gefahrlos ohne Mutex/
-    // Atomics: server.handleClient() (und damit handleRadarJson()) laeuft
-    // synchron innerhalb von WebExportServer::update(), das ausschliesslich
-    // von NetTask auf Core 0 aufgerufen wird - kein anderer Task schreibt
-    // oder liest diese Variable.
+    // isRadarUiActive() (siehe web_export_server.h).
     uint32_t lastRadarJsonRequestMs = 0;
     constexpr uint32_t RADAR_UI_ACTIVE_WINDOW_MS = 20000; // > 8s Poll-Intervall der Seite, mit Puffer
 
@@ -75,12 +72,12 @@ namespace {
     // SettingsStore::radarThemeIndex() etc., aber Core 1 (UI) bekam davon
     // nichts mit, bis zufaellig der naechste erfolgreiche ADS-B-Zyklus kam
     // - bei intakter Verbindung meist nur ein paar Sekunden, aber bei
-    // fehlschlagenden Abrufen (siehe CLAUDE.md "Bekannte Probleme", TLS/
-    // Heap-Fragmentierung) mit Backoff bis zu Config::FETCH_BACKOFF_MAX_MS
-    // (3 Minuten) - exakt die von Alex beobachtete Verzoegerung. Der
-    // Radius-Button wirkte dabei "haengengeblieben", weil er (wie alle
-    // anderen sichtbaren Elemente auch) schlicht ueberhaupt nicht neu
-    // gezeichnet wurde, nicht weil seine Farbe falsch verdrahtet waere.
+    // fehlschlagenden Abrufen (TLS/Heap-Fragmentierung) mit Backoff bis zu
+    // Config::FETCH_BACKOFF_MAX_MS (3 Minuten) - exakt die von Alex
+    // beobachtete Verzoegerung. Der Radius-Button wirkte dabei "haengen-
+    // geblieben", weil er (wie alle anderen sichtbaren Elemente auch)
+    // schlicht ueberhaupt nicht neu gezeichnet wurde, nicht weil seine
+    // Farbe falsch verdrahtet waere.
     //
     // Fix: dieses Flag wird von JEDEM Fernsteuerungs-Handler unten gesetzt,
     // der tatsaechlich (nicht debounce-uebersprungen) eine sichtbare
@@ -88,9 +85,7 @@ namespace {
     // main.cpp::loop() (Core 1) konsumiert es ueber
     // WebExportServer::consumeRemoteSettingsChanged() (siehe .h) bei jedem
     // Schleifendurchlauf und erzwingt darueber sofort ein forceRedraw,
-    // VOELLIG unabhaengig vom ADS-B-Abruf - identisches Cross-Core-Signal-
-    // Muster wie I18n::reloadPending/consumeReloadPending() fuer die SD-
-    // Sprachdateien.
+    // VOELLIG unabhaengig vom ADS-B-Abruf.
     std::atomic<bool> remoteSettingsChanged{false};
 
     // Web-Pendant zu UiTheme::accentColor() (siehe ui_theme.h/.cpp auf dem
@@ -1466,8 +1461,15 @@ namespace {
         // Zeitpunkt noch gar nicht im DOM, das Ergebnis waere dauerhaft
         // null) - stattdessen bei JEDEM updateConnStatus()-Aufruf frisch
         // nachschlagen.
+        // Bewusst IMMER Gruen/Rot, unabhaengig vom gewaehlten Farbthema
+        // (Alex' Wunsch) - anders als sonst im Projekt ueblich (siehe
+        // CLAUDE.md "Farbschema"), da dieser Punkt wie die Hoehenfarben/
+        // Status-Ringe eine eigene, themenunabhaengige Bedeutung traegt
+        // (Verbunden/Nicht verbunden), die bei z.B. Amber- oder Blau-Thema
+        // sonst nicht mehr eindeutig von anderen UI-Elementen unterscheidbar
+        // waere.
         html += "function updateConnStatus(ok){var connDot=document.getElementById('connDot'),connText=document.getElementById('connText');if(!connDot||!connText)return;";
-        html += "connDot.style.background=ok?cssVar('--accent'):'#ff3b3b';connText.textContent=ok?" +
+        html += "connDot.style.background=ok?'#39ff14':'#ff3b3b';connText.textContent=ok?" +
                 jsLit(I18n::t(StringId::WEB_CONNECTED)) + ":" + jsLit(I18n::t(StringId::WEB_NO_CONNECTION)) + ";}";
         // Watchlist-/Squawk-Wachposten-Badge (#watchBadge im Footer, siehe
         // handleRoot()) - zeigt/versteckt sich je nachdem, ob mindestens ein
@@ -1908,7 +1910,7 @@ namespace {
         // allererste poll() durchgelaufen ist.
         html += "<footer style=\"margin-top:24px;padding-top:10px;border-top:1px solid var(--accent-border);font-size:11px;color:var(--accent-muted);\">";
         html += "Eiswolfs Flightradar v" + String(Config::APP_VERSION) + " &middot; ";
-        html += "<span id=\"connDot\" style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent-muted);margin-right:4px;\"></span>";
+        html += "<span id=\"connDot\" style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:#888888;margin-right:4px;\"></span>";
         html += "<span id=\"connText\">" + String(I18n::t(StringId::WEB_CHECKING)) + "</span>";
         // Watchlist-/Squawk-Wachposten-Badge (Alex' Wunsch) - zeigt an, ob
         // GERADE (im aktuellsten poll()-Ergebnis) mindestens ein Flugzeug
@@ -2302,6 +2304,8 @@ namespace {
                 }
             }
         }
+        bool hideGround = SettingsStore::hideGroundVehicles();
+        bool onlyHeli = SettingsStore::onlyHelicopters();
         bool emergencyOn = SettingsStore::emergencyAlertEnabled();
         bool militaryOn = SettingsStore::militarySquawkDetectionEnabled();
 
@@ -2509,20 +2513,15 @@ namespace {
         for (uint8_t i = 0; i < AircraftTable::capacity(); i++) {
             Aircraft& a = table[i];
             if (!a.valid) continue;
-            // EIN gemeinsamer Filter-Check (Reichweite, Bodenfahrzeuge,
-            // Nur-Helikopter, Nur-Niedrigflieger, Nur-Interessantes,
-            // Airline-Filter) statt einer separat gepflegten Kopie hier -
-            // Alex' Wunsch: die Web-Livekarte soll konsistent dieselbe
-            // Sichtbarkeitsmenge zeigen wie Radar/Flugzeugliste/Live-
-            // Traffic. Explizit MIT dem hier lokal aufgeloesten rangeKm
-            // (kann per "range_km"-Query-Parameter vom eigentlichen
-            // Geraete-Wert abweichen, siehe Kommentar weiter oben), NICHT
-            // ueber RadarScreen::isAircraftCurrentlyVisible() (das
-            // haette wieder fest die Geraete-Reichweite angenommen).
-            if (!RadarScreen::isAircraftVisibleAtRange(a, rangeKm)) continue;
+            if (a.distanceKm > rangeKm * 1.05f) continue;
 
             bool isGroundVehicle = a.category[0] == 'C';
+            if (hideGround && isGroundVehicle) continue;
+
             bool isRotorcraft = a.category[0] == 'A' && a.category[1] == '7';
+            if (onlyHeli && !isRotorcraft) continue;
+
+            if (AirlineFilter::isHidden(a.callsign)) continue;
 
             bool isHeavy = isHeavyCategoryWeb(a.category);
             bool isEmergency = emergencyOn && isEmergencySquawkWeb(a.squawk);
@@ -2762,6 +2761,7 @@ namespace {
     void handleNotFound() {
         server.send(404, "text/plain", "Not found");
     }
+
 }
 
 void begin() {

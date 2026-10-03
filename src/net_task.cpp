@@ -15,7 +15,6 @@
 #include "weather.h"
 #include "ota_update.h"
 #include "sd_storage.h"
-#include "iss_tracker.h"
 #include "ntfy_push.h"
 #include "mqtt_client.h"
 #include "aircraft_watchlist.h"
@@ -23,7 +22,11 @@
 #include "type_watchlist.h"
 #include "watchlist_alert.h"
 #include "radar_screen.h"
+#include "live_traffic_screen.h"
+#include "airline_filter.h"
+#include "i18n.h"
 #include <Arduino.h>
+#include <time.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <cstring>
@@ -35,6 +38,23 @@ namespace {
     TaskHandle_t taskHandle = nullptr;
     uint32_t lastFetchMs = 0;
 
+    // Drei neue, taeglich zuruecksetzende ntfy-Event-Merker (Alex' Auftrag,
+    // "Grok"-Ideenliste) - gleiches Tageswechsel-Muster wie DailySightings/
+    // FlightLogbook::updatePeakTraffic() (String-Datumsvergleich statt
+    // eigener Kalenderarithmetik).
+    char dailyFirstsDay[11] = {0};
+    bool militaryNotifiedToday = false;
+    bool heavyNotifiedToday = false;
+
+    // "Peak Traffic erreicht" - letzter BEKANNTER Hoechststand, um einen
+    // NEUEN Rekord zu erkennen (FlightLogbook::todayPeakTraffic() selbst
+    // liefert kein "neu"-Signal).
+    uint16_t lastKnownPeakTraffic = 0;
+
+    // "Logbook-Auto-Off in X Stunden" - verhindert Mehrfachversand,
+    // solange die verbleibende Zeit unter der Warnschwelle bleibt.
+    bool logbookAutoOffNotified = false;
+
     // TESTWEISE - adaptives ADS-B-Abfrageintervall (siehe Absprache mit
     // Karl, Reaktion auf vereinzelte HTTP 429 von adsb.lol): startet bei
     // Config::FETCH_INTERVAL_MS, verdoppelt sich nach einem 429 (oder
@@ -42,26 +62,12 @@ namespace {
     // Config::FETCH_BACKOFF_MAX_MS, und kehrt nach jeder erfolgreichen
     // Abfrage schrittweise (nicht abrupt) zum Grundintervall zurueck. Bei
     // einem einzelnen sonstigen Fehlschlag (Timeout/SSL) wird stattdessen
-    // Config::FETCH_RETRY_DELAY_MS gewartet (siehe genericFailureBackoffMs
-    // unten fuer das Verhalten bei MEHREREN Fehlschlaegen in Folge).
+    // IMMER die feste Config::FETCH_RETRY_DELAY_MS gewartet (ein
+    // zwischenzeitlich eingefuehrtes, bei MEHREREN Fehlschlaegen in Folge
+    // eskalierendes Backoff wurde als Ursache fuer Alex' "Verbindung sofort
+    // weg"-Meldung identifiziert und wieder auf dieses einfache, in v6.5.5
+    // bewaehrte Verhalten zurueckgesetzt).
     uint32_t currentIntervalMs = Config::FETCH_INTERVAL_MS;
-
-    // BUGFIX/VERBESSERUNG (Alex' Auftrag, Heap-Fragmentierungs-
-    // Untersuchung): generische Verbindungsfehler (Timeout/SSL/"HTTP -1",
-    // siehe adsb_client.cpp) warteten bisher IMMER fest
-    // Config::FETCH_RETRY_DELAY_MS (18s), egal wie viele Fehlschlaege schon
-    // in Folge aufgetreten sind - bei einer laengeren Pechstraehne (z.B.
-    // voruebergehend zu fragmentierter Heap fuer den TLS-Handshake, siehe
-    // CLAUDE.md "Bekannte Probleme") fuehrte das zu vielen aussichtslosen
-    // Handshake-Versuchen im 18s-Takt. Jetzt: eigener, vom 429-Backoff
-    // UNABHAENGIGER Zaehler, der bei JEDEM weiteren generischen Fehlschlag
-    // in Folge verdoppelt wird (18s -> 36s -> 72s -> ...), gedeckelt bei
-    // Config::FETCH_BACKOFF_MAX_MS (derselbe Deckel wie beim 429-Pfad,
-    // kein neuer Konstantenwert noetig) - und bei JEDEM erfolgreichen
-    // Abruf sofort wieder auf den Ausgangswert (Config::FETCH_RETRY_DELAY_MS)
-    // zurueckgesetzt, damit eine kuenftige NEUE Pechstraehne wieder bei 18s
-    // beginnt, nicht beim zuletzt erreichten Maximum.
-    uint32_t genericFailureBackoffMs = Config::FETCH_RETRY_DELAY_MS;
 
     // Von NetTask (Core 0) geschrieben, von pause() (Core 1, siehe unten)
     // gelesen - std::atomic statt eines ungeschuetzten bool, gleiches
@@ -71,7 +77,7 @@ namespace {
     // umspannt seit dem Bugfix (Alex' Meldung: OTA-Download durch spaeter
     // hinzugekommene Hintergrund-Netzwerkaufrufe verlangsamt) die GESAMTE
     // Schleifeniteration (WifiMgr/LocationManager/WebExportServer/
-    // AircraftDetails/PreviouslySeen/Weather/IssTracker/OTA-Hintergrund-
+    // AircraftDetails/PreviouslySeen/Weather/OTA-Hintergrund-
     // check/MQTT/ADS-B-Abruf), nicht mehr nur AdsbClient::fetch() -
     // false ganz am Schleifenanfang, true erst unmittelbar vor dem
     // 50ms-Schlaf am Ende. Frueher deckte es NUR den ADS-B-Abruf ab, jeder
@@ -97,14 +103,14 @@ namespace {
         MqttClient::init();
 
         for (;;) {
-            // BUGFIX (Alex' Meldung: OTA-Download seit Weather-/MQTT-/ISS-/
+            // BUGFIX (Alex' Meldung: OTA-Download seit Weather-/MQTT-/
             // Update-Hintergrundcheck & Co. spuerbar langsamer, obwohl
             // NetTask::pause() waehrend eines OTA-Downloads doch eigentlich
             // suspendiert werden sollte) - netTaskIdle war bisher NUR waehrend
             // AdsbClient::fetch() false (siehe historischer Kommentar beim
             // vorherigen Deklarationsort), alle spaeter hinzugekommenen
             // Netzwerkaufrufe in dieser Schleife (Weather::update(),
-            // IssTracker::update(), OtaUpdate::pollBackground(),
+            // OtaUpdate::pollBackground(),
             // MqttClient::loop(), WebExportServer::update(), WifiMgr::
             // update(), LocationManager::update()) meldeten sich nie als
             // "nicht idle". pause() (Core 1) konnte dadurch mitten in einem
@@ -145,25 +151,11 @@ namespace {
             RouteWatchlist::pollBackground();
             PreviouslySeen::update();
             Weather::update();
-            // Bonus-Feature (siehe iss_tracker.h) - kuemmert sich intern
-            // um ihr eigenes, deutlich selteneres Intervall
-            // (Config::ISS_FETCH_INTERVAL_MS), gleiches Muster wie
-            // Weather::update() oben. Nur HTTP (kein TLS), daher unkritisch
-            // fuer die ADS-B-Speicher-/Verbindungsproblematik.
-            IssTracker::update();
             // Kuemmert sich intern um ihr eigenes, deutlich selteneres
             // Intervall (Config::OTA_BACKGROUND_CHECK_INTERVAL_MS, siehe
             // ota_update.cpp) - hier einfach jede Schleife mit aufrufen,
             // genau wie Weather::update() oben.
             OtaUpdate::pollBackground();
-            // Holt einen beim Boot mangels WLAN fehlgeschlagenen (oder noch
-            // nie versuchten) Download der Flughafendatenbank nach (siehe
-            // sd_storage.cpp) - kuemmert sich intern selbst um ihr eigenes,
-            // deutlich selteneres Intervall, gleiches "jede Schleife mit
-            // aufrufen"-Muster wie OtaUpdate::pollBackground() oben. Kehrt
-            // nach dem EINEN erfolgreichen Download im Geraeteleben dauerhaft
-            // sofort zurueck.
-            SdStorage::retryAirportsDownloadIfNeeded();
             // Optionale MQTT-Anbindung (SettingsStore::mqttEnabled(), AUS
             // per Default, siehe mqtt_client.h) - kuemmert sich selbst um
             // (Wieder-)Verbinden mit eigenem Mindestabstand zwischen
@@ -239,16 +231,67 @@ namespace {
                     // Minuten bei 100km bzw. korrekte Naechste-40-Auswahl
                     // synthetisch UND unter echtem Web-UI-Verkehr) - die
                     // Deckelung auf 50km war fuer BEIDE Probleme nur eine
-                    // Notloesung und ist damit nicht mehr noetig.
-                    constexpr float WEB_UI_MAX_AUTO_RANGE_KM = 100.0f;
-                    if (webServerStarted && WebExportServer::isRadarUiActive() &&
-                        rangeKm < WEB_UI_MAX_AUTO_RANGE_KM) {
+                    // Notloesung und war damit eine Zeit lang nicht mehr
+                    // noetig.
+                    //
+                    // ERNEUT gedeckelt (01.10., siehe CLAUDE.md "Bekannte
+                    // Probleme" - echter ESP32-Task-Watchdog-Absturz bei
+                    // 100km+Web-Livekarte): Live reproduziert, dass bei
+                    // 100km + vielen Flugzeugen + gleichzeitiger
+                    // Hintergrundlast ein echter Watchdog-Reset auftreten
+                    // kann, weil die Streaming-Parse-Schleife in
+                    // AdsbClient::fetch() an keiner Stelle yieldet (dort
+                    // bislang unveraendert, ein gezielter vTaskDelay()-Fix
+                    // dort wurde bewusst NICHT versucht, siehe Begruendung
+                    // im IncompleteInput-Eintrag in CLAUDE.md). Auf Alex'
+                    // Wunsch 75km statt 50km als Kompromiss zwischen
+                    // Stabilitaet und Web-UI-Reichweite - noch nicht
+                    // abschliessend live verifiziert, ob 75km bereits
+                    // ausreichend kleiner ist als die problematischen
+                    // 100km. Pragmatische Notloesung, bis die eigentliche
+                    // Parse-Schleife robust gemacht ist - KEIN
+                    // vollstaendiger Fix der Ursache.
+                    constexpr float WEB_UI_MAX_AUTO_RANGE_KM = 75.0f;
+                    // ACHTUNG: Nicht nur nach OBEN eskalieren (rangeKm <
+                    // Cap), sondern bei aktiver WebUI auch nach UNTEN
+                    // deckeln - sonst bleibt bei manuell am Geraet
+                    // eingestelltem 100km (rangeKm bereits >= Cap) die
+                    // Abfrage trotz Deckelung bei 100km, genau der
+                    // Praxisfall, der den Watchdog-Crash ausloest (Alex'
+                    // Live-Test 01.10.: "kann immernoch auf 100km, sowohl
+                    // live radar als auch Geraet" - die reine
+                    // "< Cap"-Bedingung von vorher griff dabei nicht).
+                    if (webServerStarted && WebExportServer::isRadarUiActive()) {
                         rangeKm = WEB_UI_MAX_AUTO_RANGE_KM;
+                    }
+
+                    // BUGFIX (Alex' Meldung: "Flight Stories" schickte trotz
+                    // 10-Minuten-Wiederholungssperre alle ~8s erneut dieselbe
+                    // Meldung): tempTable wurde bisher nur EINMAL direkt nach
+                    // einem erfolgreichen Abruf aus AircraftTable::raw()
+                    // resynchronisiert (siehe memcpy() weiter unten,
+                    // Kommentar bei "proximityZone 'ueberlebt' das..."). Mit
+                    // lastFlightStoryMs schreibt radar_screen.cpp::
+                    // updateProximityAlert() (Core 1) aber oft ERST NACH
+                    // diesem Zeitpunkt in die Live-Tabelle - also NACH dem
+                    // Resync, aber VOR dem naechsten Abruf. Der naechste
+                    // AdsbClient::fetch()-Aufruf schnappschoss dadurch
+                    // tempTable (siehe PrevFlightStory dort) IMMER im alten,
+                    // noch-nicht-gesetzten Zustand. Frische Resync direkt vor
+                    // JEDEM Abruf behebt das - erfasst garantiert auch
+                    // Core-1-Schreibzugriffe aus der Luecke seit dem letzten
+                    // Zyklus.
+                    {
+                        AircraftTable::lock();
+                        memcpy(tempTable, AircraftTable::raw(),
+                               sizeof(Aircraft) * Config::MAX_TRACKED_AIRCRAFT);
+                        AircraftTable::unlock();
                     }
 
                     // netTaskIdle ist bereits seit Schleifenbeginn false
                     // (siehe dortiger Kommentar) - kein erneutes Setzen hier
                     // noetig.
+                    Serial.printf("[DIAG] fetch rangeKm=%.0f webUiActive=%d\n", rangeKm, WebExportServer::isRadarUiActive() ? 1 : 0);
                     uint32_t fetchStartMs = millis();
                     auto result = AdsbClient::fetch(lat, lon, rangeKm,
                                                      tempTable, Config::MAX_TRACKED_AIRCRAFT);
@@ -260,6 +303,26 @@ namespace {
                     // das nur bei Erfolg laeuft). fetchDurationMs zusaetzlich
                     // fuer den System-Status-Screen (system_status_screen.cpp).
                     AircraftTable::recordFetchOutcome(result.ok, result.httpCode, fetchDurationMs);
+
+                    // Kurzer Yield-Punkt (Alex' Meldung: Verbindungsverlust/
+                    // Watchdog-Absturz bei 100km + geoeffneter Web-Livekarte) -
+                    // Alex' Meldung: Watchdog-Absturz (ESP32 Task-Watchdog,
+                    // echter abort()+Auto-Reboot) bei 100km Reichweite
+                    // waehrend die Web-Livekarte offen ist - siehe
+                    // ausfuehrlicher Eintrag in CLAUDE.md "Bekannte
+                    // Probleme". Dieser vTaskDelay(1) hier war ein erster
+                    // Versuch, dem Scheduler zwischen Abruf und der neuen
+                    // Nachbearbeitung dieses Batches eine Gelegenheit zu
+                    // geben - hat den Absturz in einem WIEDERHOLTEN Testlauf
+                    // NICHT verhindert (trat erneut auf, diesmal mit
+                    // "NetTask" statt "wifi" als blockiertem Task). Der
+                    // eigentliche Sitz des Problems liegt hoechstwahrschein-
+                    // lich in der Streaming-Parse-Schleife in
+                    // adsb_client.cpp::fetch() (dort KEIN einziger Yield-
+                    // Punkt, unveraendert seit vor diesem Batch) - bewusst
+                    // trotzdem hier stehen gelassen (kann nicht schaden),
+                    // aber NICHT als verifizierter Fix zu verstehen.
+                    vTaskDelay(1);
 
                     if (result.ok) {
                         // Offline-/Stale-Data-Modus (radar_screen.cpp) - haelt
@@ -297,6 +360,30 @@ namespace {
                                sizeof(Aircraft) * Config::MAX_TRACKED_AIRCRAFT);
 
                         uint8_t validAircraftCount = AircraftTable::validCount();
+
+                        // Verkehrstrend-Sample (Alex' Auftrag, siehe
+                        // live_traffic_screen.cpp::recordTrendSample()) -
+                        // bewusst HIER nach jedem erfolgreichen ADS-B-Abruf
+                        // auf Core 0 aufgenommen, UNABHAENGIG davon, ob der
+                        // Live-Traffic-Screen gerade geoeffnet ist, damit
+                        // der ~15-30-Minuten-Trend auch im Hintergrund
+                        // weiterlaeuft. Zaehlt mit DENSELBEN Filtern
+                        // (RadarScreen::isAircraftCurrentlyVisible(), noch
+                        // unter dem oben gehaltenen Lock) wie die Gesamtzahl
+                        // auf dem Live-Traffic-Screen selbst, statt einfach
+                        // validAircraftCount zu uebernehmen - sonst wuerde
+                        // der Trend z.B. bei aktivem "Nur Helikopter"-Filter
+                        // von einer anderen Grundmenge ausgehen als die
+                        // Anzeige, die er beschreibt.
+                        {
+                            uint16_t visibleNow = 0;
+                            Aircraft* rawTable = AircraftTable::raw();
+                            for (uint8_t ti = 0; ti < AircraftTable::capacity(); ti++) {
+                                if (!rawTable[ti].valid) continue;
+                                if (RadarScreen::isAircraftCurrentlyVisible(rawTable[ti])) visibleNow++;
+                            }
+                            LiveTrafficScreen::recordTrendSample(visibleNow);
+                        }
 
                         AircraftTable::unlock();
 
@@ -355,6 +442,24 @@ namespace {
                                 if (!traffic.hasNearest || table[i].distanceKm < traffic.nearestKm) {
                                     traffic.hasNearest = true;
                                     traffic.nearestKm = table[i].distanceKm;
+                                    // Flugphase des naechstgelegenen Flugzeugs
+                                    // (Alex' Auftrag) - genau an diesem Punkt
+                                    // erfasst, da table[i] hier gerade DAS
+                                    // naechstgelegene Flugzeug ist.
+                                    const char* phase = RadarScreen::flightPhaseLabelFor(table[i]);
+                                    strncpy(traffic.nearestPhase, phase, sizeof(traffic.nearestPhase) - 1);
+                                    traffic.nearestPhase[sizeof(traffic.nearestPhase) - 1] = 0;
+                                }
+                                // Naechste Ueberflug-ETA (Alex' Auftrag) - das
+                                // insgesamt kleinste cpaEtaMin ueber ALLE
+                                // gerade relevanten Flugzeuge (nicht
+                                // notwendigerweise das naechstgelegene), siehe
+                                // aircraft_table.cpp::postFetchUpdate() fuer
+                                // cpaRelevant/cpaEtaMin.
+                                if (table[i].cpaRelevant &&
+                                    (!traffic.hasNextOverflight || table[i].cpaEtaMin < traffic.nextOverflightEtaMin)) {
+                                    traffic.hasNextOverflight = true;
+                                    traffic.nextOverflightEtaMin = table[i].cpaEtaMin;
                                 }
                                 if (!traffic.hasHighest || table[i].altBaroFt > traffic.highestFt) {
                                     traffic.hasHighest = true;
@@ -379,7 +484,108 @@ namespace {
                                 }
                             }
                             AircraftTable::unlock();
+
+                            // Wetter-Code/GPS-Fix/gefilterte-Airlines (Alex'
+                            // Auftrag) - alle drei brauchen KEINEN eigenen
+                            // AircraftTable-Zugriff, deshalb bewusst erst
+                            // HIER nach dem unlock() oben ermittelt.
+                            switch (Weather::current()) {
+                                case Weather::Condition::Clear:        strncpy(traffic.weatherCode, "clear", sizeof(traffic.weatherCode) - 1); break;
+                                case Weather::Condition::PartlyCloudy: strncpy(traffic.weatherCode, "partly_cloudy", sizeof(traffic.weatherCode) - 1); break;
+                                case Weather::Condition::Cloudy:       strncpy(traffic.weatherCode, "cloudy", sizeof(traffic.weatherCode) - 1); break;
+                                case Weather::Condition::Rain:         strncpy(traffic.weatherCode, "rain", sizeof(traffic.weatherCode) - 1); break;
+                                case Weather::Condition::Snow:         strncpy(traffic.weatherCode, "snow", sizeof(traffic.weatherCode) - 1); break;
+                                case Weather::Condition::Thunderstorm: strncpy(traffic.weatherCode, "thunderstorm", sizeof(traffic.weatherCode) - 1); break;
+                                case Weather::Condition::Unknown:
+                                default:                                strncpy(traffic.weatherCode, "unknown", sizeof(traffic.weatherCode) - 1); break;
+                            }
+                            // "GPS-Fix-Qualitaet" (Alex' Auftrag) - im Projekt
+                            // ist aktuell nur ein einfaches Ja/Nein verfuegbar
+                            // (LocationManager::hasGpsFix()), keine feinere
+                            // HDOP-/Satelliten-Anzahl-Erfassung - daher als
+                            // einfacher Binaer-Sensor umgesetzt statt einer
+                            // erfundenen Detailstufe.
+                            traffic.gpsFixAvailable = LocationManager::hasGpsFix();
+                            traffic.filteredAirlineCount = AirlineFilter::count();
+
                             MqttClient::publishStatus(aircraftCount, anyWatched, anyClose, traffic);
+                            vTaskDelay(1); // zweiter Yield-Punkt, siehe Kommentar oben
+
+                            // Drei neue ntfy-Events (Alex' Auftrag) - jeweils
+                            // einmalig pro Tag ausgeloest (eigene, lokal
+                            // taeglich zuruecksetzende Merker, gleiches
+                            // Tageswechsel-Muster wie FlightLogbook::
+                            // updatePeakTraffic()/DailySightings), gated
+                            // durch denselben SettingsStore::ntfyPushEnabled()/
+                            // isQuietHoursActive()-Check wie alle bestehenden
+                            // ntfy-Versandstellen in radar_screen.cpp.
+                            if (SettingsStore::ntfyPushEnabled() && !NtfyPush::isQuietHoursActive()) {
+                                time_t nowEpoch = time(nullptr);
+                                if (nowEpoch > 8 * 3600 * 2) {
+                                    struct tm tmNow;
+                                    localtime_r(&nowEpoch, &tmNow);
+                                    char today[11];
+                                    snprintf(today, sizeof(today), "%04d-%02d-%02d",
+                                             tmNow.tm_year + 1900, tmNow.tm_mon + 1, tmNow.tm_mday);
+                                    if (strcmp(today, dailyFirstsDay) != 0) {
+                                        strncpy(dailyFirstsDay, today, sizeof(dailyFirstsDay) - 1);
+                                        dailyFirstsDay[sizeof(dailyFirstsDay) - 1] = 0;
+                                        militaryNotifiedToday = false;
+                                        heavyNotifiedToday = false;
+                                    }
+                                    if (traffic.militaryDetected && !militaryNotifiedToday) {
+                                        militaryNotifiedToday = true;
+                                        NtfyPush::request(I18n::t(StringId::NTFY_PUSH_MSG_FIRST_MILITARY));
+                                    }
+                                    if (traffic.heavy > 0 && !heavyNotifiedToday) {
+                                        heavyNotifiedToday = true;
+                                        NtfyPush::request(I18n::t(StringId::NTFY_PUSH_MSG_FIRST_HEAVY));
+                                    }
+                                }
+
+                                // "Peak Traffic erreicht" - vergleicht gegen
+                                // den zuletzt BEKANNTEN Hoechststand (lokaler
+                                // Merker, da FlightLogbook::updatePeakTraffic()
+                                // selbst kein "neuer Rekord"-Signal liefert,
+                                // siehe dortiger Kommentar) - erkennt so auch
+                                // einen Tageswechsel automatisch (der neue Tag
+                                // startet bei 0, der naechste Zyklus mit
+                                // >0 Flugzeugen ist dann automatisch wieder
+                                // ein "neuer" Peak).
+                                FlightLogbook::PeakTraffic peak = FlightLogbook::todayPeakTraffic();
+                                if (peak.count > lastKnownPeakTraffic) {
+                                    lastKnownPeakTraffic = peak.count;
+                                    if (lastKnownPeakTraffic > 0) {
+                                        char msg[64];
+                                        snprintf(msg, sizeof(msg), "%s%u", I18n::t(StringId::NTFY_PUSH_MSG_PEAK_TRAFFIC_PREFIX),
+                                                 (unsigned)peak.count);
+                                        NtfyPush::request(msg);
+                                    }
+                                } else if (peak.count < lastKnownPeakTraffic) {
+                                    // Tageswechsel (Peak wurde zurueckgesetzt) -
+                                    // Merker mitziehen, OHNE eine Meldung zu
+                                    // senden (0 ist kein neuer Rekord).
+                                    lastKnownPeakTraffic = peak.count;
+                                }
+
+                                // "Logbook-Auto-Off in X Stunden" - einmalig
+                                // ausgeloest, wenn die verbleibende Zeit zum
+                                // ersten Mal unter die Schwelle faellt (siehe
+                                // FlightLogbook::secondsUntilAutoOff()).
+                                // logbookAutoOffNotified wird zurueckgesetzt,
+                                // sobald wieder MEHR Zeit uebrig ist als die
+                                // Schwelle (z.B. Flugbuch wurde zwischenzeitlich
+                                // erneut eingeschaltet) - sonst wuerde nach
+                                // einem Wiedereinschalten nie erneut gewarnt.
+                                constexpr int32_t AUTO_OFF_WARN_SECONDS = 3600; // 1 Stunde
+                                int32_t remaining = FlightLogbook::secondsUntilAutoOff();
+                                if (remaining < 0 || remaining > AUTO_OFF_WARN_SECONDS) {
+                                    logbookAutoOffNotified = false;
+                                } else if (!logbookAutoOffNotified) {
+                                    logbookAutoOffNotified = true;
+                                    NtfyPush::request(I18n::t(StringId::NTFY_PUSH_MSG_LOGBOOK_AUTO_OFF));
+                                }
+                            }
                         }
 
                         // Kurzer gruener LED-Blitz als "Herzschlag" - zeigt,
@@ -401,11 +607,6 @@ namespace {
                                 ? Config::FETCH_INTERVAL_MS
                                 : Config::FETCH_INTERVAL_MS + excess / 2;
                         }
-                        // Siehe genericFailureBackoffMs-Kommentar oben -
-                        // JEDER Erfolg beendet eine evtl. laufende
-                        // Pechstraehne generischer Fehlschlaege, die naechste
-                        // beginnt wieder bei Config::FETCH_RETRY_DELAY_MS.
-                        genericFailureBackoffMs = Config::FETCH_RETRY_DELAY_MS;
                     } else if (result.httpCode == 429) {
                         // TESTWEISE - exponentielles Backoff nach HTTP 429:
                         // Retry-After-Header bevorzugen, falls vorhanden,
@@ -419,15 +620,21 @@ namespace {
                         Serial.printf("[NetTask] HTTP 429 - naechste Abfrage in %lums (retryAfterSec=%d)\n",
                                       (unsigned long)currentIntervalMs, result.retryAfterSec);
                     } else {
-                        // Sonstiger Fehlschlag (Timeout/SSL/"HTTP -1"/...):
-                        // siehe genericFailureBackoffMs-Kommentar oben -
-                        // wartet den aktuellen Backoff-Wert ab und verdoppelt
-                        // ihn danach fuer den naechsten Fehlschlag in Folge
-                        // (gedeckelt bei FETCH_BACKOFF_MAX_MS), unabhaengig
-                        // vom 429-Backoff in currentIntervalMs.
-                        currentIntervalMs = genericFailureBackoffMs;
-                        genericFailureBackoffMs = min(genericFailureBackoffMs * 2,
-                                                       Config::FETCH_BACKOFF_MAX_MS);
+                        // Einzelner sonstiger Fehlschlag (Timeout/SSL/...):
+                        // IMMER feste Config::FETCH_RETRY_DELAY_MS, keine
+                        // Eskalation - ein zwischenzeitlich eingefuehrtes
+                        // exponentielles Backoff fuer generische Fehlschlaege
+                        // wurde per Bisektion als Ursache fuer Alex'
+                        // "Verbindung/Heartbeat sofort weg"-Meldung
+                        // identifiziert (kurze Serien von 2-3 harmlosen
+                        // Fehlschlagen liessen die naechste Chance auf einen
+                        // Neuversuch immer weiter in die Zukunft rutschen)
+                        // und wieder auf dieses einfache, in v6.5.5 bewaehrte
+                        // Verhalten zurueckgesetzt. Der 429-Zweig oben
+                        // (echtes Rate-Limiting durch adsb.lol, wo eine
+                        // Eskalation tatsaechlich sinnvoll ist) bleibt davon
+                        // unberuehrt.
+                        currentIntervalMs = max(currentIntervalMs, Config::FETCH_RETRY_DELAY_MS);
                         Serial.printf("[NetTask] Abfrage fehlgeschlagen (HTTP %d), naechster Versuch in %lums\n",
                                       result.httpCode, (unsigned long)currentIntervalMs);
                     }

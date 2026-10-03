@@ -47,7 +47,7 @@
 #include "first_run_complete_screen.h"
 #include "menu_stars.h"
 #include "radar_logo.h"
-#include "dev_file_manager_screen.h"
+#include "github_screen_logo_image.h"
 #include "ui_font.h"
 #include "changelog.h"
 #include "ota_update.h"
@@ -100,6 +100,23 @@ bool nightDimActive = false;
 // loop() weiter unten.
 bool screensaverShowing = false;
 uint32_t lastScreensaverClockMs = 0;
+
+// "Was war das gerade?"-Rueckblick (Alex' Auftrag) - Schnappschuss des
+// zuletzt naechstgelegenen Flugzeugs, eingefroren GENAU beim Eintritt in
+// den Ruhe-/Dimm-Zustand (siehe loop() weiter unten) - bewusst NICHT der
+// live weiterlaufende Wert aus drawScreensaverNearestAircraft() (der
+// aktualisiert sich automatisch weiter und zeigt bei leerem Himmel gar
+// nichts mehr an). "Noch keine Daten" (eigener i18n-String), falls seit
+// dem letzten Boot noch kein Flugzeug erfasst wurde.
+bool lastKnownNearestValid = false;
+char lastKnownNearestCallsign[9] = {0};
+char lastKnownNearestType[9] = {0};
+float lastKnownNearestDistanceKm = 0;
+// Zeigt den Schnappschuss fuer ein paar Sekunden an (statt dauerhaft) -
+// danach faellt die Zeile automatisch auf die normale, live weiterlaufende
+// Anzeige zurueck (lastScreensaverAircraftText-Cache erzwingt dafuer kein
+// Sonderverhalten, siehe showNearestRecall() unten).
+uint32_t nearestRecallShownUntilMs = 0;
 
 // Wandelt die Nutzer-Helligkeit (Menue > System > Helligkeit, 10-100%) in
 // einen PWM-Wert 0-255 um - ersetzt das bisher fest verdrahtete
@@ -872,6 +889,59 @@ void drawScreensaverNearestAircraft() {
     tft.setTextDatum(TL_DATUM);
 }
 
+// Antippbare Flaeche fuer den "Was war das gerade?"-Rueckblick (Alex'
+// Auftrag) - deckt dieselbe Zeile wie drawScreensaverNearestAircraft() ab
+// (volle Bildschirmbreite, damit sie ohne Zielgenauigkeit zu treffen ist),
+// aber NUR aktiv, waehrend der Ruhebildschirm selbst gezeigt wird (siehe
+// loop()-Tap-Abfrage) - beim normalen Radarbild ist dort ohnehin keine
+// solche Zeile sichtbar.
+Rect screensaverRecallRect = {0, (int16_t)(SCREENSAVER_AIRCRAFT_CY - 10), Config::SCREEN_WIDTH, 20};
+
+// Zeigt den eingefrorenen "zuletzt naechstgelegenes Flugzeug"-Schnappschuss
+// fuer ein paar Sekunden an derselben Stelle wie die live weiterlaufende
+// Anzeige (gleiche Zeile, kein zusaetzlicher Platzbedarf auf dem ohnehin
+// schon knappen Ruhebildschirm). Reines Text-Overlay, KEINE Radar-
+// Neuzeichnung (Alex' ausdrueckliche Vorgabe "ressourcenschonend").
+void showNearestRecall() {
+    constexpr int16_t AIRCRAFT_BAND_H = 14;
+    tft.fillRect(0, (int16_t)(SCREENSAVER_AIRCRAFT_CY - AIRCRAFT_BAND_H / 2), Config::SCREEN_WIDTH, AIRCRAFT_BAND_H, TFT_BLACK);
+
+    String text;
+    if (lastKnownNearestValid) {
+        char buf[48];
+        char distBuf[16];
+        if (LocationManager::useMetricUnits()) {
+            snprintf(distBuf, sizeof(distBuf), "%.1fkm", lastKnownNearestDistanceKm);
+        } else {
+            snprintf(distBuf, sizeof(distBuf), "%.1fnm", Units::kmToNm(lastKnownNearestDistanceKm));
+        }
+        snprintf(buf, sizeof(buf), "%s%s %s (%s)", I18n::t(StringId::SCREENSAVER_RECALL_PREFIX),
+                 lastKnownNearestCallsign, lastKnownNearestType, distBuf);
+        text = buf;
+    } else {
+        // Wiederverwendet die bestehende SESSION_STATS_NO_DATA (Alex'
+        // Auftrag: "noch keine Daten"-Hinweis) statt eines eigenen,
+        // praktisch gleichbedeutenden Strings.
+        text = I18n::t(StringId::SESSION_STATS_NO_DATA);
+    }
+
+    tft.setTextSize(1);
+    uint16_t color = UiTheme::accentColorDimmed(tft, 0.5f);
+    tft.setTextColor(color, TFT_BLACK);
+    tft.setTextDatum(MC_DATUM);
+    tft.drawString(text, Config::SCREEN_WIDTH / 2, SCREENSAVER_AIRCRAFT_CY);
+    tft.setTextDatum(TL_DATUM);
+
+    // Faellt nach ein paar Sekunden automatisch auf die normale, live
+    // weiterlaufende Anzeige zurueck (siehe loop(), 1s-Tick-Block) - "\x01"
+    // ist ein Steuerzeichen, das garantiert in KEINEM echten cacheKey von
+    // drawScreensaverNearestAircraft() vorkommt (auch nicht im Leerstring-
+    // Fall "kein Flugzeug") - erzwingt dort zuverlaessig ein Neuzeichnen,
+    // egal ob der live Wert gerade leer oder nichtleer ist.
+    lastScreensaverAircraftText = "\x01";
+    nearestRecallShownUntilMs = millis() + 4000;
+}
+
 // Regen-Effekt fuer den Ruhebildschirm (SettingsStore::rainEffectEnabled(),
 // Menue > System > Radar-Darstellung) - aktiv unter derselben Bedingung wie
 // beim Radarscreen (Schalter an UND Weather::current() zeigt Regen/Gewitter).
@@ -1335,126 +1405,119 @@ void updateWifiIcon() {
 // ui_theme.h) - frueher war das nur dem persistenten Menu-Header-Button
 // vorbehalten, alle anderen Screens blieben fest gruen; das wurde auf
 // Alex' ausdruecklichen Wunsch aufgehoben.
+// Entpackt/zeichnet das RLE-komprimierte GitHub-Avatar-Bild (siehe
+// github_screen_logo_image.h fuer das genaue Byte-Format) zeilenweise statt
+// es komplett in einen 115.200-Byte-RAM-Puffer zu entpacken - bei aktuell
+// ~29% RAM-Auslastung waere ein Vollbild-Puffer zwar rechnerisch noch
+// machbar, angesichts der von diesem Projekt bekannten Heap-Fragmentierungs-
+// Empfindlichkeit (siehe CLAUDE.md "Bekannte Probleme") aber unnoetiges
+// Risiko fuer eine reine Deko-Grafik. Der Zeilenpuffer braucht nur 480 Byte
+// (240 Pixel a 2 Byte) statt 115.200 - der RLE-Datenstrom wird dafuer
+// einfach fortlaufend gelesen, OHNE auf Zeilengrenzen zu achten (ein
+// einzelner Lauf kann ueber eine Zeilengrenze hinausreichen, siehe
+// Kommentar in github_screen_logo_image.h) - der Zeilenpuffer wird
+// trotzdem korrekt gefuellt, weil ein zu langer Lauf einfach ueber mehrere
+// pushImage()-Aufrufe verteilt wird.
+void drawGithubScreenLogo(TFT_eSPI& gfx, int16_t x, int16_t topY) {
+    uint16_t lineBuf[GITHUB_SCREEN_LOGO_W];
+    int16_t lineFill = 0;
+    int16_t row = 0;
+    size_t pos = 0;
+    while (row < GITHUB_SCREEN_LOGO_H && pos + 2 < GITHUB_SCREEN_LOGO_RLE_LEN) {
+        uint8_t count = GITHUB_SCREEN_LOGO_RLE[pos];
+        uint16_t value = (uint16_t)GITHUB_SCREEN_LOGO_RLE[pos + 1] |
+                          ((uint16_t)GITHUB_SCREEN_LOGO_RLE[pos + 2] << 8);
+        pos += 3;
+
+        while (count > 0) {
+            int16_t spaceInLine = GITHUB_SCREEN_LOGO_W - lineFill;
+            int16_t take = count < spaceInLine ? count : spaceInLine;
+            for (int16_t i = 0; i < take; i++) lineBuf[lineFill + i] = value;
+            lineFill += take;
+            count -= take;
+            if (lineFill == GITHUB_SCREEN_LOGO_W) {
+                gfx.pushImage(x, (int16_t)(topY + row), GITHUB_SCREEN_LOGO_W, 1, lineBuf);
+                lineFill = 0;
+                row++;
+            }
+        }
+    }
+}
+
 void runGithubQrScreen(TFT_eSPI& tftRef) {
     MenuStars::reset();
     tftRef.setTextSize(1);
 
-    // Logo entfernt (Alex' Wunsch) - der QR-Code steht jetzt allein, dafuer
-    // deutlich groesser und mittig statt klein in der Ecke. Die frueher
-    // hier stehende drawGithubScreenLogo()-Funktion samt der zugehoerigen
-    // ~40-KB-Bilddaten (ehemals github_screen_logo_image.h/.cpp) wurde
-    // komplett entfernt - das kleine Logo auf den OTA-Screens
-    // (menu_screen.cpp) zeigt inzwischen ebenfalls einen zur Laufzeit
-    // erzeugten QR-Code statt eines gespeicherten Fotos, siehe
-    // menu_screen.cpp::drawSmallGithubQr().
+    // Alex' eigenes Avatar-Bild (auf all seinen Social-Kanaelen genutzt)
+    // statt des Radar-Logos vom Splashscreen - als 240x240px Graustufen-
+    // RGB565-Bitmap eingebettet (siehe github_screen_logo_image.h), ueber
+    // die VOLLE Bildschirmbreite bis knapp ueber den Zurueck-Button (Alex'
+    // Wunsch: "Foto in voller Breite direkt auf den Zurueckbutton, 5px
+    // darueber"). Der QR-Code liegt oben links im dunklen Bildbereich neben
+    // dem Kopf, statt darunter Platz zu beanspruchen.
     constexpr int16_t BACK_BTN_H = 30;
     constexpr int16_t BACK_BTN_TOP = Config::SCREEN_HEIGHT - 40;
+    constexpr int16_t LOGO_GAP_ABOVE_BTN = 5;
+    constexpr int16_t LOGO_BOTTOM = BACK_BTN_TOP - LOGO_GAP_ABOVE_BTN;
+    constexpr int16_t LOGO_TOP = LOGO_BOTTOM - GITHUB_SCREEN_LOGO_H;
 
     constexpr uint8_t QR_VERSION = 4;
     constexpr int16_t QR_SIZE_MODULES = 33; // Version 4: 4*4+17 = 33
-    // Alex' Wunsch: nochmal etwas kleiner, mit mehr Luft an den Seiten -
-    // 5px statt 6px pro Modul ergibt 185px (vorher 222px) und damit
-    // (240-185)/2 = 27px Rand je Seite statt vorher 9px - deutlich mehr
-    // als die gewuenschten mindestens 5px zusaetzlich, aber die naechste
-    // "sauber durch die Modulanzahl teilbare" Blockgroesse unterhalb der
-    // vorherigen - ein Zwischenwert wie 212px liesse sich mit dieser
-    // Block-basierten QR-Zeichentechnik nicht scharf/pixelgenau
-    // darstellen. Bei diesem Block-Wert (5px/Modul) bleibt der Code auf
-    // dem 240x320-Panel weiterhin bequem mit dem Handy scannbar.
-    constexpr int16_t QR_BLOCK = 5;
+    constexpr int16_t QR_BLOCK = 2;
     constexpr int16_t QR_QUIET = 2;
     constexpr int16_t QR_PIXEL_SIZE = (QR_SIZE_MODULES + 2 * QR_QUIET) * QR_BLOCK;
-    // Mittig im Bereich oberhalb des Zurueck-Buttons statt oben links in
-    // der Ecke (Alex' Wunsch: "gross und mittig"). TITLE_BASELINE_Y raeumt
-    // oben Platz fuer die Ueberschrift "Eiswolfs Github" frei (Alex'
-    // Wunsch) - Baseline bei 26px haelt die CLAUDE.md-Faustregel fuer
-    // Size 2 (>= ~24-26px) ein, siehe Baseline-Falle-Hinweis dort.
-    // Alex' Wunsch: QR-Code mittig zwischen Unterkante der Ueberschrift
-    // und Oberkante des Zurueck-Buttons zentrieren (vorher zu dicht an
-    // der Ueberschrift geklebt) - TITLE_BOTTOM_Y schaetzt die Unterkante
-    // des Ueberschrift-Textes ab (Baseline + Descent, ~6px bei Size 2),
-    // der verbleibende Platz bis BACK_BTN_TOP wird dann gleichmaessig
-    // ueber und unter dem QR-Code verteilt statt fest an die Ueberschrift
-    // anzuschliessen.
-    constexpr int16_t QR_X = (Config::SCREEN_WIDTH - QR_PIXEL_SIZE) / 2;
-    constexpr int16_t TITLE_BASELINE_Y = 26;
-    constexpr int16_t TITLE_BOTTOM_Y = TITLE_BASELINE_Y + 6;
-    constexpr int16_t QR_Y = TITLE_BOTTOM_Y + (BACK_BTN_TOP - TITLE_BOTTOM_Y - QR_PIXEL_SIZE) / 2;
+    // Ganz oben links in die Bildschirmecke (Alex' Wunsch: "sollte das Foto
+    // nicht beruehren, ganz hoch ins linke Eck damit") - unabhaengig von
+    // LOGO_TOP an der Bildschirmkante ausgerichtet, statt am Bildanfang, da
+    // Alex' Foto bis dicht an die obere linke Ecke heranreicht.
+    constexpr int16_t QR_X = 4;
+    constexpr int16_t QR_Y = 4;
 
     Rect backBtn = {10, BACK_BTN_TOP, (int16_t)(Config::SCREEN_WIDTH - 20), BACK_BTN_H};
-    Rect qrRect  = {QR_X, QR_Y, QR_PIXEL_SIZE, QR_PIXEL_SIZE};
 
-    // Feste Projekt-URL (Config::GITHUB_REPO_URL, siehe config.h) - 56
-    // Zeichen, komfortabel innerhalb der 78-Byte-Kapazitaet von
-    // QR-Version 4 bei ECC_LOW (gleiche Version wie beim Flug-QR-Code
-    // oben, dessen URLs aehnlich lang sind).
+    // Feste Projekt-URL - 56 Zeichen, komfortabel innerhalb der 78-Byte-
+    // Kapazitaet von QR-Version 4 bei ECC_LOW (gleiche Version wie beim
+    // Flug-QR-Code oben, dessen URLs aehnlich lang sind).
+    constexpr const char* GITHUB_URL = "https://github.com/Eiswolf-BG/eiswolfs-flightradar-CYD";
+
     uint8_t qrData[qrcode_getBufferSize(QR_VERSION)];
     QRCode qrcode;
-    qrcode_initText(&qrcode, qrData, QR_VERSION, ECC_LOW, Config::GITHUB_REPO_URL);
+    qrcode_initText(&qrcode, qrData, QR_VERSION, ECC_LOW, GITHUB_URL);
 
-    // Kompletter Bildaufbau in eine lokale Lambda ausgelagert - wird nach
-    // der Rueckkehr aus dem Easter-Egg-Dateimanager (der den Bildschirm
-    // komplett ueberschreibt) erneut aufgerufen, um diesen Screen wieder
-    // sauber herzustellen.
-    auto draw = [&]() {
-        tftRef.fillScreen(TFT_BLACK);
-        // Ueberschrift "Eiswolfs Github" (Alex' Wunsch) - Size 2, zentriert
-        // ueber dem QR-Code, in der projektweiten Akzentfarbe wie jeder
-        // andere Screen (siehe CLAUDE.md-Farbschema-Konvention).
-        tftRef.setTextSize(2);
-        tftRef.setTextDatum(MC_DATUM);
-        tftRef.setTextColor(UiTheme::accentColor(tftRef), TFT_BLACK);
-        tftRef.drawString("Eiswolfs Github", Config::SCREEN_WIDTH / 2, TITLE_BASELINE_Y);
-        tftRef.setTextDatum(TL_DATUM);
-        tftRef.setTextSize(1);
-        tftRef.fillRect(QR_X, QR_Y, QR_PIXEL_SIZE, QR_PIXEL_SIZE, TFT_WHITE);
-        for (uint8_t my = 0; my < qrcode.size; my++) {
-            for (uint8_t mx = 0; mx < qrcode.size; mx++) {
-                if (qrcode_getModule(&qrcode, mx, my)) {
-                    int16_t px = (int16_t)(QR_X + (QR_QUIET + mx) * QR_BLOCK);
-                    int16_t py = (int16_t)(QR_Y + (QR_QUIET + my) * QR_BLOCK);
-                    tftRef.fillRect(px, py, QR_BLOCK, QR_BLOCK, TFT_BLACK);
-                }
+    tftRef.fillScreen(TFT_BLACK);
+    // setSwapBytes(true) noetig, damit pushImage() unser Graustufen-Array
+    // korrekt (statt farbstichig) darstellt - direkt danach wieder auf
+    // false zurueckgesetzt, damit alle anderen Zeichenoperationen (Text,
+    // fillRect etc.) unveraendert bleiben.
+    tftRef.setSwapBytes(true);
+    drawGithubScreenLogo(tftRef, 0, LOGO_TOP);
+    tftRef.setSwapBytes(false);
+
+    tftRef.fillRect(QR_X, QR_Y, QR_PIXEL_SIZE, QR_PIXEL_SIZE, TFT_WHITE);
+    for (uint8_t my = 0; my < qrcode.size; my++) {
+        for (uint8_t mx = 0; mx < qrcode.size; mx++) {
+            if (qrcode_getModule(&qrcode, mx, my)) {
+                int16_t px = (int16_t)(QR_X + (QR_QUIET + mx) * QR_BLOCK);
+                int16_t py = (int16_t)(QR_Y + (QR_QUIET + my) * QR_BLOCK);
+                tftRef.fillRect(px, py, QR_BLOCK, QR_BLOCK, TFT_BLACK);
             }
         }
+    }
 
-        // Grauer statt gruener Button (Alex' Wunsch: "Zurueckbutton soll
-        // graue Schrift und eine graue Umrandung haben").
-        tftRef.fillRoundRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h, 4, TFT_BLACK);
-        tftRef.drawRoundRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h, 4, TFT_LIGHTGREY);
-        tftRef.setTextDatum(MC_DATUM);
-        tftRef.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-        tftRef.drawString(I18n::t(StringId::BACK), backBtn.x + backBtn.w / 2, backBtn.y + backBtn.h / 2);
-        tftRef.setTextDatum(TL_DATUM);
-    };
-    draw();
-
-    // Easter Egg (Alex' Wunsch): 6x den QR-Code hintereinander antippen
-    // oeffnet den Entwickler-Dateimanager (dev_file_manager_screen.h) -
-    // nirgendwo sonst im Menue verlinkt, bewusst nicht dokumentiert. Ein zu
-    // grosser Abstand zwischen zwei Tipps (EASTER_EGG_GAP_MS) setzt den
-    // Zaehler zurueck, damit ein normales, einzelnes Antippen (z.B.
-    // versehentlich) nichts ausloest.
-    constexpr uint8_t EASTER_EGG_TAPS = 6;
-    constexpr uint32_t EASTER_EGG_GAP_MS = 2000;
-    uint8_t qrTapCount = 0;
-    uint32_t lastQrTapMs = 0;
+    // Grauer statt gruener Button (Alex' Wunsch: "Zurueckbutton soll graue
+    // Schrift und eine graue Umrandung haben") - passt zum zurueckhaltenden,
+    // graustufigen Look dieses Screens (Foto + graue Sterne).
+    tftRef.fillRoundRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h, 4, TFT_BLACK);
+    tftRef.drawRoundRect(backBtn.x, backBtn.y, backBtn.w, backBtn.h, 4, TFT_LIGHTGREY);
+    tftRef.setTextDatum(MC_DATUM);
+    tftRef.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    tftRef.drawString(I18n::t(StringId::BACK), backBtn.x + backBtn.w / 2, backBtn.y + backBtn.h / 2);
+    tftRef.setTextDatum(TL_DATUM);
 
     while (true) {
         TouchInput::Point tap;
         if (TouchInput::wasTapped(tap)) {
             if (backBtn.contains(tap.x, tap.y)) return;
-            if (qrRect.contains(tap.x, tap.y)) {
-                uint32_t now = millis();
-                if (now - lastQrTapMs > EASTER_EGG_GAP_MS) qrTapCount = 0;
-                lastQrTapMs = now;
-                qrTapCount++;
-                if (qrTapCount >= EASTER_EGG_TAPS) {
-                    qrTapCount = 0;
-                    DevFileManagerScreen::run(tftRef);
-                    draw();
-                }
-            }
         }
         // Inaktivitaets-Timeout - siehe SettingsStore::menuIdleTimeoutMs().
         if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) return;
@@ -2036,8 +2099,8 @@ void loop() {
     // UNABHAENGIG vom naechsten ADS-B-Abruf - vorher haengte die
     // Sichtbarkeit einer Web-Aenderung am Geraet komplett am naechsten
     // ERFOLGREICHEN Abruf (AircraftTable::version()-Aenderung), was bei
-    // WLAN-/API-Aussetzern (siehe CLAUDE.md "Bekannte Probleme") auf bis zu
-    // Config::FETCH_BACKOFF_MAX_MS (3 Minuten) anwuchs.
+    // WLAN-/API-Aussetzern auf bis zu Config::FETCH_BACKOFF_MAX_MS
+    // (3 Minuten) anwuchs.
     if (WebExportServer::consumeRemoteSettingsChanged()) {
         forceRedraw = true;
     }
@@ -2048,7 +2111,19 @@ void loop() {
     if (tapped) {
         lastInteractionMs = millis();
 
-        if (screenDimmed) {
+        // "Was war das gerade?"-Rueckblick (Alex' Auftrag) - EINZIGE
+        // Ausnahme von "jeder Tap waehrend screenDimmed weckt den
+        // Bildschirm": ein Tap genau auf diese eine Zeile zeigt statt
+        // dessen den eingefrorenen Schnappschuss, OHNE den Ruhebildschirm
+        // zu verlassen (muss deshalb VOR dem generischen Weck-Zweig unten
+        // geprueft werden). Nur relevant, waehrend der Ruhebildschirm
+        // selbst gezeigt wird - beim einfachen Komplett-Dunkel ist der
+        // Bildschirm ja aus, ein gezielter Tap auf eine unsichtbare Zeile
+        // waere ohnehin nicht moeglich/sinnvoll.
+        if (screenDimmed && screensaverShowing && screensaverRecallRect.contains(tap.x, tap.y)) {
+            showNearestRecall();
+            tapped = false;
+        } else if (screenDimmed) {
             bool shouldNightDim = SettingsStore::nightDimmingEnabled() && isNightDimHours();
             ledcWrite(BACKLIGHT_PWM_CHANNEL, shouldNightDim ? nightDimBacklightPwm() : normalBacklightPwm());
             nightDimActive = shouldNightDim;
@@ -2249,6 +2324,28 @@ void loop() {
     if (!screenDimmed && timeoutMin > 0) {
         uint32_t timeoutMs = (uint32_t)timeoutMin * 60000UL;
         if (nowMs - lastInteractionMs >= timeoutMs) {
+            // "Was war das gerade?"-Schnappschuss (Alex' Auftrag) - GENAU
+            // beim Eintritt in den Dimm-/Ruhezustand eingefroren, bevor der
+            // Bildschirm ueberhaupt dunkel wird. Gilt fuer BEIDE Faelle
+            // (Ruhebildschirm UND einfaches Komplett-Dunkel) - abgerufen
+            // wird der Schnappschuss zwar aktuell nur im Ruhebildschirm
+            // (siehe screensaverRecallRect-Tap-Abfrage), die Erfassung hier
+            // kostet aber nichts Zusaetzliches und bleibt so unabhaengig
+            // vom jeweils aktiven Dimm-Modus konsistent.
+            AircraftTable::lock();
+            Aircraft* snapshotTable = AircraftTable::raw();
+            lastKnownNearestValid = snapshotTable[0].valid;
+            if (lastKnownNearestValid) {
+                const char* snapLabel = snapshotTable[0].callsign[0] ? snapshotTable[0].callsign : snapshotTable[0].hex;
+                strncpy(lastKnownNearestCallsign, snapLabel, sizeof(lastKnownNearestCallsign) - 1);
+                lastKnownNearestCallsign[sizeof(lastKnownNearestCallsign) - 1] = 0;
+                strncpy(lastKnownNearestType, snapshotTable[0].typeCode[0] ? snapshotTable[0].typeCode : I18n::t(StringId::DETAIL_UNKNOWN),
+                        sizeof(lastKnownNearestType) - 1);
+                lastKnownNearestType[sizeof(lastKnownNearestType) - 1] = 0;
+                lastKnownNearestDistanceKm = snapshotTable[0].distanceKm;
+            }
+            AircraftTable::unlock();
+
             if (SettingsStore::screensaverEnabled()) {
                 // Ruhebildschirm statt komplett dunkel (Menue > System >
                 // Ruhebildschirm, AUS per Default) - gedimmter
@@ -2321,7 +2418,21 @@ void loop() {
             drawScreensaverLogo();
             drawScreensaverVersion();
             drawScreensaverClock();
-            drawScreensaverNearestAircraft();
+            // "Was war das gerade?"-Rueckblick (Alex' Auftrag) - waehrend
+            // der Anzeigedauer wird drawScreensaverNearestAircraft() NICHT
+            // aufgerufen (sonst wuerde sie die Recall-Zeile schon beim
+            // naechsten 1s-Tick wieder ueberschreiben, siehe deren eigene
+            // Diff-Logik). Nach Ablauf einmalig mit erzwungenem Mismatch
+            // (siehe showNearestRecall()-Kommentar) aufgerufen, danach
+            // wieder ganz normal bei jedem Tick.
+            if (nearestRecallShownUntilMs > 0) {
+                if (nowMs >= nearestRecallShownUntilMs) {
+                    nearestRecallShownUntilMs = 0;
+                    drawScreensaverNearestAircraft();
+                }
+            } else {
+                drawScreensaverNearestAircraft();
+            }
         }
         MenuStars::update(tft);
         ScreensaverRain::update(tft);
