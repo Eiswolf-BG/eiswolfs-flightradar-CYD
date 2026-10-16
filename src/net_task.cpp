@@ -292,6 +292,22 @@ namespace {
                     // (siehe dortiger Kommentar) - kein erneutes Setzen hier
                     // noetig.
                     Serial.printf("[DIAG] fetch rangeKm=%.0f webUiActive=%d\n", rangeKm, WebExportServer::isRadarUiActive() ? 1 : 0);
+                    // DAUERHAFTE DIAGNOSE (urspruenglich temporaer fuer
+                    // Alex' Meldung 05.10.: SSL-Speicherfehler bei JEDEM
+                    // Abruf nach ~2,4h Laufzeit - bewusst dauerhaft
+                    // behalten, Alex' Auftrag 16.10., gleiches Prinzip wie
+                    // andere permanente [...-DIAG]-Logs im Projekt) -
+                    // trackt freien Heap UND den groessten noch
+                    // zusammenhaengenden Block bei JEDEM Abrufversuch.
+                    // War bereits bei der MQTT-Dangling-Pointer-Diagnose
+                    // (13.10.) hilfreich: maxAlloc blieb dabei konstant bei
+                    // ~43KB, obwohl freeHeap bei 105-110KB lag - die
+                    // quantifizierte Bestaetigung fuer Heap-Fragmentierung
+                    // als Ursache der "SSL Memory allocation failed"-
+                    // Fehler (noch ungeloest, siehe "Bekannte Probleme").
+                    Serial.printf("[HEAP-DIAG] uptimeMs=%lu freeHeap=%u maxAlloc=%u\n",
+                                  (unsigned long)millis(), (unsigned)ESP.getFreeHeap(),
+                                  (unsigned)ESP.getMaxAllocHeap());
                     uint32_t fetchStartMs = millis();
                     auto result = AdsbClient::fetch(lat, lon, rangeKm,
                                                      tempTable, Config::MAX_TRACKED_AIRCRAFT);
