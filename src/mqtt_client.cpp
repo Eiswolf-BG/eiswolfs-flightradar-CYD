@@ -16,6 +16,26 @@ namespace {
     // konfigurieren, siehe ensureConfigured().
     String configuredBroker;
 
+    // BUGFIX (GitHub Issue #12, dottgrasso: MQTT verbindet nie, auch nicht
+    // nach Toggle/Neustart) - live am lokalen Testbroker reproduziert:
+    // PubSubClient::setServer(const char* domain, ...) speichert NUR den
+    // rohen Zeiger (this->domain = domain;), KEINE Kopie des Strings
+    // (siehe PubSubClient.cpp). ensureConfigured() uebergab bisher
+    // host.c_str() einer rein LOKALEN String-Variable "host" - deren
+    // Pufferspeicher wurde beim Verlassen der Funktion sofort wieder
+    // freigegeben, PubSubClient hielt danach einen Dangling Pointer auf
+    // bereits freigegebenen/zwischenzeitlich anderweitig ueberschriebenen
+    // Speicher. Live beobachtet: der ERSTE Verbindungsversuch gelang noch
+    // zufaellig (Speicherinhalt war zufaellig noch intakt), der naechste
+    // Versuch ~30s spaeter scheiterte mit "DNS Failed for " (LEERER
+    // Hostname) - exakt das gemeldete Symptom, und durch den exakt
+    // gleichen Codepfad bei jeder Neukonfiguration reproduzierbar, auch
+    // nach Toggle/Neustart. Fix: der Hostname wird jetzt in dieser
+    // Namespace-weiten (langlebigen) String-Variable gehalten, deren
+    // Speicher fuer die gesamte Laufzeit gueltig bleibt, solange
+    // PubSubClient den Zeiger haelt.
+    String configuredHost;
+
     // Mindestabstand zwischen zwei Verbindungsversuchen - verhindert, dass
     // ein unerreichbarer/falscher Broker die NetTask-Schleife mit staendigen
     // (blockierenden) connect()-Versuchen flutet. PubSubClient::connect()
@@ -75,12 +95,15 @@ namespace {
         if (hostPort.length() == 0) return false;
         if (hostPort == configuredBroker) return true;
 
-        String host;
         uint16_t port;
-        splitHostPort(hostPort, host, port);
-        if (host.length() == 0) return false;
+        splitHostPort(hostPort, configuredHost, port);
+        if (configuredHost.length() == 0) return false;
 
-        mqtt.setServer(host.c_str(), port);
+        // configuredHost ist jetzt namespace-weit langlebig (siehe
+        // Deklaration oben) - PubSubClient::setServer() speichert nur den
+        // rohen Zeiger, ihr Speicher muss deshalb mindestens so lange
+        // gueltig bleiben, bis der naechste setServer()-Aufruf ihn ersetzt.
+        mqtt.setServer(configuredHost.c_str(), port);
         configuredBroker = hostPort;
         // Ein Broker-/Port-Wechsel macht eine evtl. bestehende Verbindung
         // zum ALTEN Broker ungueltig - PubSubClient haelt intern aber noch

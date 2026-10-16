@@ -365,8 +365,8 @@ static const char* const I18N_TR[] = {
     "MQTT",
     "MQTT",
     "MQTT'yi Etkinleştir",
-    "Broker: ",
-    "Broker adresi (host:port)",
+    "Host: ",
+    "Host adresi (örn. 192.168.1.10)",
     "Kullanıcı adı: ",
     "Kullanıcı adı (isteğe bağlı)",
     "Şifre: ",
@@ -374,6 +374,8 @@ static const char* const I18N_TR[] = {
     "(ayarlanmadı)",
     "MQTT Hakkında",
     "MQTT, Home Assistant gibi akıllı ev sistemlerinin diğer cihazlarla canlı değerler alışverişi yapmak için kullandığı basit bir mesajlaşma protokolüdür. Etkinleştirildiğinde bu cihaz, menzildeki uçak sayısını, izleme listesi ve yakınlık alarmı durumunu düzenli olarak kendi MQTT broker'ınıza gönderir - burada bir broker adresi girilmeden hiçbir şey gönderilmez.",
+    "Port: ",
+    "Port (varsayılan: 1883)",
 
     "= Resmi/Askeri (tahmini)",
 

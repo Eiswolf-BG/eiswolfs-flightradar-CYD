@@ -82,7 +82,17 @@ namespace {
         drawButton(tft, btn, "?");
     }
 
-    constexpr uint8_t ROW_COUNT = 5; // Enable, Broker, Username, Passwort, Zurueck
+    // BUGFIX (Alex' Auftrag, nach Live-Test am lokalen Broker): das
+    // bisherige kombinierte "Broker (Host:Port)"-Feld lief bei laengeren
+    // Werten (z.B. "192.168.178.143:1883", 20 Zeichen bei Groesse 2) aus
+    // der Eingabebox heraus - weitere Tasteneingaben wurden zwar korrekt
+    // im internen Puffer uebernommen (siehe runTextKeypad()), aber
+    // visuell nicht mehr angezeigt, was wie ein blockiertes Eingabefeld
+    // wirkte ("Port nicht eingebbar"). Jetzt getrennte Host-/Port-Felder
+    // (je eigene Box, deutlich mehr Luft) PLUS ein genereller Fix in
+    // runTextKeypad() (siehe visibleTail()), der auch bei langen Domain-
+    // Namen im Host-Feld nie wieder blind ueberlaufen kann.
+    constexpr uint8_t ROW_COUNT = 6; // Enable, Host, Port, Username, Passwort, Zurueck
     constexpr int16_t ROW_GAP = 6;
     constexpr int16_t START_Y = 40;
     constexpr int16_t END_Y = Config::SCREEN_HEIGHT - 10;
@@ -91,6 +101,39 @@ namespace {
     Rect rowRect(uint8_t index) {
         return {10, (int16_t)(START_Y + index * (ROW_H + ROW_GAP)),
                 (int16_t)(Config::SCREEN_WIDTH - 20), ROW_H};
+    }
+
+    // Zeigt nur das ENDE von "buf", das in maxWidth passt (gleiches Muster
+    // wie address_search_screen.cpp/location_presets_screen.cpp, hier
+    // dupliziert, Projekt-Konvention) - das Tippende interessiert meist
+    // am meisten, was zuletzt eingegeben wurde. UTF-8-sicher (ueberspringt
+    // 2-Byte-Folgen am Wortanfang nie mitten im Zeichen).
+    String visibleTail(TFT_eSPI& tft, const char* buf, int16_t maxWidth) {
+        String s(buf);
+        while (s.length() > 0 && tft.textWidth(s) > maxWidth) {
+            int32_t cut = ((((uint8_t)s[0]) & 0xE0) == 0xC0) ? 2 : 1;
+            if (cut > (int32_t)s.length()) cut = s.length();
+            s = s.substring(cut);
+        }
+        return s;
+    }
+
+    // Zerlegt den intern weiterhin als EIN "host:port"-String gespeicherten
+    // Broker-Wert (SettingsStore::mqttBroker(), siehe mqtt_client.h) fuer
+    // die getrennte Host-/Port-Anzeige - 1:1 dieselbe Logik wie
+    // mqtt_client.cpp::splitHostPort() (dort in anonymem Namespace, nicht
+    // exportiert, deshalb hier dupliziert, Projekt-Konvention). Am LETZTEN
+    // Doppelpunkt getrennt, nicht am ersten, damit eine IPv6-Adresse nicht
+    // faelschlich mitten zerschnitten wird.
+    void splitHostPort(const String& hostPort, String& outHost, String& outPort) {
+        int colon = hostPort.lastIndexOf(':');
+        if (colon < 0) {
+            outHost = hostPort;
+            outPort = "";
+            return;
+        }
+        outHost = hostPort.substring(0, colon);
+        outPort = hostPort.substring(colon + 1);
     }
 
     // Einfaches Text-Tastenfeld: QWERTY-Grossbuchstaben + Ziffern (gleiches
@@ -162,9 +205,16 @@ namespace {
             tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(14, (int16_t)(fieldY + 22));
             if (mask) {
-                for (uint8_t i = 0; i < len; i++) tft.print('*');
+                // Masken-Zeichen zaehlen nicht pixelgenau wie echter Text,
+                // aber auch hier rein vorsichtshalber ueber visibleTail()
+                // begrenzen statt blind "len" Sternchen zu drucken - ein
+                // sehr langes Passwort wuerde sonst dieselbe Ueberlauf-
+                // Falle wie beim Broker-Feld reproduzieren.
+                String stars;
+                for (uint8_t i = 0; i < len; i++) stars += '*';
+                tft.print(visibleTail(tft, stars.c_str(), (int16_t)(Config::SCREEN_WIDTH - 28)));
             } else {
-                tft.print(buf);
+                tft.print(visibleTail(tft, buf, (int16_t)(Config::SCREEN_WIDTH - 28)));
             }
             tft.setTextSize(1);
 
@@ -240,15 +290,27 @@ void run(TFT_eSPI& tft) {
         drawRowInfoButton(tft, enableRow);
 
         String broker = SettingsStore::mqttBroker();
-        String brokerLabel = String(I18n::t(StringId::MQTT_BROKER_LABEL)) +
-                              (broker.length() ? broker : String(I18n::t(StringId::MQTT_NOT_SET)));
-        Rect brokerRow = rowRect(1);
-        drawLeftButton(tft, brokerRow, brokerLabel);
+        String currentHost, currentPort;
+        splitHostPort(broker, currentHost, currentPort);
+
+        String hostLabel = String(I18n::t(StringId::MQTT_HOST_LABEL)) +
+                            (currentHost.length() ? currentHost : String(I18n::t(StringId::MQTT_NOT_SET)));
+        Rect hostRow = rowRect(1);
+        drawLeftButton(tft, hostRow, hostLabel);
+
+        // Leeres Port-Feld zeigt den tatsaechlich wirksamen Standard-Port
+        // an (Config::MQTT_DEFAULT_PORT, siehe mqtt_client.cpp), damit auf
+        // einen Blick klar ist, dass dann trotzdem automatisch 1883
+        // verwendet wird, statt es als "nicht gesetzt" misszuverstehen.
+        String portLabel = String(I18n::t(StringId::MQTT_PORT_LABEL)) +
+                            (currentPort.length() ? currentPort : String(Config::MQTT_DEFAULT_PORT));
+        Rect portRow = rowRect(2);
+        drawLeftButton(tft, portRow, portLabel);
 
         String user = SettingsStore::mqttUsername();
         String userLabel = String(I18n::t(StringId::MQTT_USERNAME_LABEL)) +
                             (user.length() ? user : String(I18n::t(StringId::MQTT_NOT_SET)));
-        Rect userRow = rowRect(2);
+        Rect userRow = rowRect(3);
         drawLeftButton(tft, userRow, userLabel);
 
         String pass = SettingsStore::mqttPassword();
@@ -256,10 +318,10 @@ void run(TFT_eSPI& tft) {
         for (uint8_t i = 0; i < pass.length(); i++) passMasked += '*';
         String passLabel = String(I18n::t(StringId::MQTT_PASSWORD_LABEL)) +
                             (pass.length() ? passMasked : String(I18n::t(StringId::MQTT_NOT_SET)));
-        Rect passRow = rowRect(3);
+        Rect passRow = rowRect(4);
         drawLeftButton(tft, passRow, passLabel);
 
-        Rect backBtn = rowRect(4);
+        Rect backBtn = rowRect(5);
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
         TouchInput::Point tap;
@@ -277,9 +339,24 @@ void run(TFT_eSPI& tft) {
                                         I18n::t(StringId::OK));
         } else if (enableRow.contains(tap.x, tap.y)) {
             SettingsStore::setMqttEnabled(!SettingsStore::mqttEnabled());
-        } else if (brokerRow.contains(tap.x, tap.y)) {
-            String value = runTextKeypad(tft, I18n::t(StringId::MQTT_BROKER_PROMPT), false, false);
-            if (value.length() > 0) SettingsStore::setMqttBroker(value);
+        } else if (hostRow.contains(tap.x, tap.y)) {
+            String value = runTextKeypad(tft, I18n::t(StringId::MQTT_HOST_PROMPT), false, false);
+            if (value.length() > 0) {
+                // Aktuellen Port (falls gesetzt) beibehalten - nur der Host
+                // wird hier geaendert, siehe splitHostPort()-Kommentar oben.
+                String combined = currentPort.length() ? (value + ":" + currentPort) : value;
+                SettingsStore::setMqttBroker(combined);
+            }
+        } else if (portRow.contains(tap.x, tap.y)) {
+            String value = runTextKeypad(tft, I18n::t(StringId::MQTT_PORT_PROMPT), true, false);
+            // Host MUSS zu diesem Zeitpunkt bereits gesetzt sein (die
+            // Port-Zeile zeigt den Standard-Port nur als Info an, erlaubt
+            // aber kein Speichern ohne Host - sonst koennte hier ein
+            // "host"-loser String wie ":1883" entstehen).
+            if (currentHost.length() > 0) {
+                String combined = value.length() ? (currentHost + ":" + value) : currentHost;
+                SettingsStore::setMqttBroker(combined);
+            }
         } else if (userRow.contains(tap.x, tap.y)) {
             String value = runTextKeypad(tft, I18n::t(StringId::MQTT_USERNAME_PROMPT), true, false);
             SettingsStore::setMqttUsername(value);

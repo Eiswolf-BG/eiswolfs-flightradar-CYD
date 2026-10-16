@@ -365,8 +365,8 @@ static const char* const I18N_IT[] = {
     "MQTT",
     "MQTT",
     "Attiva MQTT",
-    "Broker: ",
-    "Indirizzo broker (host:porta)",
+    "Host: ",
+    "Indirizzo host (es. 192.168.1.10)",
     "Nome utente: ",
     "Nome utente (facoltativo)",
     "Password: ",
@@ -374,6 +374,8 @@ static const char* const I18N_IT[] = {
     "(non impostato)",
     "Info su MQTT",
     "MQTT è un semplice protocollo di messaggistica usato da sistemi domotici come Home Assistant per scambiare valori in tempo reale con altri dispositivi. Se attivato, questo dispositivo invia regolarmente il numero di aerei in portata e lo stato degli allarmi lista di controllo e prossimità al tuo broker MQTT - non viene inviato nulla senza un indirizzo broker impostato qui.",
+    "Porta: ",
+    "Porta (predefinita: 1883)",
 
     "= Governativo/Militare (stima)",
 

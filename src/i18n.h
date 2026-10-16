@@ -729,8 +729,14 @@ enum class StringId : uint16_t {
     MENU_MQTT,
     MQTT_TITLE,
     MQTT_ENABLE,
-    MQTT_BROKER_LABEL,
-    MQTT_BROKER_PROMPT,
+    // BUGFIX (Alex' Auftrag, nach Live-Test: Eingabefeld lief bei langen
+    // "Host:Port"-Werten visuell ueber) - vormals EIN kombiniertes
+    // "Broker (Host:Port)"-Feld, jetzt getrennte Host-/Port-Felder (siehe
+    // mqtt_screen.cpp). MQTT_BROKER_LABEL/_PROMPT dafuer umbenannt in
+    // MQTT_HOST_LABEL/_PROMPT (gleiche Position im Array, nur neuer Name
+    // + neuer Text), MQTT_PORT_LABEL/_PROMPT sind neu.
+    MQTT_HOST_LABEL,
+    MQTT_HOST_PROMPT,
     MQTT_USERNAME_LABEL,
     MQTT_USERNAME_PROMPT,
     MQTT_PASSWORD_LABEL,
@@ -738,6 +744,8 @@ enum class StringId : uint16_t {
     MQTT_NOT_SET,
     MQTT_INFO_TITLE,
     MQTT_INFO_BODY,
+    MQTT_PORT_LABEL,
+    MQTT_PORT_PROMPT,
 
     // Kurze Legenden-Zeile im Detail-Panel (drawDetailPanel(), letzte
     // Zeile - ersetzt dort den "Antippen zum Schliessen"-Hinweis, siehe

@@ -366,8 +366,8 @@ static const char* const I18N_NL[] = {
     "MQTT",
     "MQTT",
     "MQTT inschakelen",
-    "Broker: ",
-    "Broker-adres (host:poort)",
+    "Host: ",
+    "Hostadres (bijv. 192.168.1.10)",
     "Gebruikersnaam: ",
     "Gebruikersnaam (optioneel)",
     "Wachtwoord: ",
@@ -375,6 +375,8 @@ static const char* const I18N_NL[] = {
     "(niet ingesteld)",
     "Over MQTT",
     "MQTT is een eenvoudig berichtenprotocol dat door smart-home-systemen zoals Home Assistant wordt gebruikt om live waarden met andere apparaten uit te wisselen. Indien ingeschakeld, stuurt dit apparaat regelmatig het aantal vliegtuigen en de status van volglijst- en nabijheidsalarmen naar je eigen MQTT-broker - er wordt niets verzonden tenzij je hier een broker-adres invoert.",
+    "Poort: ",
+    "Poort (standaard: 1883)",
 
     "= Overheid/militair (best effort)",
 

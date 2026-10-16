@@ -366,8 +366,8 @@ static const char* const I18N_EN[] = {
     "MQTT",
     "MQTT",
     "Enable MQTT",
-    "Broker: ",
-    "Broker address (host:port)",
+    "Host: ",
+    "Host address (e.g. 192.168.1.10)",
     "Username: ",
     "Username (optional)",
     "Password: ",
@@ -375,6 +375,8 @@ static const char* const I18N_EN[] = {
     "(not set)",
     "About MQTT",
     "MQTT is a simple messaging protocol used by smart-home systems like Home Assistant to exchange live values with other devices. When enabled, this device regularly sends aircraft count, watchlist-alert, and proximity-alert status to your own MQTT broker - nothing is sent unless you enter a broker address here.",
+    "Port: ",
+    "Port (default: 1883)",
 
     "= Government/Military (best-effort)",
 
