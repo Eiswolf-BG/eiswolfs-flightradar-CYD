@@ -136,27 +136,44 @@ namespace {
         outPort = hostPort.substring(colon + 1);
     }
 
-    // Einfaches Text-Tastenfeld: QWERTY-Grossbuchstaben + Ziffern (gleiches
+    // Einfaches Text-Tastenfeld: QWERTY-Buchstaben + Ziffern (gleiches
     // Grundmuster wie andernorts im Projekt, z.B. die Rufzeichen-/Namens-
     // Tastenfelder), zusaetzlich eine schmale Symbolzeile mit den fuer
     // Broker-Adressen/Zugangsdaten typischen Sonderzeichen (. : - _ @ /) -
     // gleiches Prinzip wie die zusaetzlichen Satzzeichen-Tasten bei der
     // Adresssuche (location_presets_screen.cpp/address_search_screen.cpp).
-    // KEINE Umschalttaste/Kleinbuchstaben (anders als das volle WLAN-
-    // Passwort-Tastenfeld in wifi_setup_screen.cpp) - bewusst einfacher
-    // gehalten, siehe Einschraenkung im Abschlussbericht. allowEmpty=true
-    // erlaubt Bestaetigen ohne Eingabe (Nutzername/Passwort duerfen leer
-    // bleiben), bei false (Broker-Feld) muss mindestens ein Zeichen stehen.
-    String runTextKeypad(TFT_eSPI& tft, const String& title, bool allowEmpty, bool mask) {
+    //
+    // BUGFIX (GitHub Issue #12, Folgemeldung dottgrasso: MQTT-Verbindung
+    // laeuft jetzt, aber Benutzername/Passwort wurden IMMER in
+    // Grossbuchstaben gespeichert) - dieses Tastenfeld hatte urspruenglich
+    // bewusst KEINE Umschalttaste/Kleinbuchstaben (anders als das volle
+    // WLAN-Passwort-Tastenfeld in wifi_setup_screen.cpp, siehe dortiges
+    // KeyType::Shift), weil es fuer Felder wie Rufzeichen/Flughafencodes
+    // gedacht war, die ueblicherweise grossgeschrieben werden - wurde aber
+    // unveraendert auch fuer MQTT-Zugangsdaten (UND das ntfy.sh-Topic,
+    // siehe ntfy_push_screen.cpp) weiterverwendet, wo die exakte Schreib-
+    // weise zaehlt (Home Assistant/Mosquitto sind case-sensitive). Jetzt
+    // mit einfachem Umschalt-Knopf (kein One-Shot/Caps-Lock-Doppeltipp wie
+    // beim grossen WLAN-Tastenfeld - bewusst einfacher gehalten, passend
+    // zum Rest dieser Funktion) - Standard ist klein geschrieben, da
+    // Zugangsdaten ueberwiegend klein/gemischt sind, nicht komplett gross.
+    // allowEmpty=true erlaubt Bestaetigen ohne Eingabe (Nutzername/
+    // Passwort duerfen leer bleiben), bei false (Host-/Port-Feld) muss
+    // mindestens ein Zeichen stehen.
+    String runTextKeypad(TFT_eSPI& tft, const String& title, bool allowEmpty) {
         MenuStars::reset();
         constexpr const char* DIGITS = "1234567890";
-        constexpr const char* ROW1 = "QWERTYUIOP";
-        constexpr const char* ROW2 = "ASDFGHJKL";
-        constexpr const char* ROW3 = "ZXCVBNM";
+        constexpr const char* ROW1_UPPER = "QWERTYUIOP";
+        constexpr const char* ROW1_LOWER = "qwertyuiop";
+        constexpr const char* ROW2_UPPER = "ASDFGHJKL";
+        constexpr const char* ROW2_LOWER = "asdfghjkl";
+        constexpr const char* ROW3_UPPER = "ZXCVBNM";
+        constexpr const char* ROW3_LOWER = "zxcvbnm";
         constexpr const char* SYMBOLS = ".:-_@/";
 
         char buf[48] = {0};
         uint8_t len = 0;
+        bool shiftOn = false;
 
         constexpr int16_t KEY_H = 26;
         constexpr int16_t KEY_GAP = 3;
@@ -186,7 +203,11 @@ namespace {
         layoutRow((int16_t)(ROW0_Y + 3 * (KEY_H + KEY_GAP)), row3Rects, 7);
         layoutRow((int16_t)(ROW0_Y + 4 * (KEY_H + KEY_GAP)), symbolRects, 6);
 
-        Rect backspaceBtn = {4, (int16_t)(ROW0_Y + 5 * (KEY_H + KEY_GAP)), (int16_t)(Config::SCREEN_WIDTH - 8), KEY_H};
+        // Umschalt-Knopf links statt der vollen Backspace-Zeile (spart eine
+        // eigene Zeile/mehr Bildschirmhoehe) - Breite 70px reicht fuer
+        // "Shift"/"ABC" bequem aus.
+        Rect shiftBtn     = {4, (int16_t)(ROW0_Y + 5 * (KEY_H + KEY_GAP)), 70, KEY_H};
+        Rect backspaceBtn = {78, (int16_t)(ROW0_Y + 5 * (KEY_H + KEY_GAP)), (int16_t)(Config::SCREEN_WIDTH - 8 - 74), KEY_H};
         Rect cancelBtn    = {4, (int16_t)(ROW0_Y + 6 * (KEY_H + KEY_GAP)), 110, KEY_H};
         Rect confirmBtn   = {118, (int16_t)(ROW0_Y + 6 * (KEY_H + KEY_GAP)), (int16_t)(Config::SCREEN_WIDTH - 8 - 114), KEY_H};
 
@@ -204,26 +225,27 @@ namespace {
             tft.setTextSize(2);
             tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
             tft.setCursor(14, (int16_t)(fieldY + 22));
-            if (mask) {
-                // Masken-Zeichen zaehlen nicht pixelgenau wie echter Text,
-                // aber auch hier rein vorsichtshalber ueber visibleTail()
-                // begrenzen statt blind "len" Sternchen zu drucken - ein
-                // sehr langes Passwort wuerde sonst dieselbe Ueberlauf-
-                // Falle wie beim Broker-Feld reproduzieren.
-                String stars;
-                for (uint8_t i = 0; i < len; i++) stars += '*';
-                tft.print(visibleTail(tft, stars.c_str(), (int16_t)(Config::SCREEN_WIDTH - 28)));
-            } else {
-                tft.print(visibleTail(tft, buf, (int16_t)(Config::SCREEN_WIDTH - 28)));
-            }
+            // Passwort bewusst unmaskiert angezeigt (Alex' Wunsch) - auf
+            // diesem Geraet gibt es keine andere Person, die mitlesen
+            // koennte, und die Sichtbarkeit hilft beim Tippen von Gross-/
+            // Kleinschreibung und Sonderzeichen ohne Vertipper.
+            tft.print(visibleTail(tft, buf, (int16_t)(Config::SCREEN_WIDTH - 28)));
             tft.setTextSize(1);
 
+            const char* row1 = shiftOn ? ROW1_UPPER : ROW1_LOWER;
+            const char* row2 = shiftOn ? ROW2_UPPER : ROW2_LOWER;
+            const char* row3 = shiftOn ? ROW3_UPPER : ROW3_LOWER;
+
             for (uint8_t i = 0; i < 10; i++) drawButton(tft, digitRects[i], String(DIGITS[i]));
-            for (uint8_t i = 0; i < 10; i++) drawButton(tft, row1Rects[i], String(ROW1[i]));
-            for (uint8_t i = 0; i < 9; i++) drawButton(tft, row2Rects[i], String(ROW2[i]));
-            for (uint8_t i = 0; i < 7; i++) drawButton(tft, row3Rects[i], String(ROW3[i]));
+            for (uint8_t i = 0; i < 10; i++) drawButton(tft, row1Rects[i], String(row1[i]));
+            for (uint8_t i = 0; i < 9; i++) drawButton(tft, row2Rects[i], String(row2[i]));
+            for (uint8_t i = 0; i < 7; i++) drawButton(tft, row3Rects[i], String(row3[i]));
             for (uint8_t i = 0; i < 6; i++) drawButton(tft, symbolRects[i], String(SYMBOLS[i]));
 
+            // "active" (gefuellt statt nur Umriss) zeigt den aktuellen
+            // Umschalt-Zustand an - gleiches Prinzip wie drawCheckboxRow()
+            // oben.
+            drawButton(tft, shiftBtn, shiftOn ? "ABC" : "abc", shiftOn);
             drawButton(tft, backspaceBtn, "<- Backspace");
             drawButton(tft, cancelBtn, I18n::t(StringId::CANCEL));
             drawButton(tft, confirmBtn, I18n::t(StringId::OK));
@@ -239,17 +261,25 @@ namespace {
             for (uint8_t i = 0; i < 10 && !handled; i++) {
                 if (digitRects[i].contains(tap.x, tap.y) && len < sizeof(buf) - 1) { buf[len++] = DIGITS[i]; buf[len] = 0; handled = true; }
             }
+            // Handy-Tastatur-Verhalten (Alex' Wunsch, wie schon in
+            // ntfy_push_screen.cpp::runTopicKeypad()): nach einem per Shift
+            // gross getippten Buchstaben automatisch wieder auf
+            // Kleinschreibung zurueckschalten (kein dauerhaftes Caps-Lock).
             for (uint8_t i = 0; i < 10 && !handled; i++) {
-                if (row1Rects[i].contains(tap.x, tap.y) && len < sizeof(buf) - 1) { buf[len++] = ROW1[i]; buf[len] = 0; handled = true; }
+                if (row1Rects[i].contains(tap.x, tap.y) && len < sizeof(buf) - 1) { buf[len++] = (shiftOn ? ROW1_UPPER : ROW1_LOWER)[i]; buf[len] = 0; handled = true; if (shiftOn) shiftOn = false; }
             }
             for (uint8_t i = 0; i < 9 && !handled; i++) {
-                if (row2Rects[i].contains(tap.x, tap.y) && len < sizeof(buf) - 1) { buf[len++] = ROW2[i]; buf[len] = 0; handled = true; }
+                if (row2Rects[i].contains(tap.x, tap.y) && len < sizeof(buf) - 1) { buf[len++] = (shiftOn ? ROW2_UPPER : ROW2_LOWER)[i]; buf[len] = 0; handled = true; if (shiftOn) shiftOn = false; }
             }
             for (uint8_t i = 0; i < 7 && !handled; i++) {
-                if (row3Rects[i].contains(tap.x, tap.y) && len < sizeof(buf) - 1) { buf[len++] = ROW3[i]; buf[len] = 0; handled = true; }
+                if (row3Rects[i].contains(tap.x, tap.y) && len < sizeof(buf) - 1) { buf[len++] = (shiftOn ? ROW3_UPPER : ROW3_LOWER)[i]; buf[len] = 0; handled = true; if (shiftOn) shiftOn = false; }
             }
             for (uint8_t i = 0; i < 6 && !handled; i++) {
                 if (symbolRects[i].contains(tap.x, tap.y) && len < sizeof(buf) - 1) { buf[len++] = SYMBOLS[i]; buf[len] = 0; handled = true; }
+            }
+            if (!handled && shiftBtn.contains(tap.x, tap.y)) {
+                shiftOn = !shiftOn;
+                handled = true;
             }
             if (!handled && backspaceBtn.contains(tap.x, tap.y)) {
                 if (len > 0) { len--; buf[len] = 0; }
@@ -314,10 +344,8 @@ void run(TFT_eSPI& tft) {
         drawLeftButton(tft, userRow, userLabel);
 
         String pass = SettingsStore::mqttPassword();
-        String passMasked;
-        for (uint8_t i = 0; i < pass.length(); i++) passMasked += '*';
         String passLabel = String(I18n::t(StringId::MQTT_PASSWORD_LABEL)) +
-                            (pass.length() ? passMasked : String(I18n::t(StringId::MQTT_NOT_SET)));
+                            (pass.length() ? pass : String(I18n::t(StringId::MQTT_NOT_SET)));
         Rect passRow = rowRect(4);
         drawLeftButton(tft, passRow, passLabel);
 
@@ -340,7 +368,7 @@ void run(TFT_eSPI& tft) {
         } else if (enableRow.contains(tap.x, tap.y)) {
             SettingsStore::setMqttEnabled(!SettingsStore::mqttEnabled());
         } else if (hostRow.contains(tap.x, tap.y)) {
-            String value = runTextKeypad(tft, I18n::t(StringId::MQTT_HOST_PROMPT), false, false);
+            String value = runTextKeypad(tft, I18n::t(StringId::MQTT_HOST_PROMPT), false);
             if (value.length() > 0) {
                 // Aktuellen Port (falls gesetzt) beibehalten - nur der Host
                 // wird hier geaendert, siehe splitHostPort()-Kommentar oben.
@@ -348,7 +376,7 @@ void run(TFT_eSPI& tft) {
                 SettingsStore::setMqttBroker(combined);
             }
         } else if (portRow.contains(tap.x, tap.y)) {
-            String value = runTextKeypad(tft, I18n::t(StringId::MQTT_PORT_PROMPT), true, false);
+            String value = runTextKeypad(tft, I18n::t(StringId::MQTT_PORT_PROMPT), true);
             // Host MUSS zu diesem Zeitpunkt bereits gesetzt sein (die
             // Port-Zeile zeigt den Standard-Port nur als Info an, erlaubt
             // aber kein Speichern ohne Host - sonst koennte hier ein
@@ -358,10 +386,10 @@ void run(TFT_eSPI& tft) {
                 SettingsStore::setMqttBroker(combined);
             }
         } else if (userRow.contains(tap.x, tap.y)) {
-            String value = runTextKeypad(tft, I18n::t(StringId::MQTT_USERNAME_PROMPT), true, false);
+            String value = runTextKeypad(tft, I18n::t(StringId::MQTT_USERNAME_PROMPT), true);
             SettingsStore::setMqttUsername(value);
         } else if (passRow.contains(tap.x, tap.y)) {
-            String value = runTextKeypad(tft, I18n::t(StringId::MQTT_PASSWORD_PROMPT), true, true);
+            String value = runTextKeypad(tft, I18n::t(StringId::MQTT_PASSWORD_PROMPT), true);
             SettingsStore::setMqttPassword(value);
         } else if (backBtn.contains(tap.x, tap.y)) {
             done = true;

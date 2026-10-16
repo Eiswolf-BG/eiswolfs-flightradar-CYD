@@ -9,69 +9,86 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 8;
 
     const char* const CHANGELOG_EN =
-        "- Fix: MQTT connection broke after every reconfiguration of "
-        "the broker (fixed a dangling-pointer bug in the MQTT "
-        "client)\n"
-        "- Fix: Split the broker-address field in MQTT settings into "
-        "separate host/port fields and guarded it against overflow "
-        "with long values";
+        "- Fix: MQTT username and password were always saved in "
+        "uppercase regardless of what was typed. The on-screen "
+        "keyboard's shift key now behaves like a smartphone (active "
+        "only for the next letter), and the exact case you type is "
+        "preserved\n"
+        "- Fix: The MQTT password field now shows plain text instead "
+        "of asterisks, so typos are immediately visible";
 
     const char* const CHANGELOG_DE =
-        "- Fix: MQTT-Verbindung brach nach jeder Neukonfiguration "
-        "des Brokers ab (Dangling-Pointer-Bug im MQTT-Client "
-        "behoben)\n"
-        "- Fix: Eingabefeld für die Broker-Adresse in den MQTT-"
-        "Einstellungen in getrennte Host-/Port-Felder aufgeteilt und "
-        "gegen Überlauf bei langen Werten abgesichert";
+        "- Fix: MQTT-Benutzername und -Passwort wurden beim "
+        "Eintippen unabhängig von der tatsächlichen Eingabe immer "
+        "in Großbuchstaben gespeichert. Die Umschalttaste der "
+        "Bildschirmtastatur verhält sich jetzt wie bei einem "
+        "Smartphone (nur für den nächsten Buchstaben aktiv), und "
+        "die exakte Schreibweise wird übernommen\n"
+        "- Fix: Das MQTT-Passwortfeld zeigt die Eingabe jetzt im "
+        "Klartext statt mit Sternchen an, damit Tippfehler sofort "
+        "auffallen";
 
     const char* const CHANGELOG_FR =
-        "- Correction : la connexion MQTT se rompait après chaque "
-        "reconfiguration du broker (correction d'un bug de pointeur "
-        "pendant dans le client MQTT)\n"
-        "- Correction : le champ d'adresse du broker dans les "
-        "réglages MQTT a été divisé en champs hôte/port séparés et "
-        "protégé contre le débordement avec des valeurs longues";
+        "- Correction : le nom d'utilisateur et le mot de passe "
+        "MQTT étaient toujours enregistrés en majuscules, quelle "
+        "que soit la saisie réelle. La touche Maj du clavier à "
+        "l'écran se comporte désormais comme sur un smartphone "
+        "(active uniquement pour la lettre suivante), et la casse "
+        "exacte saisie est conservée\n"
+        "- Correction : le champ du mot de passe MQTT affiche "
+        "désormais le texte en clair au lieu d'astérisques, pour "
+        "repérer immédiatement les fautes de frappe";
 
     const char* const CHANGELOG_TR =
-        "- Düzeltme: Broker her yeniden yapılandırıldığında MQTT "
-        "bağlantısı kopuyordu (MQTT istemcisindeki sarkan işaretçi "
-        "hatası düzeltildi)\n"
-        "- Düzeltme: MQTT ayarlarındaki broker adresi alanı ayrı "
-        "host/port alanlarına bölündü ve uzun değerlerde taşmaya "
-        "karşı korundu";
+        "- Düzeltme: MQTT kullanıcı adı ve şifresi, gerçek girişten "
+        "bağımsız olarak her zaman büyük harfle kaydediliyordu. "
+        "Ekran klavyesinin shift tuşu artık bir akıllı telefon gibi "
+        "davranıyor (sadece bir sonraki harf için etkin) ve yazılan "
+        "tam büyük/küçük harf korunuyor\n"
+        "- Düzeltme: MQTT şifre alanı artık yıldız yerine düz metin "
+        "gösteriyor, böylece yazım hataları hemen fark ediliyor";
 
     const char* const CHANGELOG_ES =
-        "- Corrección: la conexión MQTT se interrumpía después de "
-        "cada reconfiguración del broker (se corrigió un error de "
-        "puntero colgante en el cliente MQTT)\n"
-        "- Corrección: el campo de dirección del broker en los "
-        "ajustes de MQTT se dividió en campos separados de host y "
-        "puerto, protegidos contra desbordamiento con valores "
-        "largos";
+        "- Corrección: el nombre de usuario y la contraseña MQTT "
+        "siempre se guardaban en mayúsculas, sin importar lo que se "
+        "escribiera. La tecla de mayúsculas del teclado en pantalla "
+        "ahora se comporta como en un smartphone (activa solo para "
+        "la siguiente letra), y se conserva exactamente la "
+        "escritura introducida\n"
+        "- Corrección: el campo de contraseña MQTT ahora muestra el "
+        "texto en claro en lugar de asteriscos, para detectar "
+        "errores de escritura de inmediato";
 
     const char* const CHANGELOG_IT =
-        "- Correzione: la connessione MQTT si interrompeva dopo ogni "
-        "riconfigurazione del broker (risolto un bug di puntatore "
-        "pendente nel client MQTT)\n"
-        "- Correzione: il campo dell'indirizzo del broker nelle "
-        "impostazioni MQTT è stato diviso in campi host/porta "
-        "separati e protetto da overflow con valori lunghi";
+        "- Correzione: il nome utente e la password MQTT venivano "
+        "sempre salvati in maiuscolo, indipendentemente da quanto "
+        "digitato. Il tasto maiuscole della tastiera a schermo ora "
+        "si comporta come su uno smartphone (attivo solo per la "
+        "lettera successiva), e viene mantenuta esattamente la "
+        "scrittura digitata\n"
+        "- Correzione: il campo password MQTT ora mostra il testo "
+        "in chiaro invece degli asterischi, così gli errori di "
+        "digitazione sono immediatamente visibili";
 
     const char* const CHANGELOG_PT =
-        "- Correção: a conexão MQTT falhava após cada "
-        "reconfiguração do broker (corrigido um bug de ponteiro "
-        "pendente no cliente MQTT)\n"
-        "- Correção: o campo de endereço do broker nas "
-        "configurações MQTT foi dividido em campos separados de "
-        "host/porta e protegido contra estouro com valores longos";
+        "- Correção: o nome de usuário e a senha MQTT eram sempre "
+        "salvos em maiúsculas, independentemente do que era "
+        "digitado. A tecla shift do teclado na tela agora se "
+        "comporta como em um smartphone (ativa apenas para a "
+        "próxima letra), e a grafia exata digitada é preservada\n"
+        "- Correção: o campo de senha MQTT agora mostra o texto em "
+        "claro em vez de asteriscos, para que erros de digitação "
+        "sejam identificados imediatamente";
 
     const char* const CHANGELOG_NL =
-        "- Fix: MQTT-verbinding viel uit na elke herconfiguratie van "
-        "de broker (dangling-pointerbug in de MQTT-client "
-        "verholpen)\n"
-        "- Fix: het broker-adresveld in de MQTT-instellingen is "
-        "opgesplitst in aparte host-/poortvelden en beveiligd tegen "
-        "overloop bij lange waarden";
+        "- Fix: MQTT-gebruikersnaam en -wachtwoord werden altijd in "
+        "hoofdletters opgeslagen, ongeacht wat er werkelijk werd "
+        "ingevoerd. De shift-toets van het schermtoetsenbord "
+        "gedraagt zich nu als bij een smartphone (alleen actief "
+        "voor de volgende letter), en de exacte schrijfwijze wordt "
+        "behouden\n"
+        "- Fix: het MQTT-wachtwoordveld toont nu platte tekst in "
+        "plaats van sterretjes, zodat typfouten direct opvallen";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT, CHANGELOG_PT, CHANGELOG_NL
