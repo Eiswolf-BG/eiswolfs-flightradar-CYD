@@ -542,7 +542,7 @@ static const char* const I18N_TR[] = {
     "Test push gönder",
     "Gönderildi",
     "ntfy.sh Push Hakkında",
-    "ntfy.sh, hesap gerektirmeyen ücretsiz bir push bildirim hizmetidir. Telefonuna ücretsiz ntfy uygulamasını kur ve burada girdiğin aynı konu adına abone ol - o konuya gönderilen her mesaj bir bildirim olarak görünür. Ücretsiz genel sunucuda konu adı GİZLİ DEĞİLDİR - onu bilen ya da tahmin eden herkes bildirimlerini okuyabilir. Bu yüzden benzersiz, tahmin edilmesi zor bir isim seç, basit bir kelime değil.",
+    "ntfy.sh, hesap gerektirmeyen ücretsiz bir push bildirim hizmetidir. Telefonuna ücretsiz ntfy uygulamasını kur ve burada girdiğin aynı konu adına abone ol - o konuya gönderilen her mesaj bir bildirim olarak görünür. Ücretsiz genel sunucuda konu adı GİZLİ DEĞİLDİR - onu bilen ya da tahmin eden herkes bildirimlerini okuyabilir. Bu yüzden benzersiz, tahmin edilmesi zor bir isim seç, basit bir kelime değil. \"Flightradar\" gibi akla gelen isimlerden kaçın - bunun yerine kendi adını ve birkaç rastgele rakam ekle (örn. \"Flightradar-MaxMuster-7429\"). Buradaki konuyu değiştirirsen, telefonundaki ntfy uygulamasını da güncellemeyi unutma (eski konudan aboneliği kaldır, yeniye abone ol) - yoksa eski konuya gönderilen mesajları almaya devam edersin.",
     "Acil durum squawk kodu ",
     "Takip listesi eşleşmesi: ",
     "Eiswolfs Flightradar'dan test bildirimi ✅",

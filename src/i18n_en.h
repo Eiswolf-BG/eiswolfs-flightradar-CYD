@@ -543,7 +543,7 @@ static const char* const I18N_EN[] = {
     "Send test push",
     "Sent",
     "About ntfy.sh Push",
-    "ntfy.sh is a free push notification service - no account needed. Install the free ntfy app on your phone and subscribe to the same topic name you enter here; any message sent to that topic then shows up as a notification. On the free public server, the topic name is NOT a secret - anyone who knows (or guesses) it could read your notifications, so pick something unique and hard to guess, not a simple word.",
+    "ntfy.sh is a free push notification service - no account needed. Install the free ntfy app on your phone and subscribe to the same topic name you enter here; any message sent to that topic then shows up as a notification. On the free public server, the topic name is NOT a secret - anyone who knows (or guesses) it could read your notifications, so pick something unique and hard to guess, not a simple word. Avoid obvious names like \"Flightradar\" - add something like your own name and a few random digits instead (e.g. \"Flightradar-MaxMuster-7429\"). If you change the topic here, remember to also update the ntfy app on your phone (unsubscribe from the old topic, subscribe to the new one) - otherwise you'll keep receiving messages sent to the old one.",
     "Emergency squawk ",
     "Watchlist match: ",
     "Test notification from Eiswolfs Flightradar ✅",
