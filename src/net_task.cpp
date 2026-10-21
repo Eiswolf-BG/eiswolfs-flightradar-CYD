@@ -612,17 +612,15 @@ namespace {
                             LedAlert::pulseHeartbeat(millis());
                         }
 
-                        // TESTWEISE - nach Erfolg schrittweise (nicht
-                        // abrupt) zum Grundintervall zurueckkehren, falls
-                        // zuvor wegen 429/Fehlern hochskaliert wurde -
-                        // halbiert bei jedem weiteren Erfolg die
-                        // verbleibende Differenz zum Grundintervall.
-                        if (currentIntervalMs > Config::FETCH_INTERVAL_MS) {
-                            uint32_t excess = currentIntervalMs - Config::FETCH_INTERVAL_MS;
-                            currentIntervalMs = (excess < 1000)
-                                ? Config::FETCH_INTERVAL_MS
-                                : Config::FETCH_INTERVAL_MS + excess / 2;
-                        }
+                        // Backoff-Fix (Auftrag, nach anhaltendem HTTP 429 bei
+                        // mehreren Nutzern gleichzeitig): nach GENAU EINER
+                        // erfolgreichen Antwort garantiert und sofort auf das
+                        // Grundintervall zurueck, kein schrittweises
+                        // Abklingen mehr (das vorherige Halbieren der
+                        // Differenz brauchte bei wiederholten 429 zwischen
+                        // den Erfolgen im Extremfall mehrere Erfolge in
+                        // Folge, bis wieder normal abgefragt wurde).
+                        currentIntervalMs = Config::FETCH_INTERVAL_MS;
                     } else if (result.httpCode == 429) {
                         // TESTWEISE - exponentielles Backoff nach HTTP 429:
                         // Retry-After-Header bevorzugen, falls vorhanden,

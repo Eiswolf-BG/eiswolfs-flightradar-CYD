@@ -159,6 +159,49 @@ void run(TFT_eSPI& tft) {
         tft.println(String(I18n::t(StringId::CONNECTION_STATUS_QUALITY_PREFIX)) + labelForQuality(quality));
         y += LINE_H;
 
+        // Manuell waehlbare ADS-B-Datenquelle (Auftrag "Fallback-Server") -
+        // tippbare Zeile, zyklisch durch Config::ADSB_SOURCE_NAMES. Nutzt
+        // drawString()+setTextDatum() statt setCursor()+println() - bei
+        // unserem Font ist NUR die zentrierte drawString()-Variante von
+        // der Grundlinien-Verankerung unberuehrt (siehe CLAUDE.md
+        // "Schriftzustand"), raw setCursor()+println() in einem eng
+        // bemessenen Knopf waere hier die Gefahrenzone. Breitenpruefung
+        // (Praefix+Quellenname je Sprache, CLAUDE.md Pflichtpruefung
+        // Textbreite) entscheidet ueber ein- oder zweizeilige Darstellung.
+        uint8_t sourceIdx = SettingsStore::adsbSourceIndex();
+        if (sourceIdx >= Config::ADSB_SOURCE_COUNT) sourceIdx = Config::DEFAULT_ADSB_SOURCE_INDEX;
+        String sourceName = Config::ADSB_SOURCE_NAMES[sourceIdx];
+        String sourcePrefix = I18n::t(StringId::CONNECTION_STATUS_SOURCE_PREFIX);
+        String sourceCombined = sourcePrefix + sourceName;
+        constexpr int16_t SOURCE_BTN_PAD = 8;
+        bool sourceFitsOneLine = tft.textWidth(sourceCombined) <= (Config::SCREEN_WIDTH - 20 - 2 * SOURCE_BTN_PAD);
+        int16_t sourceBtnH = sourceFitsOneLine ? 44 : 64;
+        // Nach unten gegen den Zurueck-Knopf geklemmt (statt ihn im
+        // theoretischen Extremfall - alle Zeilen oben gleichzeitig
+        // zweizeilig umgebrochen - zu ueberlappen): garantiert mind. 8px
+        // Abstand zum festen Zurueck-Knopf, unabhaengig davon, wie hoch
+        // der Inhalt darueber in der jeweiligen Sprache ausfaellt.
+        int16_t sourceBtnY = (int16_t)(y + 10);
+        int16_t maxBtnBottom = (int16_t)(Config::SCREEN_HEIGHT - 50 - 8);
+        if (sourceBtnY + sourceBtnH > maxBtnBottom) {
+            sourceBtnY = (int16_t)(maxBtnBottom - sourceBtnH);
+        }
+        Rect sourceBtn = {LINE_X, sourceBtnY, (int16_t)(Config::SCREEN_WIDTH - 20), sourceBtnH};
+        tft.fillRoundRect(sourceBtn.x, sourceBtn.y, sourceBtn.w, sourceBtn.h, 4, TFT_BLACK);
+        tft.drawRoundRect(sourceBtn.x, sourceBtn.y, sourceBtn.w, sourceBtn.h, 4, UiTheme::accentColor(tft));
+        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+        if (sourceFitsOneLine) {
+            tft.setTextDatum(MC_DATUM);
+            tft.drawString(sourceCombined, (int16_t)(sourceBtn.x + sourceBtn.w / 2), (int16_t)(sourceBtn.y + sourceBtn.h / 2));
+        } else {
+            tft.setTextDatum(TC_DATUM);
+            int16_t cx = (int16_t)(sourceBtn.x + sourceBtn.w / 2);
+            tft.drawString(sourcePrefix, cx, (int16_t)(sourceBtn.y + SOURCE_BTN_PAD));
+            tft.drawString(sourceName, cx, (int16_t)(sourceBtn.y + SOURCE_BTN_PAD + LINE_H));
+        }
+        tft.setTextDatum(TL_DATUM);
+        y = (int16_t)(sourceBtn.y + sourceBtn.h + 10);
+
         Rect backBtn = {LINE_X, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
         drawButton(tft, backBtn, I18n::t(StringId::BACK));
 
@@ -179,7 +222,15 @@ void run(TFT_eSPI& tft) {
             delay(20);
         }
         if (done) break;
-        if (tapped && backBtn.contains(tap.x, tap.y)) done = true;
+        if (tapped && backBtn.contains(tap.x, tap.y)) {
+            done = true;
+        } else if (tapped && sourceBtn.contains(tap.x, tap.y)) {
+            // Zyklisch zur naechsten Datenquelle, Aenderung sofort
+            // wirksam (naechster NetTask-Abruf nutzt sie direkt, siehe
+            // AdsbClient::fetch()).
+            uint8_t next = (uint8_t)((sourceIdx + 1) % Config::ADSB_SOURCE_COUNT);
+            SettingsStore::setAdsbSourceIndex(next);
+        }
     }
 }
 

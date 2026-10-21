@@ -8,6 +8,13 @@ namespace SettingsStore {
     uint8_t rangeIndex();
     void setRangeIndex(uint8_t idx);
 
+    // Manuell gewaehlte ADS-B-Datenquelle (Index in Config::ADSB_SOURCE_*,
+    // siehe config.h) - Menue > System > Werkzeuge > Verbindungsstatus,
+    // Auftrag "Fallback-Server". Standard: Config::DEFAULT_ADSB_SOURCE_INDEX
+    // (adsb.lol).
+    uint8_t adsbSourceIndex();
+    void setAdsbSourceIndex(uint8_t idx);
+
     bool displayInverted();
     void setDisplayInverted(bool inverted);
 

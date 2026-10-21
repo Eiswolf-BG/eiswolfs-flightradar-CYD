@@ -1,5 +1,6 @@
 #include "adsb_client.h"
 #include "radar_math.h"
+#include "settings_store.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -173,11 +174,21 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
         clientConfigured = true;
     }
 
+    // Manuell waehlbare Datenquelle (Menue > System > Werkzeuge >
+    // Verbindungsstatus, Auftrag "Fallback-Server") - Standard bleibt
+    // adsb.lol, siehe Config::ADSB_SOURCE_* fuer Hintergrund/Risiken der
+    // beiden Alternativen.
+    uint8_t sourceIdx = SettingsStore::adsbSourceIndex();
+    if (sourceIdx >= Config::ADSB_SOURCE_COUNT) sourceIdx = Config::DEFAULT_ADSB_SOURCE_INDEX;
+    const char* sourceHost = Config::ADSB_SOURCE_HOSTS[sourceIdx];
+    const char* sourcePathPrefix = Config::ADSB_SOURCE_PATH_PREFIXES[sourceIdx];
+    const char* sourceArrayKey = Config::ADSB_SOURCE_ARRAY_KEYS[sourceIdx];
+
     HTTPClient http;
     char url[160];
     snprintf(url, sizeof(url),
-             "https://%s/v2/lat/%.5f/lon/%.5f/dist/%.0f",
-             Config::ADSB_API_HOST, homeLat, homeLon, radiusKm);
+             "https://%s%s/v2/lat/%.5f/lon/%.5f/dist/%.0f",
+             sourceHost, sourcePathPrefix, homeLat, homeLon, radiusKm);
 
     http.setTimeout(Config::ADSB_HTTP_TIMEOUT_MS);
     if (!http.begin(persistentClient, url)) {
@@ -250,7 +261,7 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
     Stream& rawStream = http.getStream();
     WatchdogYieldingStream watchdogYieldStream(rawStream);
     Stream& stream = watchdogYieldStream;
-    if (!skipToArrayStart(stream, "\"ac\":", 512)) {
+    if (!skipToArrayStart(stream, sourceArrayKey, 512)) {
         http.end();
         result.ok = false;
         return result;

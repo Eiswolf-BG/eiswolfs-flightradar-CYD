@@ -1492,6 +1492,13 @@ enum class StringId : uint16_t {
     // Strings.
     SCREENSAVER_RECALL_PREFIX,
 
+    // Auftrag "Fallback-Server" (Menue > System > Werkzeuge >
+    // Verbindungsstatus) - manuell waehlbare ADS-B-Datenquelle. Die
+    // Quellennamen selbst (adsb.lol/airplanes.live/adsb.fi, siehe
+    // Config::ADSB_SOURCE_NAMES) sind Eigennamen und werden NICHT
+    // uebersetzt.
+    CONNECTION_STATUS_SOURCE_PREFIX,
+
     COUNT
 };
 

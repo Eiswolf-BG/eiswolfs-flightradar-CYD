@@ -658,6 +658,8 @@ static const char* const I18N_ES[] = {
     "Más regresos hoy: ",
 
     "Último: ",
+
+    "Fuente de datos: ",
 };
 
 static_assert(sizeof(I18N_ES) / sizeof(I18N_ES[0]) == (size_t)StringId::COUNT,

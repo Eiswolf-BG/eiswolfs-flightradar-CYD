@@ -8,6 +8,7 @@ namespace SettingsStore {
 
 namespace {
     uint8_t rangeIdx = Config::DEFAULT_RANGE_INDEX;
+    uint8_t adsbSourceIdx = Config::DEFAULT_ADSB_SOURCE_INDEX;
     bool inverted = true; // Dieses Board braucht invertDisplay(true) fuer korrekte Farben (siehe main.cpp)
     // AUS per Default - Tischmontage (180 Grad) ist ein bewusstes Opt-in
     // ueber Menue > System > Anzeige, siehe settings_store.h.
@@ -158,6 +159,11 @@ namespace {
             int v = value.toInt();
             if (v >= 0 && v < Config::RANGE_STEP_COUNT) {
                 rangeIdx = (uint8_t)v;
+            }
+        } else if (key == "adsb_source") {
+            int v = value.toInt();
+            if (v >= 0 && v < Config::ADSB_SOURCE_COUNT) {
+                adsbSourceIdx = (uint8_t)v;
             }
         } else if (key == "invert") {
             inverted = (value.toInt() != 0);
@@ -334,6 +340,7 @@ void save() {
     File f = SD.open(Config::SD_SETTINGS_FILE, FILE_WRITE);
     if (!f) return;
     f.printf("range_index=%d\n", rangeIdx);
+    f.printf("adsb_source=%d\n", adsbSourceIdx);
     f.printf("invert=%d\n", inverted ? 1 : 0);
     f.printf("rotate_180=%d\n", rotated180 ? 1 : 0);
     f.printf("brightness_percent=%d\n", brightnessPct);
@@ -397,6 +404,15 @@ uint8_t rangeIndex() { return rangeIdx; }
 void setRangeIndex(uint8_t idx) {
     if (idx < Config::RANGE_STEP_COUNT) {
         rangeIdx = idx;
+        save();
+    }
+}
+
+uint8_t adsbSourceIndex() { return adsbSourceIdx; }
+
+void setAdsbSourceIndex(uint8_t idx) {
+    if (idx < Config::ADSB_SOURCE_COUNT) {
+        adsbSourceIdx = idx;
         save();
     }
 }

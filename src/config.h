@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "6.9.2";
+    constexpr const char* APP_VERSION = "6.9.3";
 
     // Projekt-Repo-URL fuer den GitHub-QR-Code - zentral hier hinterlegt,
     // damit main.cpp (Ueber-Screen, grosser QR-Code) und menu_screen.cpp
@@ -128,10 +128,13 @@ namespace Config {
     // bewusst nicht weiter als 10s, damit der Radar noch reaktionsschnell
     // bleibt (Trade-off dokumentiert, siehe Bericht an Alex).
     constexpr uint32_t FETCH_INTERVAL_MS = 10000;
-    // TESTWEISE - Obergrenze fuers exponentielle Backoff nach HTTP 429
-    // (siehe net_task.cpp), damit sich das Intervall nicht unbegrenzt
-    // aufschaukelt.
-    constexpr uint32_t FETCH_BACKOFF_MAX_MS = 3UL * 60UL * 1000UL;
+    // Obergrenze fuers exponentielle Backoff nach HTTP 429 (siehe
+    // net_task.cpp), damit sich das Intervall nicht unbegrenzt aufschaukelt -
+    // auf 2 Minuten gesenkt (Auftrag "Backoff-Fix" nach anhaltendem 429 bei
+    // mehreren Nutzern gleichzeitig), vorher 3 Minuten. Nach JEDER
+    // erfolgreichen Antwort wird sofort und vollstaendig auf
+    // FETCH_INTERVAL_MS zurueckgesetzt (kein schrittweises Abklingen mehr).
+    constexpr uint32_t FETCH_BACKOFF_MAX_MS = 2UL * 60UL * 1000UL;
     // TESTWEISE - moderate feste Wartezeit nach EINEM fehlgeschlagenen
     // Request (Timeout/SSL-Fehler, kein 429) vor dem naechsten Versuch, statt
     // sofort wieder im FETCH_INTERVAL_MS-Takt weiterzumachen (siehe
@@ -143,6 +146,48 @@ namespace Config {
     // von HTTP_TIMEOUT_MS (das weiterhin fuer hexdb.io/Wetter/etc. gilt) -
     // die Antwort bei 100km Radius kann ueber 100KB gross werden.
     constexpr uint32_t ADSB_HTTP_TIMEOUT_MS = 15000;
+
+    // Manuell waehlbare ADS-B-Datenquellen (Menue > System > Werkzeuge >
+    // Verbindungsstatus, Auftrag "Fallback-Server" nach anhaltendem HTTP
+    // 429 bei adsb.lol). Alle drei nutzen dasselbe URL-Schema wie
+    // ADSB_API_HOST oben ("/v2/lat/{lat}/lon/{lon}/dist/{radius}"), das
+    // JSON-Objekt je Flugzeug ist bei allen dreien identisch benannt (live
+    // mit oeffentlichen Testkoordinaten verifiziert) - nur der NAME des
+    // umschliessenden Arrays unterscheidet sich (adsb.fi nennt es
+    // "aircraft" statt "ac", siehe ADSB_SOURCE_ARRAY_KEYS unten).
+    // WICHTIG zu adsb.fi: wurde VOR der Umstellung auf adsb.lol (siehe
+    // Kommentar bei ADSB_API_HOST oben) bereits einmal eingesetzt und
+    // wieder verworfen, weil es dem ESP32-GERAET (nicht Desktop-curl!)
+    // trotz gueltigem HTTP 200/validem JSON dauerhaft LEERE Flugzeug-
+    // listen lieferte - vermutlich Cloudflare-Bot-Management gegen den
+    // mbedTLS-TLS-Fingerprint des Geraets. Dieses Risiko kann bei dieser
+    // erneuten Aufnahme als manuelle Alternative wieder auftreten - vor
+    // Verlass auf adsb.fi unbedingt AUF DEM ECHTEN GERAET live pruefen,
+    // nicht nur per curl vom Rechner (der zeigte waehrend der Einfuehrung
+    // dieses Features volle Daten).
+    // WICHTIG zu airplanes.live: lieferte beim Test ohne vorherige
+    // Registrierung HTTP 403 ("Please contact us..."; die API verlangt
+    // offenbar eine individuelle Freischaltung). Array-Name "ac" hier
+    // deshalb UNGEPRUEFT angenommen (gleiche Codebasis-Familie wie
+    // adsb.lol) - vor echter Nutzung zuerst die noetige Freischaltung
+    // klaeren und danach live verifizieren.
+    constexpr uint8_t ADSB_SOURCE_COUNT = 3;
+    constexpr const char* ADSB_SOURCE_HOSTS[ADSB_SOURCE_COUNT] = {
+        "api.adsb.lol", "api.airplanes.live", "opendata.adsb.fi"
+    };
+    // Pfad-Praefix VOR "/v2/lat/..." - bei adsb.lol/airplanes.live leer,
+    // bei adsb.fi zusaetzlich "/api" (live mit HTTP 400 bestaetigt: ohne
+    // dieses Praefix lehnt adsb.fi die Anfrage ab, siehe Testprotokoll).
+    constexpr const char* ADSB_SOURCE_PATH_PREFIXES[ADSB_SOURCE_COUNT] = {
+        "", "", "/api"
+    };
+    constexpr const char* ADSB_SOURCE_ARRAY_KEYS[ADSB_SOURCE_COUNT] = {
+        "\"ac\":", "\"ac\":", "\"aircraft\":"
+    };
+    constexpr const char* ADSB_SOURCE_NAMES[ADSB_SOURCE_COUNT] = {
+        "adsb.lol", "airplanes.live", "adsb.fi"
+    };
+    constexpr uint8_t DEFAULT_ADSB_SOURCE_INDEX = 0; // adsb.lol bleibt Standard
 
     // Wetter-Icon im Header (siehe weather.cpp) - deutlich seltener
     // abgefragt als die ADS-B-Daten, das Wetter aendert sich nicht
