@@ -92,11 +92,53 @@ namespace {
         tft.println(value);
         return (int16_t)(lineH * 2);
     }
+
+    constexpr int16_t LINE_X = 10;
+    constexpr int16_t LINE_H = 24;
+    constexpr int16_t LINE_MAX_W = Config::SCREEN_WIDTH - 20;
+    // Datenquellen-Liste (Auftrag "Liste statt Zyklus-Knopf") - jede Quelle
+    // eine eigene, einzeln antippbare Zeile mit rundem Status-Punkt statt
+    // des vorherigen einzelnen Zyklus-Knopfs.
+    constexpr int16_t SOURCE_ROW_H = 34;
+    constexpr int16_t SOURCE_ROW_GAP = 4;
+    constexpr int16_t SOURCE_DOT_R = 6;
 }
 
 void run(TFT_eSPI& tft) {
     bool done = false;
     MenuStars::reset();
+
+    // Auftrag "Flackern beheben" (direkt nach v6.9.3 aufgefallen): dieser
+    // Screen zeichnete bisher BEDINGUNGSLOS alle ~500ms den kompletten
+    // Bildschirm neu (fillScreen+alles), auch wenn sich der Inhalt gar
+    // nicht geaendert hatte (z.B. blieb "5s" oft ueber zwei 500ms-Haelften
+    // gleich, da die Sekunde noch nicht umgesprungen war) - mit dem neuen,
+    // zusaetzlichen Datenquellen-Knopf dauerte jeder dieser unnoetigen
+    // Redraws spuerbar laenger und das Schwarz-Aufblitzen wurde sichtbar.
+    // lastSig haelt eine Signatur des zuletzt tatsaechlich gezeichneten
+    // Inhalts fest - der teure Redraw (fillScreen + alles neu) laeuft nur
+    // noch bei echter Aenderung, gleiches Prinzip wie die Inhalts-
+    // Signaturen anderswo im Projekt. sourceBtn bleibt zwischen den
+    // Iterationen bestehen (letzter TATSAECHLICH gezeichneter Stand),
+    // damit die Tipp-Erkennung unten auch in einer uebersprungenen
+    // Iteration mit der richtigen Position arbeitet - backBtn ist fix
+    // (haengt nicht vom Inhalt ab) und wird nur einmal berechnet.
+    String lastContentSig = "\x01";
+    String lastAgeStr = "";
+    Rect sourceRows[Config::ADSB_SOURCE_COUNT] = {};
+    Rect backBtn = {LINE_X, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
+
+    // "Letzter Abruf"-Zeile aendert sich (Sekundenzaehler) viel haeufiger
+    // als alles andere auf diesem Screen - deshalb eigens gemerkte
+    // Position/Hoehe dieser einen Zeile, damit sie bei einer reinen
+    // Alters-Aenderung PUNKTUELL (kleines fillRect + Zeile neu) aktualisiert
+    // werden kann, statt dafuer jedesmal den kompletten Bildschirm per
+    // fillScreen() wischen und neu zeichnen zu muessen (das war trotz der
+    // Signatur-Pruefung weiterhin 1x/Sekunde sichtbares Flackern, siehe
+    // Diagnose-Log vom 26.10.).
+    int16_t ageLineBaselineY = 0;
+    int16_t ageLineLines = 1;
+    const String agePrefix = I18n::t(StringId::CONNECTION_STATUS_LAST_FETCH_PREFIX);
 
     while (!done) {
         AircraftTable::lock();
@@ -106,23 +148,7 @@ void run(TFT_eSPI& tft) {
         uint32_t ageMs = AircraftTable::msSinceLastSuccessfulFetch(millis());
         AircraftTable::FetchOutcome outcome = AircraftTable::lastFetchOutcome();
         Quality quality = qualityForAge(ageMs);
-
-        tft.fillScreen(TFT_BLACK);
-        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
-        tft.setCursor(10, 14);
-        tft.println(I18n::t(StringId::MENU_CONNECTION_STATUS));
-
-        constexpr int16_t LINE_X = 10;
-        constexpr int16_t LINE_H = 24;
-        constexpr int16_t LINE_MAX_W = Config::SCREEN_WIDTH - 20;
-        int16_t y = 40;
-
-        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
-        y += drawPrefixedLine(tft, LINE_X, y, LINE_MAX_W, LINE_H,
-                               I18n::t(StringId::CONNECTION_STATUS_TRACKED_PREFIX), String(tracked));
-
-        y += drawPrefixedLine(tft, LINE_X, y, LINE_MAX_W, LINE_H,
-                               I18n::t(StringId::CONNECTION_STATUS_LAST_FETCH_PREFIX), formatAge(ageMs));
+        String ageStr = formatAge(ageMs);
 
         // Ergebnis des letzten Abrufversuchs (siehe AircraftTable::
         // recordFetchOutcome() in net_task.cpp) - unabhaengig vom
@@ -143,74 +169,130 @@ void run(TFT_eSPI& tft) {
         } else {
             resultText = String(I18n::t(StringId::CONNECTION_STATUS_RESULT_ERROR_PREFIX)) + outcome.httpCode;
         }
-        y += drawPrefixedLine(tft, LINE_X, y, LINE_MAX_W, LINE_H,
-                               I18n::t(StringId::CONNECTION_STATUS_RESULT_PREFIX), resultText);
 
-        // Farbstatus: farbiger Punkt (funktioniert unabhaengig vom
-        // aktuellen Radar-Farbthema, da Gruen/Gelb/Rot hier eine feste,
-        // eigene Bedeutung haben - gleiches Prinzip wie die Hoehenfarben
-        // auf dem Radar, siehe CLAUDE.md "Ausnahmen" bei den UI-
-        // Konventionen) PLUS ein uebersetztes Wort (Gut/Mittel/Schlecht),
-        // damit die Aussage nicht ausschliesslich von der Farbe abhaengt.
-        uint16_t qColor = colorForQuality(quality);
-        tft.fillCircle((int16_t)(LINE_X + 6), (int16_t)(y - 4), 6, qColor);
-        tft.setTextColor(qColor, TFT_BLACK);
-        tft.setCursor((int16_t)(LINE_X + 20), y);
-        tft.println(String(I18n::t(StringId::CONNECTION_STATUS_QUALITY_PREFIX)) + labelForQuality(quality));
-        y += LINE_H;
-
-        // Manuell waehlbare ADS-B-Datenquelle (Auftrag "Fallback-Server") -
-        // tippbare Zeile, zyklisch durch Config::ADSB_SOURCE_NAMES. Nutzt
-        // drawString()+setTextDatum() statt setCursor()+println() - bei
-        // unserem Font ist NUR die zentrierte drawString()-Variante von
-        // der Grundlinien-Verankerung unberuehrt (siehe CLAUDE.md
-        // "Schriftzustand"), raw setCursor()+println() in einem eng
-        // bemessenen Knopf waere hier die Gefahrenzone. Breitenpruefung
-        // (Praefix+Quellenname je Sprache, CLAUDE.md Pflichtpruefung
-        // Textbreite) entscheidet ueber ein- oder zweizeilige Darstellung.
+        // Manuell waehlbare ADS-B-Datenquelle (Auftrag "Fallback-Server").
         uint8_t sourceIdx = SettingsStore::adsbSourceIndex();
         if (sourceIdx >= Config::ADSB_SOURCE_COUNT) sourceIdx = Config::DEFAULT_ADSB_SOURCE_INDEX;
-        String sourceName = Config::ADSB_SOURCE_NAMES[sourceIdx];
-        String sourcePrefix = I18n::t(StringId::CONNECTION_STATUS_SOURCE_PREFIX);
-        String sourceCombined = sourcePrefix + sourceName;
-        constexpr int16_t SOURCE_BTN_PAD = 8;
-        bool sourceFitsOneLine = tft.textWidth(sourceCombined) <= (Config::SCREEN_WIDTH - 20 - 2 * SOURCE_BTN_PAD);
-        int16_t sourceBtnH = sourceFitsOneLine ? 44 : 64;
-        // Nach unten gegen den Zurueck-Knopf geklemmt (statt ihn im
-        // theoretischen Extremfall - alle Zeilen oben gleichzeitig
-        // zweizeilig umgebrochen - zu ueberlappen): garantiert mind. 8px
-        // Abstand zum festen Zurueck-Knopf, unabhaengig davon, wie hoch
-        // der Inhalt darueber in der jeweiligen Sprache ausfaellt.
-        int16_t sourceBtnY = (int16_t)(y + 10);
-        int16_t maxBtnBottom = (int16_t)(Config::SCREEN_HEIGHT - 50 - 8);
-        if (sourceBtnY + sourceBtnH > maxBtnBottom) {
-            sourceBtnY = (int16_t)(maxBtnBottom - sourceBtnH);
-        }
-        Rect sourceBtn = {LINE_X, sourceBtnY, (int16_t)(Config::SCREEN_WIDTH - 20), sourceBtnH};
-        tft.fillRoundRect(sourceBtn.x, sourceBtn.y, sourceBtn.w, sourceBtn.h, 4, TFT_BLACK);
-        tft.drawRoundRect(sourceBtn.x, sourceBtn.y, sourceBtn.w, sourceBtn.h, 4, UiTheme::accentColor(tft));
-        tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
-        if (sourceFitsOneLine) {
-            tft.setTextDatum(MC_DATUM);
-            tft.drawString(sourceCombined, (int16_t)(sourceBtn.x + sourceBtn.w / 2), (int16_t)(sourceBtn.y + sourceBtn.h / 2));
-        } else {
-            tft.setTextDatum(TC_DATUM);
-            int16_t cx = (int16_t)(sourceBtn.x + sourceBtn.w / 2);
-            tft.drawString(sourcePrefix, cx, (int16_t)(sourceBtn.y + SOURCE_BTN_PAD));
-            tft.drawString(sourceName, cx, (int16_t)(sourceBtn.y + SOURCE_BTN_PAD + LINE_H));
-        }
-        tft.setTextDatum(TL_DATUM);
-        y = (int16_t)(sourceBtn.y + sourceBtn.h + 10);
 
-        Rect backBtn = {LINE_X, (int16_t)(Config::SCREEN_HEIGHT - 50), (int16_t)(Config::SCREEN_WIDTH - 20), 40};
-        drawButton(tft, backBtn, I18n::t(StringId::BACK));
+        // Enthaelt bewusst NICHT ageStr - dessen Aenderung wird weiter unten
+        // separat per Teil-Redraw behandelt, statt hier einen kompletten
+        // Full-Redraw auszuloesen.
+        String contentSig = String(tracked) + "|" + resultText + "|" + (int)quality + "|" + sourceIdx;
+
+        // Ob sich bei einem reinen Alters-Update die Zeilenanzahl (1 oder 2
+        // Zeilen) aendern wuerde - falls ja, wuerde ein punktueller
+        // Teil-Redraw die Zeilen darunter verschieben/ueberlappen, also dann
+        // lieber einen vollen Redraw auslösen (sehr seltener Fall, da
+        // Praefix+Wert hier immer kurz sind).
+        bool ageWouldWrap = tft.textWidth(agePrefix + ageStr) > LINE_MAX_W;
+        bool ageWrapChanged = (ageWouldWrap != (ageLineLines > 1)) && contentSig == lastContentSig;
+
+        if (contentSig != lastContentSig || ageWrapChanged) {
+            lastContentSig = contentSig;
+
+            tft.fillScreen(TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+            tft.setCursor(10, 14);
+            tft.println(I18n::t(StringId::MENU_CONNECTION_STATUS));
+
+            int16_t y = 40;
+
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+            y += drawPrefixedLine(tft, LINE_X, y, LINE_MAX_W, LINE_H,
+                                   I18n::t(StringId::CONNECTION_STATUS_TRACKED_PREFIX), String(tracked));
+
+            ageLineBaselineY = y;
+            int16_t ageLineH = drawPrefixedLine(tft, LINE_X, y, LINE_MAX_W, LINE_H, agePrefix, ageStr);
+            ageLineLines = (int16_t)(ageLineH / LINE_H);
+            y += ageLineH;
+            lastAgeStr = ageStr;
+
+            y += drawPrefixedLine(tft, LINE_X, y, LINE_MAX_W, LINE_H,
+                                   I18n::t(StringId::CONNECTION_STATUS_RESULT_PREFIX), resultText);
+
+            // Farbstatus: farbiger Punkt (funktioniert unabhaengig vom
+            // aktuellen Radar-Farbthema, da Gruen/Gelb/Rot hier eine feste,
+            // eigene Bedeutung haben - gleiches Prinzip wie die Hoehenfarben
+            // auf dem Radar, siehe CLAUDE.md "Ausnahmen" bei den UI-
+            // Konventionen) PLUS ein uebersetztes Wort (Gut/Mittel/Schlecht),
+            // damit die Aussage nicht ausschliesslich von der Farbe abhaengt.
+            uint16_t qColor = colorForQuality(quality);
+            tft.fillCircle((int16_t)(LINE_X + 6), (int16_t)(y - 4), 6, qColor);
+            tft.setTextColor(qColor, TFT_BLACK);
+            tft.setCursor((int16_t)(LINE_X + 20), y);
+            tft.println(String(I18n::t(StringId::CONNECTION_STATUS_QUALITY_PREFIX)) + labelForQuality(quality));
+            y += LINE_H;
+
+            // Ueberschrift der Datenquellen-Liste (Auftrag "Liste statt
+            // Zyklus-Knopf") - danach eine eigene, einzeln antippbare Zeile
+            // pro Quelle mit rundem Status-Punkt (gefuellt+gruen = aktiv,
+            // nur Umriss = inaktiv), statt des vorherigen einzelnen
+            // Zyklus-Knopfs, der zufaellig zur naechsten Quelle sprang.
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+            tft.setCursor(LINE_X, y);
+            tft.println(I18n::t(StringId::CONNECTION_STATUS_SOURCE_PREFIX));
+            y += LINE_H;
+
+            int16_t rowsTotalH = (int16_t)(Config::ADSB_SOURCE_COUNT * SOURCE_ROW_H +
+                                            (Config::ADSB_SOURCE_COUNT - 1) * SOURCE_ROW_GAP);
+            int16_t rowsStartY = (int16_t)(y + 6);
+            // Nach unten gegen den Zurueck-Knopf geklemmt (gleiches Prinzip
+            // wie vorher beim einzelnen Knopf) - garantiert mind. 8px
+            // Abstand, unabhaengig davon, wie hoch der Inhalt darueber in
+            // der jeweiligen Sprache ausfaellt.
+            int16_t maxRowsBottom = (int16_t)(Config::SCREEN_HEIGHT - 50 - 8);
+            if (rowsStartY + rowsTotalH > maxRowsBottom) {
+                rowsStartY = (int16_t)(maxRowsBottom - rowsTotalH);
+            }
+            for (uint8_t i = 0; i < Config::ADSB_SOURCE_COUNT; i++) {
+                int16_t rowY = (int16_t)(rowsStartY + i * (SOURCE_ROW_H + SOURCE_ROW_GAP));
+                Rect row = {LINE_X, rowY, (int16_t)(Config::SCREEN_WIDTH - 20), SOURCE_ROW_H};
+                sourceRows[i] = row;
+                tft.fillRoundRect(row.x, row.y, row.w, row.h, 4, TFT_BLACK);
+                tft.drawRoundRect(row.x, row.y, row.w, row.h, 4, UiTheme::accentColor(tft));
+
+                bool active = (i == sourceIdx);
+                int16_t dotCx = (int16_t)(row.x + 16);
+                int16_t dotCy = (int16_t)(row.y + row.h / 2);
+                if (active) {
+                    tft.fillCircle(dotCx, dotCy, SOURCE_DOT_R, TFT_GREEN);
+                } else {
+                    tft.drawCircle(dotCx, dotCy, SOURCE_DOT_R, UiTheme::accentColor(tft));
+                }
+
+                // drawString()+setTextDatum() statt setCursor()+println() -
+                // bei unserem Font ist nur die datum-basierte drawString()-
+                // Variante von der Grundlinien-Verankerung unberuehrt (siehe
+                // CLAUDE.md "Schriftzustand").
+                tft.setTextDatum(ML_DATUM);
+                tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+                tft.drawString(Config::ADSB_SOURCE_NAMES[i], (int16_t)(row.x + 32), dotCy);
+                tft.setTextDatum(TL_DATUM);
+            }
+
+            drawButton(tft, backBtn, I18n::t(StringId::BACK));
+        } else if (ageStr != lastAgeStr) {
+            // Punktueller Teil-Redraw NUR der Alters-Zeile: kleines
+            // fillRect (schwarz) genau ueber dieser einen Zeile, dann Text
+            // neu zeichnen - der Rest des Bildschirms bleibt unberuehrt,
+            // dadurch kein sichtbares Flackern mehr bei jedem Sekunden-Tick.
+            // Hoehe/Breite des Clear-Rects bewusst grosszuegig gewaehlt
+            // (deckt Ascent/Descent unseres Grundlinien-verankerten Fonts
+            // ab, siehe CLAUDE.md "Schriftzustand"), damit auch laengere
+            // Vorwerte (z.B. "45min" -> "2h") vollstaendig verschwinden.
+            int16_t clearH = (int16_t)(ageLineLines * LINE_H + 6);
+            tft.fillRect(LINE_X, (int16_t)(ageLineBaselineY - LINE_H + 4), LINE_MAX_W, clearH, TFT_BLACK);
+            tft.setTextColor(UiTheme::accentColor(tft), TFT_BLACK);
+            drawPrefixedLine(tft, LINE_X, ageLineBaselineY, LINE_MAX_W, LINE_H, agePrefix, ageStr);
+            lastAgeStr = ageStr;
+        }
 
         // Anders als die meisten anderen Menue-Screens (die nur bei einem
-        // Tap neu zeichnen) wird hier alle ~500ms neu gezeichnet, auch ohne
-        // Antippen - Datenalter und Farbstatus sollen sichtbar live
-        // weiterlaufen, waehrend der Screen offen ist (Alex' Testwunsch:
-        // Farbwechsel beim Beobachten einer simulierten Verbindungs-
-        // unterbrechung live verfolgen koennen).
+        // Tap neu zeichnen) wird hier alle ~500ms GEPRUEFT, ob sich etwas
+        // geaendert hat (Datenalter/Farbstatus sollen sichtbar live
+        // weiterlaufen, waehrend der Screen offen ist, Alex' Testwunsch) -
+        // tatsaechlich NEU GEZEICHNET wird aber nur oben, wenn sich die
+        // Signatur wirklich geaendert hat (Auftrag "Flackern beheben").
         TouchInput::Point tap;
         bool tapped = false;
         uint32_t waitStartMs = millis();
@@ -224,12 +306,21 @@ void run(TFT_eSPI& tft) {
         if (done) break;
         if (tapped && backBtn.contains(tap.x, tap.y)) {
             done = true;
-        } else if (tapped && sourceBtn.contains(tap.x, tap.y)) {
-            // Zyklisch zur naechsten Datenquelle, Aenderung sofort
-            // wirksam (naechster NetTask-Abruf nutzt sie direkt, siehe
-            // AdsbClient::fetch()).
-            uint8_t next = (uint8_t)((sourceIdx + 1) % Config::ADSB_SOURCE_COUNT);
-            SettingsStore::setAdsbSourceIndex(next);
+        } else if (tapped) {
+            for (uint8_t i = 0; i < Config::ADSB_SOURCE_COUNT; i++) {
+                if (sourceRows[i].contains(tap.x, tap.y)) {
+                    // Direkte Auswahl GENAU dieser Zeile (Auftrag "Liste
+                    // statt Zyklus-Knopf") statt wie vorher zyklisch zur
+                    // naechsten Quelle zu springen - Aenderung sofort
+                    // wirksam (naechster NetTask-Abruf nutzt sie direkt,
+                    // siehe AdsbClient::fetch()). Der naechste
+                    // Schleifendurchlauf liest den neuen Wert frisch und
+                    // loest damit automatisch einen Redraw aus (die
+                    // Signatur enthaelt sourceIdx).
+                    SettingsStore::setAdsbSourceIndex(i);
+                    break;
+                }
+            }
         }
     }
 }

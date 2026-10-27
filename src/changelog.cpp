@@ -9,107 +9,101 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 8;
 
     const char* const CHANGELOG_EN =
-        "- New: You can now manually pick a fallback ADS-B data source "
-        "under System > Tools > Connection status - airplanes.live and "
-        "adsb.fi are available in addition to adsb.lol, in case one of "
-        "the sources has trouble\n"
-        "- Fix: The retry delay after repeated 429 (rate limit) "
-        "responses from the ADS-B API grew without limit and was no "
-        "longer reset after a successful response - the device could "
-        "then go days without fetching new data, even though the "
-        "server had long since returned to normal. Now capped and "
-        "guaranteed to reset after a success";
+        "- Improvement: The data source picker on the Connection status "
+        "screen (System > Tools) is now a proper list of all three "
+        "sources (adsb.lol, airplanes.live, adsb.fi) with a dot showing "
+        "which one is active, instead of a button that jumped to a "
+        "random next source on each tap\n"
+        "- Fix: The Connection status screen used to redraw the whole "
+        "screen roughly every half second even when nothing on it had "
+        "actually changed, causing a visible flicker - it now only "
+        "redraws when the displayed content really changed";
 
     const char* const CHANGELOG_DE =
-        "- Neu: Unter System > Werkzeuge > Verbindungsstatus lässt sich "
-        "jetzt manuell eine alternative ADS-B-Datenquelle wählen - "
-        "airplanes.live und adsb.fi stehen zusätzlich zu adsb.lol zur "
-        "Verfügung, falls eine der Quellen mal Probleme macht\n"
-        "- Fix: Die Wartezeit nach wiederholten 429-Antworten "
-        "(Rate-Limit) der ADS-B-API wuchs unbegrenzt weiter und wurde "
-        "nach einer erfolgreichen Antwort nicht mehr zurückgesetzt - "
-        "das Gerät konnte dadurch tagelang keine neuen Daten mehr "
-        "abrufen, obwohl der Server längst wieder normal antwortete. "
-        "Jetzt mit fester Obergrenze und garantiertem Reset bei Erfolg";
+        "- Verbesserung: Die Datenquellen-Auswahl auf der "
+        "Verbindungsstatus-Seite (System > Werkzeuge) ist jetzt eine "
+        "richtige Liste aller drei Quellen (adsb.lol, airplanes.live, "
+        "adsb.fi) mit einer Punkt-Anzeige, welche davon aktiv ist - "
+        "statt eines Knopfs, der bei jedem Antippen zufällig zur "
+        "nächsten Quelle sprang\n"
+        "- Fix: Die Verbindungsstatus-Seite hat bisher etwa alle halbe "
+        "Sekunde den kompletten Bildschirm neu gezeichnet, auch wenn "
+        "sich gar nichts geändert hatte - das führte zu sichtbarem "
+        "Flackern. Jetzt wird nur noch neu gezeichnet, wenn sich der "
+        "angezeigte Inhalt tatsächlich geändert hat";
 
     const char* const CHANGELOG_FR =
-        "- Nouveau : il est désormais possible de choisir manuellement "
-        "une source de données ADS-B alternative sous Système > Outils "
-        "> État de la connexion - airplanes.live et adsb.fi sont "
-        "disponibles en plus d'adsb.lol, au cas où l'une des sources "
-        "poserait problème\n"
-        "- Correction : le délai d'attente après des réponses 429 "
-        "(limite de débit) répétées de l'API ADS-B augmentait sans "
-        "limite et n'était plus réinitialisé après une réponse "
-        "réussie - l'appareil pouvait ainsi rester plusieurs jours "
-        "sans récupérer de nouvelles données, alors que le serveur "
-        "répondait de nouveau normalement depuis longtemps. Désormais "
-        "plafonné, avec réinitialisation garantie après un succès";
+        "- Amélioration : le sélecteur de source de données sur l'écran "
+        "État de la connexion (Système > Outils) est désormais une "
+        "vraie liste des trois sources (adsb.lol, airplanes.live, "
+        "adsb.fi) avec un point indiquant celle qui est active, au lieu "
+        "d'un bouton qui passait de façon aléatoire à la source "
+        "suivante à chaque tapotement\n"
+        "- Correction : l'écran État de la connexion redessinait "
+        "entièrement l'écran environ toutes les demi-secondes, même "
+        "sans aucun changement réel, ce qui provoquait un scintillement "
+        "visible - il ne redessine désormais que lorsque le contenu "
+        "affiché a réellement changé";
 
     const char* const CHANGELOG_TR =
-        "- Yeni: Sistem > Araçlar > Bağlantı durumu altında artık "
-        "manuel olarak alternatif bir ADS-B veri kaynağı seçilebiliyor "
-        "- adsb.lol'a ek olarak airplanes.live ve adsb.fi de "
-        "kullanılabilir, kaynaklardan biri sorun çıkarırsa diye\n"
-        "- Düzeltme: ADS-B API'sinden art arda gelen 429 (hız sınırı) "
-        "yanıtlarından sonraki bekleme süresi sınırsız büyüyordu ve "
-        "başarılı bir yanıttan sonra artık sıfırlanmıyordu - bu "
-        "nedenle cihaz, sunucu çoktan normale dönmüş olsa bile "
-        "günlerce yeni veri alamıyordu. Artık sabit bir üst sınırı "
-        "var ve başarıdan sonra kesin olarak sıfırlanıyor";
+        "- İyileştirme: Bağlantı durumu ekranındaki (Sistem > Araçlar) "
+        "veri kaynağı seçimi artık her üç kaynağı (adsb.lol, "
+        "airplanes.live, adsb.fi) gösteren gerçek bir liste - hangisinin "
+        "etkin olduğunu bir nokta gösteriyor - her dokunuşta rastgele "
+        "bir sonraki kaynağa atlayan bir düğme yerine\n"
+        "- Düzeltme: Bağlantı durumu ekranı, hiçbir şey değişmese bile "
+        "yaklaşık her yarım saniyede bir tüm ekranı yeniden çiziyordu - "
+        "bu da gözle görülür bir titremeye yol açıyordu. Artık yalnızca "
+        "gösterilen içerik gerçekten değiştiğinde yeniden çiziliyor";
 
     const char* const CHANGELOG_ES =
-        "- Novedad: ahora se puede elegir manualmente una fuente de "
-        "datos ADS-B alternativa en Sistema > Herramientas > Estado "
-        "de la conexión - airplanes.live y adsb.fi están disponibles "
-        "además de adsb.lol, por si alguna de las fuentes da "
-        "problemas\n"
-        "- Corrección: el tiempo de espera tras respuestas 429 "
-        "(límite de solicitudes) repetidas de la API ADS-B crecía sin "
-        "límite y ya no se restablecía tras una respuesta exitosa - "
-        "el dispositivo podía así pasar días sin obtener datos "
-        "nuevos, aunque el servidor llevara tiempo respondiendo con "
-        "normalidad. Ahora tiene un límite máximo fijo y se "
-        "restablece de forma garantizada tras un éxito";
+        "- Mejora: el selector de fuente de datos en la pantalla Estado "
+        "de la conexión (Sistema > Herramientas) es ahora una lista "
+        "real de las tres fuentes (adsb.lol, airplanes.live, adsb.fi) "
+        "con un punto que muestra cuál está activa, en lugar de un "
+        "botón que saltaba aleatoriamente a la siguiente fuente con "
+        "cada toque\n"
+        "- Corrección: la pantalla Estado de la conexión redibujaba "
+        "toda la pantalla aproximadamente cada medio segundo aunque no "
+        "hubiera cambiado nada, lo que provocaba un parpadeo visible - "
+        "ahora solo se redibuja cuando el contenido mostrado realmente "
+        "cambia";
 
     const char* const CHANGELOG_IT =
-        "- Novità: ora è possibile scegliere manualmente una fonte "
-        "dati ADS-B alternativa in Sistema > Strumenti > Stato della "
-        "connessione - airplanes.live e adsb.fi sono disponibili "
-        "oltre ad adsb.lol, nel caso una delle fonti dia problemi\n"
-        "- Correzione: il tempo di attesa dopo ripetute risposte 429 "
-        "(limite di frequenza) dell'API ADS-B cresceva senza limiti e "
-        "non veniva più azzerato dopo una risposta riuscita - il "
-        "dispositivo poteva così restare giorni senza recuperare "
-        "nuovi dati, anche se il server rispondeva normalmente da "
-        "tempo. Ora ha un limite massimo fisso e si azzera garantito "
-        "dopo un successo";
+        "- Miglioramento: il selettore della fonte dati nella schermata "
+        "Stato della connessione (Sistema > Strumenti) è ora un vero "
+        "elenco di tutte e tre le fonti (adsb.lol, airplanes.live, "
+        "adsb.fi) con un pallino che indica quale sia attiva, al posto "
+        "di un pulsante che saltava in modo casuale alla fonte "
+        "successiva a ogni tocco\n"
+        "- Correzione: la schermata Stato della connessione ridisegnava "
+        "l'intero schermo circa ogni mezzo secondo anche senza alcuna "
+        "modifica reale, causando uno sfarfallio visibile - ora si "
+        "ridisegna solo quando il contenuto mostrato cambia davvero";
 
     const char* const CHANGELOG_PT =
-        "- Novo: agora é possível escolher manualmente uma fonte de "
-        "dados ADS-B alternativa em Sistema > Ferramentas > Estado da "
-        "conexão - airplanes.live e adsb.fi estão disponíveis além do "
-        "adsb.lol, caso uma das fontes apresente problemas\n"
-        "- Correção: o tempo de espera após respostas 429 (limite de "
-        "taxa) repetidas da API ADS-B crescia sem limite e não era "
-        "mais redefinido após uma resposta bem-sucedida - o "
-        "dispositivo podia assim ficar dias sem buscar novos dados, "
-        "mesmo que o servidor já estivesse respondendo normalmente há "
-        "muito tempo. Agora com limite máximo fixo e reinício "
-        "garantido após um sucesso";
+        "- Melhoria: o seletor de fonte de dados na tela Estado da "
+        "conexão (Sistema > Ferramentas) agora é uma lista completa das "
+        "três fontes (adsb.lol, airplanes.live, adsb.fi) com um ponto "
+        "indicando qual está ativa, em vez de um botão que pulava "
+        "aleatoriamente para a próxima fonte a cada toque\n"
+        "- Correção: a tela Estado da conexão redesenhava a tela "
+        "inteira a cada meio segundo aproximadamente, mesmo sem "
+        "nenhuma mudança real, causando uma cintilação visível - agora "
+        "só redesenha quando o conteúdo exibido realmente muda";
 
     const char* const CHANGELOG_NL =
-        "- Nieuw: onder Systeem > Hulpmiddelen > Verbindingsstatus "
-        "kan nu handmatig een alternatieve ADS-B-gegevensbron gekozen "
-        "worden - naast adsb.lol zijn nu ook airplanes.live en "
-        "adsb.fi beschikbaar, voor het geval een van de bronnen "
-        "problemen geeft\n"
-        "- Fix: de wachttijd na herhaalde 429-reacties (rate limit) "
-        "van de ADS-B-API bleef onbeperkt groeien en werd na een "
-        "geslaagde reactie niet meer gereset - het apparaat kon "
-        "hierdoor dagenlang geen nieuwe gegevens meer ophalen, "
-        "terwijl de server allang weer normaal reageerde. Nu met een "
-        "vaste bovengrens en gegarandeerde reset na succes";
+        "- Verbetering: de keuzelijst voor de gegevensbron op het scherm "
+        "Verbindingsstatus (Systeem > Hulpmiddelen) is nu een echte "
+        "lijst met alle drie de bronnen (adsb.lol, airplanes.live, "
+        "adsb.fi) met een stip die laat zien welke actief is - in plaats "
+        "van een knop die bij elke tik willekeurig naar de volgende bron "
+        "sprong\n"
+        "- Fix: het scherm Verbindingsstatus tekende ongeveer elke "
+        "halve seconde het hele scherm opnieuw, zelfs als er niets "
+        "veranderd was - dat zorgde voor zichtbaar geflikker. Nu wordt "
+        "alleen opnieuw getekend als de getoonde inhoud echt is "
+        "veranderd";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT, CHANGELOG_PT, CHANGELOG_NL
