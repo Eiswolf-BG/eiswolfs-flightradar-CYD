@@ -9,101 +9,79 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 8;
 
     const char* const CHANGELOG_EN =
-        "- Improvement: The data source picker on the Connection status "
-        "screen (System > Tools) is now a proper list of all three "
-        "sources (adsb.lol, airplanes.live, adsb.fi) with a dot showing "
-        "which one is active, instead of a button that jumped to a "
-        "random next source on each tap\n"
-        "- Fix: The Connection status screen used to redraw the whole "
-        "screen roughly every half second even when nothing on it had "
-        "actually changed, causing a visible flicker - it now only "
-        "redraws when the displayed content really changed";
+        "- Fix: Repeatedly switching between ADS-B data sources could "
+        "cause the device to crash and restart in a loop - fixed by "
+        "properly closing the old connection before opening a new one "
+        "and reducing CPU load while parsing\n"
+        "- Fix: Removed airplanes.live from the data source list - it "
+        "requires manual registration and proved unreliable without it";
 
     const char* const CHANGELOG_DE =
-        "- Verbesserung: Die Datenquellen-Auswahl auf der "
-        "Verbindungsstatus-Seite (System > Werkzeuge) ist jetzt eine "
-        "richtige Liste aller drei Quellen (adsb.lol, airplanes.live, "
-        "adsb.fi) mit einer Punkt-Anzeige, welche davon aktiv ist - "
-        "statt eines Knopfs, der bei jedem Antippen zufällig zur "
-        "nächsten Quelle sprang\n"
-        "- Fix: Die Verbindungsstatus-Seite hat bisher etwa alle halbe "
-        "Sekunde den kompletten Bildschirm neu gezeichnet, auch wenn "
-        "sich gar nichts geändert hatte - das führte zu sichtbarem "
-        "Flackern. Jetzt wird nur noch neu gezeichnet, wenn sich der "
-        "angezeigte Inhalt tatsächlich geändert hat";
+        "- Fix: Mehrfaches Wechseln zwischen den ADS-B-Datenquellen "
+        "konnte zu wiederholten Abstürzen/Neustarts führen - behoben, "
+        "indem die alte Verbindung vor dem Aufbau einer neuen sauber "
+        "geschlossen und die CPU-Last beim Verarbeiten verringert wird\n"
+        "- Fix: airplanes.live aus der Quellenliste entfernt - verlangt "
+        "eine manuelle Registrierung und erwies sich ohne diese als zu "
+        "unzuverlässig";
 
     const char* const CHANGELOG_FR =
-        "- Amélioration : le sélecteur de source de données sur l'écran "
-        "État de la connexion (Système > Outils) est désormais une "
-        "vraie liste des trois sources (adsb.lol, airplanes.live, "
-        "adsb.fi) avec un point indiquant celle qui est active, au lieu "
-        "d'un bouton qui passait de façon aléatoire à la source "
-        "suivante à chaque tapotement\n"
-        "- Correction : l'écran État de la connexion redessinait "
-        "entièrement l'écran environ toutes les demi-secondes, même "
-        "sans aucun changement réel, ce qui provoquait un scintillement "
-        "visible - il ne redessine désormais que lorsque le contenu "
-        "affiché a réellement changé";
+        "- Correction : passer plusieurs fois entre les sources de "
+        "données ADS-B pouvait provoquer des plantages et redémarrages "
+        "en boucle de l'appareil - corrigé en fermant proprement "
+        "l'ancienne connexion avant d'en ouvrir une nouvelle et en "
+        "réduisant la charge CPU pendant l'analyse\n"
+        "- Correction : airplanes.live a été retiré de la liste des "
+        "sources - nécessite une inscription manuelle et s'est révélé "
+        "peu fiable sans elle";
 
     const char* const CHANGELOG_TR =
-        "- İyileştirme: Bağlantı durumu ekranındaki (Sistem > Araçlar) "
-        "veri kaynağı seçimi artık her üç kaynağı (adsb.lol, "
-        "airplanes.live, adsb.fi) gösteren gerçek bir liste - hangisinin "
-        "etkin olduğunu bir nokta gösteriyor - her dokunuşta rastgele "
-        "bir sonraki kaynağa atlayan bir düğme yerine\n"
-        "- Düzeltme: Bağlantı durumu ekranı, hiçbir şey değişmese bile "
-        "yaklaşık her yarım saniyede bir tüm ekranı yeniden çiziyordu - "
-        "bu da gözle görülür bir titremeye yol açıyordu. Artık yalnızca "
-        "gösterilen içerik gerçekten değiştiğinde yeniden çiziliyor";
+        "- Düzeltme: ADS-B veri kaynakları arasında tekrar tekrar geçiş "
+        "yapmak, cihazın döngü halinde çökmesine ve yeniden başlamasına "
+        "neden olabiliyordu - yeni bir bağlantı açmadan önce eskisinin "
+        "düzgün kapatılması ve ayrıştırma sırasındaki CPU yükünün "
+        "azaltılmasıyla düzeltildi\n"
+        "- Düzeltme: airplanes.live kaynak listesinden kaldırıldı - "
+        "manuel kayıt gerektiriyor ve bu olmadan güvenilmez olduğu "
+        "görüldü";
 
     const char* const CHANGELOG_ES =
-        "- Mejora: el selector de fuente de datos en la pantalla Estado "
-        "de la conexión (Sistema > Herramientas) es ahora una lista "
-        "real de las tres fuentes (adsb.lol, airplanes.live, adsb.fi) "
-        "con un punto que muestra cuál está activa, en lugar de un "
-        "botón que saltaba aleatoriamente a la siguiente fuente con "
-        "cada toque\n"
-        "- Corrección: la pantalla Estado de la conexión redibujaba "
-        "toda la pantalla aproximadamente cada medio segundo aunque no "
-        "hubiera cambiado nada, lo que provocaba un parpadeo visible - "
-        "ahora solo se redibuja cuando el contenido mostrado realmente "
-        "cambia";
+        "- Corrección: cambiar repetidamente entre las fuentes de datos "
+        "ADS-B podía provocar que el dispositivo se bloqueara y se "
+        "reiniciara en bucle - corregido cerrando correctamente la "
+        "conexión anterior antes de abrir una nueva y reduciendo la "
+        "carga de CPU durante el análisis\n"
+        "- Corrección: se eliminó airplanes.live de la lista de fuentes "
+        "- requiere un registro manual y resultó poco fiable sin él";
 
     const char* const CHANGELOG_IT =
-        "- Miglioramento: il selettore della fonte dati nella schermata "
-        "Stato della connessione (Sistema > Strumenti) è ora un vero "
-        "elenco di tutte e tre le fonti (adsb.lol, airplanes.live, "
-        "adsb.fi) con un pallino che indica quale sia attiva, al posto "
-        "di un pulsante che saltava in modo casuale alla fonte "
-        "successiva a ogni tocco\n"
-        "- Correzione: la schermata Stato della connessione ridisegnava "
-        "l'intero schermo circa ogni mezzo secondo anche senza alcuna "
-        "modifica reale, causando uno sfarfallio visibile - ora si "
-        "ridisegna solo quando il contenuto mostrato cambia davvero";
+        "- Correzione: cambiare ripetutamente tra le fonti dati ADS-B "
+        "poteva causare blocchi e riavvii in loop del dispositivo - "
+        "risolto chiudendo correttamente la vecchia connessione prima "
+        "di aprirne una nuova e riducendo il carico della CPU durante "
+        "l'analisi\n"
+        "- Correzione: airplanes.live è stata rimossa dall'elenco delle "
+        "fonti - richiede una registrazione manuale e si è rivelata "
+        "inaffidabile senza di essa";
 
     const char* const CHANGELOG_PT =
-        "- Melhoria: o seletor de fonte de dados na tela Estado da "
-        "conexão (Sistema > Ferramentas) agora é uma lista completa das "
-        "três fontes (adsb.lol, airplanes.live, adsb.fi) com um ponto "
-        "indicando qual está ativa, em vez de um botão que pulava "
-        "aleatoriamente para a próxima fonte a cada toque\n"
-        "- Correção: a tela Estado da conexão redesenhava a tela "
-        "inteira a cada meio segundo aproximadamente, mesmo sem "
-        "nenhuma mudança real, causando uma cintilação visível - agora "
-        "só redesenha quando o conteúdo exibido realmente muda";
+        "- Correção: alternar repetidamente entre as fontes de dados "
+        "ADS-B podia causar travamentos e reinicializações em loop do "
+        "dispositivo - corrigido fechando corretamente a conexão antiga "
+        "antes de abrir uma nova e reduzindo a carga de CPU durante a "
+        "análise\n"
+        "- Correção: airplanes.live foi removida da lista de fontes - "
+        "exige registro manual e se mostrou pouco confiável sem ele";
 
     const char* const CHANGELOG_NL =
-        "- Verbetering: de keuzelijst voor de gegevensbron op het scherm "
-        "Verbindingsstatus (Systeem > Hulpmiddelen) is nu een echte "
-        "lijst met alle drie de bronnen (adsb.lol, airplanes.live, "
-        "adsb.fi) met een stip die laat zien welke actief is - in plaats "
-        "van een knop die bij elke tik willekeurig naar de volgende bron "
-        "sprong\n"
-        "- Fix: het scherm Verbindingsstatus tekende ongeveer elke "
-        "halve seconde het hele scherm opnieuw, zelfs als er niets "
-        "veranderd was - dat zorgde voor zichtbaar geflikker. Nu wordt "
-        "alleen opnieuw getekend als de getoonde inhoud echt is "
-        "veranderd";
+        "- Fix: herhaaldelijk wisselen tussen de ADS-B-gegevensbronnen "
+        "kon ertoe leiden dat het apparaat herhaaldelijk crashte en "
+        "opnieuw opstartte - opgelost door de oude verbinding netjes te "
+        "sluiten voordat een nieuwe wordt geopend en door de "
+        "CPU-belasting tijdens het verwerken te verlagen\n"
+        "- Fix: airplanes.live is verwijderd uit de bronnenlijst - "
+        "vereist handmatige registratie en bleek daarzonder "
+        "onbetrouwbaar";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT, CHANGELOG_PT, CHANGELOG_NL

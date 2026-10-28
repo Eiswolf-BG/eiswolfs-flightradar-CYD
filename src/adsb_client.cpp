@@ -70,6 +70,30 @@ namespace {
         return c == ' ' || c == '\t' || c == '\n' || c == '\r';
     }
 
+    // BUGFIX (echter ESP32-Task-Watchdog-Crash, live mit seriellem
+    // Mitschnitt reproduziert nach Datenquellen-Wechsel - "IDLE0 (CPU 0)"
+    // kam nicht rechtzeitig dran, "CPU 0: NetTask"/"tiT"/"wifi" lief
+    // abwechselnd zu lange am Stueck): Die drei Scan-Helfer unten
+    // (skipToArrayStart/peekNextNonSpace/readNextNonSpace) lesen den
+    // Stream NICHT ueber readBytes() (das waere durch
+    // WatchdogYieldingStream::readBytes() oben bereits yield-geschuetzt),
+    // sondern ueber die rohen read()/peek()-Methoden - der bestehende
+    // Fix griff dort also NICHT. Gleiches Prinzip wie oben: alle
+    // YIELD_EVERY_CALLS Einzel-read()/peek()-Aufrufe ein vTaskDelay(1),
+    // damit der Idle-Task auf Core 0 wieder drankommt. Gemeinsamer Zaehler
+    // wird vom Aufrufer uebergeben (nicht statisch/global), damit
+    // mehrere Aufrufe hintereinander (z.B. peekNextNonSpace() und
+    // readNextNonSpace() pro Flugzeug-Objekt in fetch()) sich die
+    // Zaehlung teilen koennen, statt bei jedem Aufruf wieder bei 0
+    // anzufangen.
+    constexpr uint16_t YIELD_EVERY_CALLS = 32;
+    void yieldEveryFewCalls(uint16_t& callsSinceYield) {
+        if (++callsSinceYield >= YIELD_EVERY_CALLS) {
+            callsSinceYield = 0;
+            vTaskDelay(1);
+        }
+    }
+
     // Speicherschonendes Parsen grosser Antworten (siehe Root-Cause-
     // Untersuchung/Design-Absprache im Chat): liest byte-weise vom Stream,
     // bis die Zeichenfolge keyPattern (z.B. "\"ac\":") vollstaendig
@@ -81,14 +105,17 @@ namespace {
     bool skipToArrayStart(Stream& stream, const char* keyPattern, size_t maxScan) {
         size_t patLen = strlen(keyPattern);
         size_t matched = 0;
+        uint16_t callsSinceYield = 0;
         for (size_t i = 0; i < maxScan; i++) {
             int c = stream.read();
+            yieldEveryFewCalls(callsSinceYield);
             if (c < 0) return false;
             if ((char)c == keyPattern[matched]) {
                 matched++;
                 if (matched == patLen) {
                     for (size_t j = 0; j < maxScan; j++) {
                         int c2 = stream.read();
+                        yieldEveryFewCalls(callsSinceYield);
                         if (c2 < 0) return false;
                         if ((char)c2 == '[') return true;
                         if (!isJsonSpace((char)c2)) return false;
@@ -110,8 +137,10 @@ namespace {
     // Entscheidung "naechstes Flugzeug-Objekt oder Array-Ende", bevor
     // deserializeJson() fuer das naechste Objekt aufgerufen wird.
     int peekNextNonSpace(Stream& stream, size_t maxScan) {
+        uint16_t callsSinceYield = 0;
         for (size_t i = 0; i < maxScan; i++) {
             int p = stream.peek();
+            yieldEveryFewCalls(callsSinceYield);
             if (p < 0) return -1;
             if (!isJsonSpace((char)p)) return p;
             stream.read();
@@ -122,8 +151,10 @@ namespace {
     // Liest UND verbraucht das naechste Nicht-Leerzeichen-Byte - fuer das
     // Trennzeichen zwischen zwei Array-Elementen (',' oder ']').
     int readNextNonSpace(Stream& stream, size_t maxScan) {
+        uint16_t callsSinceYield = 0;
         for (size_t i = 0; i < maxScan; i++) {
             int c = stream.read();
+            yieldEveryFewCalls(callsSinceYield);
             if (c < 0) return -1;
             if (!isJsonSpace((char)c)) return c;
         }
@@ -173,6 +204,25 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
         persistentClient.setTimeout(Config::ADSB_HTTP_TIMEOUT_MS);
         clientConfigured = true;
     }
+
+    // BUGFIX (echter Boot-Loop, live mit seriellem Mitschnitt reproduziert:
+    // nach mehrfachem schnellem Wechsel zwischen den drei Datenquellen
+    // schlugen irgendwann ALLE weiteren Verbindungsversuche sofort mit
+    // "start_ssl_client: -1" fehl, unabhaengig von der gewaehlten Quelle -
+    // zeitgleich blieb eine VOELLIG separate Verbindung (OTA-Pruefung zu
+    // github.com, eigenes WiFiClientSecure-Objekt) problemlos erfolgreich,
+    // das WLAN selbst war also intakt). http.end() ruft zwar bereits bei
+    // jedem Aufruf stop() auf persistentClient auf (setReuse(false), siehe
+    // unten), trotzdem haeufte sich offenbar ueber viele schnelle
+    // Host-Wechsel hinweg ein kaputter Zustand im wiederverwendeten
+    // persistentClient-Objekt an. Hier zusaetzlich VOR jedem neuen
+    // Verbindungsversuch nochmal explizit stop() aufrufen (rein
+    // vorsorglich, schadet bei einer bereits sauber geschlossenen
+    // Verbindung nicht) plus ein kurzer Yield, damit der TCP/IP-Stack
+    // (lwIP) Zeit hat, den alten Socket wirklich freizugeben, bevor
+    // sofort ein neuer - ggf. zu einem anderen Host - aufgemacht wird.
+    persistentClient.stop();
+    vTaskDelay(1);
 
     // Manuell waehlbare Datenquelle (Menue > System > Werkzeuge >
     // Verbindungsstatus, Auftrag "Fallback-Server") - Standard bleibt

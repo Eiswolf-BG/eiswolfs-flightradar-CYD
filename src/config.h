@@ -6,7 +6,7 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "6.9.4";
+    constexpr const char* APP_VERSION = "6.9.5";
 
     // Projekt-Repo-URL fuer den GitHub-QR-Code - zentral hier hinterlegt,
     // damit main.cpp (Ueber-Screen, grosser QR-Code) und menu_screen.cpp
@@ -165,27 +165,28 @@ namespace Config {
     // Verlass auf adsb.fi unbedingt AUF DEM ECHTEN GERAET live pruefen,
     // nicht nur per curl vom Rechner (der zeigte waehrend der Einfuehrung
     // dieses Features volle Daten).
-    // WICHTIG zu airplanes.live: lieferte beim Test ohne vorherige
-    // Registrierung HTTP 403 ("Please contact us..."; die API verlangt
-    // offenbar eine individuelle Freischaltung). Array-Name "ac" hier
-    // deshalb UNGEPRUEFT angenommen (gleiche Codebasis-Familie wie
-    // adsb.lol) - vor echter Nutzung zuerst die noetige Freischaltung
-    // klaeren und danach live verifizieren.
-    constexpr uint8_t ADSB_SOURCE_COUNT = 3;
+    // airplanes.live wieder ENTFERNT (Alex' Auftrag, 27.10.): lieferte
+    // schon beim ersten Test ohne vorherige Registrierung HTTP 403
+    // ("Please contact us..."; die API verlangt offenbar eine
+    // individuelle Freischaltung) und zusaetzlich beim Live-Test
+    // wiederholt DNS-Fehler - insgesamt zu unzuverlaessig als dritte
+    // Auswahl. Die beiden verbleibenden Quellen (adsb.lol/adsb.fi)
+    // brauchen keine Registrierung und liefern live verifiziert Daten.
+    constexpr uint8_t ADSB_SOURCE_COUNT = 2;
     constexpr const char* ADSB_SOURCE_HOSTS[ADSB_SOURCE_COUNT] = {
-        "api.adsb.lol", "api.airplanes.live", "opendata.adsb.fi"
+        "api.adsb.lol", "opendata.adsb.fi"
     };
-    // Pfad-Praefix VOR "/v2/lat/..." - bei adsb.lol/airplanes.live leer,
-    // bei adsb.fi zusaetzlich "/api" (live mit HTTP 400 bestaetigt: ohne
-    // dieses Praefix lehnt adsb.fi die Anfrage ab, siehe Testprotokoll).
+    // Pfad-Praefix VOR "/v2/lat/..." - bei adsb.lol leer, bei adsb.fi
+    // zusaetzlich "/api" (live mit HTTP 400 bestaetigt: ohne dieses
+    // Praefix lehnt adsb.fi die Anfrage ab, siehe Testprotokoll).
     constexpr const char* ADSB_SOURCE_PATH_PREFIXES[ADSB_SOURCE_COUNT] = {
-        "", "", "/api"
+        "", "/api"
     };
     constexpr const char* ADSB_SOURCE_ARRAY_KEYS[ADSB_SOURCE_COUNT] = {
-        "\"ac\":", "\"ac\":", "\"aircraft\":"
+        "\"ac\":", "\"aircraft\":"
     };
     constexpr const char* ADSB_SOURCE_NAMES[ADSB_SOURCE_COUNT] = {
-        "adsb.lol", "airplanes.live", "adsb.fi"
+        "adsb.lol", "adsb.fi"
     };
     constexpr uint8_t DEFAULT_ADSB_SOURCE_INDEX = 0; // adsb.lol bleibt Standard
 

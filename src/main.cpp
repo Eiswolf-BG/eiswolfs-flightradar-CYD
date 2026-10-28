@@ -1863,6 +1863,23 @@ void setup() {
     Serial.begin(115200);
     delay(300);
 
+    // BUGFIX (echter, mehrfach live reproduzierter Boot-Loop beim
+    // schnellen Quellenwechsel, siehe CLAUDE.md "Bekannte Probleme"):
+    // Ursache war Core-0-Starvation der IDLE0-Task durch die Byte-fuer-
+    // Byte-Verarbeitung der ADS-B-JSON-Antwort. Behoben durch zwei
+    // gezielte Fixes (nicht durch Abschalten des Watchdogs, siehe unten):
+    // 1) yield() alle 32 Aufrufe in den Byte-Scan-Helfern (adsb_client.cpp,
+    //    skipToArrayStart/peekNextNonSpace/readNextNonSpace), 2) explizites
+    // persistentClient.stop() vor jedem neuen Verbindungsversuch
+    // (adsb_client.cpp). Ein disableCore0WDT() wurde als dritte, zunaechst
+    // zusaetzlich eingebaute Massnahme erwogen, bewusst wieder verworfen:
+    // ein 30-minuetiger Soak-Test mit aktivem Core-0-Watchdog und
+    // automatischem Quellenwechsel alle 10s (180 Wechsel) zeigte mit den
+    // beiden Fixes allein keinen einzigen Watchdog-Reset und stabilen
+    // Heap - der Watchdog bleibt deshalb als Sicherheitsnetz fuer
+    // unbekannte, zukuenftige Haenger aktiv (Alex' ausdruecklicher
+    // Wunsch: kein dauerhaftes Abschalten ohne nachgewiesene Notwendigkeit).
+
     tft.init();
     tft.setRotation(0);
     tft.setFreeFont(&UiFont11pt);
