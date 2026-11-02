@@ -1987,12 +1987,13 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             // Kein Seiten-Header-"?"-Button mehr (frueher oben rechts, siehe
             // Git-Historie) - Zeilen starten deshalb beim normalen
             // ROW_START_Y=18 (Default-Parameter von subMenuRowRect()).
-            Rect airlineBtn        = subMenuRowRect(0, 6);
-            Rect groundBtn         = subMenuRowRect(1, 6);
-            Rect helicoptersBtn    = subMenuRowRect(2, 6);
-            Rect lowAltitudeBtn    = subMenuRowRect(3, 6);
-            Rect interestingBtn    = subMenuRowRect(4, 6);
-            Rect backBtn           = subMenuRowRect(5, 6);
+            Rect airlineBtn        = subMenuRowRect(0, 7);
+            Rect groundBtn         = subMenuRowRect(1, 7);
+            Rect helicoptersBtn    = subMenuRowRect(2, 7);
+            Rect lowAltitudeBtn    = subMenuRowRect(3, 7);
+            Rect interestingBtn    = subMenuRowRect(4, 7);
+            Rect zeroAltSpeedBtn   = subMenuRowRect(5, 7);
+            Rect backBtn           = subMenuRowRect(6, 7);
 
             drawButton(tft, airlineBtn, I18n::t(StringId::MENU_AIRLINE_FILTER));
             // Label jetzt "Bodenfahrzeuge anzeigen" statt "...ausblenden" -
@@ -2013,6 +2014,11 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
             // Pflicht fuer jeden neuen Toggle).
             drawButton(tft, interestingBtn, I18n::t(StringId::MENU_ONLY_INTERESTING) + onOff(SettingsStore::onlyInteresting()));
             drawRowInfoButton(tft, interestingBtn);
+            // "Nullhoehe/-geschwindigkeit ausblenden" (GitHub-Discussion #15) -
+            // eigener "?"-Info-Button, gleiches Muster wie "Nur Interessantes"
+            // oben (CLAUDE.md-Pflicht fuer jeden neuen Toggle).
+            drawButton(tft, zeroAltSpeedBtn, I18n::t(StringId::MENU_HIDE_ZERO_ALT_SPEED) + onOff(SettingsStore::hideZeroAltSpeed()));
+            drawRowInfoButton(tft, zeroAltSpeedBtn);
             drawButton(tft, backBtn, I18n::t(StringId::BACK_ARROW));
 
             TouchInput::Point tap;
@@ -2031,6 +2037,10 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 infoScreen(tft, I18n::t(StringId::MENU_ONLY_INTERESTING_INFO_TITLE),
                            I18n::t(StringId::MENU_ONLY_INTERESTING_INFO_BODY),
                            UiTheme::accentColor(tft), I18n::t(StringId::OK));
+            } else if (rowInfoBtnRect(zeroAltSpeedBtn).contains(tap.x, tap.y)) {
+                infoScreen(tft, I18n::t(StringId::MENU_HIDE_ZERO_ALT_SPEED_INFO_TITLE),
+                           I18n::t(StringId::MENU_HIDE_ZERO_ALT_SPEED_INFO_BODY),
+                           UiTheme::accentColor(tft), I18n::t(StringId::OK));
             } else if (airlineBtn.contains(tap.x, tap.y)) {
                 AirlineFilterScreen::run(tft);
             } else if (groundBtn.contains(tap.x, tap.y)) {
@@ -2041,6 +2051,8 @@ void run(TFT_eSPI& tft, bool startAtFilters, bool startAtSystem) {
                 SettingsStore::setOnlyLowAltitude(!SettingsStore::onlyLowAltitude());
             } else if (interestingBtn.contains(tap.x, tap.y)) {
                 SettingsStore::setOnlyInteresting(!SettingsStore::onlyInteresting());
+            } else if (zeroAltSpeedBtn.contains(tap.x, tap.y)) {
+                SettingsStore::setHideZeroAltSpeed(!SettingsStore::hideZeroAltSpeed());
             } else if (backBtn.contains(tap.x, tap.y)) {
                 page = Page::Flight;
             }

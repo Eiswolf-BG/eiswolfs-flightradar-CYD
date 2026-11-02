@@ -2305,6 +2305,7 @@ namespace {
             }
         }
         bool hideGround = SettingsStore::hideGroundVehicles();
+        bool hideZeroAltSpeed = SettingsStore::hideZeroAltSpeed();
         bool onlyHeli = SettingsStore::onlyHelicopters();
         bool emergencyOn = SettingsStore::emergencyAlertEnabled();
         bool militaryOn = SettingsStore::militarySquawkDetectionEnabled();
@@ -2517,6 +2518,9 @@ namespace {
 
             bool isGroundVehicle = a.category[0] == 'C';
             if (hideGround && isGroundVehicle) continue;
+            // Nullhoehe/-geschwindigkeit ausblenden (GitHub-Discussion #15) -
+            // gleiche Filterung wie radar_screen.cpp::isAircraftVisibleOnRadar().
+            if (hideZeroAltSpeed && (a.altBaroFt == 0 || a.groundSpeedKt == 0)) continue;
 
             bool isRotorcraft = a.category[0] == 'A' && a.category[1] == '7';
             if (onlyHeli && !isRotorcraft) continue;

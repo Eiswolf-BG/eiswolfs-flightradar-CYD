@@ -616,7 +616,11 @@ static const char* const I18N_TR[] = {
     "İlginç: ",
     "Sadece İlginç",
     "Yalnızca şu kriterlerden en az birine uyan uçakları gösterir: askeri/resmi uçuş, acil durum squawk kodu, dört izleme listenizden birinde eşleşme (çağrı işareti, squawk, tip, rota) veya bir Heavy uçak (ADS-B yayıcı kategorisi). Yukarıdaki diğer filtrelerle birleşir.",
+    "0-İrt/Hız: ",
+    "0 irtifa/0 hız gizle",
+    "İrtifası veya yer hızı tam olarak 0 olan uçakları gizler - hem yerde park halindeki/duran uçakları hem de yer istasyonlarını kapsar. Yukarıdaki diğer filtrelerle birleşir.",
     "İlginç",
+    "0 irtifa/0 hız gizlendi",
 
     "Sessiz Saatler",
     "Sessiz Saatler",

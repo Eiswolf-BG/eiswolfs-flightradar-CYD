@@ -49,6 +49,7 @@ namespace {
     bool onlyHelicoptersOn = false;
     bool onlyLowAltitudeOn = false;
     bool onlyInterestingOn = false;
+    bool hideZeroAltSpeedOn = false;
     bool airlineFilterShowOnlyOn = false;
     uint8_t languageIdx = 0;
     uint8_t unitsModeVal = 0;
@@ -223,6 +224,8 @@ namespace {
             onlyLowAltitudeOn = (value.toInt() != 0);
         } else if (key == "only_interesting") {
             onlyInterestingOn = (value.toInt() != 0);
+        } else if (key == "hide_zero_alt_speed") {
+            hideZeroAltSpeedOn = (value.toInt() != 0);
         } else if (key == "airline_filter_show_only") {
             airlineFilterShowOnlyOn = (value.toInt() != 0);
         } else if (key == "language") {
@@ -365,6 +368,7 @@ void save() {
     f.printf("only_helicopters=%d\n", onlyHelicoptersOn ? 1 : 0);
     f.printf("only_low_altitude=%d\n", onlyLowAltitudeOn ? 1 : 0);
     f.printf("only_interesting=%d\n", onlyInterestingOn ? 1 : 0);
+    f.printf("hide_zero_alt_speed=%d\n", hideZeroAltSpeedOn ? 1 : 0);
     f.printf("airline_filter_show_only=%d\n", airlineFilterShowOnlyOn ? 1 : 0);
     f.printf("language=%d\n", languageIdx);
     f.printf("units_mode=%d\n", unitsModeVal);
@@ -604,6 +608,13 @@ bool onlyInteresting() { return onlyInterestingOn; }
 
 void setOnlyInteresting(bool on) {
     onlyInterestingOn = on;
+    save();
+}
+
+bool hideZeroAltSpeed() { return hideZeroAltSpeedOn; }
+
+void setHideZeroAltSpeed(bool on) {
+    hideZeroAltSpeedOn = on;
     save();
 }
 

@@ -617,7 +617,11 @@ static const char* const I18N_EN[] = {
     "Interesting: ",
     "Interesting Only",
     "Shows only aircraft matching at least one of: military/government flight, emergency squawk, a hit on any of your four watchlists (callsign, squawk, type, route), or a Heavy aircraft (ADS-B emitter category). Combines with the other filters above.",
+    "0-Alt/Speed: ",
+    "Hide 0-altitude/0-speed",
+    "Hides aircraft whose altitude or ground speed is exactly 0 - covers both parked/stationary aircraft on the ground and ground stations. Combines with the other filters above.",
     "Interesting",
+    "0-altitude/0-speed hidden",
 
     "Quiet Hours",
     "Quiet Hours",

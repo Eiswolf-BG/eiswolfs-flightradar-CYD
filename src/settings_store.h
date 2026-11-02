@@ -171,6 +171,17 @@ namespace SettingsStore {
     bool onlyInteresting();
     void setOnlyInteresting(bool on);
 
+    // Filter "Nullhoehe/-geschwindigkeit ausblenden" (GitHub-Discussion #15,
+    // Menue > Flugoptionen > Anzeigefilter, gleiche Stelle wie
+    // onlyHelicopters()/onlyLowAltitude()/onlyInteresting() oben) - blendet
+    // Flugzeuge aus, deren Hoehe (alt_baro) GLEICH 0 ODER deren
+    // Geschwindigkeit (gs) GLEICH 0 ist (radar_screen.cpp::
+    // isAircraftVisibleOnRadar(), aircraft_list_screen.cpp,
+    // web_export_server.cpp). Gleiches Speicher-/Getter-/Setter-Muster wie
+    // die Geschwister oben, AUS per Default.
+    bool hideZeroAltSpeed();
+    void setHideZeroAltSpeed(bool on);
+
     // Modus des Airline-Filters (airline_filter.h/.cpp) - false (Default)
     // = "Ausblenden" (bisheriges Verhalten: eingetragene Airlines werden
     // versteckt, alle anderen bleiben sichtbar), true = "Nur anzeigen"

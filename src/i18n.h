@@ -1393,12 +1393,32 @@ enum class StringId : uint16_t {
     MENU_ONLY_INTERESTING_INFO_TITLE,
     MENU_ONLY_INTERESTING_INFO_BODY,
 
+    // Filter "Nullhoehe/-geschwindigkeit ausblenden" (GitHub-Discussion #15,
+    // "Include option to filter out aircraft at 0 altitude and/or 0 knots") -
+    // Menue > Flugoptionen > Anzeigefilter, gleiche Stelle wie
+    // MENU_ONLY_HELICOPTERS/MENU_ONLY_LOW_ALTITUDE/MENU_ONLY_INTERESTING.
+    // Blendet Flugzeuge aus, deren Hoehe (alt_baro) GLEICH 0 ODER deren
+    // Geschwindigkeit (gs) GLEICH 0 ist (radar_screen.cpp::
+    // isAircraftVisibleOnRadar(), gleiche Filterung auch in
+    // aircraft_list_screen.cpp und web_export_server.cpp) - deckt sowohl
+    // stehende/geparkte Maschinen am Boden als auch Bodenstationen ab. AUS
+    // per Default, bestehendes Verhalten bleibt unveraendert, bis man den
+    // Schalter aktiv einschaltet. Eigener "?"-Info-Button (CLAUDE.md-Pflicht
+    // fuer jeden neuen Toggle).
+    MENU_HIDE_ZERO_ALT_SPEED,
+    MENU_HIDE_ZERO_ALT_SPEED_INFO_TITLE,
+    MENU_HIDE_ZERO_ALT_SPEED_INFO_BODY,
+
     // Kurzer Name fuer den "aktive Filter"-Hinweis auf dem Radarscreen
     // selbst (radar_screen.cpp, gleiche Liste wie RADAR_FILTER_NAME_
     // HELICOPTERS/_LOW_ALTITUDE/_AIRLINE), wenn "Nur Interessantes" aktiv
     // ist - kurzes Substantiv statt des vollen Menue-Texts, gleiches Muster
     // wie die drei bestehenden Eintraege dort.
     RADAR_FILTER_NAME_INTERESTING,
+
+    // Gleiches Prinzip wie RADAR_FILTER_NAME_INTERESTING oben, fuer den
+    // neuen Nullhoehe/-geschwindigkeit-Filter (MENU_HIDE_ZERO_ALT_SPEED).
+    RADAR_FILTER_NAME_ZERO_ALT_SPEED,
 
     // Ruhezeiten fuer ntfy-Push (Alex' Wunsch, "alles kann, nichts muss",
     // Menue > System > "ntfy.sh Push") - eigener Ein/Aus-Schalter (AUS per

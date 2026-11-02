@@ -616,7 +616,11 @@ static const char* const I18N_DE[] = {
     "Interessant: ",
     "Nur Interessantes",
     "Zeigt nur Flugzeuge, auf die mindestens eines zutrifft: Militär-/Behördenflug, Notfall-Squawk, ein Treffer auf einer deiner vier Wachlisten (Rufzeichen, Squawk, Typ, Route) oder ein Heavy-Flugzeug (ADS-B-Emitter-Kategorie). Kombiniert sich mit den anderen Filtern oben.",
+    "0-Höhe/Speed: ",
+    "Null-Höhe/-Speed ausblenden",
+    "Blendet Flugzeuge aus, deren Höhe oder Geschwindigkeit exakt 0 ist - deckt sowohl stehende/geparkte Maschinen am Boden als auch Bodenstationen ab. Kombiniert sich mit den anderen Filtern oben.",
     "Interessant",
+    "0-Höhe/0-Speed ausgeblendet",
 
     "Ruhezeiten",
     "Ruhezeiten",

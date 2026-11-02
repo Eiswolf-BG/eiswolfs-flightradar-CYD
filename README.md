@@ -113,9 +113,10 @@ Priority order when several conditions apply at once: emergency alert first, the
 - **Hide ground vehicles (ON/OFF)** - hides airport ground vehicles (follow-me cars, pushback tugs) that ADS-B data can include alongside real aircraft, so the radar stays focused purely on air traffic.
 - **Show helicopters only (ON/OFF)** - filters the radar, [Aircraft List](#-aircraft-list), and Live Radar web page down to helicopters only, hiding everything else. Off by default; handy for rotorcraft-specific traffic (medevac, police, sightseeing tours).
 - **Show low-altitude aircraft only (ON/OFF)** - filters the radar down to aircraft currently below the green altitude threshold. Ground vehicles are never included by this filter regardless of the separate ground-vehicle setting. Off by default.
-- **Empty-sky filter hint** - when the radar shows no aircraft because a filter (helicopters only, low-altitude only, airline filter) is hiding everything, the "empty sky" message names which filter is active and is tappable, jumping straight to the Display Filters menu.
+- **Hide ground-level / 0-knot aircraft (ON/OFF)** - hides aircraft reporting 0 altitude or 0 ground speed, covering both parked/stationary aircraft and ground stations. Off by default; especially useful near busy airports where terminal traffic can otherwise clutter the display.
+- **Empty-sky filter hint** - when the radar shows no aircraft because a filter (helicopters only, low-altitude only, ground-level/0-knot, airline filter) is hiding everything, the "empty sky" message names which filter is active and is tappable, jumping straight to the Display Filters menu.
 
-All four toggles live under **Menu → Flight Options → Display Filters**.
+All five toggles live under **Menu → Flight Options → Display Filters**.
 
 ### 📍 Location & Range
 

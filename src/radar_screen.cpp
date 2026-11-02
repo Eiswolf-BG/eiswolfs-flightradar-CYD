@@ -479,6 +479,10 @@ namespace {
         if (SettingsStore::onlyLowAltitude() &&
             (a.category[0] == 'C' || a.altBaroFt >= Config::COLOR_LOW_ALT_THRESHOLD_FT)) return false;
         if (SettingsStore::onlyInteresting() && !isInterestingAircraft(a)) return false;
+        // Nullhoehe/-geschwindigkeit ausblenden (GitHub-Discussion #15) -
+        // deckt sowohl stehende/geparkte Maschinen am Boden als auch
+        // Bodenstationen ab, unabhaengig von der Emitter-Kategorie.
+        if (SettingsStore::hideZeroAltSpeed() && (a.altBaroFt == 0 || a.groundSpeedKt == 0)) return false;
         return true;
     }
 
@@ -5160,6 +5164,10 @@ void tick(TFT_eSPI& tft, int16_t top, uint32_t deltaMs) {
     if (SettingsStore::onlyInteresting()) {
         if (activeFilters.length()) activeFilters += ", ";
         activeFilters += I18n::t(StringId::RADAR_FILTER_NAME_INTERESTING);
+    }
+    if (SettingsStore::hideZeroAltSpeed()) {
+        if (activeFilters.length()) activeFilters += ", ";
+        activeFilters += I18n::t(StringId::RADAR_FILTER_NAME_ZERO_ALT_SPEED);
     }
     if (AirlineFilter::count() > 0) {
         if (activeFilters.length()) activeFilters += ", ";

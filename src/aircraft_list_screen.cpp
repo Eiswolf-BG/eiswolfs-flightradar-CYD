@@ -92,6 +92,9 @@ bool run(TFT_eSPI& tft) {
             if (!table[i].valid) continue;
             if (table[i].distanceKm > rangeKm * 1.05f) continue;
             if (SettingsStore::hideGroundVehicles() && table[i].category[0] == 'C') continue;
+            // Nullhoehe/-geschwindigkeit ausblenden (GitHub-Discussion #15) -
+            // gleiche Filterung wie radar_screen.cpp::isAircraftVisibleOnRadar().
+            if (SettingsStore::hideZeroAltSpeed() && (table[i].altBaroFt == 0 || table[i].groundSpeedKt == 0)) continue;
 
             if (SettingsStore::onlyHelicopters() && !(table[i].category[0] == 'A' && table[i].category[1] == '7')) continue;
             if (AirlineFilter::isHidden(table[i].callsign)) continue;
