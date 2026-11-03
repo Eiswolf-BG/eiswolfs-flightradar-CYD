@@ -259,7 +259,11 @@ namespace SettingsStore {
     // Geschwindigkeit automatisch weiter heraus - siehe
     // RadarScreen::followMeRotationOffsetDeg()/followMeEffectiveRangeKm()
     // in radar_screen.cpp. Ohne gueltigen GPS-Kurs/-Fix faellt die Anzeige
-    // sauber auf die normale, unrotierte Nordausrichtung zurueck.
+    // sauber auf die gespeicherte feste Oben-Richtung zurueck.
+    // Feste Oben-Richtung: 0=N, 1=E, 2=S, 3=W; GPS-Kurs hat Vorrang.
+    uint8_t radarUpDirection();
+    void setRadarUpDirection(uint8_t direction);
+
     bool followMeModeEnabled();
     void setFollowMeModeEnabled(bool on);
 

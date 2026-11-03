@@ -665,6 +665,9 @@ static const char* const I18N_EN[] = {
     "Last: ",
 
     "Data source: ",
+    "Up",
+    "Clockwise",
+    "Counterclockwise",
 };
 
 static_assert(sizeof(I18N_EN) / sizeof(I18N_EN[0]) == (size_t)StringId::COUNT,
