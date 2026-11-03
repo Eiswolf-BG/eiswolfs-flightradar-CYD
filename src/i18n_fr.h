@@ -664,6 +664,9 @@ static const char* const I18N_FR[] = {
     "Dernier : ",
 
     "Source de données : ",
+    "Haut",
+    "Sens horaire",
+    "Sens antihoraire",
 };
 
 static_assert(sizeof(I18N_FR) / sizeof(I18N_FR[0]) == (size_t)StringId::COUNT,

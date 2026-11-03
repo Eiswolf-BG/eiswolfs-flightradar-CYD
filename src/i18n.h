@@ -1519,6 +1519,10 @@ enum class StringId : uint16_t {
     // uebersetzt.
     CONNECTION_STATUS_SOURCE_PREFIX,
 
+    RADAR_UP,
+    RADAR_ROTATE_CW,
+    RADAR_ROTATE_CCW,
+
     COUNT
 };
 

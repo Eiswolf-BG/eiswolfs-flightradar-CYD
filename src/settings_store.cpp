@@ -70,6 +70,7 @@ namespace {
     bool radarPulseOn = true;
     bool classicRadarOn = false;
     bool militarySquawkDetectionOn = false;
+    uint8_t radarUp = 0;
     bool followMeModeOn = false;
     bool perfAutoTuningOn = true;
     bool rainEffectOn = true;
@@ -247,6 +248,9 @@ namespace {
             classicRadarOn = (value.toInt() != 0);
         } else if (key == "military_squawk_detection") {
             militarySquawkDetectionOn = (value.toInt() != 0);
+        } else if (key == "radar_up") {
+            int direction = value.toInt();
+            radarUp = direction >= 0 && direction < 4 ? direction : 0;
         } else if (key == "follow_me_mode") {
             followMeModeOn = (value.toInt() != 0);
         } else if (key == "perf_auto_tuning") {
@@ -378,6 +382,7 @@ void save() {
     f.printf("radar_pulse=%d\n", radarPulseOn ? 1 : 0);
     f.printf("classic_radar=%d\n", classicRadarOn ? 1 : 0);
     f.printf("military_squawk_detection=%d\n", militarySquawkDetectionOn ? 1 : 0);
+    f.printf("radar_up=%u\n", radarUp);
     f.printf("follow_me_mode=%d\n", followMeModeOn ? 1 : 0);
     f.printf("perf_auto_tuning=%d\n", perfAutoTuningOn ? 1 : 0);
     f.printf("rain_effect=%d\n", rainEffectOn ? 1 : 0);
@@ -684,6 +689,13 @@ bool militarySquawkDetectionEnabled() { return militarySquawkDetectionOn; }
 
 void setMilitarySquawkDetectionEnabled(bool on) {
     militarySquawkDetectionOn = on;
+    save();
+}
+
+uint8_t radarUpDirection() { return radarUp; }
+
+void setRadarUpDirection(uint8_t direction) {
+    radarUp = direction < 4 ? direction : 0;
     save();
 }
 

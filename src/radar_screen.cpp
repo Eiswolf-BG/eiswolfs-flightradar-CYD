@@ -750,17 +750,18 @@ namespace {
     constexpr uint8_t FOLLOW_ME_ZOOM_STEP_COUNT =
         sizeof(FOLLOW_ME_ZOOM_STEPS) / sizeof(FOLLOW_ME_ZOOM_STEPS[0]);
 
-    // Liefert 0.0f (= keine Drehung, normales Nord-oben-Verhalten), wenn der
+    // Liefert die gespeicherte feste Oben-Richtung, wenn der
     // Modus aus ist oder aktuell kein brauchbarer GPS-Kurs vorliegt (deckt
     // Anforderung 5 ab - sauberer Fallback statt Fehler/Absturz). Aktualisiert
     // bei jedem Aufruf den geglaetteten Kurs weiter - wird nur aus render()
     // aufgerufen (nicht aus dem haeufigeren tick()), die Drehung aktualisiert
     // sich also im selben ~8s-Rhythmus wie neue ADS-B-Daten/GPS-Fixes.
     float followMeRotationOffsetDeg() {
-        if (!SettingsStore::followMeModeEnabled()) { haveSmoothedHeading = false; return 0.0f; }
+        const float manualRotation = SettingsStore::radarUpDirection() * 90.0f;
+        if (!SettingsStore::followMeModeEnabled()) { haveSmoothedHeading = false; return manualRotation; }
         if (!LocationManager::hasGpsCourse() || !LocationManager::hasGpsSpeed()) {
             haveSmoothedHeading = false;
-            return 0.0f;
+            return manualRotation;
         }
         float speedKmh = LocationManager::gpsSpeedKmh();
         if (speedKmh < FOLLOW_ME_MIN_HEADING_SPEED_KMH) {
@@ -768,7 +769,7 @@ namespace {
             // geglaetteten Wert einfach beibehalten (kein Zurueckspringen
             // auf Norden bei kurzem Ampelstopp), aber erst nach dem ersten
             // brauchbaren Fix ueberhaupt.
-            return haveSmoothedHeading ? smoothedHeadingDeg : 0.0f;
+            return haveSmoothedHeading ? smoothedHeadingDeg : manualRotation;
         }
         float rawHeading = LocationManager::gpsCourseDeg();
         if (!haveSmoothedHeading) {

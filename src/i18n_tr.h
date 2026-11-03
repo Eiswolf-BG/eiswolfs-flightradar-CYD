@@ -664,6 +664,9 @@ static const char* const I18N_TR[] = {
     "Son: ",
 
     "Veri kaynağı: ",
+    "Üst",
+    "Saat yönünde",
+    "Saat yönü tersine",
 };
 
 static_assert(sizeof(I18N_TR) / sizeof(I18N_TR[0]) == (size_t)StringId::COUNT,

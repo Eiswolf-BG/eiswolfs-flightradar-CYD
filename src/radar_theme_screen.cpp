@@ -123,6 +123,39 @@ namespace {
                 (int16_t)(Config::SCREEN_WIDTH - 20), COLOR_ROW_H};
     }
 
+    // Eigener Screen: grosse Touchflaechen ohne weitere schmale Hauptmenue-Zeile.
+    String upLabel() {
+        const char* directions[] = {"N", "E", "S", "W"};
+        return String(I18n::t(StringId::RADAR_UP)) + ": " + directions[SettingsStore::radarUpDirection()];
+    }
+
+    void runOrientationScreen(TFT_eSPI& tft) {
+        MenuStars::reset();
+        while (true) {
+            tft.fillScreen(TFT_BLACK);
+            Rect title = colorRowRect(0);
+            drawButton(tft, title, upLabel(), true);
+            Rect cw = colorRowRect(2);
+            Rect ccw = colorRowRect(3);
+            Rect back = colorRowRect(5);
+            drawButton(tft, cw, I18n::t(StringId::RADAR_ROTATE_CW));
+            drawButton(tft, ccw, I18n::t(StringId::RADAR_ROTATE_CCW));
+            drawButton(tft, back, I18n::t(StringId::BACK));
+            TouchInput::Point tap;
+            while (!TouchInput::wasTapped(tap)) {
+                if (TouchInput::msSinceLastTap() >= SettingsStore::menuIdleTimeoutMs()) return;
+                MenuStars::update(tft);
+                delay(20);
+            }
+            // CW dreht das Radarbild: Westen wandert von links nach oben.
+            if (cw.contains(tap.x, tap.y))
+                SettingsStore::setRadarUpDirection((SettingsStore::radarUpDirection() + 3) % 4);
+            else if (ccw.contains(tap.x, tap.y))
+                SettingsStore::setRadarUpDirection((SettingsStore::radarUpDirection() + 1) % 4);
+            else if (back.contains(tap.x, tap.y)) return;
+        }
+    }
+
     // Unterscreen mit den fuenf exklusiven Farbschema-Optionen (Gruen/
     // Amber/Blau/Rot/Lila) - gleiches 5-Wege-Auswahl-Muster wie vorher die
     // drei Buttons direkt im Hauptscreen, nur jetzt auf einem eigenen
@@ -184,7 +217,11 @@ void run(TFT_eSPI& tft) {
         tft.println(I18n::t(StringId::RADAR_THEME_TITLE));
 
         Rect colorsRow = rowRect(0);
+        colorsRow.w = (colorsRow.w - ROW_GAP) / 2;
+        Rect orientationRow = {(int16_t)(colorsRow.x + colorsRow.w + ROW_GAP),
+                               colorsRow.y, colorsRow.w, colorsRow.h};
         drawButton(tft, colorsRow, I18n::t(StringId::RADAR_COLORS_BUTTON));
+        drawButton(tft, orientationRow, upLabel());
 
         Rect crtRow = rowRect(1);
         drawCheckboxRow(tft, crtRow, I18n::t(StringId::RADAR_THEME_CRT), SettingsStore::crtPhosphorEnabled());
@@ -237,6 +274,11 @@ void run(TFT_eSPI& tft) {
         bool handled = false;
         if (colorsRow.contains(tap.x, tap.y)) {
             runColorsScreen(tft);
+            MenuStars::reset();
+            handled = true;
+        }
+        if (!handled && orientationRow.contains(tap.x, tap.y)) {
+            runOrientationScreen(tft);
             MenuStars::reset();
             handled = true;
         }
