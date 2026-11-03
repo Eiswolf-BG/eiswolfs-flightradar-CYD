@@ -616,7 +616,7 @@ static const char* const I18N_FR[] = {
     "Intéressant : ",
     "Uniquement intéressant",
     "Affiche uniquement les avions correspondant à au moins l'un des critères suivants : vol militaire/gouvernemental, squawk d'urgence, correspondance sur l'une de vos quatre listes de surveillance (indicatif, squawk, type, route), ou un avion Heavy (catégorie d'émetteur ADS-B). Se combine avec les autres filtres ci-dessus.",
-    "0-Alt/Vit. : ",
+    "Masquer 0-Alt/Vit.: ",
     "Masquer altitude/vitesse 0",
     "Masque les avions dont l'altitude ou la vitesse au sol est exactement de 0 - couvre à la fois les appareils stationnés/garés au sol et les stations au sol. Se combine avec les autres filtres ci-dessus.",
     "Intéressant",

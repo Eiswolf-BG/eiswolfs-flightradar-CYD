@@ -618,7 +618,7 @@ static const char* const I18N_NL[] = {
     "Interessant: ",
     "Alleen interessant",
     "Toont alleen vliegtuigen die aan minstens een van deze criteria voldoen: militaire/overheidsvlucht, noodsquawk, een treffer op een van je vier volglijsten (roepnaam, squawk, type, route), of een Heavy-vliegtuig (ADS-B-zendercategorie). Combineert met de andere filters hierboven.",
-    "0-Hgt/Snelh.: ",
+    "Verb. 0-Hgt/Snelh.: ",
     "0-hoogte/0-snelheid verbergen",
     "Verbergt vliegtuigen waarvan de hoogte of grondsnelheid precies 0 is - geldt zowel voor geparkeerde/stilstaande vliegtuigen aan de grond als grondstations. Combineert met de andere filters hierboven.",
     "Interessant",

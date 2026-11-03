@@ -616,7 +616,7 @@ static const char* const I18N_IT[] = {
     "Interessante: ",
     "Solo interessanti",
     "Mostra solo aerei che soddisfano almeno uno di questi criteri: volo militare/governativo, squawk di emergenza, corrispondenza in una delle tue quattro liste di controllo (nominativo, squawk, tipo, rotta), oppure un aereo Heavy (categoria emittente ADS-B). Si combina con gli altri filtri sopra.",
-    "0-Alt/Vel.: ",
+    "Nasc. 0-Alt/Vel.: ",
     "Nascondi altitudine/velocità 0",
     "Nasconde gli aerei la cui altitudine o velocità al suolo è esattamente 0 - copre sia gli aerei parcheggiati/fermi a terra sia le stazioni a terra. Si combina con gli altri filtri sopra.",
     "Interessante",

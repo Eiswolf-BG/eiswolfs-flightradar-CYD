@@ -616,7 +616,7 @@ static const char* const I18N_ES[] = {
     "Interesante: ",
     "Solo interesante",
     "Muestra solo aeronaves que cumplan al menos uno de estos criterios: vuelo militar/gubernamental, squawk de emergencia, coincidencia en una de tus cuatro listas de vigilancia (indicativo, squawk, tipo, ruta), o una aeronave Heavy (categoría de emisor ADS-B). Se combina con los demás filtros de arriba.",
-    "0-Alt/Vel.: ",
+    "Ocult. 0-Alt/Vel.: ",
     "Ocultar altitud/velocidad 0",
     "Oculta aeronaves cuya altitud o velocidad respecto al suelo sea exactamente 0 - abarca tanto aeronaves estacionadas/paradas en tierra como estaciones terrestres. Se combina con los demás filtros de arriba.",
     "Interesante",
