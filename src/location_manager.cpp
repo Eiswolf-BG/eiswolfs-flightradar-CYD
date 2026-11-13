@@ -10,6 +10,8 @@
 #include <Preferences.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#include <freertos/task.h>
+#include <math.h>
 
 namespace LocationManager {
 
@@ -125,14 +127,41 @@ void requestIpLookupIfNeeded() {
 
     if (!http.begin(client, url)) return;
 
-    http.setTimeout(5000);
+    // BUGFIX (echter Task-Watchdog-Bootloop, live mit seriellem Mitschnitt
+    // reproduziert - lief bei JEDEM Boot ohne GPS-Fix, da ipLookupDone nach
+    // einem Neustart immer wieder false ist): Timeout war bisher 5000ms,
+    // gefaehrlich nah am Standard-Task-Watchdog (ca. 5000ms) - eine
+    // langsame Antwort von ip-api.com blockierte NetTask (Core 0) dadurch
+    // manchmal bis knapp an die Watchdog-Grenze, ohne dass IDLE0
+    // dazwischen drankam. Jetzt klar darunter, damit ein zu langsamer
+    // Server lieber per HTTP-Timeout fehlschlaegt (naechster Versuch nach
+    // IP_LOOKUP_RETRY_MS) statt den Watchdog zu riskieren.
+    http.setTimeout(3000);
 
+    uint32_t tGetStart = millis();
     int code = http.GET();
-    if (code != HTTP_CODE_OK) { http.end(); return; } 
+    vTaskDelay(1);
+    if (code != HTTP_CODE_OK) {
+        Serial.printf("[LocationManager] IP-Geolocation fehlgeschlagen: HTTP %d (GET=%ums)\n", code, (unsigned)(millis() - tGetStart));
+        http.end();
+        return;
+    }
+
+    // Body erst komplett als String einsammeln statt direkt aus
+    // http.getStream() zu parsen - dasselbe bereits in weather.cpp
+    // dokumentierte Problem (Letzteres scheiterte dort zuverlaessig mit
+    // einem ArduinoJson-"InvalidInput"-Fehler bzw. blockierte hier ohne
+    // Yield zu lange fuer den Watchdog).
+    uint32_t tGetMs = millis() - tGetStart;
+    uint32_t tReadStart = millis();
+    String body = http.getString();
+    uint32_t tReadMs = millis() - tReadStart;
+    http.end();
+    vTaskDelay(1);
+    Serial.printf("[LocationManager] IP-Geolocation: GET=%ums getString=%ums\n", (unsigned)tGetMs, (unsigned)tReadMs);
 
     JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, http.getStream());
-    http.end();
+    DeserializationError err = deserializeJson(doc, body);
     if (err) return;
 
     const char* status = doc["status"] | "";
@@ -148,6 +177,15 @@ void requestIpLookupIfNeeded() {
     const char* countryCode = doc["countryCode"] | "";
     metricUnits = (strcmp(countryCode, "US") != 0);
 
+    // ZURUECKGEROLLT (siehe Chat): ein Versuch, den NVS-Schreibzugriff bei
+    // unveraendertem Standort zu ueberspringen (in der Annahme, ein NVS-
+    // Flash-Write wuerde gelegentlich den Task-Watchdog ausloesen), hat den
+    // Bootloop empirisch NICHT behoben, sondern live reproduzierbar
+    // VERSCHLIMMERT (vorher ca. 1 von 3 Boots betroffen, mit dem
+    // "Skip"-Fix 10 von 10) - der NVS-Write war also nicht die Ursache,
+    // sondern hat den eigentlichen Engpass offenbar nur zufaellig zeitlich
+    // verschoben. Deshalb wieder das urspruengliche, unbedingte
+    // persistLocationAndSource() bei jeder erfolgreichen IP-Abfrage.
     persistLocationAndSource(lat, lon, Source::IpGeolocation);
     ipLookupDone = true;
 }

@@ -261,7 +261,16 @@ FetchResult fetch(double homeLat, double homeLon, float radiusKm,
     const char* collectedHeaders[] = {"Retry-After"};
     http.collectHeaders(collectedHeaders, 1);
 
+    uint32_t tGetStart = millis();
     int code = http.GET();
+    // DIAGNOSE (Bootloop-Eingrenzung, siehe Chat): misst, wie lange GET()
+    // (TLS-Handshake + Request + Antwort-Header) braucht - der naechste
+    // Block (Streaming-Parser) ist bereits umfangreich yield-geschuetzt
+    // (siehe WatchdogYieldingStream/yieldEveryFewCalls unten), GET() selbst
+    // bisher nicht gemessen. flush() stellt sicher, dass diese Zeile auch
+    // bei einem Absturz kurz danach im seriellen Mitschnitt ankommt.
+    Serial.printf("[AdsbClient-DIAG] GET=%ums code=%d\n", (unsigned)(millis() - tGetStart), code);
+    Serial.flush();
     result.httpCode = code;
 
     if (code == 429) {

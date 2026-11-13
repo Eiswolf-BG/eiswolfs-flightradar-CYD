@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <esp_task_wdt.h>
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <SD.h>
@@ -1879,6 +1880,24 @@ void setup() {
     // Heap - der Watchdog bleibt deshalb als Sicherheitsnetz fuer
     // unbekannte, zukuenftige Haenger aktiv (Alex' ausdruecklicher
     // Wunsch: kein dauerhaftes Abschalten ohne nachgewiesene Notwendigkeit).
+    //
+    // NEUER Bootloop (13.11., siehe Chat-Historie): auf ZWEI unabhaengigen,
+    // unveraenderten Geraeten live reproduziert, IDLE0 (Core 0) kam
+    // gelegentlich ~5+ Sekunden lang nicht dran. ROOT CAUSE (siehe
+    // Config::TASK_WDT_TIMEOUT_SEC in config.h fuer die Details): einzelne
+    // http.GET()-Aufrufe zur ADS-B-API brauchten auf dem betroffenen WLAN
+    // wiederholt 4,5 bis ueber 16 Sekunden (kein Fehler, nur langsam) - ein
+    // einzelner Bibliotheksaufruf, der sich nicht durch eigene Yields
+    // absichern laesst. Auf Alex' ausdruecklichen Wunsch (weiterhin KEIN
+    // disableCore0WDT(), siehe oben) das Zeitfenster selbst angehoben:
+    // esp_task_wdt_init() aktualisiert laut eigener Doku einen BEREITS
+    // laufenden Watchdog nachtraeglich (muss deshalb erst NACH dem
+    // automatischen Arduino-Core-Start der TWDT aufgerufen werden, daher
+    // hier ganz am Anfang von setup(), aber nicht frueher). panic=true
+    // bleibt bestehen - ein echter, dauerhafter Hang fuehrt weiterhin zu
+    // einem Neustart, nur mit genug Spielraum fuer langsame, aber
+    // erfolgreiche Netzwerkantworten.
+    esp_task_wdt_init(Config::TASK_WDT_TIMEOUT_SEC, true);
 
     tft.init();
     tft.setRotation(0);

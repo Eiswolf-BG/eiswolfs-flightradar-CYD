@@ -71,7 +71,13 @@ namespace {
         // keinen. Rein defensiv, kostet nichts, falls nicht noetig.
         http.addHeader("User-Agent", "EiswolfsFlightradarCYD/1.0");
 
+        // Zusaetzlicher Yield direkt nach GET() (vor dem Lesen der Antwort)
+        // - gleiches Vorsichtsprinzip wie die vTaskDelay(1)-Aufrufe
+        // zwischen den drei Anfragen in fetchNow(), siehe dortiger
+        // Kommentar: hilft, falls GET() selbst (TLS-Handshake) schon
+        // ungewoehnlich lange ohne Yield braucht.
         int code = http.GET();
+        vTaskDelay(1);
         if (code != HTTP_CODE_OK) {
             Serial.printf("[Weather] METAR-Abfrage fuer %s fehlgeschlagen: HTTP %d\n", icao, code);
             http.end();
@@ -131,6 +137,7 @@ namespace {
         http.setTimeout(HEXDB_AIRPORT_TIMEOUT_MS);
         if (!http.begin(client, url)) return;
         int code = http.GET();
+        vTaskDelay(1);
         if (code != HTTP_CODE_OK) {
             http.end();
             return;
@@ -271,7 +278,10 @@ namespace {
         http.setTimeout(Config::HTTP_TIMEOUT_MS);
         if (!http.begin(client, url)) return;
 
+        // Zusaetzlicher Yield direkt nach GET() - siehe Kommentar bei
+        // fetchMetarFor().
         int code = http.GET();
+        vTaskDelay(1);
         if (code != HTTP_CODE_OK) {
             http.end();
             return;

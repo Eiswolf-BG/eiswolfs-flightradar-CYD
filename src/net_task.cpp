@@ -136,8 +136,10 @@ namespace {
             vTaskDelay(1);
 
             if (!webServerStarted && WifiMgr::getState() == WifiMgr::State::Connected) {
+                vTaskDelay(1);
                 WebExportServer::begin();
                 webServerStarted = true;
+                vTaskDelay(1);
             }
             if (webServerStarted) {
                 WebExportServer::update();
@@ -211,15 +213,37 @@ namespace {
             // Naeherungsalarm auf einem eingefrorenen Zustand haengen
             // lassen (Alex' Meldung).
             AircraftTable::ageOutStale(millis());
+            // BUGFIX (echter Task-Watchdog-Bootloop, live mit seriellem
+            // Mitschnitt reproduziert - Absturz ohne erkennbares Muster
+            // ~5-5,5s nach "radar screen active", in ca. einem Drittel der
+            // Boots, bei ansonsten unveraendertem Code): dieser ganze
+            // Abschnitt (ageOutStale() bis zum "[DIAG] fetch"-Log weiter
+            // unten, inkl. IP-Geolocation/getHomeLocation()/rangeKm-
+            // Bestimmung/AircraftTable::lock()+memcpy()) hatte bislang KEINEN
+            // einzigen Yield-Punkt, obwohl direkt danach der naechste,
+            // potenziell langsame Block folgt (AdsbClient::fetch(), dessen
+            // Streaming-Parser bekanntermaessen selbst nicht yieldet, siehe
+            // CLAUDE.md "Bekannte Probleme"). Per Eingrenzung (zusaetzliche
+            // Serial-Diagnose an mehreren Stellen in diesem Abschnitt
+            // eingefuegt) verschwand der Absturz dadurch zuverlaessig - die
+            // Serial.printf()-Aufrufe yielden selbst kurz, genau wie
+            // vTaskDelay(1) anderswo im Projekt. Jetzt als schlanke,
+            // dauerhafte vTaskDelay(1)-Aufrufe (statt der Diagnose-Prints)
+            // an denselben Stellen - gleiches Vorsichtsprinzip wie ueberall
+            // sonst in dieser Schleife.
+            vTaskDelay(1);
 
             if (millis() - lastFetchMs >= currentIntervalMs) {
                 lastFetchMs = millis();
 
                 if (WifiMgr::getState() == WifiMgr::State::Connected) {
+                    vTaskDelay(1);
                     LocationManager::requestIpLookupIfNeeded();
+                    vTaskDelay(1);
 
                     double lat = 0, lon = 0;
                     LocationManager::getHomeLocation(lat, lon);
+                    vTaskDelay(1);
 
                     float rangeKm = Config::RANGE_STEPS_KM[SettingsStore::rangeIndex()];
 
@@ -321,6 +345,14 @@ namespace {
                     // (siehe dortiger Kommentar) - kein erneutes Setzen hier
                     // noetig.
                     Serial.printf("[DIAG] fetch rangeKm=%.0f webUiActive=%d\n", rangeKm, WebExportServer::isRadarUiActive() ? 1 : 0);
+                    // DIAGNOSE (Bootloop-Eingrenzung, siehe Chat): erzwingt,
+                    // dass diese Zeile VOR einem moeglichen Absturz in
+                    // AdsbClient::fetch() direkt danach ueber die serielle
+                    // Schnittstelle rausgeschrieben ist - schliesst aus, dass
+                    // der Print zwar ausgefuehrt wurde, aber durch einen
+                    // Absturz Millisekunden spaeter nie im UART-Puffer
+                    // ankam (reine Verifikation, kein Fix).
+                    Serial.flush();
                     // DAUERHAFTE DIAGNOSE (urspruenglich temporaer fuer
                     // Alex' Meldung 05.10.: SSL-Speicherfehler bei JEDEM
                     // Abruf nach ~2,4h Laufzeit - bewusst dauerhaft

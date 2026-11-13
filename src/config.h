@@ -6,7 +6,30 @@ namespace Config {
     // CLAUDE.md-Workflow "Standard-Workflow: Push & Release") - erscheint
     // im Info-Screen (Menue > System > Info) und muss zum jeweiligen
     // Git-Tag passen.
-    constexpr const char* APP_VERSION = "6.9.7";
+    constexpr const char* APP_VERSION = "6.9.8";
+
+    // ESP32-Task-Watchdog-Timeout fuer IDLE0/IDLE1 (siehe main.cpp::setup(),
+    // esp_task_wdt_init()) - Standardwert des Arduino-Core ist ca. 5s. Auf
+    // Alex' ausdruecklichen Wunsch angehoben, nachdem ein Bootloop live auf
+    // ZWEI unabhaengigen, unveraenderten Geraeten reproduziert wurde.
+    // ROOT CAUSE GEFUNDEN (13.11., per Serial-Diagnose in adsb_client.cpp,
+    // siehe "[AdsbClient-DIAG]"-Log dort): http.GET() zur ADS-B-API
+    // (adsb.lol) brauchte auf dem betroffenen WLAN wiederholt 4,5 bis ueber
+    // 16 Sekunden bis zur Antwort (jedes Mal HTTP 200, also kein Fehler,
+    // einfach eine langsame Verbindung/Gegenstelle) - ein einzelner
+    // Bibliotheksaufruf (HTTPClient::GET(), kein eigener Code), der sich
+    // NICHT durch vTaskDelay()/Yields absichern laesst, weil er nicht
+    // unterbrochen werden kann. Der alte ~5s-Watchdog loeste dadurch bei
+    // jeder ungewoehnlich langsamen Antwort faelschlich aus. Mit 25s bleibt
+    // auf demselben Geraet/WLAN ueber mehrere Minuten kein einziger
+    // Watchdog-Reset mehr uebrig, obwohl einzelne GET()-Aufrufe weiterhin
+    // 16+ Sekunden brauchten. Bewusst NICHT komplett abgeschaltet
+    // (disableCore0WDT(), siehe Kommentar in main.cpp::setup() - Alex'
+    // Wunsch: kein dauerhaftes Abschalten ohne nachgewiesene Notwendigkeit)
+    // - erkennt einen echten Dauer-Hang (z.B. das bestehende
+    // FETCH_WATCHDOG_REBOOT_AFTER_MS von 15 Minuten in net_task.cpp) immer
+    // noch zuverlaessig als zusaetzliches, tieferliegendes Sicherheitsnetz.
+    constexpr uint32_t TASK_WDT_TIMEOUT_SEC = 25;
 
     // Projekt-Repo-URL fuer den GitHub-QR-Code - zentral hier hinterlegt,
     // damit main.cpp (Ueber-Screen, grosser QR-Code) und menu_screen.cpp

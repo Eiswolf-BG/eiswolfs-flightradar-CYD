@@ -4,6 +4,7 @@
 #include <ArduinoJson.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#include <freertos/task.h>
 #include <cstring>
 
 namespace AircraftDetails {
@@ -106,6 +107,19 @@ bool fetchRoute(WiFiClientSecure& client, const String& callsign,
             }
         }
     }
+    // BUGFIX (echter Task-Watchdog-Bootloop, live mit seriellem Mitschnitt
+    // reproduziert - Absturz exakt ~5,0-5,2s nach Aufruf, passend zur Summe
+    // mehrerer dieser Timeouts): fetchRoute()/update() machen bis zu FUeNF
+    // sequentielle blockierende HTTPS-Anfragen (hier plus die beiden
+    // folgenden, plus die zwei in update() fuer das Modell) komplett OHNE
+    // Yield dazwischen - schlagen mehrere Quellen in Folge fehl/timen aus
+    // (bekanntes hexdb.io-Ausfallthema, siehe CLAUDE.md "Bekannte
+    // Probleme"), summieren sich die Timeouts leicht auf mehr als die ca.
+    // 5s des ESP32-Task-Watchdogs, ohne dass IDLE0 (Core 0) je drankommt.
+    // Gleiches Vorsichtsprinzip wie die vTaskDelay(1)-Aufrufe in
+    // weather.cpp::fetchNow()/net_task.cpp: kurzer Yield nach JEDER
+    // einzelnen Anfrage dieser Kette.
+    vTaskDelay(1);
 
     //   2. adsbdb.com Callsign-Endpunkt - ebenfalls ICAO UND IATA im selben
     //      JSON, falls Quelle 1 nichts geliefert hat.
@@ -135,6 +149,7 @@ bool fetchRoute(WiFiClientSecure& client, const String& callsign,
             }
         }
     }
+    vTaskDelay(1);
 
     //   3. hexdb.io Route-Endpunkt - letzter Fallback, kurzer Timeout
     //      (liefert NIE IATA-Codes, nur ICAO).
@@ -220,6 +235,9 @@ void update() {
             }
         }
     }
+    // Yield nach jeder einzelnen Anfrage dieser Kette - siehe
+    // ausfuehrlicher Kommentar bei fetchRoute() oben (gleiche Ursache).
+    vTaskDelay(1);
 
     // Fallback: hexdb.io war nicht erreichbar/lieferte kein Modell -
     // adsbdb.com als zweite, unabhaengige Quelle versuchen (andere API-Form,
@@ -240,6 +258,7 @@ void update() {
             }
         }
     }
+    vTaskDelay(1);
 
     // Flugroute (Start-/Zielflughafen) - ueber die gemeinsame fetchRoute()-
     // Fallback-Kette oben (VRS-Standing-Data-Mirror -> adsbdb.com ->
