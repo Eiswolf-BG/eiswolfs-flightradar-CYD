@@ -309,8 +309,34 @@ bool run(TFT_eSPI& tft) {
         }
 
         if (stage == Stage::Scanning && WifiMgr::isScanComplete()) {
-            ssidCount = (uint8_t)min((int)WifiMgr::getScanResultCount(), (int)MAX_LIST);
-            for (uint8_t i = 0; i < ssidCount; i++) ssidList[i] = WifiMgr::getScanResultSSID(i);
+            // Nach Signalstaerke sortiert (Alex' Meldung: bei vielen
+            // Netzwerken in Reichweite - z.B. Mehrfamilienhaus - fiel das
+            // gewuenschte Netzwerk manchmal aus der auf MAX_LIST
+            // begrenzten Liste heraus, weil die Reihenfolge vorher einfach
+            // die zufaellige Scan-Reihenfolge des ESP32-Treibers war, NICHT
+            // nach Signalstaerke). Jetzt werden ALLE gefundenen Indizes
+            // erst nach RSSI absteigend sortiert (einfacher Insertion-Sort,
+            // bei ueblicherweise wenigen Dutzend gefundenen Netzwerken
+            // voellig unkritisch performant) - die MAX_LIST-Begrenzung
+            // danach behaelt dadurch bevorzugt die staerksten (= meist die
+            // eigenen/nahegelegenen) Netzwerke statt zufaellig abgeschnittener.
+            constexpr uint8_t MAX_SCAN_RAW = 64;
+            int rawCount = WifiMgr::getScanResultCount();
+            uint8_t order[MAX_SCAN_RAW];
+            uint8_t rawCapped = (uint8_t)min(rawCount, (int)MAX_SCAN_RAW);
+            for (uint8_t i = 0; i < rawCapped; i++) order[i] = i;
+            for (uint8_t i = 1; i < rawCapped; i++) {
+                uint8_t key = order[i];
+                int32_t keyRssi = WifiMgr::getScanResultRSSI(key);
+                int8_t j = (int8_t)i - 1;
+                while (j >= 0 && WifiMgr::getScanResultRSSI(order[j]) < keyRssi) {
+                    order[j + 1] = order[j];
+                    j--;
+                }
+                order[j + 1] = key;
+            }
+            ssidCount = (uint8_t)min((int)rawCapped, (int)MAX_LIST);
+            for (uint8_t i = 0; i < ssidCount; i++) ssidList[i] = WifiMgr::getScanResultSSID(order[i]);
             stage = Stage::PickSsid;
             needsRedraw = true;
 

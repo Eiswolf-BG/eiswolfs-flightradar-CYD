@@ -8,6 +8,8 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <math.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace Weather {
 
@@ -385,6 +387,19 @@ namespace {
         currentHourlyTimelineData = timeline;
         if (havePrecip) currentPrecipProbVal = precipProb;
 
+        // BUGFIX (echter Task-Watchdog-Bootloop, live mit seriellem
+        // Mitschnitt reproduziert - siehe net_task.cpp-Kommentar bei den
+        // vTaskDelay(1)-Aufrufen dort): fetchNow() macht bis zu DREI
+        // sequentielle blockierende HTTPS-Anfragen an drei verschiedene
+        // Hosts (hier, fetchMetarFor(), fetchAirportIata()) komplett OHNE
+        // Yield dazwischen - durch Eingrenzung (Weather::update() testweise
+        // komplett auskommentiert) als Ursache bestaetigt. Kurzer Yield
+        // zwischen jeder der drei Anfragen, damit der Scheduler (IDLE0 auf
+        // Core 0) sicher dazwischen drankommt, auch wenn eine der drei
+        // Anfragen ungewoehnlich lange braucht (z.B. bei einem gerade
+        // langsamen/nicht erreichbaren einzelnen Server).
+        vTaskDelay(1);
+
         // METAR-Flugwetterbericht fuer den naechstgelegenen Flughafen - im
         // selben Aufruf/Intervall wie das Icon-Wetter oben, damit dafuer
         // keine zusaetzliche Netzwerklast/kein eigener Timer noetig ist. Der
@@ -398,6 +413,7 @@ namespace {
             Serial.printf("[Weather] Naechster Flughafen: %s, %.0f km entfernt - frage METAR ab...\n",
                           nearest.icao, nearest.distanceKm);
             fetchMetarFor(client, nearest.icao);
+            vTaskDelay(1);
 
             // NearestAirport-Cache (siehe weather.h) - Peilung per
             // RadarMath::toPolar() (dieselbe Funktion, die AirportLookup

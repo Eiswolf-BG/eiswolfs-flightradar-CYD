@@ -242,7 +242,7 @@ Under **Menu → WiFi/Network** you can save up to 3 WiFi networks at once. On b
 
 This is useful for portable use (take the device to the office, a friend's place, or a holiday home, and it connects automatically everywhere), for a guest network plus a main network (many routers offer both - save both, and the device uses whichever is reachable), or for multiple access points/repeaters around the house (the device connects to whichever saved network it can currently reach).
 
-Any saved network can be removed again at any time via the red "X", freeing up a slot for a new one.
+Any saved network can be removed again at any time via the red "X", freeing up a slot for a new one. The scan list is sorted by signal strength (strongest first), so your network stays visible even if many others are in range (e.g. in an apartment building).
 
 **Hidden networks:** if your WiFi network doesn't broadcast its name, it won't show up in the scan list. An "Other/Hidden SSID" button on that same list lets you type the network name manually using the same on-screen keyboard used for passwords, then continue straight to the password step as usual - available both during first-time setup and when adding a network later.
 

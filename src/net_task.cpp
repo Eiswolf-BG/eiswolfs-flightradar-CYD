@@ -131,7 +131,9 @@ namespace {
             netTaskIdle.store(false, std::memory_order_release);
 
             WifiMgr::update();
+            vTaskDelay(1);
             LocationManager::update();
+            vTaskDelay(1);
 
             if (!webServerStarted && WifiMgr::getState() == WifiMgr::State::Connected) {
                 WebExportServer::begin();
@@ -139,9 +141,11 @@ namespace {
             }
             if (webServerStarted) {
                 WebExportServer::update();
+                vTaskDelay(1);
             }
 
             AircraftDetails::update();
+            vTaskDelay(1);
             // Route-Watchlist (SettingsStore::routeWatchlistAlertEnabled(),
             // AUS per Default, siehe route_watchlist.h) - kuemmert sich
             // intern selbst darum, hoechstens EINE Route pro Aufruf zu
@@ -149,19 +153,43 @@ namespace {
             // abgeschlossenen Lookup, gleiches "jede Schleife mit
             // aufrufen"-Muster wie AircraftDetails::update() oben.
             RouteWatchlist::pollBackground();
+            vTaskDelay(1);
             PreviouslySeen::update();
+            vTaskDelay(1);
+            // BUGFIX (echter Task-Watchdog-Bootloop, live mit seriellem
+            // Mitschnitt reproduziert - wiederholt ~15-20s nach "radar
+            // screen active" abgestuerzt, "IDLE0 (CPU 0)" kam nicht
+            // rechtzeitig dran): Per Eingrenzung (Weather::update() testweise
+            // auskommentiert -> Absturz blieb ueber mehrere Minuten komplett
+            // aus) auf Weather::fetchNow() zurueckgefuehrt - macht beim
+            // ALLERERSTEN Aufruf (locationChanged beim Programmstart immer
+            // true, umgeht damit das normale 5-Minuten-Intervall) bis zu DREI
+            // sequentielle blockierende HTTPS-Anfragen an drei verschiedene
+            // Hosts (Open-Meteo, aviationweather.gov, hexdb.io) OHNE
+            // irgendeinen Yield dazwischen. Der eigentliche Fix (vTaskDelay(1)
+            // zwischen diesen drei Aufrufen) sitzt in weather.cpp::fetchNow()
+            // selbst, siehe dortiger Kommentar. Diese Stellen hier
+            // (vTaskDelay(1) zwischen JEDEM Netzwerkaufruf der Hauptschleife)
+            // bleiben zusaetzlich als generelle Absicherung bestehen - selbes
+            // Prinzip/Begruendung wie der bestehende Fix in adsb_client.cpp
+            // (vTaskDelay(1), NICHT esp_task_wdt_reset(), siehe Kommentar
+            // dort), kostet im Normalfall (alles bereits idle) nur wenige
+            // Millisekunden pro Schleifendurchlauf.
             Weather::update();
+            vTaskDelay(1);
             // Kuemmert sich intern um ihr eigenes, deutlich selteneres
             // Intervall (Config::OTA_BACKGROUND_CHECK_INTERVAL_MS, siehe
             // ota_update.cpp) - hier einfach jede Schleife mit aufrufen,
             // genau wie Weather::update() oben.
             OtaUpdate::pollBackground();
+            vTaskDelay(1);
             // Optionale MQTT-Anbindung (SettingsStore::mqttEnabled(), AUS
             // per Default, siehe mqtt_client.h) - kuemmert sich selbst um
             // (Wieder-)Verbinden mit eigenem Mindestabstand zwischen
             // Versuchen, hier einfach jede Schleife mit aufrufen, gleiches
             // Muster wie Weather::update()/OtaUpdate::pollBackground() oben.
             MqttClient::loop();
+            vTaskDelay(1);
             // Optionale ntfy.sh-Push-Benachrichtigung (SettingsStore::
             // ntfyPushEnabled(), AUS per Default, siehe ntfy_push.h) - sendet
             // nur, wenn radar_screen.cpp::updateProximityAlert() (Core 1)
@@ -169,6 +197,7 @@ namespace {
             // sofort zurueck. Gleiches "jede Schleife mit aufrufen"-Muster
             // wie MqttClient::loop() oben.
             NtfyPush::update();
+            vTaskDelay(1);
             // Unabhaengig vom Erfolg der ADS-B-Abfrage weiter unten pruefen,
             // damit die 24h-Sicherheitsabschaltung des Flugbuchs auch waehrend
             // laengerer WLAN-/ADS-B-Ausfaelle zuverlaessig greift (siehe

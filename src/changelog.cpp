@@ -9,59 +9,65 @@ namespace {
     constexpr uint8_t CHANGELOG_LANG_COUNT = 8;
 
     const char* const CHANGELOG_EN =
-        "- New: Optional toggle to hide aircraft on the ground "
-        "(altitude 0) or at 0 knots ground speed - disabled by default, "
-        "especially useful near airports against cluttered displays. "
-        "Find it under Menu -> Flight Options -> Display Filters.";
+        "- New: The WiFi network list during setup is now sorted by "
+        "signal strength, so your network is less likely to fall off "
+        "the list when many networks are nearby.\n"
+        "- Fix: Fixed a rare restart loop shortly after startup, caused "
+        "by the weather lookup.";
 
     const char* const CHANGELOG_DE =
-        "- Neu: Optionaler Schalter zum Ausblenden von Flugzeugen am "
-        "Boden (Höhe 0) oder mit 0 Knoten Geschwindigkeit - "
-        "standardmäßig deaktiviert, hilfreich vor allem in "
-        "Flughafennähe gegen überfüllte Anzeigen. Zu finden unter "
-        "Menü -> Flugoptionen -> Anzeigefilter.";
+        "- Neu: Die WLAN-Netzliste bei der Einrichtung ist jetzt nach "
+        "Signalstärke sortiert, damit dein Netzwerk bei vielen "
+        "Netzwerken in der Nähe seltener aus der Liste fällt.\n"
+        "- Fix: Einen seltenen Neustart-Loop kurz nach dem Start "
+        "behoben, der durch die Wetterabfrage ausgelöst wurde.";
 
     const char* const CHANGELOG_FR =
-        "- Nouveau : Interrupteur optionnel pour masquer les avions au "
-        "sol (altitude 0) ou à une vitesse de 0 nœud - désactivé par "
-        "défaut, particulièrement utile à proximité des aéroports "
-        "contre un affichage surchargé. À trouver dans Menu -> Options "
-        "de vol -> Filtres d'affichage.";
+        "- Nouveau : La liste des réseaux WiFi lors de la configuration "
+        "est désormais triée par force du signal, afin que votre réseau "
+        "ait moins de risques de disparaître de la liste lorsqu'il y a "
+        "beaucoup de réseaux à proximité.\n"
+        "- Correction : Correction d'une boucle de redémarrage rare peu "
+        "après le démarrage, causée par la recherche météo.";
 
     const char* const CHANGELOG_TR =
-        "- Yeni: Yerdeki (irtifa 0) veya 0 knot hızdaki uçakları "
-        "gizlemek için isteğe bağlı bir anahtar - varsayılan olarak "
-        "kapalı, özellikle havalimanı yakınında dolup taşan ekranlara "
-        "karşı faydalı. Menü -> Uçuş Seçenekleri -> Görüntü "
-        "Filtreleri altında bulunur.";
+        "- Yeni: Kurulum sırasında WiFi ağ listesi artık sinyal gücüne "
+        "göre sıralanıyor, böylece yakınında çok sayıda ağ olduğunda "
+        "senin ağın listeden düşme ihtimali azalıyor.\n"
+        "- Düzeltme: Başlangıçtan kısa süre sonra hava durumu "
+        "sorgusunun neden olduğu nadir bir yeniden başlatma döngüsü "
+        "düzeltildi.";
 
     const char* const CHANGELOG_ES =
-        "- Novedad: Interruptor opcional para ocultar aeronaves en "
-        "tierra (altitud 0) o a 0 nudos de velocidad - desactivado de "
-        "forma predeterminada, especialmente útil cerca de aeropuertos "
-        "contra pantallas sobrecargadas. Se encuentra en Menú -> "
-        "Opciones de vuelo -> Filtros de visualización.";
+        "- Novedad: La lista de redes WiFi durante la configuración "
+        "ahora está ordenada por intensidad de señal, para que tu red "
+        "tenga menos probabilidades de desaparecer de la lista cuando "
+        "hay muchas redes cerca.\n"
+        "- Corrección: Se corrigió un raro bucle de reinicio poco "
+        "después del arranque, causado por la consulta del tiempo.";
 
     const char* const CHANGELOG_IT =
-        "- Novità: Interruttore opzionale per nascondere gli aerei a "
-        "terra (altitudine 0) o a velocità 0 nodi - disattivato per "
-        "impostazione predefinita, utile soprattutto vicino agli "
-        "aeroporti contro schermate affollate. Si trova in Menu -> "
-        "Opzioni di volo -> Filtri di visualizzazione.";
+        "- Novità: L'elenco delle reti WiFi durante la configurazione è "
+        "ora ordinato per intensità del segnale, così la tua rete ha "
+        "meno probabilità di scomparire dall'elenco quando ci sono "
+        "molte reti nelle vicinanze.\n"
+        "- Correzione: Risolto un raro ciclo di riavvio poco dopo "
+        "l'avvio, causato dalla richiesta meteo.";
 
     const char* const CHANGELOG_PT =
-        "- Novo: Interruptor opcional para ocultar aeronaves no solo "
-        "(altitude 0) ou a 0 nós de velocidade - desativado por padrão, "
-        "útil principalmente perto de aeroportos contra telas "
-        "sobrecarregadas. Encontra-se em Menu -> Opções de voo -> "
-        "Filtros de exibição.";
+        "- Novo: A lista de redes WiFi durante a configuração agora é "
+        "ordenada por intensidade de sinal, para que sua rede tenha "
+        "menos chance de sair da lista quando há muitas redes por "
+        "perto.\n"
+        "- Correção: Corrigido um raro loop de reinicialização pouco "
+        "depois de iniciar, causado pela consulta de meteorologia.";
 
     const char* const CHANGELOG_NL =
-        "- Nieuw: Optionele schakelaar om vliegtuigen aan de grond "
-        "(hoogte 0) of met 0 knopen snelheid te verbergen - standaard "
-        "uitgeschakeld, vooral handig in de buurt van luchthavens tegen "
-        "overvolle weergaves. Te vinden onder Menu -> Vluchtopties -> "
-        "Weergavefilters.";
+        "- Nieuw: De wifi-netwerklijst tijdens het instellen is nu "
+        "gesorteerd op signaalsterkte, zodat je netwerk minder snel van "
+        "de lijst valt wanneer er veel netwerken in de buurt zijn.\n"
+        "- Fix: Een zeldzame herstartlus kort na het opstarten, "
+        "veroorzaakt door de weersopvraging, is verholpen.";
 
     const char* const TABLE[CHANGELOG_LANG_COUNT] = {
         CHANGELOG_EN, CHANGELOG_DE, CHANGELOG_FR, CHANGELOG_TR, CHANGELOG_ES, CHANGELOG_IT, CHANGELOG_PT, CHANGELOG_NL
